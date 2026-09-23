@@ -54,6 +54,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--debug-dir", type=Path, help="write overlay PNGs here")
     args = parser.parse_args(argv)
 
+    missing = [str(p) for p in (args.front, args.side) if p is not None and not p.is_file()]
+    if missing:
+        parser.error(f"photo not found: {', '.join(missing)} (current folder: {Path.cwd()})")
+
     input_ = AnalysisInput(args.height, args.weight, Gender(args.gender), Clothing(args.clothing))
     estimator = MediaPipePoseEstimator()
     pipeline = BodyAnalysisPipeline(estimator)
