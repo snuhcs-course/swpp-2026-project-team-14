@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+.pytest_cache/
+# downloaded model weights (see README)
+models/*.task
+# local body photos and debug overlays — never commit
+private/

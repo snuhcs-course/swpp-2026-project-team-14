@@ -245,8 +245,27 @@ class StylingProfile:
 - underbust only for female
 - no warnings for ideal input
 
+**Implemented (P10 baseline, `backend/tests`, 22 tests passing):**
+- **Geometry:** mask segments, clamped widths, ellipse perimeter.
+- **Measurer vs. a synthetic mannequin** (`tests/synthetic.py`: front and side masks drawn from known width and depth profiles):
+  - every length within 0.5–1.5 cm
+  - torso circumferences within 3 %
+  - front-only depth fallback
+  - legs and arms
+  - derived ratios
+- **Pipeline:**
+  - confidence rules (ideal, loose clothing, front only)
+  - underbust only for female
+  - API-shaped output
+  - quality-gate codes (`no_person`, `multiple_people`, `body_cropped`, `not_frontal`, `not_side_view`, `invalid_image`)
+  - large-image downscaling
+- **MediaPipe smoke test:** the real model loads.
+  - This test found that MediaPipe's C++ loader cannot open paths with Korean characters. The model is now loaded from bytes.
+
+Known limitation found by the tests: a waist that is flat over several cm leaves the waist row ambiguous by about ±1.5 cm, which moves rise, outseam and torso length. The measurer takes the middle of the near-minimum rows.
+
 **Planned:**
-- **Server unit (pytest):** measurer on synthetic masks with known widths/depths; ellipse circumference; quality-gate codes; serializer validation; temp dir empty after each request (photo not persisted).
+- **Server unit (pytest):** serializer validation; no photo is persisted after a request.
 - **Integration:** analyze → confirm → get → delete round trip.
 - **UI (Compose test):** state transitions; "분석하기" disabled without front photo/height; 4th style chip disabled; warning banners shown for loose clothing / no side photo.
 - **Smoke:** Galaxy S23 against a dev server.
