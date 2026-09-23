@@ -10,16 +10,22 @@ The professor's feedback asks us to define exactly what "body characteristics" a
 Design principle: **a single phone photo cannot give medically accurate or exact clothing-size measurements.**
 The system therefore produces *approximate, fashion-oriented features* (relative proportions, silhouette category, confidence) and the user always reviews, edits and confirms them.
 
-What the downstream components actually need (and therefore what we must estimate):
+**Rev. 2 (2026-09-24): the target changed to garment measurements.**
+The team decided the app should estimate as many garment-relevant body measurements as possible:
+- **lengths:** shoulder width, sleeve, torso, rise, inseam, outseam
+- **circumferences:** neck, chest, underbust, natural waist, hip, armhole, bicep, wrist, thigh, calf
+
+The full table is in `02-design.md` §2. Users are guided to take a **front and a side photo in underwear or tight clothing**. Loose clothing is accepted, but confidence drops and a warning is shown.
+
+This moves the problem from "classify a body shape" to **photo-based anthropometry**. Families C (3D mesh) and D (measurement regressors) below become more central, and the **side photo + height/weight** inputs are strongly supported by the BodyM ablation.
+
+What the downstream components need:
 
 | Feature | Used by | Why |
 |---|---|---|
-| Shoulder-to-hip width ratio | recommender | top/bottom volume balance (e.g. wider shoulders → avoid shoulder-padded tops) |
-| Waist definition (waist vs. shoulder/hip width) | recommender | belted / fitted vs. straight cuts |
-| Torso-to-leg ratio | recommender | cropped tops, high-rise bottoms, jacket length |
-| Silhouette category (5-class) | recommender, insight text | human-readable summary, rule lookup |
-| Approximate top/bottom size | wardrobe, product recs | pre-fill; user always corrects |
-| Confidence per feature | recommender, UI | low-confidence features are down-weighted and flagged for the user |
+| Garment measurements (lengths, circumferences) with confidence | size matching, product recs, fit checks | the core output; user-editable |
+| Derived ratios (shoulder/hip, waist/hip, torso/leg) | outfit recommender, insights | proportion-aware styling |
+| Confidence per measurement | recommender, UI | low-confidence values are down-weighted and flagged |
 | Preferred fit and styles (user input) | recommender, chat editor | not estimated — entered by the user |
 
 ## 2. Candidate families
@@ -114,6 +120,13 @@ Verdict: HMR is valuable as a **reference/teacher in the benchmark**, not as the
 All licenses above allow our **non-commercial course project**. SMPL, SHAPY, Sapiens-1 and BodyM would block a commercial launch. That is recorded as a constraint, not a blocker.
 
 ## 4. Implementation options
+
+> **Rev. 2 note.** With measurements as the target and underwear/tight clothing as the default capture condition, the options become:
+> - **Option 1 (baseline):** MediaPipe landmarks + person masks on **both** photos. Lengths come from landmark distances scaled by height. Circumferences come from front width × side depth at landmark-defined heights, with an ellipse model.
+> - **Option 2 (hybrid):** Option 1 plus a **regressor trained on BodyM** (front + side silhouettes + height/weight → 14 measurements, the closest public match to our task). SCHP parsing detects and down-weights loose garments.
+> - **Option 3 (fine-tuning):** fine-tune a compact silhouette → measurement network on BodyM with clothing augmentation. HMR models (CameraHMR, SAM 3D Body) are used offline as reference measurements from a mesh.
+>
+> The original option text below still applies for the styling features derived from the measurements.
 
 ### Option 1 — MVP baseline (Iteration 1)
 Front photo + height (required) + weight, gender/fit category (optional)

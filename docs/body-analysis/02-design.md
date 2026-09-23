@@ -1,151 +1,203 @@
 # Body Analysis — Feature Design
 
-> Owner: Dongkun Moon (P9 screen, P10 AI integration) · Status: Iteration 1 draft (2026-09-23)
+> Owner: Dongkun Moon (P9 screen, P10 AI integration) · Status: Iteration 1 draft, rev. 2 (2026-09-24)
 > Stack (team decision): **Android — Kotlin + Jetpack Compose** · **Backend — Django (REST API)** · MySQL · object storage for images · Python AI module
-> Wiki targets: *Requirements Specification* (§1–3) and *Design Documentation* (§4–8)
+> Wiki targets: *Requirements Specification* (§1–4) and *Design Documentation* (§5–9)
+
+**Rev. 2 changes:**
+- Scope changed from "body-shape category" to **garment measurements** (§2).
+- Photos are now **front (required) + side (recommended)**.
+- Users are guided to wear **underwear or tight clothing**; loose clothing still works but lowers confidence.
+- Privacy requirements are stricter because photos may show underwear.
 
 ## 1. User stories and acceptance criteria
 
-**US-B1 — Create my body profile during onboarding**
-*As a new user, I want to upload a full-body photo and my height so that StyleMate understands my proportions without me measuring myself.*
-- AC1: I can take a photo with the camera or pick one from the gallery, and I see a preview before analysis.
-- AC2: Height is required (100–220 cm). Weight and gender/fit category are optional.
-- AC3: While the analysis runs I see a progress state. On success I see the result within 5 s (p95, server path).
-- AC4: If the photo is unusable (no person, several people, body cut off, strong side angle), I get a specific retake hint instead of a result.
-- AC5: I can skip onboarding and fill the profile manually later.
+**US-B1 — Measure my body during onboarding**
+*As a new user, I want to take two photos and enter my height so that StyleMate knows my body measurements without a tape measure.*
+- AC1: Before the camera, a capture guide explains:
+  - wear underwear or tight clothing
+  - stand in an A-pose
+  - keep the full body in frame
+  - hold the phone at waist height
+  - use a plain background
+- AC2: I can add a **front photo (required)** and a **side photo (recommended)** from the camera or the gallery, and I see previews.
+- AC3: Height is required (100–220 cm). Weight (30–200 kg) and gender (for size charts) are optional.
+- AC4: I say what I wore: underwear / tight clothing / everyday-loose clothing.
+- AC5: While analysis runs I see a progress state. On success I see results within 5 s (p95, server path).
+- AC6: If a photo is unusable (no person, several people, body cut off, wrong view), I get a specific retake hint.
+- AC7: I can skip and create the profile later from My Profile.
 
-**US-B2 — Review and correct the AI result**
-*As a user, I want to see what the AI estimated and fix anything wrong, so that recommendations use correct information.*
-- AC1: Estimated fields (top size, bottom size, silhouette, shoulder/hip balance, torso/leg balance) are shown with a confidence hint. Low-confidence fields are highlighted.
-- AC2: Every field can be edited with a picker. Editing marks the field as `user_confirmed`.
-- AC3: I choose a preferred fit (slim / regular / loose) and up to 3 preferred styles (미니멀, 캐주얼, 스트릿, 러블리, 클래식, 스포티). Choosing a 4th style is blocked.
-- AC4: Pressing "옷장 등록하고 시작하기" saves the profile and moves to the wardrobe.
+**US-B2 — Review and correct the measurements**
+*As a user, I want to see each estimated measurement and fix wrong ones.*
+- AC1: Measurements are grouped into lengths and circumferences, each with a confidence badge (high / medium / low).
+- AC2: If I wore loose clothing, a warning says circumference accuracy is reduced and suggests retaking in tight clothing. The analysis still returns results.
+- AC3: If I gave no side photo or no weight, a warning says which values are rough.
+- AC4: Tapping a value opens an editor. An edited value is marked "직접 수정함" and treated as ground truth.
+- AC5: I choose a preferred fit (slim / regular / loose) and up to 3 styles (미니멀, 캐주얼, 스트릿, 러블리, 클래식, 스포티). A 4th style cannot be selected.
+- AC6: "옷장 등록하고 시작하기" saves the profile and opens the main app.
 
-**US-B3 — Understand my body profile (My Profile tab)**
-*As a user, I want easy-to-read insights about my proportions and what styles balance them.*
-- AC1: The profile tab shows the confirmed values and 2–4 insight sentences (e.g. torso/leg balance → recommended rise and top length).
-- AC2: Insights use neutral, non-judgemental wording. No weight/health/"obesity" terms.
-- AC3: A disclaimer states that values are approximate styling estimates, not measurements.
+**US-B3 — See my profile and insights (My Profile tab)**
+- AC1: Shows basic info, the confirmed measurements, and 2–4 styling insights derived from them.
+- AC2: Insights use neutral, styling-only wording. No weight/health/"obesity" terms.
+- AC3: A disclaimer states the values are approximate styling estimates, not medical measurements.
 
-**US-B4 — Re-analyse**
-*As a user whose body or preferences changed, I want to re-run the analysis from My Profile.*
-- AC1: "체형 다시 분석하기" runs US-B1/US-B2 again, pre-filled with my current values.
-- AC2: The previous profile is kept until I confirm the new one.
+**US-B4 — Re-measure**
+- AC1: "체형 다시 분석하기" reopens the flow pre-filled with my height, weight, gender, clothing and preferences.
+- AC2: The previous profile stays until the new one is confirmed. Leaving the flow keeps the old profile.
 
-**US-B5 — Privacy of my body photo**
-*As a user, I want my body photo to be used only for analysis.*
-- AC1: Before the first upload, a consent notice explains what is sent, what is extracted, and that the photo is deleted.
-- AC2: The photo is deleted from the server immediately after analysis (success or failure). Only numeric features are stored.
-- AC3: I can delete my body profile at any time.
+**US-B5 — Privacy of body photos**
+- AC1: The capture guide and input screen state that photos are used only for measurement, deleted right after analysis, and only numbers are stored.
+- AC2: Photos are never written to disk or object storage on the server. They are processed in memory and discarded on success or failure.
+- AC3: Photos are never sent to third-party AI APIs.
+- AC4: I can delete my body profile at any time.
 
-## 2. Non-functional requirements
+## 2. Measurement set
+
+Names follow ISO 8559-1 (garment sizing). "Side" means the value needs body depth from the side photo.
+Expected accuracy assumes underwear or tight clothing. It is validated in the benchmark (`03-benchmark-plan.md`).
+
+| Group | Measurement (UI label) | Definition | Photos | Expected accuracy | Main garment use |
+|---|---|---|---|---|---|
+| Length | Shoulder width (어깨너비) | acromion to acromion across the back | front | high | tops, jackets |
+| Length | Sleeve length (소매길이) | shoulder point → wrist, arm slightly bent | front | high | tops, outerwear |
+| Length | Torso length (상체길이) | neck base (C7) → natural waist | front + side | high | top length, crop vs. regular |
+| Length | Rise (밑위길이) | natural waist → crotch | front + side | medium | trousers rise |
+| Length | Inseam (안쪽 다리길이) | crotch → floor | front | high | trousers length |
+| Length | Outseam (바깥 다리길이) | natural waist → floor, outside leg | front | high | trousers length |
+| Circ. | Neck (목둘레) | around the neck base | front + side | low | shirt collar |
+| Circ. | Chest / bust (가슴둘레) | fullest part of chest, horizontal | front + side | medium | tops |
+| Circ. | Underbust (밑가슴둘레, female) | directly below the bust | front + side | low | underwear, fitted tops |
+| Circ. | Natural waist (허리둘레) | narrowest point of the torso | front + side | medium | trousers, skirts, dresses |
+| Circ. | Hip (엉덩이둘레) | fullest part of the buttocks | front + side | medium | trousers, skirts |
+| Circ. | Armhole (암홀둘레) | around the arm–torso junction | front + side | low | sleeve fit |
+| Circ. | Bicep (팔뚝둘레) | fullest part of the upper arm | front + side | medium | sleeve fit |
+| Circ. | Wrist (손목둘레) | around the wrist bone | front | low | cuffs |
+| Circ. | Thigh (허벅지둘레) | fullest part of the upper thigh | front + side | medium | trousers fit |
+| Circ. | Calf (종아리둘레) | fullest part of the calf | front + side | medium | slim trousers, boots |
+
+**Confidence rules** (v1, implemented in the prototype's `FakeBodyAnalyzer.confidenceFor` and to be reused by the server):
+- Start from the expected accuracy above.
+- Downgrade one level if the measurement needs the side photo and it is missing.
+- Downgrade one level for circumferences when clothing is "everyday / loose".
+- The real pipeline additionally lowers confidence for poor landmark visibility, crop or angle.
+
+**Derived styling features** (computed from the measurements, used by recommendation):
+- shoulder-to-hip ratio
+- waist-to-hip ratio
+- torso-to-leg ratio (torso length / inseam)
+- inseam/height
+- chest-to-hip balance
+
+## 3. Non-functional requirements
 
 | ID | Requirement | Target |
 |---|---|---|
-| NFR-B1 | Analysis latency (server, CPU) | p95 ≤ 5 s including upload on Wi-Fi; model inference ≤ 1 s |
-| NFR-B2 | Robustness | ≥ 90 % of valid full-body front photos produce a result; invalid photos get a specific retake reason |
-| NFR-B3 | Consistency | Same person, two photos: silhouette class identical in ≥ 80 % of cases; ratio difference ≤ 0.05 |
-| NFR-B4 | Accuracy (vs. tape measure, test set) | shoulder-to-hip ratio MAE ≤ 0.08; top-size exact-or-adjacent ≥ 90 % |
-| NFR-B5 | Privacy | body photo never persisted; not sent to third-party APIs in the default pipeline |
-| NFR-B6 | Usefulness | user correction rate tracked; target < 40 % of fields edited on average |
-| NFR-B7 | Cost | $0 per analysis in the default pipeline (LLM insight call optional, ≤ 1 call per confirmed profile) |
+| NFR-B1 | Analysis latency (server, CPU) | p95 ≤ 5 s including upload on Wi-Fi; inference ≤ 1.5 s for two photos |
+| NFR-B2 | Robustness | ≥ 90 % of valid photos produce results; invalid photos get a specific retake reason |
+| NFR-B3 | Accuracy, tight clothing, both photos (vs. tape) | lengths MAE ≤ 2.5 cm; chest/waist/hip MAE ≤ 4 cm; low-confidence items reported but not targeted |
+| NFR-B4 | Loose-clothing behaviour | still returns all measurements; circumference confidence lowered; warning shown in 100 % of loose cases |
+| NFR-B5 | Consistency | same person, two sessions: lengths within 2 cm, chest/waist/hip within 3 cm |
+| NFR-B6 | Privacy | photos never persisted, never sent to third parties; HTTPS only |
+| NFR-B7 | Usefulness | user correction rate tracked in beta; target < 30 % of high-confidence fields edited |
+| NFR-B8 | Cost | $0 per analysis in the default pipeline |
 
-## 3. Key constraints
+## 4. Key constraints
 
-- One phone photo cannot give exact measurements, so every output is approximate and editable.
-- The model licenses we may use for research (SMPL, BodyM, Sapiens-1) are **non-commercial**. They are allowed for the course but must not end up in the default production path.
-- Backend must run on a CPU-only free-tier cloud instance.
-- Body photos are sensitive personal data (PIPA). Minimise and delete (team task "Define Photo Privacy Rules").
-- Iteration 1 budget is P9 7 h + P10 5 h, so Iteration 1 ships Option 1 (baseline). Options 2 and 3 follow in Iterations 2–3.
+- A phone photo cannot give tape-measure accuracy. All values are approximate, labelled with confidence, and editable.
+- Accurate circumferences need body depth, hence the side photo. Accurate scale needs a known height, hence height is required.
+- Photos may show underwear, so this is highly sensitive personal data (PIPA). Minimise, process in memory, delete immediately. On-device extraction is the preferred long-term design (§6, decision 4).
+- Research-only licenses (SMPL, BodyM, Sapiens-1) are fine for the course but must not end up in a commercial path.
+- Backend must run on a CPU-only free-tier instance.
+- Iteration 1 budget: P9 7 h + P10 5 h. Iteration 1 therefore ships the UI prototype with a fake analyzer plus the API contract; the real pipeline follows in Iterations 2–3.
 
-## 4. UI flow (Compose)
+## 5. UI flow (Compose) — implemented in `android/`
 
 ```
-[Splash] ──first launch──▶ [Onboarding: 프로필 설정]
-                              │  photo box (camera / gallery) + height, weight, gender inputs
-                              │  "분석하기"
-                              ▼
-                           [Analyzing…]  ── fail(reason) ──▶ retake hint (stay on screen)
-                              ▼
-                           [Result review]  AI가 추정한 체형 (editable chips, confidence dots)
-                              │  선호 핏 · 선호 스타일 (max 3)
-                              │  "옷장 등록하고 시작하기"
-                              ▼
-                           [Wardrobe]   (P11/P12)
-Bottom nav: 홈 | 옷장 | 마이프로필
-[마이프로필] ── "체형 다시 분석하기" ──▶ [Onboarding screen in re-analysis mode]
-[마이프로필] shows: confirmed values, insight cards, preferences, "프로필 삭제"
+first launch
+  └▶ [체형 촬영 가이드]  A-pose illustration (front / side), what to wear, privacy note   (건너뛰기 → main)
+       └▶ [체형 분석 입력]  front photo* / side photo (camera or album), clothing type,
+             height* / weight / gender  →  "분석하기" (enabled when front photo + valid height)
+             └▶ [분석 중]
+                  └▶ [AI가 추정한 체형]  warnings, lengths, circumferences (confidence badges, tap to edit),
+                        선호 핏, 선호 스타일 (≤ 3)  →  "옷장 등록하고 시작하기"
+                          └▶ main app, bottom nav: 홈 | 옷장 | 마이프로필
+[마이프로필]  basic info, insights, measurements, disclaimer, "체형 다시 분석하기", "체형 프로필 삭제"
 ```
 
-Compose structure (P9):
-- `BodyProfileSetupScreen` (stateless) + `BodyProfileViewModel` (StateFlow `UiState`)
-- `UiState = Idle | PhotoSelected | Analyzing | Review(draft) | Error(reason) | Saved`
-- `BodyProfileRepository` → Retrofit `BodyProfileApi`
-- Photo pick: `ActivityResultContracts.PickVisualMedia` / `TakePicture`. Downscale to max 1280 px and strip EXIF before upload.
+Code structure:
 
-## 5. System architecture
+| File | Role |
+|---|---|
+| `data/BodyMeasurements.kt` | `MeasurementType` (§2 table), `Confidence`, `ClothingType`, `BodyProfile`, `toggleStyle` |
+| `data/BodyAnalyzer.kt` | `BodyAnalyzer` interface, `FakeBodyAnalyzer` (placeholder values + real confidence rules), `buildInsights` |
+| `ui/profile/BodyProfileViewModel.kt` | `SetupState` / `AppState` as `StateFlow`; drops photos right after analysis |
+| `ui/profile/*Screen.kt` | Guide, input, analyzing, review, My Profile |
+| `ui/StyleMateApp.kt` | switches between setup flow and bottom-nav tabs (home / wardrobe are placeholders for P8, P11, P12) |
+
+To swap in the real AI, implement `BodyAnalyzer` with a Retrofit call to the endpoint in §7 and pass it to `BodyProfileViewModel`. The UI does not change.
+
+## 6. System architecture
 
 ```
 ┌──────────────── Android (Compose) ───────────────┐
-│ BodyProfileSetupScreen / MyProfileScreen         │
-│ BodyProfileViewModel ─ BodyProfileRepository     │
+│ Setup screens / MyProfileScreen                  │
+│ BodyProfileViewModel ─ BodyAnalyzer (interface)  │
+│   ├ FakeBodyAnalyzer   (Iteration 1 prototype)   │
+│   └ RemoteBodyAnalyzer (Retrofit → Django)       │
 └───────────────┬──────────────────────────────────┘
-                │ HTTPS, multipart (photo + height/weight/gender)
+                │ HTTPS multipart: front, side?, height, weight?, gender, clothing
 ┌───────────────▼──────── Django backend ──────────┐
-│ profiles app (DRF)                               │
-│  views: analyze / confirm / get / delete         │
-│  services.body_analysis  ◀── AnalysisPipeline    │
-│  models: BodyProfile (MySQL)                     │
+│ profiles app (DRF): analyze / confirm / get / delete │
+│ BodyProfile model (MySQL)                        │
 └───────────────┬──────────────────────────────────┘
-                │ in-process Python call
-┌───────────────▼──────── body_analysis package ───┐
-│ QualityGate → PoseEstimator (MediaPipe)          │
-│ → Segmenter (mask; SCHP in Option 2)             │
-│ → FeatureExtractor (widths, lengths, ratios)     │
-│ → ProfileEstimator (rules v1 / regressor v2)     │
-│ → InsightGenerator (templates v1 / LLM v2)       │
-└──────────────────────────────────────────────────┘
+                │ in-process call, photos kept in memory only
+┌───────────────▼──────── body_analysis (pure Python) ─┐
+│ QualityGate (person count, full body, view check)    │
+│ → PoseEstimator (MediaPipe / RTMPose)                │
+│ → Segmenter (person mask; SCHP parsing for clothing) │
+│ → Measurer: front widths + side depths at landmark-  │
+│   defined heights → ellipse/regression circumference │
+│   → lengths from landmarks, scaled by height         │
+│ → Calibrator (regressor trained on BodyM, Option 2)  │
+│ → ConfidenceScorer + warnings                        │
+└──────────────────────────────────────────────────────┘
 ```
 
 Architectural decisions:
-1. **AI runs inside Django as a pure-Python package (`body_analysis/`) with no Django imports.** It is testable on its own, reusable by the benchmark harness, and swappable (each stage is an interface → Strategy pattern, a natural candidate for the Iteration 5 design-pattern refactoring).
-2. **Photo is processed in memory and never written to object storage.** The storage teammate's image service is not needed for this feature, which removes a cross-team dependency for Iteration 1.
-3. **Numbers, not pictures, are the contract with other components.** The recommender and chat editor read `BodyProfile.features`. Neither ever sees a photo.
-4. **Future option:** move `PoseEstimator` + `Segmenter` on-device (MediaPipe Android) and send only landmarks/widths. The server-side `FeatureExtractor` stays the same.
+1. **The AI is a pure-Python package with no Django imports.** It is reused by the benchmark harness, and each stage sits behind an interface (Strategy pattern, a candidate for the Iteration 5 design-pattern work).
+2. **Photos never touch storage.** The storage teammate's image service is not needed for this feature, which removes a cross-team dependency.
+3. **Numbers, not pictures, are the contract.** Recommendation and chat editing read measurements and derived features only.
+4. **On-device option.** MediaPipe also runs on Android. Pose and masks can move into the app so only landmarks and widths are uploaded, a privacy-driven technical constraint.
+5. **The client depends on an interface.** `BodyAnalyzer` lets the UI ship now with a fake and switch to the server without UI changes.
 
-## 6. API (Django REST Framework)
+## 7. API (Django REST Framework)
 
 | Method | Path | Body | Response |
 |---|---|---|---|
-| POST | `/api/body-profile/analyze/` | multipart: `photo` (jpg/png ≤ 8 MB), `height_cm` (req), `weight_kg`, `gender` (`female`/`male`/`unspecified`) | `200 {draft}` or `422 {"error": "<code>", "hint": "…"}` |
-| PUT | `/api/body-profile/` | confirmed profile JSON (draft + user edits + preferences) | `200 {profile}` |
+| POST | `/api/body-profile/analyze/` | multipart: `front_photo` (req), `side_photo`, `height_cm` (req), `weight_kg`, `gender` (`female`/`male`/`unspecified`), `clothing` (`underwear`/`tight`/`loose`) | `200 {draft}` or `422 {"error", "hint"}` |
+| PUT | `/api/body-profile/` | confirmed profile (draft + edits + preferences) | `200 {profile}` |
 | GET | `/api/body-profile/` | — | `200 {profile}` / `404` |
 | DELETE | `/api/body-profile/` | — | `204` |
 
-Error codes for `422`: `no_person`, `multiple_people`, `body_cropped`, `not_frontal`, `low_quality`, `invalid_image`.
+`422` codes: `no_person`, `multiple_people`, `body_cropped`, `not_frontal`, `not_side_view`, `low_quality`, `invalid_image`.
 
-Draft response example:
+Draft response:
 ```json
 {
   "analysis_id": "b1f3…",
   "pipeline_version": "baseline-1.0",
-  "inputs": {"height_cm": 172, "weight_kg": null, "gender": "unspecified"},
-  "features": {
-    "shoulder_hip_ratio":   {"value": 1.12, "confidence": 0.78},
-    "waist_definition":     {"value": 0.18, "confidence": 0.55},
-    "torso_leg_ratio":      {"value": 0.94, "confidence": 0.83},
-    "shoulder_width_cm":    {"value": 43.0, "confidence": 0.60}
-  },
-  "silhouette": {"value": "inverted_triangle", "confidence": 0.62},
-  "size_estimate": {"top": "M", "bottom": "30", "confidence": 0.45},
-  "quality": {"clothing_looseness": "medium", "warnings": ["loose_top"]},
-  "insights": [
-    {"key": "long_legs", "text": "다리가 상체에 비해 긴 편이라 크롭 기장 상의나 하이웨이스트 하의가 비율을 살려줘요."}
-  ]
+  "inputs": {"height_cm": 172, "weight_kg": 65, "gender": "male", "clothing": "loose", "has_side_photo": true},
+  "measurements": [
+    {"type": "shoulder_width", "value_cm": 44.5, "confidence": "high"},
+    {"type": "chest",          "value_cm": 95.5, "confidence": "low"},
+    {"type": "inseam",         "value_cm": 78.0, "confidence": "high"}
+  ],
+  "derived": {"shoulder_hip_ratio": 0.48, "waist_hip_ratio": 0.85, "torso_leg_ratio": 0.58},
+  "warnings": ["loose_clothing"]
 }
 ```
 
-## 7. Data model
+## 8. Data model
 
 ```python
 class BodyProfile(models.Model):
@@ -153,65 +205,48 @@ class BodyProfile(models.Model):
     height_cm = models.PositiveSmallIntegerField()
     weight_kg = models.PositiveSmallIntegerField(null=True)
     gender = models.CharField(max_length=12, default="unspecified")
+    clothing = models.CharField(max_length=12)          # what the user wore in the photos
+    had_side_photo = models.BooleanField()
 
-    # structured body state (reused by recommendation and chat editing)
-    features = models.JSONField()          # {name: {value, confidence, source}}; source ∈ {ai, user}
-    silhouette = models.CharField(max_length=24)   # rectangle | triangle | inverted_triangle | oval | hourglass
-    top_size = models.CharField(max_length=8)
-    bottom_size = models.CharField(max_length=8)
+    # [{type, value_cm, confidence, source: "ai" | "user"}] — types from §2
+    measurements = models.JSONField()
+    derived = models.JSONField()                        # styling ratios, recomputed on save
 
-    # user preferences
-    preferred_fit = models.CharField(max_length=12)   # slim | regular | loose
-    preferred_styles = models.JSONField()             # ≤ 3 of the 6 style keys
+    preferred_fit = models.CharField(max_length=12)     # slim | regular | loose
+    preferred_styles = models.JSONField()               # ≤ 3 of the 6 style keys
 
-    insights = models.JSONField(default=list)
     pipeline_version = models.CharField(max_length=32)
     confirmed_at = models.DateTimeField()
     updated_at = models.DateTimeField(auto_now=True)
 ```
-The table name and field types are to be aligned with 김기환's P6 data-model document before merging.
+To be aligned with 김기환's P6 data model before merging. No image fields, by design.
 
-**Interface for other components** (`profiles.selectors.get_styling_profile(user) -> StylingProfile`):
+Interface for other components (`profiles.selectors.get_styling_profile(user)`):
 ```python
 @dataclass(frozen=True)
 class StylingProfile:
-    silhouette: str
+    measurements_cm: dict[str, float]
+    confidence: dict[str, str]
     shoulder_hip_ratio: float
-    waist_definition: float
+    waist_hip_ratio: float
     torso_leg_ratio: float
-    confidence: dict[str, float]     # recommender down-weights low-confidence features
-    top_size: str; bottom_size: str
-    preferred_fit: str; preferred_styles: list[str]
-    def to_prompt_block(self) -> str: ...   # compact text for LLM prompts in chat editing
+    preferred_fit: str
+    preferred_styles: list[str]
+    def to_prompt_block(self) -> str: ...   # compact text for the chat-editing LLM
 ```
-This keeps the chat editor's LLM prompt small (a few numbers instead of a photo). That supports the professor's point about managing structured state for cost-efficient, consistent editing.
 
-## 8. Feature definitions (baseline v1)
+## 9. Test plan
 
-All widths are measured on the person mask at rows defined by landmarks, and normalised by body height in pixels (nose-to-heel scaled by 1.08 to approximate the full head).
+**Implemented (Iteration 1, `android/app/src/test/.../BodyMeasurementsTest.kt`, 7 tests passing):**
+- style selection refuses a 4th style
+- underwear + both photos keeps base confidence
+- loose clothing lowers only circumferences and adds the warning
+- missing side photo lowers only depth-dependent items
+- underbust only for female
+- no warnings for ideal input
 
-| Feature | Definition |
-|---|---|
-| `shoulder_width` | mask width at shoulder landmarks' y, or landmark distance × 1.15, whichever is smaller (limits hood/padding inflation) |
-| `hip_width` | max mask width in the band from 10 % above to 15 % below the hip landmarks' y |
-| `waist_width` | min mask width between shoulder y + 55 % of torso length and hip y |
-| `shoulder_hip_ratio` | `shoulder_width / hip_width` |
-| `waist_definition` | `1 − waist_width / max(shoulder_width, hip_width)` |
-| `torso_leg_ratio` | (shoulder-mid → hip-mid length) / (hip-mid → ankle-mid length) |
-| `*_cm` | normalised value × `height_cm` (only reported when height is given; confidence capped at 0.6) |
-
-Silhouette rules (v1, thresholds tuned in the benchmark):
-- `inverted_triangle`: shoulder_hip_ratio ≥ 1.10
-- `triangle`: shoulder_hip_ratio ≤ 0.92
-- `hourglass`: 0.92 < ratio < 1.10 and waist_definition ≥ 0.22
-- `oval`: waist_width ≥ 0.98 × max(shoulder, hip)
-- `rectangle`: otherwise
-
-Confidence = mean landmark visibility × quality penalty (looseness, crop, angle).
-
-## 9. Test plan (Iteration 1)
-
-- **Unit (pytest):** feature extraction on synthetic masks with known widths; silhouette rules at threshold boundaries; quality-gate error codes; serializer validation (height range, ≤ 3 styles); photo is not persisted (temp dir empty after request).
-- **Integration:** `POST analyze` → `PUT confirm` → `GET` round trip with a sample image. `DELETE` removes the profile.
-- **UI (Compose):** state transitions `Idle → PhotoSelected → Analyzing → Review → Saved`; 4th style chip disabled; error state shows the hint text.
+**Planned:**
+- **Server unit (pytest):** measurer on synthetic masks with known widths/depths; ellipse circumference; quality-gate codes; serializer validation; temp dir empty after each request (photo not persisted).
+- **Integration:** analyze → confirm → get → delete round trip.
+- **UI (Compose test):** state transitions; "분석하기" disabled without front photo/height; 4th style chip disabled; warning banners shown for loose clothing / no side photo.
 - **Smoke:** Galaxy S23 against a dev server.

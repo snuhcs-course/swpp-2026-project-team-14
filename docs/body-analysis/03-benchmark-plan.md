@@ -3,6 +3,12 @@
 > Owner: Dongkun Moon · Status: plan (2026-09-23), results to be filled in Iterations 2–3
 > Wiki target: *Testing Documentation → AI Module Testing* (course requirement from Iteration 3)
 
+**Rev. 2 (2026-09-24):** the target is now the garment measurement set in `02-design.md` §2.
+- **Ground truth:** tape measurements of all 16 items, taken by two team members following ISO 8559-1 landmarks, averaged.
+- **Photo conditions per volunteer:** underwear or tight (default), everyday-loose (robustness), front only vs. front + side.
+- **Headline metric:** per-measurement MAE (cm), reported separately for lengths and circumferences, and per clothing condition.
+- **"Still works in loose clothing" check:** results are returned for 100 % of loose-clothing photos, the warning is shown, and the confidence badge correlates with the actual error (Spearman ρ between confidence level and absolute error).
+
 ## 1. Questions the benchmark must answer
 
 1. **Input ablation (technical-depth route #1).** Which inputs are worth asking the user for?
