@@ -17,7 +17,7 @@ spec:
       automountServiceAccountToken: false
       containers:
         - name: backend
-          image: ghcr.io/snuhcs-course/swpp-2026-project-team-14-backend:bootstrap
+          image: ghcr.io/snuhcs-course/swpp-2026-project-team-14-backend:sha-3fa12fac8d63596c9fb677c6217118c693fe813e
           ports:
             - name: http
               containerPort: 8000
