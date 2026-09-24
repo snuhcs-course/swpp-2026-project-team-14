@@ -139,9 +139,11 @@ Insight text comes from templates keyed on the silhouette and ratios.
 Cost: free, CPU-only, ~100 ms. Risk: clothing inflates widths.
 
 ### Option 2 — Hybrid pipeline (recommended target, Iterations 2–3)
+
+> **Status (2026-09-24):** the learned-regressor part is implemented and deployed for underwear and tight clothing. It was trained on synthetic Anny bodies instead of BodyM. Held-out errors dropped 40–90 %. See `05-learned-correction.md`. SCHP parsing and real-photo training remain open.
 Option 1 plus:
 - **SCHP human parsing** to mask out loose garments and pick measurement rows on body regions, with a *clothing looseness flag* that lowers confidence and asks for a re-shoot or a tighter outfit.
-- **Optional side photo** (BodyM shows the second view reduces error).
+- **Side photo** (BodyM shows the second view reduces error; required in the app since 2026-09-24).
 - A **small learned regressor** (gradient boosting / MLP) from our geometric features + height/weight/gender → ratios and measurements, trained on BodyM silhouettes.
 - **LLM insight generation from the structured features only** (no photo sent), with the output schema enforced and wording constrained to fashion-neutral, non-judgemental language.
 - Optional on-device variant: run MediaPipe inside the Compose app so the photo never leaves the phone. That is a privacy-driven technical constraint the course explicitly counts as depth.
