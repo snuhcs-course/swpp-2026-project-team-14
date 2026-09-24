@@ -19,7 +19,7 @@ spec:
         - name: ghcr-secret
       containers:
         - name: backend
-          image: ghcr.io/snuhcs-course/swpp-2026-project-team-14-backend:sha-3fa12fac8d63596c9fb677c6217118c693fe813e
+          image: ghcr.io/snuhcs-course/swpp-2026-project-team-14-backend:sha-bd87d2812118bf76d2fb311b4ed8d8e2f5492b4d
           ports:
             - name: http
               containerPort: 8000
