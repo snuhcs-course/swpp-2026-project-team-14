@@ -19,6 +19,7 @@ import numpy as np
 from .measurer import RawMeasurements
 from .pipeline import BodyAnalysisPipeline, decode_image
 from .pose import MediaPipePoseEstimator
+from .regressor import MeasurementCorrector
 from .types import AnalysisError, AnalysisInput, Clothing, Gender
 
 GUIDE_COLORS = {"front": (255, 90, 40), "side": (40, 160, 255)}
@@ -46,24 +47,25 @@ def draw_overlay(image_rgb: np.ndarray, mask: np.ndarray, landmarks, raw: RawMea
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--front", type=Path, required=True)
-    parser.add_argument("--side", type=Path)
+    parser.add_argument("--side", type=Path, required=True)
     parser.add_argument("--height", type=float, required=True, help="cm")
     parser.add_argument("--weight", type=float, help="kg")
     parser.add_argument("--gender", choices=[g.value for g in Gender], default=Gender.UNSPECIFIED.value)
     parser.add_argument("--clothing", choices=[c.value for c in Clothing], default=Clothing.UNDERWEAR.value)
     parser.add_argument("--debug-dir", type=Path, help="write overlay PNGs here")
+    parser.add_argument("--geometry-only", action="store_true", help="skip the learned correction")
     args = parser.parse_args(argv)
 
-    missing = [str(p) for p in (args.front, args.side) if p is not None and not p.is_file()]
+    missing = [str(p) for p in (args.front, args.side) if not p.is_file()]
     if missing:
         parser.error(f"photo not found: {', '.join(missing)} (current folder: {Path.cwd()})")
 
     input_ = AnalysisInput(args.height, args.weight, Gender(args.gender), Clothing(args.clothing))
     estimator = MediaPipePoseEstimator()
-    pipeline = BodyAnalysisPipeline(estimator)
+    pipeline = BodyAnalysisPipeline(estimator, None if args.geometry_only else MeasurementCorrector.load())
     try:
         front = decode_image(args.front.read_bytes())
-        side = decode_image(args.side.read_bytes()) if args.side else None
+        side = decode_image(args.side.read_bytes())
         result, raw = pipeline.analyze_images(front, side, input_)
     except AnalysisError as error:
         print(json.dumps({"error": error.code, "photo": error.photo, "hint": error.hint}, ensure_ascii=False, indent=2))
@@ -76,8 +78,6 @@ def main(argv: list[str] | None = None) -> int:
 
         args.debug_dir.mkdir(parents=True, exist_ok=True)
         for view, image in (("front", front), ("side", side)):
-            if image is None:
-                continue
             pose = estimator.estimate(image)
             overlay = draw_overlay(image, pose.mask, pose.landmarks, raw, view)
             path = args.debug_dir / f"{view}_overlay.png"

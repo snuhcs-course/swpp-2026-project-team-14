@@ -7,6 +7,7 @@ import numpy as np
 from .geometry import largest_component, vertical_extent
 from .measurer import RawMeasurements, measure
 from .pose import PoseEstimator, PoseResult
+from .regressor import MeasurementCorrector
 from .types import (
     AnalysisError,
     AnalysisInput,
@@ -58,6 +59,17 @@ def check_quality(pose: PoseResult | None, view: str) -> PoseResult:
     if pose.num_people > 1:
         raise AnalysisError("multiple_people", view)
     lm = pose.landmarks
+    mask = largest_component(pose.mask)
+    top, bottom = vertical_extent(mask)
+
+    # Orientation first: in a wrongly-oriented photo half the body is hidden, which would otherwise
+    # be reported as "body cropped" and give the user the wrong retake hint.
+    shoulder_spread = abs(lm["left_shoulder"].x - lm["right_shoulder"].x) / max(bottom - top, 1)
+    if view == "front" and shoulder_spread < 0.12:
+        raise AnalysisError("not_frontal", view)
+    if view == "side" and shoulder_spread > 0.10:
+        raise AnalysisError("not_side_view", view)
+
     if view == "front":
         visible = all(lm[name].visibility >= MIN_VISIBILITY for name in REQUIRED_LANDMARKS)
     else:
@@ -66,33 +78,13 @@ def check_quality(pose: PoseResult | None, view: str) -> PoseResult:
             max(lm[f"left_{part}"].visibility, lm[f"right_{part}"].visibility) >= MIN_VISIBILITY
             for part in ("shoulder", "hip", "knee", "ankle")
         )
-    if not visible:
+    if not visible or top <= 1 or bottom >= mask.shape[0] - 2:
         raise AnalysisError("body_cropped", view)
-
-    mask = largest_component(pose.mask)
-    top, bottom = vertical_extent(mask)
-    h = mask.shape[0]
-    if top <= 1 or bottom >= h - 2:
-        raise AnalysisError("body_cropped", view)
-
-    body_px = bottom - top
-    shoulder_spread = abs(lm["left_shoulder"].x - lm["right_shoulder"].x) / body_px
-    if view == "front" and shoulder_spread < 0.12:
-        raise AnalysisError("not_frontal", view)
-    if view == "side" and shoulder_spread > 0.10:
-        raise AnalysisError("not_side_view", view)
     return pose
 
 
-def score_confidence(
-    type_: MeasurementType,
-    has_side: bool,
-    clothing: Clothing,
-    mean_visibility: float,
-) -> Confidence:
+def score_confidence(type_: MeasurementType, clothing: Clothing, mean_visibility: float) -> Confidence:
     confidence = type_.base_confidence
-    if type_.needs_side_photo and not has_side:
-        confidence = confidence.downgrade()
     if clothing is Clothing.LOOSE and type_.group is Group.CIRCUMFERENCE:
         confidence = confidence.downgrade()
     if mean_visibility < LOW_VISIBILITY:
@@ -100,37 +92,53 @@ def score_confidence(
     return confidence
 
 
-def build_warnings(input_: AnalysisInput, has_side: bool, raw: RawMeasurements) -> list[str]:
+def build_warnings(input_: AnalysisInput, raw: RawMeasurements) -> list[str]:
     warnings = []
     if input_.clothing is Clothing.LOOSE:
         warnings.append("loose_clothing")
-    if not has_side:
-        warnings.append("no_side_photo")
     if input_.weight_kg is None:
         warnings.append("no_weight")
     return warnings + raw.warnings
 
 
+def _derived_from(values: dict[MeasurementType, float], height_cm: float) -> dict[str, float]:
+    """Ratios that depend only on measurements (recomputed after a learned correction)."""
+    return {
+        "waist_hip_ratio": round(values[MeasurementType.WAIST] / values[MeasurementType.HIP], 3),
+        "torso_leg_ratio": round(values[MeasurementType.TORSO_LENGTH] / values[MeasurementType.INSEAM], 3),
+        "inseam_height_ratio": round(values[MeasurementType.INSEAM] / height_cm, 3),
+    }
+
+
 class BodyAnalysisPipeline:
-    def __init__(self, estimator: PoseEstimator):
+    def __init__(self, estimator: PoseEstimator, corrector: MeasurementCorrector | None = None):
+        """`corrector`: optional learned correction (MeasurementCorrector.load()); None = pure geometry."""
         self.estimator = estimator
+        self.corrector = corrector
 
     def analyze_images(
         self,
         front_rgb: np.ndarray,
-        side_rgb: np.ndarray | None,
+        side_rgb: np.ndarray,
         input_: AnalysisInput,
     ) -> tuple[AnalysisResult, RawMeasurements]:
+        if side_rgb is None:
+            raise AnalysisError("side_photo_required", "side")
         front = check_quality(self.estimator.estimate(front_rgb), "front")
-        side = check_quality(self.estimator.estimate(side_rgb), "side") if side_rgb is not None else None
+        side = check_quality(self.estimator.estimate(side_rgb), "side")
 
         raw = measure(front, side, input_.height_cm)
+        version = PIPELINE_VERSION
+        if self.corrector is not None and self.corrector.applies_to(input_):
+            raw.values = self.corrector.correct(raw.values, raw.features, input_)
+            raw.derived.update(_derived_from(raw.values, input_.height_cm))
+            version = f"{PIPELINE_VERSION}+{self.corrector.version}"
         mean_visibility = float(np.mean([front.landmarks[n].visibility for n in REQUIRED_LANDMARKS]))
         measurements = [
             Measurement(
                 type=type_,
                 value_cm=round(value * 2) / 2,  # 0.5 cm steps
-                confidence=score_confidence(type_, side is not None, input_.clothing, mean_visibility),
+                confidence=score_confidence(type_, input_.clothing, mean_visibility),
             )
             for type_, value in raw.values.items()
             if type_ is not MeasurementType.UNDERBUST or input_.gender is Gender.FEMALE
@@ -139,14 +147,16 @@ class BodyAnalysisPipeline:
         result = AnalysisResult(
             measurements=measurements,
             derived=raw.derived,
-            warnings=build_warnings(input_, side is not None, raw),
-            pipeline_version=PIPELINE_VERSION,
+            warnings=build_warnings(input_, raw),
+            pipeline_version=version,
         )
         return result, raw
 
-    def analyze(self, front: bytes, side: bytes | None, input_: AnalysisInput) -> AnalysisResult:
+    def analyze(self, front: bytes, side: bytes, input_: AnalysisInput) -> AnalysisResult:
+        if not side:
+            raise AnalysisError("side_photo_required", "side")
         front_rgb = decode_image(front)
-        side_rgb = decode_image(side) if side else None
+        side_rgb = decode_image(side)
         try:
             result, _ = self.analyze_images(front_rgb, side_rgb, input_)
         finally:

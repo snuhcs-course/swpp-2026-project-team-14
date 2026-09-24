@@ -4,10 +4,8 @@ Method (docs/body-analysis/02-design.md §6, Option 1):
 - Scale: user height / person-mask height in pixels, per photo.
 - Lengths: landmark distances and landmark-defined rows (waist, crotch, floor).
 - Circumferences: front width × side depth at the same relative body height → ellipse perimeter.
-  Without a side photo, depth = width × population depth ratio.
 
-All CALIBRATION / DEPTH_RATIO values are initial guesses to be fitted in the benchmark
-(docs/body-analysis/03-benchmark-plan.md).
+Both photos are required: circumferences and the waist row depend on body depth.
 """
 
 from __future__ import annotations
@@ -31,34 +29,28 @@ from .pose import PoseResult
 from .types import MeasurementType as M
 
 # Multipliers applied to the raw geometric value.
+# Fitted on the synthetic Anny benchmark (8 bodies, front + side; docs/body-analysis/04-synthetic-benchmark.md)
+# for measurements with a well-defined mesh ground truth. The others keep their initial guesses
+# until real tape-measure data exists.
 CALIBRATION: dict[M, float] = {
-    M.SHOULDER_WIDTH: 1.12,  # shoulder joint centres → acromion breadth
-    M.SLEEVE_LENGTH: 1.04,  # joint centre → shoulder point
-    M.TORSO_LENGTH: 1.0,
-    M.RISE: 1.0,
-    M.INSEAM: 1.0,
-    M.OUTSEAM: 1.0,
-    M.NECK: 1.0,
-    M.CHEST: 1.03,  # torso sections are closer to rounded rectangles than ellipses
-    M.UNDERBUST: 1.03,
-    M.WAIST: 1.03,
-    M.HIP: 1.03,
-    M.ARMHOLE: 1.0,
-    M.BICEP: 1.0,
-    M.WRIST: 1.0,
-    M.THIGH: 1.0,
-    M.CALF: 1.0,
-}
-
-# depth / width when there is no side photo (population averages, to be calibrated).
-DEPTH_RATIO: dict[M, float] = {
-    M.NECK: 0.95,
-    M.CHEST: 0.70,
-    M.UNDERBUST: 0.68,
-    M.WAIST: 0.72,
-    M.HIP: 0.72,
-    M.THIGH: 0.95,
-    M.CALF: 1.0,
+    # 1.12 × 1.175 fitted on the benchmark. The mesh ground truth for shoulder width is weakly
+    # defined (between biacromial and bideltoid), so re-check against real tape measurements.
+    M.SHOULDER_WIDTH: 1.316,
+    M.SLEEVE_LENGTH: 1.04,  # initial guess: joint centre → shoulder point
+    M.TORSO_LENGTH: 1.056,
+    M.RISE: 1.005,
+    M.INSEAM: 0.974,
+    M.OUTSEAM: 0.981,
+    M.NECK: 1.001,
+    M.CHEST: 1.063,
+    M.UNDERBUST: 1.03,  # initial guess, not evaluated
+    M.WAIST: 1.050,
+    M.HIP: 0.990,
+    M.ARMHOLE: 1.0,  # initial guess, not evaluated
+    M.BICEP: 1.089,
+    M.WRIST: 1.0,  # initial guess
+    M.THIGH: 1.013,
+    M.CALF: 0.992,
 }
 
 ACROMION_OFFSET_CM = 3.0  # top of the armhole sits above the shoulder joint centre
@@ -81,6 +73,13 @@ class RawMeasurements:
     derived: dict[str, float]
     warnings: list[str] = field(default_factory=list)
     guides: list[Guide] = field(default_factory=list)
+    # Scale-free geometric features (all lengths divided by body height) for the learned
+    # correction model; see body_analysis/regressor.py.
+    features: dict[str, float] = field(default_factory=dict)
+
+
+# Relative heights (share of body height from the floor) where silhouette widths/depths are sampled.
+PROFILE_LEVELS = [round(0.30 + 0.025 * i, 3) for i in range(23)]  # 0.30 … 0.85
 
 
 class BodyView:
@@ -121,19 +120,22 @@ def _rows(start: float, end: float, count: int = 40) -> np.ndarray:
     return np.linspace(start, end, count)
 
 
-def _narrowest_row(rows: np.ndarray, width_fn) -> float:
-    """Middle of the rows whose width is within 1 px of the minimum.
+def _extreme_row(rows: np.ndarray, fn, tolerance: float, largest: bool = False) -> float:
+    """Middle of the rows whose value is within `tolerance` of the min (or max).
 
-    Waists are often flat over several cm; taking the first minimum biases the row upwards.
+    Body profiles are often flat over several cm; taking the first extreme biases the row.
     """
-    widths = np.array([width_fn(y) for y in rows])
-    candidates = rows[widths <= widths.min() + 1]
+    values = np.array([fn(y) for y in rows])
+    if largest:
+        candidates = rows[values >= values.max() - tolerance]
+    else:
+        candidates = rows[values <= values.min() + tolerance]
     return float(np.median(candidates))
 
 
-def measure(front_pose: PoseResult, side_pose: PoseResult | None, height_cm: float) -> RawMeasurements:
+def measure(front_pose: PoseResult, side_pose: PoseResult, height_cm: float) -> RawMeasurements:
     f = BodyView(front_pose, height_cm, "front")
-    s = BodyView(side_pose, height_cm, "side") if side_pose is not None else None
+    s = BodyView(side_pose, height_cm, "side")
     values: dict[M, float] = {}
     warnings: list[str] = []
     guides: list[Guide] = []
@@ -151,29 +153,38 @@ def measure(front_pose: PoseResult, side_pose: PoseResult | None, height_cm: flo
     def torso_width(y: float) -> float:
         return width_at(f.mask, y, f.center_x(y), clamp=torso_clamp)
 
-    def side_depth(front_y: float) -> float | None:
-        if s is None:
-            return None
+    def side_depth(front_y: float) -> float:
         y = s.y_at(f.frac(front_y))
-        depth = width_at(s.mask, y, s.center_x(y))
         seg = run_at(s.mask, y, s.center_x(y))
-        if seg:
-            guides.append(Guide("depth", "side", y, seg[0], seg[1]))
-        return depth * s.scale
+        if seg is None:
+            return 0.0
+        guides.append(Guide("depth", "side", y, seg[0], seg[1]))
+        return (seg[1] - seg[0]) * s.scale
 
     def circumference(type_: M, front_y: float, front_width_px: float, x_center: float) -> float:
         width_cm = front_width_px * f.scale
         depth_cm = side_depth(front_y)
-        if depth_cm is None:
-            depth_cm = width_cm * DEPTH_RATIO[type_]
         guides.append(Guide(type_.value, "front", front_y, x_center - front_width_px / 2, x_center + front_width_px / 2))
         return ellipse_perimeter(width_cm / 2, depth_cm / 2) * CALIBRATION[type_]
 
+    cx = (lh[0] + rh[0]) / 2
+    hip_joint_px = distance(lh, rh)
+    hip_clamp = (cx - 1.3 * hip_joint_px, cx + 1.3 * hip_joint_px)
+
+    def hip_width(y: float) -> float:
+        return width_at(f.mask, y, cx, clamp=hip_clamp)
+
+    def estimated_circumference(width_fn, y: float) -> float:
+        """Uncalibrated circumference (cm) used only to pick rows."""
+        return ellipse_perimeter(width_fn(y) * f.scale / 2, side_depth_raw(s, f, y) * s.scale / 2)
+
     # --- rows -----------------------------------------------------------------------------
-    waist_y = _narrowest_row(_rows(sh_y + 0.45 * torso_px, hip_y), torso_width)
+    # Rows are chosen by estimated circumference: the front width alone is nearly constant over
+    # the waist region, and depth decides where the true minimum is.
+    waist_rows = _rows(sh_y + 0.45 * torso_px, hip_y)
+    waist_y = _extreme_row(waist_rows, lambda y: estimated_circumference(torso_width, y), tolerance=0.3)
 
     crotch_y = None
-    cx = (lh[0] + rh[0]) / 2
     for y in np.arange(hip_y, knee_y):  # every pixel row
         if not contains(f.mask, y, cx):
             crotch_y = float(y)
@@ -182,7 +193,8 @@ def measure(front_pose: PoseResult, side_pose: PoseResult | None, height_cm: flo
         crotch_y = lerp(hip_y, knee_y, 0.25)
         warnings.append("crotch_not_found")
 
-    neck_base_y = sh_y - 0.1 * (sh_y - mouth_y)
+    # C7 sits roughly 40 % of the way from the shoulder joints up to the mouth
+    neck_base_y = sh_y - 0.4 * (sh_y - mouth_y)
 
     # --- lengths --------------------------------------------------------------------------
     values[M.SHOULDER_WIDTH] = shoulder_px * f.scale * CALIBRATION[M.SHOULDER_WIDTH]
@@ -194,46 +206,49 @@ def measure(front_pose: PoseResult, side_pose: PoseResult | None, height_cm: flo
     ]
     values[M.SLEEVE_LENGTH] = float(np.mean(arm_lengths)) * f.scale * CALIBRATION[M.SLEEVE_LENGTH]
 
-    torso_lengths = [(waist_y - neck_base_y) * f.scale]
-    if s is not None:
-        s_sh_y = s.mid("left_shoulder", "right_shoulder")[1]
-        s_hip_y = s.mid("left_hip", "right_hip")[1]
-        s_mouth_y = s.mid("mouth_left", "mouth_right")[1]
-        s_band = _rows(s_sh_y + 0.45 * (s_hip_y - s_sh_y), s_hip_y)
-        s_waist_y = _narrowest_row(s_band, lambda y: width_at(s.mask, y, s.center_x(y)))
-        s_neck_y = s_sh_y - 0.1 * (s_sh_y - s_mouth_y)
-        torso_lengths.append((s_waist_y - s_neck_y) * s.scale)
+    s_sh_y = s.mid("left_shoulder", "right_shoulder")[1]
+    s_mouth_y = s.mid("mouth_left", "mouth_right")[1]
+    s_neck_y = s_sh_y - 0.4 * (s_sh_y - s_mouth_y)
+    torso_lengths = [(waist_y - neck_base_y) * f.scale, (s.y_at(f.frac(waist_y)) - s_neck_y) * s.scale]
     values[M.TORSO_LENGTH] = float(np.mean(torso_lengths)) * CALIBRATION[M.TORSO_LENGTH]
     values[M.RISE] = (crotch_y - waist_y) * f.scale * CALIBRATION[M.RISE]
     values[M.INSEAM] = (f.floor - crotch_y) * f.scale * CALIBRATION[M.INSEAM]
     values[M.OUTSEAM] = (f.floor - waist_y) * f.scale * CALIBRATION[M.OUTSEAM]
 
     # --- torso circumferences -------------------------------------------------------------
-    if s is not None:
-        chest_y = float(max(_rows(sh_y + 0.18 * torso_px, sh_y + 0.42 * torso_px), key=lambda y: side_depth_raw(s, f, y)))
-    else:
-        chest_y = sh_y + 0.3 * torso_px
+    def arm_merged(y: float) -> bool:
+        """True if either upper arm touches the torso on this row (its width would leak in)."""
+        torso_seg = run_at(f.mask, y, f.center_x(y))
+        for side in ("left", "right"):
+            (sx, sy), (ex, ey) = f.p(f"{side}_shoulder"), f.p(f"{side}_elbow")
+            arm_x = lerp(sx, ex, (y - sy) / max(ey - sy, 1))
+            if contains(f.mask, y, arm_x) and run_at(f.mask, y, arm_x) == torso_seg:
+                return True
+        return False
+
+    chest_rows = _rows(sh_y + 0.15 * torso_px, sh_y + 0.45 * torso_px)
+    clear_rows = np.array([y for y in chest_rows if not arm_merged(y)])
+    if clear_rows.size < 3:
+        clear_rows = chest_rows[len(chest_rows) // 2 :]
+        warnings.append("arms_touching_body")
+    chest_y = _extreme_row(clear_rows, lambda y: estimated_circumference(torso_width, y), 0.3, largest=True)
     values[M.CHEST] = circumference(M.CHEST, chest_y, torso_width(chest_y), f.center_x(chest_y))
     underbust_y = chest_y + 0.12 * torso_px
     values[M.UNDERBUST] = circumference(M.UNDERBUST, underbust_y, torso_width(underbust_y), f.center_x(underbust_y))
     values[M.WAIST] = circumference(M.WAIST, waist_y, torso_width(waist_y), f.center_x(waist_y))
 
-    hip_joint_px = distance(lh, rh)
-    hip_clamp = (cx - 1.3 * hip_joint_px, cx + 1.3 * hip_joint_px)
     hip_rows = _rows(hip_y - 0.1 * torso_px, crotch_y - 1)
-    hip_row = float(max(hip_rows, key=lambda y: width_at(f.mask, y, cx, clamp=hip_clamp)))
-    hip_width_px = width_at(f.mask, hip_row, cx, clamp=hip_clamp)
+    hip_row = _extreme_row(hip_rows, lambda y: estimated_circumference(hip_width, y), 0.3, largest=True)
+    hip_width_px = hip_width(hip_row)
     values[M.HIP] = circumference(M.HIP, hip_row, hip_width_px, cx)
 
-    neck_y = sh_y - 0.3 * (sh_y - mouth_y)
+    # narrowest row between the chin and the shoulders
     neck_x = f.mid("left_shoulder", "right_shoulder")[0]
+    neck_rows = _rows(mouth_y + 0.35 * (sh_y - mouth_y), sh_y)
+    neck_y = _extreme_row(neck_rows, lambda y: width_at(f.mask, y, neck_x), tolerance=1)
     neck_w = width_at(f.mask, neck_y, neck_x)
-    if s is not None:
-        s_neck_y = s.y_at(f.frac(neck_y))
-        s_neck_x = (s.mid("left_ear", "right_ear")[0] + s.mid("left_shoulder", "right_shoulder")[0]) / 2
-        neck_depth_cm = width_at(s.mask, s_neck_y, s_neck_x) * s.scale
-    else:
-        neck_depth_cm = neck_w * f.scale * DEPTH_RATIO[M.NECK]
+    s_neck_x = (s.mid("left_ear", "right_ear")[0] + s.mid("left_shoulder", "right_shoulder")[0]) / 2
+    neck_depth_cm = width_at(s.mask, s.y_at(f.frac(neck_y)), s_neck_x) * s.scale
     values[M.NECK] = ellipse_perimeter(neck_w * f.scale / 2, neck_depth_cm / 2) * CALIBRATION[M.NECK]
     guides.append(Guide("neck", "front", neck_y, neck_x - neck_w / 2, neck_x + neck_w / 2))
 
@@ -271,7 +286,43 @@ def measure(front_pose: PoseResult, side_pose: PoseResult | None, height_cm: flo
         "torso_leg_ratio": round(values[M.TORSO_LENGTH] / values[M.INSEAM], 3),
         "inseam_height_ratio": round(values[M.INSEAM] / height_cm, 3),
     }
-    return RawMeasurements(values=values, derived=derived, warnings=warnings, guides=guides)
+    features = _features(f, s, values, height_cm, waist_y=waist_y, crotch_y=crotch_y, chest_y=chest_y,
+                         hip_row=hip_row, arms_found=arm is not None)
+    return RawMeasurements(values=values, derived=derived, warnings=warnings, guides=guides, features=features)
+
+
+def _features(
+    f: "BodyView",
+    s: "BodyView",
+    values: dict[M, float],
+    height_cm: float,
+    *,
+    waist_y: float,
+    crotch_y: float,
+    chest_y: float,
+    hip_row: float,
+    arms_found: bool,
+) -> dict[str, float]:
+    """Scale-free description of the body for the learned correction model."""
+    feats: dict[str, float] = {}
+    for type_, value in values.items():
+        feats[f"geo_{type_.value}"] = value / CALIBRATION[type_] / height_cm  # uncalibrated, / height
+    body_px = f.floor - f.top
+    for level in PROFILE_LEVELS:
+        y_front = f.floor - level * body_px
+        y_side = s.y_at(f.frac(y_front))
+        feats[f"w_{level:.3f}"] = width_at(f.mask, y_front, f.center_x(y_front)) / body_px
+        feats[f"d_{level:.3f}"] = width_at(s.mask, y_side, s.center_x(y_side)) / (s.floor - s.top)
+    for name in ("left_shoulder", "left_hip", "left_knee", "left_ankle", "left_elbow", "left_wrist", "nose"):
+        feats[f"lm_{name}"] = (f.floor - f.p(name)[1]) / body_px
+    feats["row_waist"] = (f.floor - waist_y) / body_px
+    feats["row_crotch"] = (f.floor - crotch_y) / body_px
+    feats["row_chest"] = (f.floor - chest_y) / body_px
+    feats["row_hip"] = (f.floor - hip_row) / body_px
+    feats["shoulder_spread"] = distance(f.p("left_shoulder"), f.p("right_shoulder")) / body_px
+    feats["hip_joint_spread"] = distance(f.p("left_hip"), f.p("right_hip")) / body_px
+    feats["arms_found"] = float(arms_found)
+    return feats
 
 
 def side_depth_raw(s: BodyView, f: BodyView, front_y: float) -> float:
@@ -282,7 +333,7 @@ def side_depth_raw(s: BodyView, f: BodyView, front_y: float) -> float:
 def _limb_circumference(
     type_: M,
     f: BodyView,
-    s: BodyView | None,
+    s: BodyView,
     front_y: float,
     front_width_px: float,
     joints: tuple[str, str],
@@ -290,13 +341,10 @@ def _limb_circumference(
     x_center: float,
 ) -> float:
     width_cm = front_width_px * f.scale
-    if s is not None:
-        y = s.y_at(f.frac(front_y))
-        (ax, ay), (bx, by) = s.p(joints[0]), s.p(joints[1])
-        x = lerp(ax, bx, (y - ay) / max(by - ay, 1))
-        depth_cm = width_at(s.mask, y, x) * cos_from_vertical((ax, ay), (bx, by)) * s.scale
-    else:
-        depth_cm = width_cm * DEPTH_RATIO[type_]
+    y = s.y_at(f.frac(front_y))
+    (ax, ay), (bx, by) = s.p(joints[0]), s.p(joints[1])
+    x = lerp(ax, bx, (y - ay) / max(by - ay, 1))
+    depth_cm = width_at(s.mask, y, x) * cos_from_vertical((ax, ay), (bx, by)) * s.scale
     guides.append(Guide(type_.value, "front", front_y, x_center - front_width_px / 2, x_center + front_width_px / 2))
     return ellipse_perimeter(width_cm / 2, depth_cm / 2) * CALIBRATION[type_]
 
@@ -314,16 +362,20 @@ def _arm_measurements(f: BodyView, torso_width_fn) -> tuple[float, float, float]
             torso_seg = run_at(f.mask, y, f.center_x(y))
             return arm_seg is not None and arm_seg != torso_seg
 
-        bx, by = point_on(sh, el, 0.45)
-        if not separate_from_torso(bx, by):
+        # Bicep = widest part of the upper arm, searched over rows already clear of the torso. The
+        # armpit often sits more than halfway down the upper arm, so a single fixed row would
+        # usually still touch the torso (synthetic dataset: arms found for only 15 % of bodies).
+        clear = [point_on(sh, el, t) for t in np.linspace(0.4, 0.8, 17)]
+        clear = [(x, y) for x, y in clear if separate_from_torso(x, y)]
+        if not clear:
             continue
-        bicep_w = width_at(f.mask, by, bx) * cos_from_vertical(sh, el)
+        bicep_w = max(width_at(f.mask, y, x) for x, y in clear) * cos_from_vertical(sh, el)
 
         wx, wy = point_on(el, wr, 0.9)
         wrist_w = width_at(f.mask, wy, wx) * cos_from_vertical(el, wr)
 
         armpit_y = None
-        for t in np.linspace(0.05, 0.6, 40):
+        for t in np.linspace(0.05, 0.85, 60):
             x, y = point_on(sh, el, t)
             if separate_from_torso(x, y):
                 armpit_y = y

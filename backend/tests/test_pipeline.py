@@ -21,9 +21,11 @@ IMAGE = np.zeros((10, 10, 3), np.uint8)
 
 
 def run(front, side=None, **input_kwargs):
-    pipeline = BodyAnalysisPipeline(FakeEstimator(front, side) if side else FakeEstimator(front))
+    """Runs the pipeline with fake poses. `side` defaults to the mannequin's side view."""
+    side = side if side is not None else syn.side_pose()
+    pipeline = BodyAnalysisPipeline(FakeEstimator(front, side))
     input_ = AnalysisInput(height_cm=syn.HEIGHT_CM, **input_kwargs)
-    result, _ = pipeline.analyze_images(IMAGE, IMAGE if side else None, input_)
+    result, _ = pipeline.analyze_images(IMAGE, IMAGE, input_)
     return result
 
 
@@ -46,11 +48,14 @@ def test_loose_clothing_still_works_but_lowers_circumferences():
     assert confidence(result, MeasurementType.INSEAM) is Confidence.HIGH
 
 
-def test_front_only_lowers_depth_dependent_items():
-    result = run(syn.front_pose(), weight_kg=65)
-    assert "no_side_photo" in result.warnings
-    assert confidence(result, MeasurementType.TORSO_LENGTH) is Confidence.MEDIUM
-    assert confidence(result, MeasurementType.SHOULDER_WIDTH) is Confidence.HIGH
+def test_side_photo_is_required():
+    pipeline = BodyAnalysisPipeline(FakeEstimator(syn.front_pose()))
+    with pytest.raises(AnalysisError) as error:
+        pipeline.analyze_images(IMAGE, None, AnalysisInput(height_cm=syn.HEIGHT_CM))
+    assert (error.value.code, error.value.photo) == ("side_photo_required", "side")
+    with pytest.raises(AnalysisError) as error:
+        pipeline.analyze(b"front bytes", b"", AnalysisInput(height_cm=syn.HEIGHT_CM))
+    assert error.value.code == "side_photo_required"
 
 
 def test_underbust_only_for_female():
