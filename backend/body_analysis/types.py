@@ -1,7 +1,7 @@
 """Data types shared by the body analysis pipeline.
 
 Measurement keys and confidence rules mirror the Android client
-(`android/.../data/BodyMeasurements.kt`) and docs/body-analysis/02-design.md §2.
+(`frontend/.../data/BodyMeasurements.kt`) and docs/body-analysis/02-design.md §2.
 """
 
 from __future__ import annotations

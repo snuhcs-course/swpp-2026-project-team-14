@@ -2,4 +2,4 @@ from django.apps import AppConfig
 
 
 class BodyProfilesConfig(AppConfig):
-    name = "body_profiles"
+    name = "apps.body_profiles"

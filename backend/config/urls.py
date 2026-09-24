@@ -5,5 +5,5 @@ from . import views
 urlpatterns = [
     path("api/hello/", views.hello),
     path("healthz/", views.health),
-    path("api/body-profile/", include("body_profiles.urls")),
+    path("api/body-profile/", include("apps.body_profiles.urls")),
 ]

@@ -5,7 +5,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client
 
 from body_analysis import BodyAnalysisPipeline
-from body_profiles import services
+from apps.body_profiles import services
 
 from . import synthetic as syn
 from .test_pipeline import FakeEstimator

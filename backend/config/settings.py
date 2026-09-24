@@ -14,10 +14,10 @@ DEBUG = os.environ.get("DJANGO_DEBUG", "0") == "1"
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY") or secrets.token_urlsafe(64)
 ALLOWED_HOSTS = os.environ.get("DJANGO_ALLOWED_HOSTS", "*").split(",")
 
-INSTALLED_APPS = ["body_profiles"]
+INSTALLED_APPS = ["apps.body_profiles"]
 MIDDLEWARE = ["django.middleware.common.CommonMiddleware"]
-ROOT_URLCONF = "stylemate_server.urls"
-WSGI_APPLICATION = "stylemate_server.wsgi.application"
+ROOT_URLCONF = "config.urls"
+WSGI_APPLICATION = "config.wsgi.application"
 DATABASES = {}  # the analyze endpoint is stateless; profile storage comes with the database setup
 USE_TZ = True
 

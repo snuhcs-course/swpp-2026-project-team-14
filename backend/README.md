@@ -1,13 +1,13 @@
 # StyleMate backend — body analysis
 
-The team backend: a Django project (`stylemate_server/`) deployed to the team14 Kubernetes namespace by
+The team backend: a Django project (`config/` + `apps/`) deployed to the team14 Kubernetes namespace by
 `.github/workflows/backend-release.yaml` → GHCR image → ArgoCD (`infra/`).
 
 | Endpoint | Purpose |
 |---|---|
 | `GET /healthz/` | Kubernetes readiness/liveness probe |
 | `GET /api/hello/` | smoke test (kept from the original `app.py`) |
-| `POST /api/body-profile/analyze/` | body measurements from front + side photos (`body_profiles/`) |
+| `POST /api/body-profile/analyze/` | body measurements from front + side photos (`apps/body_profiles/`) |
 
 `body_analysis/` turns a front photo, a side photo and the user's height into garment measurements.
 It is a plain Python package with no Django dependency.
@@ -49,13 +49,13 @@ curl -H "Host: localhost" http://localhost:8000/healthz/
 
 ## Run the API server locally (for the Android app)
 
-`stylemate_server/` + `body_profiles/` is a minimal Django project that serves the body-analysis endpoint:
+`config/` (settings, URLs) + `apps/body_profiles/` serve the body-analysis endpoint:
 - `POST /api/body-profile/analyze/` (contract in `docs/body-analysis/02-design.md` §7)
 - multipart fields: `front_photo`, `side_photo`, `height_cm`, and optionally `weight_kg`, `gender`, `clothing`
 - `422` responses carry an `error` code and a Korean `hint`
 - uploads are kept in memory only; nothing is written to disk
 
-When the team's Django project (P7) exists, add `body_profiles` to its `INSTALLED_APPS`/urls and copy the upload settings from `stylemate_server/settings.py`.
+New Django apps go in `apps/` and are registered in `config/settings.py` / `config/urls.py` (layout: wiki → Directory Structure).
 
 ```bash
 set DJANGO_DEBUG=1
@@ -65,7 +65,7 @@ set DJANGO_DEBUG=1
 - **Android emulator:** the app's default base URL `http://10.0.2.2:8000` reaches this server.
 - **Real phone (Galaxy S23):**
   - The phone and PC must be on the same Wi-Fi.
-  - Add `stylemate.apiBaseUrl=http://<PC IP>:8000` to `android/local.properties`; find the PC's IP with `ipconfig`.
+  - Add `stylemate.apiBaseUrl=http://<PC IP>:8000` to `frontend/local.properties`; find the PC's IP with `ipconfig`.
   - Allow Python through the Windows firewall when prompted.
 - Debug builds allow plain HTTP. Release builds need HTTPS.
 
@@ -75,7 +75,7 @@ Quick check with the synthetic renders:
 curl -X POST http://127.0.0.1:8000/api/body-profile/analyze/ -F front_photo=@private/synthetic_benchmark/m_avg_front.png -F side_photo=@private/synthetic_benchmark/m_avg_side.png -F height_cm=168 -F gender=male -F clothing=tight
 ```
 
-`android/app/src/test/resources/analyze_response_*.json` are real responses captured this way. The Android `ServerContractTest` parses them, so re-capture them when the API changes.
+`frontend/app/src/test/resources/analyze_response_*.json` are real responses captured this way. The Android `ServerContractTest` parses them, so re-capture them when the API changes.
 
 ## Try it on your own photos
 
@@ -130,3 +130,5 @@ The server applies `body_analysis/models/measurement_corrector.json`, a ridge re
 | `pipeline.py` | decode in memory → quality gate → measure → learned correction (optional) → confidence + warnings |
 | `regressor.py` | loads and applies the learned correction model (numpy only) |
 | `cli.py` | local runner with debug overlays |
+
+Django side: `config/` (settings, root URLs, `/healthz/`, `/api/hello/`), `apps/body_profiles/` (analyze endpoint, pipeline singleton).

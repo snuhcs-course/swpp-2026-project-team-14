@@ -380,7 +380,7 @@ def dress(body: Body, offsets: dict[str, float] | None) -> Body:
     return Body(body.name, v + normals * thickness[:, None], body.faces, body.bones, body.gender)
 
 
-# --- insight agreement (mirrors buildInsights in android/.../data/BodyAnalyzer.kt) -------------
+# --- insight agreement (mirrors buildInsights in frontend/.../data/BodyAnalyzer.kt) -------------
 
 @dataclass(frozen=True)
 class InsightRule:

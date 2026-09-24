@@ -111,7 +111,7 @@ Expected accuracy assumes underwear or tight clothing. It is validated in the be
 - Backend must run on a CPU-only free-tier instance.
 - Iteration 1 budget: P9 7 h + P10 5 h. Iteration 1 therefore ships the UI prototype with a fake analyzer plus the API contract; the real pipeline follows in Iterations 2–3.
 
-## 5. UI flow (Compose) — implemented in `android/`
+## 5. UI flow (Compose) — implemented in `frontend/`
 
 ```
 first launch
@@ -176,7 +176,7 @@ Architectural decisions:
 4. **On-device option.** MediaPipe also runs on Android. Pose and masks can move into the app so only landmarks and widths are uploaded, a privacy-driven technical constraint.
 5. **The client depends on an interface.** `BodyAnalyzer` lets the UI ship now with a fake and switch to the server without UI changes.
 
-## 7. API (Django, implemented in `backend/body_profiles`)
+## 7. API (Django, implemented in `backend/apps/body_profiles`)
 
 | Method | Path | Body | Response |
 |---|---|---|---|
@@ -246,7 +246,7 @@ class StylingProfile:
 
 ## 9. Test plan
 
-**Implemented (Iteration 1, `android/app/src/test/.../BodyMeasurementsTest.kt`, 7 tests passing):**
+**Implemented (Iteration 1, `frontend/app/src/test/.../BodyMeasurementsTest.kt`, 7 tests passing):**
 - style selection refuses a 4th style
 - underwear + both photos keeps base confidence
 - loose clothing lowers only circumferences and adds the warning

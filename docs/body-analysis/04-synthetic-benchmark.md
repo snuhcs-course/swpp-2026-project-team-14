@@ -184,7 +184,7 @@ Each finding below was measured on the first 2-body run, before the change, and 
 
 - In loose clothing, the app now **hides all proportion insights**: leg proportion, broad shoulders, lower-body volume and defined waist.
 - An insight comes back if the user typed the underlying values in themselves.
-- Instead, the app shows a note suggesting a retake in tight clothing (`buildInsights` in `android/.../data/BodyAnalyzer.kt`, covered by `InsightsTest`).
+- Instead, the app shows a note suggesting a retake in tight clothing (`buildInsights` in `frontend/.../data/BodyAnalyzer.kt`, covered by `InsightsTest`).
 
 With the rule applied, the benchmark counts **0 wrong insights on screen** for underwear and loose clothing. Tight clothing has 2 (both threshold cases).
 
@@ -203,7 +203,7 @@ A possible next step is a margin around each threshold: show an insight only whe
 
 **Problem:** in tight clothing, two insights flipped for bodies sitting right at a rule's threshold. A ratio error of about 0.01 was enough to show the wrong sentence.
 
-**Change:** each insight is shown only when its ratio is past the threshold by a margin. The margins match the largest ratio error for underwear photos in this benchmark (`InsightThresholds` in `android/.../data/BodyAnalyzer.kt`; mirrored by `InsightRule` in the benchmark script).
+**Change:** each insight is shown only when its ratio is past the threshold by a margin. The margins match the largest ratio error for underwear photos in this benchmark (`InsightThresholds` in `frontend/.../data/BodyAnalyzer.kt`; mirrored by `InsightRule` in the benchmark script).
 
 | Insight | Ratio | Threshold | Margin | Largest underwear error | Shown when |
 |---|---|---|---|---|---|

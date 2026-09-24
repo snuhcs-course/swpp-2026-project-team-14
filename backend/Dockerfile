@@ -4,7 +4,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     # gunicorn and MediaPipe write small runtime files under $HOME; "/" is not writable for uid 10001
     HOME=/tmp \
-    DJANGO_SETTINGS_MODULE=stylemate_server.settings \
+    DJANGO_SETTINGS_MODULE=config.settings \
     DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,backend
 
 # OpenCV and MediaPipe's native library need these even without a display
@@ -25,8 +25,8 @@ ADD --checksum=sha256:64437af838a65d18e5ba7a0d39b465540069bc8aae8308de3e318aad31
 RUN chmod 644 /app/models/pose_landmarker_heavy.task
 
 COPY manage.py .
-COPY stylemate_server ./stylemate_server
-COPY body_profiles ./body_profiles
+COPY config ./config
+COPY apps ./apps
 COPY body_analysis ./body_analysis
 
 USER 10001:10001
@@ -34,4 +34,4 @@ USER 10001:10001
 EXPOSE 8000
 
 # One worker: the pose model is loaded once per process (~280 MB) and analyses are serialised.
-CMD ["gunicorn", "stylemate_server.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "1", "--threads", "2", "--timeout", "60", "--access-logfile", "-", "--error-logfile", "-"]
+CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "1", "--threads", "2", "--timeout", "60", "--access-logfile", "-", "--error-logfile", "-"]
