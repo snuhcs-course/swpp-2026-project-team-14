@@ -15,6 +15,8 @@ spec:
         app: backend
     spec:
       automountServiceAccountToken: false
+      imagePullSecrets:
+        - name: ghcr-secret
       containers:
         - name: backend
           image: ghcr.io/snuhcs-course/swpp-2026-project-team-14-backend:sha-3fa12fac8d63596c9fb677c6217118c693fe813e
