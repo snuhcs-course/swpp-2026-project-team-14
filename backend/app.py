@@ -22,7 +22,7 @@ from django.core.wsgi import get_wsgi_application
 
 @require_GET
 def hello(request):
-    return JsonResponse({"message": "Hello, world!!!"})
+    return JsonResponse({"message": "Hello, world!!!!!!!!"})
 
 
 @require_GET
