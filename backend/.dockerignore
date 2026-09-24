@@ -1,0 +1,10 @@
+.venv/
+private/
+models/
+tests/
+scripts/
+**/__pycache__/
+.pytest_cache/
+*.md
+requirements-dev.txt
+requirements-benchmark.txt

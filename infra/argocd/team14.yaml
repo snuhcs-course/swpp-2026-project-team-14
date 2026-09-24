@@ -1,0 +1,18 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: team14
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/snuhcs-course/swpp-2026-project-team-14.git
+    targetRevision: main
+    path: infra/apps
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: team14
+  syncPolicy:
+    automated:
+      prune: false
+      selfHeal: true

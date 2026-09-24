@@ -1,7 +1,16 @@
 # StyleMate backend — body analysis
 
+The team backend: a Django project (`stylemate_server/`) deployed to the team14 Kubernetes namespace by
+`.github/workflows/backend-release.yaml` → GHCR image → ArgoCD (`infra/`).
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /healthz/` | Kubernetes readiness/liveness probe |
+| `GET /api/hello/` | smoke test (kept from the original `app.py`) |
+| `POST /api/body-profile/analyze/` | body measurements from front + side photos (`body_profiles/`) |
+
 `body_analysis/` turns a front photo, a side photo and the user's height into garment measurements.
-It is a plain Python package with no Django dependency. `body_profiles/` (Django) exposes it over HTTP for the Android app.
+It is a plain Python package with no Django dependency.
 Design: [`docs/body-analysis/02-design.md`](../docs/body-analysis/02-design.md).
 
 ## Setup (Windows, Python 3.11)
@@ -9,7 +18,7 @@ Design: [`docs/body-analysis/02-design.md`](../docs/body-analysis/02-design.md).
 ```bash
 cd backend
 py -3.11 -m venv .venv
-.venv\Scripts\python -m pip install -r requirements.txt
+.venv\Scripts\python -m pip install -r requirements-dev.txt
 mkdir models
 curl -L -o models/pose_landmarker_heavy.task https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_heavy/float16/latest/pose_landmarker_heavy.task
 ```
@@ -23,7 +32,22 @@ curl -L -o models/pose_landmarker_heavy.task https://storage.googleapis.com/medi
 Tests use a synthetic mannequin (`tests/synthetic.py`) with known dimensions instead of real body photos.
 `test_mediapipe_smoke.py` checks that the real model loads, and is skipped if the model is not downloaded.
 
-## Run the API server (for the Android app)
+## Docker image (what runs in the cluster)
+
+```bash
+docker build -t team14-backend .
+docker run --rm -p 8000:8000 --memory=1g team14-backend
+curl -H "Host: localhost" http://localhost:8000/healthz/
+```
+
+- **Image:** Python 3.12, gunicorn with one worker, runs as non-root uid 10001.
+  - Includes the MediaPipe pose model (downloaded at build time, checksum-verified).
+  - Includes the system libraries OpenCV/MediaPipe need (`libgl1`, `libglib2.0-0`, `libegl1`, `libgles2`). Without `libegl1` every analysis fails with a 500.
+- **Memory:** about 340 MiB after the first analysis. With the original 256 Mi limit the worker is OOM-killed, so `infra/apps/backend.yaml` requests 512 Mi with a 1 Gi limit.
+- **Environment:** `DJANGO_ALLOWED_HOSTS` (the image sets `localhost,127.0.0.1,backend`; add the public host when an Ingress is added), `DJANGO_SECRET_KEY`, `DJANGO_DEBUG`.
+- **CI:** runs `pytest` before building and deploying.
+
+## Run the API server locally (for the Android app)
 
 `stylemate_server/` + `body_profiles/` is a minimal Django project that serves the body-analysis endpoint:
 - `POST /api/body-profile/analyze/` (contract in `docs/body-analysis/02-design.md` §7)
@@ -34,6 +58,7 @@ Tests use a synthetic mannequin (`tests/synthetic.py`) with known dimensions ins
 When the team's Django project (P7) exists, add `body_profiles` to its `INSTALLED_APPS`/urls and copy the upload settings from `stylemate_server/settings.py`.
 
 ```bash
+set DJANGO_DEBUG=1
 .venv\Scripts\python manage.py runserver 0.0.0.0:8000
 ```
 
