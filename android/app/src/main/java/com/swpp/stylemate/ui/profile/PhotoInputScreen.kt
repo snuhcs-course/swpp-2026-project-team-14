@@ -3,7 +3,11 @@ package com.swpp.stylemate.ui.profile
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Matrix
 import android.net.Uri
+import androidx.core.content.FileProvider
+import androidx.exifinterface.media.ExifInterface
+import java.io.File
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -42,6 +46,7 @@ import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -86,18 +91,17 @@ fun PhotoInputScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp),
         ) {
-            SectionTitle("전신 사진", "정면 필수 · 측면 권장")
+            state.errorMessage?.let { WarningBanner(it) }
+            SectionTitle("전신 사진", "정면 · 측면 모두 필요")
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 PhotoSlotCard(
                     label = "정면",
-                    required = true,
                     bitmap = state.frontPhoto,
                     onPicked = { onPhoto(PhotoSlot.FRONT, it) },
                     modifier = Modifier.weight(1f),
                 )
                 PhotoSlotCard(
                     label = "측면",
-                    required = false,
                     bitmap = state.sidePhoto,
                     onPicked = { onPhoto(PhotoSlot.SIDE, it) },
                     modifier = Modifier.weight(1f),
@@ -138,15 +142,24 @@ fun PhotoInputScreen(
 @Composable
 private fun PhotoSlotCard(
     label: String,
-    required: Boolean,
     bitmap: Bitmap?,
     onPicked: (Bitmap?) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicturePreview()) { bmp ->
-        if (bmp != null) onPicked(bmp)
+    // Full-resolution capture into a temporary cache file; the file is deleted right after decoding.
+    val captureFile = remember { File(context.cacheDir, "body_photos/$label.jpg") }
+    val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { saved ->
+        scope.launch {
+            if (saved) onPicked(decodeDownscaled(context, Uri.fromFile(captureFile)))
+            withContext(Dispatchers.IO) { captureFile.delete() }
+        }
+    }
+    fun launchCamera() {
+        captureFile.parentFile?.mkdirs()
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.photos", captureFile)
+        cameraLauncher.launch(uri)
     }
     val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) scope.launch { onPicked(decodeDownscaled(context, uri)) }
@@ -184,16 +197,16 @@ private fun PhotoSlotCard(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Text(
-                        if (required) "필수" else "권장",
+                        "필수",
                         style = MaterialTheme.typography.bodySmall,
-                        color = if (required) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = MaterialTheme.colorScheme.primary,
                     )
                 }
             }
         }
         Spacer(Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            SmallOutlinedButton("카메라", Modifier.weight(1f)) { cameraLauncher.launch(null) }
+            SmallOutlinedButton("카메라", Modifier.weight(1f)) { launchCamera() }
             SmallOutlinedButton("앨범", Modifier.weight(1f)) {
                 galleryLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
             }
@@ -283,7 +296,11 @@ private fun NumberField(
     )
 }
 
-/** Decodes a gallery image at most ~1280 px on the long side, which is enough for body analysis. */
+/**
+ * Decodes a photo at most ~1280 px on the long side (enough for body analysis) and turns it upright.
+ * Phone cameras often store photos sideways with an EXIF orientation tag that BitmapFactory ignores;
+ * a sideways body would be rejected by the pose model.
+ */
 private suspend fun decodeDownscaled(context: Context, uri: Uri, maxSide: Int = 1280): Bitmap? =
     withContext(Dispatchers.IO) {
         val resolver = context.contentResolver
@@ -292,7 +309,16 @@ private suspend fun decodeDownscaled(context: Context, uri: Uri, maxSide: Int = 
         var sample = 1
         while (maxOf(bounds.outWidth, bounds.outHeight) / sample > maxSide) sample *= 2
         val options = BitmapFactory.Options().apply { inSampleSize = sample }
-        resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) }
+        val bitmap = resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) }
+            ?: return@withContext null
+        val degrees = resolver.openInputStream(uri)?.use { ExifInterface(it).rotationDegrees } ?: 0
+        if (degrees == 0) {
+            bitmap
+        } else {
+            val matrix = Matrix().apply { postRotate(degrees.toFloat()) }
+            Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+                .also { if (it !== bitmap) bitmap.recycle() }
+        }
     }
 
 @Preview(showBackground = true, heightDp = 1100)

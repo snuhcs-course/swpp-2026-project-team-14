@@ -4,19 +4,27 @@ import kotlinx.coroutines.delay
 import kotlin.math.pow
 import kotlin.math.roundToInt
 
-/** Analyzes body photos. The real implementation will call the Django `/api/body-profile/analyze/` endpoint. */
+/** JPEG-encoded body photos. Kept in memory only and dropped after analysis. */
+class BodyPhotos(val frontJpeg: ByteArray, val sideJpeg: ByteArray)
+
+/** Analysis failed; [message] is a Korean hint that can be shown to the user as-is. */
+class BodyAnalysisException(message: String, val code: String? = null, cause: Throwable? = null) :
+    Exception(message, cause)
+
+/** Turns body photos into measurements. [RemoteBodyAnalyzer] calls the Django pipeline. */
 interface BodyAnalyzer {
-    suspend fun analyze(input: AnalysisInput): AnalysisResult
+    /** @throws BodyAnalysisException with a user-facing hint when the photos cannot be analysed. */
+    suspend fun analyze(input: AnalysisInput, photos: BodyPhotos): AnalysisResult
 }
 
 /**
- * Prototype stand-in for the AI pipeline. It ignores the photo pixels and derives plausible values
- * from height, weight and gender using average body proportions, so the UI flow can be tried
- * end to end. Confidence rules match the design document.
+ * Offline stand-in used by previews and tests. It ignores the photo pixels and derives plausible
+ * values from height, weight and gender using average body proportions. Confidence rules match
+ * the backend.
  */
 class FakeBodyAnalyzer(private val latencyMillis: Long = 1_800) : BodyAnalyzer {
 
-    override suspend fun analyze(input: AnalysisInput): AnalysisResult {
+    override suspend fun analyze(input: AnalysisInput, photos: BodyPhotos): AnalysisResult {
         delay(latencyMillis)
         val measurements = MeasurementType.entries
             .filter { it != MeasurementType.UNDERBUST || input.gender == Gender.FEMALE }
@@ -50,7 +58,6 @@ class FakeBodyAnalyzer(private val latencyMillis: Long = 1_800) : BodyAnalyzer {
 
         fun confidenceFor(type: MeasurementType, input: AnalysisInput): Confidence {
             var confidence = type.baseConfidence
-            if (type.needsSidePhoto && !input.hasSidePhoto) confidence = confidence.downgrade()
             if (input.clothing == ClothingType.LOOSE && type.group == MeasurementGroup.CIRCUMFERENCE) {
                 confidence = confidence.downgrade()
             }
@@ -58,15 +65,8 @@ class FakeBodyAnalyzer(private val latencyMillis: Long = 1_800) : BodyAnalyzer {
         }
 
         fun warningsFor(input: AnalysisInput): List<String> = buildList {
-            if (input.clothing == ClothingType.LOOSE) {
-                add("헐렁한 옷을 입은 사진이라 둘레 치수의 정확도가 낮아요. 속옷이나 몸에 붙는 옷을 입고 다시 찍으면 더 정확해져요.")
-            }
-            if (!input.hasSidePhoto) {
-                add("측면 사진이 없어 둘레와 상체길이는 대략적인 추정치예요.")
-            }
-            if (input.weightKg == null) {
-                add("몸무게를 입력하면 둘레 치수가 더 정확해져요.")
-            }
+            if (input.clothing == ClothingType.LOOSE) add(warningText("loose_clothing"))
+            if (input.weightKg == null) add(warningText("no_weight"))
         }
 
         // Share of body height, from average adult proportions. Placeholder until the real model exists.
@@ -109,29 +109,71 @@ class FakeBodyAnalyzer(private val latencyMillis: Long = 1_800) : BodyAnalyzer {
     }
 }
 
-/** Neutral, styling-focused insight sentences derived from the confirmed measurements. */
+const val LOOSE_CLOTHING_INSIGHT_NOTE =
+    "헐렁한 옷을 입고 찍은 사진이라 체형 비율 인사이트는 보여주지 않았어요. " +
+        "속옷이나 몸에 붙는 옷을 입고 다시 분석하거나, 해당 치수를 직접 입력하면 볼 수 있어요."
+
+/**
+ * Ratio thresholds for the insights. Each insight is only shown when the ratio is past its threshold
+ * by at least the margin, so a measurement error cannot flip it (docs/body-analysis/04 §9).
+ * Margins ≈ the largest ratio error for underwear photos in the synthetic benchmark.
+ */
+object InsightThresholds {
+    const val LEG_RATIO = 0.46 // inseam / height
+    const val LEG_MARGIN = 0.01
+    const val SHOULDER_RATIO = 0.255 // shoulder width / height
+    const val SHOULDER_MARGIN = 0.01
+    const val HIP_CHEST_RATIO = 1.05
+    const val HIP_CHEST_MARGIN = 0.05
+    const val WAIST_HIP_RATIO = 0.75
+    const val WAIST_HIP_MARGIN = 0.05
+}
+
+/**
+ * Neutral, styling-focused insight sentences derived from the confirmed measurements.
+ *
+ * Loose clothing distorts the measurements these insights use (synthetic benchmark,
+ * docs/body-analysis/04 §8): circumferences and shoulder width are inflated, and wide trousers hide
+ * the crotch so inseam comes out far too short. Insights are therefore only shown for underwear/tight
+ * photos, or when the user typed the underlying values in themselves.
+ */
 fun buildInsights(profile: BodyProfile): List<String> = buildList {
     val height = profile.input.heightCm.toDouble()
-    val inseam = profile.valueOf(MeasurementType.INSEAM)
-    val shoulder = profile.valueOf(MeasurementType.SHOULDER_WIDTH)
-    val waist = profile.valueOf(MeasurementType.WAIST)
-    val hip = profile.valueOf(MeasurementType.HIP)
-    val chest = profile.valueOf(MeasurementType.CHEST)
+    val looseClothing = profile.input.clothing == ClothingType.LOOSE
+    var suppressed = false
+    fun trusted(type: MeasurementType): Double? {
+        val measurement = profile.measurements.firstOrNull { it.type == type } ?: return null
+        if (looseClothing && !measurement.editedByUser) {
+            suppressed = true
+            return null
+        }
+        return measurement.valueCm
+    }
+    val inseam = trusted(MeasurementType.INSEAM)
+    val shoulder = trusted(MeasurementType.SHOULDER_WIDTH)
+    val waist = trusted(MeasurementType.WAIST)
+    val hip = trusted(MeasurementType.HIP)
+    val chest = trusted(MeasurementType.CHEST)
 
-    if (inseam != null) {
-        if (inseam / height >= 0.46) {
-            add("키에 비해 다리가 긴 편이에요. 크롭 기장 상의나 하이웨이스트 하의가 비율을 잘 살려줘요.")
-        } else {
-            add("상체가 비교적 긴 편이에요. 하이웨이스트 하의와 상의 넣어 입기로 다리 라인을 길어 보이게 할 수 있어요.")
+    with(InsightThresholds) {
+        if (inseam != null) {
+            // two-sided: close to the threshold neither sentence is shown
+            val legRatio = inseam / height
+            if (legRatio >= LEG_RATIO + LEG_MARGIN) {
+                add("키에 비해 다리가 긴 편이에요. 크롭 기장 상의나 하이웨이스트 하의가 비율을 잘 살려줘요.")
+            } else if (legRatio <= LEG_RATIO - LEG_MARGIN) {
+                add("상체가 비교적 긴 편이에요. 하이웨이스트 하의와 상의 넣어 입기로 다리 라인을 길어 보이게 할 수 있어요.")
+            }
+        }
+        if (shoulder != null && shoulder / height >= SHOULDER_RATIO + SHOULDER_MARGIN) {
+            add("어깨가 넓은 편이라 어깨선이 딱 맞는 상의와 V넥이 균형 있게 어울려요.")
+        }
+        if (chest != null && hip != null && hip / chest >= HIP_CHEST_RATIO + HIP_CHEST_MARGIN) {
+            add("하체 볼륨이 상체보다 있는 편이에요. A라인 스커트나 스트레이트 팬츠로 균형을 맞춰보세요.")
+        }
+        if (waist != null && hip != null && waist / hip <= WAIST_HIP_RATIO - WAIST_HIP_MARGIN) {
+            add("허리 라인이 잘 드러나는 편이라 벨트나 허리선이 들어간 아이템이 잘 어울려요.")
         }
     }
-    if (shoulder != null && shoulder / height >= 0.255) {
-        add("어깨가 넓은 편이라 어깨선이 딱 맞는 상의와 V넥이 균형 있게 어울려요.")
-    }
-    if (chest != null && hip != null && hip > chest * 1.05) {
-        add("하체 볼륨이 상체보다 있는 편이에요. A라인 스커트나 스트레이트 팬츠로 균형을 맞춰보세요.")
-    }
-    if (waist != null && hip != null && waist / hip <= 0.75) {
-        add("허리 라인이 잘 드러나는 편이라 벨트나 허리선이 들어간 아이템이 잘 어울려요.")
-    }
+    if (suppressed) add(LOOSE_CLOTHING_INSIGHT_NOTE)
 }

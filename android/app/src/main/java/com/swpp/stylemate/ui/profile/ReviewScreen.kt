@@ -286,7 +286,7 @@ fun formatCm(value: Double): String = "${formatNumber(value)} cm"
 @Preview(showBackground = true, heightDp = 1600)
 @Composable
 private fun ReviewPreview() {
-    val input = AnalysisInput(172, 65, Gender.MALE, ClothingType.LOOSE, hasSidePhoto = false)
+    val input = AnalysisInput(172, 65, Gender.MALE, ClothingType.LOOSE)
     val measurements = MeasurementType.entries
         .filter { it != MeasurementType.UNDERBUST }
         .map { BodyMeasurement(it, 40.0, FakeBodyAnalyzer.confidenceFor(it, input)) }

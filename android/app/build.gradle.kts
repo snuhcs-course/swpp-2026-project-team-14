@@ -1,7 +1,16 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
 }
+
+// Body-analysis API base URL. Default = the dev server on the host PC as seen from the emulator.
+// For a real phone, add `stylemate.apiBaseUrl=http://<PC LAN IP>:8000` to local.properties.
+val localProperties = Properties().apply {
+    rootProject.file("local.properties").takeIf { it.exists() }?.inputStream()?.use { load(it) }
+}
+val apiBaseUrl = localProperties.getProperty("stylemate.apiBaseUrl", "http://10.0.2.2:8000")
 
 android {
     namespace = "com.swpp.stylemate"
@@ -13,6 +22,7 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "0.1-prototype"
+        buildConfigField("String", "BODY_API_BASE_URL", "\"$apiBaseUrl\"")
     }
 
     buildTypes {
@@ -30,6 +40,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
@@ -44,6 +55,11 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material.icons.core)
+    implementation(libs.okhttp)
+    implementation(libs.androidx.exifinterface)
+    implementation(libs.kotlinx.coroutines.android)
     debugImplementation(libs.androidx.compose.ui.tooling)
     testImplementation(libs.junit)
+    testImplementation(libs.okhttp.mockwebserver)
+    testImplementation(libs.org.json) // real org.json for JVM tests (Android's copy is a stub there)
 }

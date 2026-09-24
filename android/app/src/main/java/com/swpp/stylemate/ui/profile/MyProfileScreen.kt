@@ -167,7 +167,7 @@ private fun InsightCard(text: String) {
 @Composable
 private fun MyProfilePreview() {
     val profile = BodyProfile(
-        input = AnalysisInput(172, 65, Gender.MALE, ClothingType.TIGHT, hasSidePhoto = true),
+        input = AnalysisInput(172, 65, Gender.MALE, ClothingType.TIGHT),
         measurements = listOf(
             BodyMeasurement(MeasurementType.SHOULDER_WIDTH, 45.0, Confidence.HIGH),
             BodyMeasurement(MeasurementType.INSEAM, 80.0, Confidence.HIGH),

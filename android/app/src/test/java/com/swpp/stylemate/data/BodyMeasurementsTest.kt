@@ -6,14 +6,15 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+private val PHOTOS = BodyPhotos(ByteArray(0), ByteArray(0))
+
 class BodyMeasurementsTest {
 
     private fun input(
         clothing: ClothingType = ClothingType.UNDERWEAR,
-        hasSidePhoto: Boolean = true,
         weightKg: Int? = 65,
         gender: Gender = Gender.MALE,
-    ) = AnalysisInput(172, weightKg, gender, clothing, hasSidePhoto)
+    ) = AnalysisInput(172, weightKg, gender, clothing)
 
     @Test
     fun toggleStyle_addsAndRemoves() {
@@ -29,7 +30,7 @@ class BodyMeasurementsTest {
     }
 
     @Test
-    fun underwearWithBothPhotos_keepsBaseConfidence() {
+    fun underwear_keepsBaseConfidence() {
         MeasurementType.entries.forEach {
             assertEquals(it.baseConfidence, FakeBodyAnalyzer.confidenceFor(it, input()))
         }
@@ -44,24 +45,17 @@ class BodyMeasurementsTest {
     }
 
     @Test
-    fun missingSidePhoto_lowersDepthDependentMeasurements() {
-        val frontOnly = input(hasSidePhoto = false)
-        assertEquals(Confidence.MEDIUM, FakeBodyAnalyzer.confidenceFor(MeasurementType.TORSO_LENGTH, frontOnly))
-        assertEquals(Confidence.HIGH, FakeBodyAnalyzer.confidenceFor(MeasurementType.SHOULDER_WIDTH, frontOnly))
-    }
-
-    @Test
     fun analyze_includesUnderbustOnlyForFemale() = runBlocking {
         val analyzer = FakeBodyAnalyzer(latencyMillis = 0)
-        val male = analyzer.analyze(input(gender = Gender.MALE)).measurements.map { it.type }
-        val female = analyzer.analyze(input(gender = Gender.FEMALE)).measurements.map { it.type }
+        val male = analyzer.analyze(input(gender = Gender.MALE), PHOTOS).measurements.map { it.type }
+        val female = analyzer.analyze(input(gender = Gender.FEMALE), PHOTOS).measurements.map { it.type }
         assertFalse(MeasurementType.UNDERBUST in male)
         assertTrue(MeasurementType.UNDERBUST in female)
     }
 
     @Test
     fun analyze_noWarningsForIdealInput() = runBlocking {
-        val result = FakeBodyAnalyzer(latencyMillis = 0).analyze(input())
+        val result = FakeBodyAnalyzer(latencyMillis = 0).analyze(input(), PHOTOS)
         assertTrue(result.warnings.isEmpty())
         assertTrue(result.measurements.all { it.valueCm > 0 })
     }

@@ -21,32 +21,33 @@ enum class Confidence(val label: String) {
 /**
  * Body measurements StyleMate estimates, named after ISO 8559-1.
  *
- * @param needsSidePhoto the value depends on body depth, which only the side photo shows.
  * @param baseConfidence expected confidence with underwear/tight clothing and both photos.
  */
 enum class MeasurementType(
     val label: String,
     val group: MeasurementGroup,
-    val needsSidePhoto: Boolean,
     val baseConfidence: Confidence,
 ) {
-    SHOULDER_WIDTH("어깨너비", MeasurementGroup.LENGTH, false, Confidence.HIGH),
-    SLEEVE_LENGTH("소매길이", MeasurementGroup.LENGTH, false, Confidence.HIGH),
-    TORSO_LENGTH("상체길이 (목~허리)", MeasurementGroup.LENGTH, true, Confidence.HIGH),
-    RISE("밑위길이", MeasurementGroup.LENGTH, true, Confidence.MEDIUM),
-    INSEAM("안쪽 다리길이", MeasurementGroup.LENGTH, false, Confidence.HIGH),
-    OUTSEAM("바깥 다리길이", MeasurementGroup.LENGTH, false, Confidence.HIGH),
+    SHOULDER_WIDTH("어깨너비", MeasurementGroup.LENGTH, Confidence.HIGH),
+    SLEEVE_LENGTH("소매길이", MeasurementGroup.LENGTH, Confidence.HIGH),
+    TORSO_LENGTH("상체길이 (목~허리)", MeasurementGroup.LENGTH, Confidence.HIGH),
+    RISE("밑위길이", MeasurementGroup.LENGTH, Confidence.MEDIUM),
+    INSEAM("안쪽 다리길이", MeasurementGroup.LENGTH, Confidence.HIGH),
+    OUTSEAM("바깥 다리길이", MeasurementGroup.LENGTH, Confidence.HIGH),
 
-    NECK("목둘레", MeasurementGroup.CIRCUMFERENCE, true, Confidence.LOW),
-    CHEST("가슴둘레", MeasurementGroup.CIRCUMFERENCE, true, Confidence.MEDIUM),
-    UNDERBUST("밑가슴둘레", MeasurementGroup.CIRCUMFERENCE, true, Confidence.LOW),
-    WAIST("허리둘레", MeasurementGroup.CIRCUMFERENCE, true, Confidence.MEDIUM),
-    HIP("엉덩이둘레", MeasurementGroup.CIRCUMFERENCE, true, Confidence.MEDIUM),
-    ARMHOLE("암홀둘레", MeasurementGroup.CIRCUMFERENCE, true, Confidence.LOW),
-    BICEP("팔뚝둘레", MeasurementGroup.CIRCUMFERENCE, true, Confidence.MEDIUM),
-    WRIST("손목둘레", MeasurementGroup.CIRCUMFERENCE, false, Confidence.LOW),
-    THIGH("허벅지둘레", MeasurementGroup.CIRCUMFERENCE, true, Confidence.MEDIUM),
-    CALF("종아리둘레", MeasurementGroup.CIRCUMFERENCE, true, Confidence.MEDIUM),
+    NECK("목둘레", MeasurementGroup.CIRCUMFERENCE, Confidence.LOW),
+    CHEST("가슴둘레", MeasurementGroup.CIRCUMFERENCE, Confidence.MEDIUM),
+    UNDERBUST("밑가슴둘레", MeasurementGroup.CIRCUMFERENCE, Confidence.LOW),
+    WAIST("허리둘레", MeasurementGroup.CIRCUMFERENCE, Confidence.MEDIUM),
+    HIP("엉덩이둘레", MeasurementGroup.CIRCUMFERENCE, Confidence.MEDIUM),
+    ARMHOLE("암홀둘레", MeasurementGroup.CIRCUMFERENCE, Confidence.LOW),
+    BICEP("팔뚝둘레", MeasurementGroup.CIRCUMFERENCE, Confidence.MEDIUM),
+    WRIST("손목둘레", MeasurementGroup.CIRCUMFERENCE, Confidence.LOW),
+    THIGH("허벅지둘레", MeasurementGroup.CIRCUMFERENCE, Confidence.MEDIUM),
+    CALF("종아리둘레", MeasurementGroup.CIRCUMFERENCE, Confidence.MEDIUM);
+
+    /** Key used by the backend API, e.g. "shoulder_width". */
+    val apiKey: String get() = name.lowercase()
 }
 
 enum class Gender(val label: String) {
@@ -83,7 +84,6 @@ data class AnalysisInput(
     val weightKg: Int?,
     val gender: Gender,
     val clothing: ClothingType,
-    val hasSidePhoto: Boolean,
 )
 
 data class AnalysisResult(

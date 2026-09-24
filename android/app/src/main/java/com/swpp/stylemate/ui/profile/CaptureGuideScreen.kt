@@ -37,7 +37,7 @@ private val CAPTURE_TIPS = listOf(
     "팔을 몸에서 살짝 떼고(A자 자세) 정면을 바라보고 서주세요.",
     "머리부터 발끝까지 전신이 화면에 모두 나오게 찍어주세요.",
     "휴대폰은 허리 높이에 두고, 밝고 단순한 배경에서 찍어주세요.",
-    "정면 사진은 필수, 측면 사진은 둘레 치수를 더 정확하게 해줘요.",
+    "정면과 측면 사진 두 장이 모두 필요해요. 측면 사진으로 몸의 두께를 재요.",
 )
 
 @Composable
@@ -71,8 +71,8 @@ fun CaptureGuideScreen(onStart: () -> Unit, onSkip: () -> Unit) {
                     .padding(vertical = 20.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly,
             ) {
-                PoseIllustration("정면 (필수)", side = false)
-                PoseIllustration("측면 (권장)", side = true)
+                PoseIllustration("정면", side = false)
+                PoseIllustration("측면", side = true)
             }
             Spacer(Modifier.height(20.dp))
             CAPTURE_TIPS.forEach { tip ->
