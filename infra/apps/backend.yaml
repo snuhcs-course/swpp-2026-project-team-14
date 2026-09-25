@@ -24,7 +24,7 @@ spec:
             - name: http
               containerPort: 8000
           resources:
-            # The body-analysis model needs ~280 MB resident (measured locally); 256Mi would OOM-kill it.
+            # The body-analysis model uses ~340 MiB in the container (measured); with 256Mi it is OOM-killed.
             requests:
               cpu: 250m
               memory: 512Mi
