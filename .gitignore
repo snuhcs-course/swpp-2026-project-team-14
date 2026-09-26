@@ -1,0 +1,17 @@
+# Local development state and credentials
+.local/
+.venv/
+.env
+.env.*
+!.env.example
+__pycache__/
+*.py[cod]
+# Android generated files and machine-specific settings
+.gradle/
+.kotlin/
+.idea/
+local.properties
+**/build/
+*.iml
+*.jks
+*.keystore
