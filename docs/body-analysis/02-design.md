@@ -15,6 +15,10 @@
 - Results and My Profile show a **cartoon body figure**: key measurements are pinned next to it, and tapping any body part shows that measurement.
 - Insights are cards led by a **body-shape type** (하체 볼륨형 / 상체 볼륨형 / 허리 라인형 / 일자형).
 
+**Open decisions (Iteration 1):**
+- **The results design is not final.** How to present the measurements (the body figure with values pinned around it, US-B2 AC1) is still to be discussed by the team. The current screen is a draft for that discussion.
+- **Confidence badges (높음 / 보통 / 낮음) are included on purpose for this stage** so we can check the pipeline. Users do not need to see them, so they will be removed from the final iteration. The confidence values stay in the API for internal use.
+
 ## 1. User stories and acceptance criteria
 
 **US-B1 — Measure my body during onboarding**
