@@ -8,7 +8,7 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
-from body_analysis import AnalysisError, AnalysisInput, Clothing, Gender
+from body_analysis import AnalysisError, AnalysisInput, Gender
 
 from . import services
 
@@ -57,11 +57,11 @@ def analyze(request):
             return _bad_request("weight_kg", "몸무게는 30~200kg 사이로 입력해주세요.")
     try:
         gender = Gender(request.POST.get("gender", Gender.UNSPECIFIED.value))
-        clothing = Clothing(request.POST.get("clothing", Clothing.UNDERWEAR.value))
     except ValueError as error:
-        return _bad_request("gender/clothing", str(error))
+        return _bad_request("gender", str(error))
+    # A "clothing" field sent by older app builds is ignored: clothing is now detected from the photos.
 
-    input_ = AnalysisInput(height_cm=height, weight_kg=weight, gender=gender, clothing=clothing)
+    input_ = AnalysisInput(height_cm=height, weight_kg=weight, gender=gender)
     front_bytes, side_bytes = front.read(), side.read()
     front.close()
     side.close()
@@ -78,7 +78,6 @@ def analyze(request):
             "height_cm": height,
             "weight_kg": weight,
             "gender": gender.value,
-            "clothing": clothing.value,
         },
         **result.to_dict(),
     }

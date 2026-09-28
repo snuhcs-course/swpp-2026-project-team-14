@@ -31,9 +31,18 @@ class Gender(str, Enum):
 
 
 class Clothing(str, Enum):
+    """Simulated clothing conditions in the synthetic dataset/benchmark (not an API input)."""
+
     UNDERWEAR = "underwear"
     TIGHT = "tight"
     LOOSE = "loose"
+
+
+class Region(str, Enum):
+    """Garment regions whose looseness is detected separately."""
+
+    TOP = "top"
+    BOTTOM = "bottom"
 
 
 class MeasurementType(str, Enum):
@@ -94,12 +103,59 @@ _BASE_CONFIDENCE = {
 }
 
 
+# Measurements that a loose garment in each region distorts (synthetic benchmark §8).
+LOOSE_AFFECTS: dict[Region, frozenset[MeasurementType]] = {
+    Region.TOP: frozenset({
+        MeasurementType.NECK,
+        MeasurementType.SHOULDER_WIDTH,
+        MeasurementType.CHEST,
+        MeasurementType.UNDERBUST,
+        MeasurementType.WAIST,
+        MeasurementType.ARMHOLE,
+        MeasurementType.BICEP,
+        MeasurementType.TORSO_LENGTH,
+    }),
+    Region.BOTTOM: frozenset({
+        MeasurementType.HIP,
+        MeasurementType.THIGH,
+        MeasurementType.CALF,
+        MeasurementType.INSEAM,
+        MeasurementType.RISE,
+    }),
+}
+
+
 @dataclass(frozen=True)
 class AnalysisInput:
     height_cm: float
     weight_kg: float | None = None
     gender: Gender = Gender.UNSPECIFIED
-    clothing: Clothing = Clothing.UNDERWEAR
+
+
+@dataclass(frozen=True)
+class ClothingAssessment:
+    """What the pipeline detected about the clothing in the photos."""
+
+    top_loose: bool = False
+    bottom_loose: bool = False
+    top_probability: float | None = None  # None = no detector available
+    bottom_probability: float | None = None
+
+    @property
+    def loose_regions(self) -> set[Region]:
+        return {r for r, loose in ((Region.TOP, self.top_loose), (Region.BOTTOM, self.bottom_loose)) if loose}
+
+    def affected(self) -> set[MeasurementType]:
+        """Measurements distorted by the detected loose garments."""
+        return set().union(*(LOOSE_AFFECTS[r] for r in self.loose_regions)) if self.loose_regions else set()
+
+    def to_dict(self) -> dict:
+        return {
+            "top": "loose" if self.top_loose else "fitted",
+            "bottom": "loose" if self.bottom_loose else "fitted",
+            "top_loose_probability": None if self.top_probability is None else round(self.top_probability, 3),
+            "bottom_loose_probability": None if self.bottom_probability is None else round(self.bottom_probability, 3),
+        }
 
 
 @dataclass(frozen=True)
@@ -118,6 +174,7 @@ class AnalysisResult:
     derived: dict[str, float]
     warnings: list[str] = field(default_factory=list)
     pipeline_version: str = ""
+    clothing: ClothingAssessment = field(default_factory=ClothingAssessment)
 
     def value(self, type_: MeasurementType) -> float | None:
         return next((m.value_cm for m in self.measurements if m.type is type_), None)
@@ -128,6 +185,7 @@ class AnalysisResult:
             "measurements": [m.to_dict() for m in self.measurements],
             "derived": self.derived,
             "warnings": self.warnings,
+            "clothing": self.clothing.to_dict(),
         }
 
 

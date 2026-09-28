@@ -1,7 +1,7 @@
 """Run the pipeline on local photos.
 
     python -m body_analysis.cli --front front.jpg --side side.jpg --height 172 --weight 65 \
-        --gender male --clothing underwear --debug-dir out/
+        --gender male --debug-dir out/
 
 Prints the API-shaped JSON. With --debug-dir, also writes overlay images (person mask, landmarks,
 measured lines) so you can check *where* each value was measured. Photos never leave this machine.
@@ -16,11 +16,12 @@ from pathlib import Path
 
 import numpy as np
 
+from .clothing import ClothingDetector
 from .measurer import RawMeasurements
 from .pipeline import BodyAnalysisPipeline, decode_image
 from .pose import MediaPipePoseEstimator
 from .regressor import MeasurementCorrector
-from .types import AnalysisError, AnalysisInput, Clothing, Gender
+from .types import AnalysisError, AnalysisInput, Gender
 
 GUIDE_COLORS = {"front": (255, 90, 40), "side": (40, 160, 255)}
 
@@ -51,18 +52,20 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--height", type=float, required=True, help="cm")
     parser.add_argument("--weight", type=float, help="kg")
     parser.add_argument("--gender", choices=[g.value for g in Gender], default=Gender.UNSPECIFIED.value)
-    parser.add_argument("--clothing", choices=[c.value for c in Clothing], default=Clothing.UNDERWEAR.value)
     parser.add_argument("--debug-dir", type=Path, help="write overlay PNGs here")
-    parser.add_argument("--geometry-only", action="store_true", help="skip the learned correction")
+    parser.add_argument("--geometry-only", action="store_true", help="skip the learned models")
     args = parser.parse_args(argv)
 
     missing = [str(p) for p in (args.front, args.side) if not p.is_file()]
     if missing:
         parser.error(f"photo not found: {', '.join(missing)} (current folder: {Path.cwd()})")
 
-    input_ = AnalysisInput(args.height, args.weight, Gender(args.gender), Clothing(args.clothing))
+    input_ = AnalysisInput(args.height, args.weight, Gender(args.gender))
     estimator = MediaPipePoseEstimator()
-    pipeline = BodyAnalysisPipeline(estimator, None if args.geometry_only else MeasurementCorrector.load())
+    if args.geometry_only:
+        pipeline = BodyAnalysisPipeline(estimator)
+    else:
+        pipeline = BodyAnalysisPipeline(estimator, MeasurementCorrector.load(), ClothingDetector.load())
     try:
         front = decode_image(args.front.read_bytes())
         side = decode_image(args.side.read_bytes())

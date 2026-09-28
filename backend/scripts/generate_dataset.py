@@ -109,7 +109,7 @@ def main() -> int:
                 side = sb.render(dressed, "side", yaw_deg=cam["side_yaw_deg"], **common)
                 if index < 3:
                     cv2.imwrite(str(args.out / f"{spec['name']}_{condition}_front.png"), cv2.cvtColor(front, cv2.COLOR_RGB2BGR))
-                input_ = AnalysisInput(round(height_cm, 1), None, body.gender, sb.CLOTHING_FLAG[condition])
+                input_ = AnalysisInput(round(height_cm, 1), None, body.gender)
                 row = {
                     "body": spec["name"],
                     "condition": condition,

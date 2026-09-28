@@ -35,7 +35,8 @@ from body_analysis.cli import draw_overlay  # noqa: E402
 from body_analysis.pipeline import BodyAnalysisPipeline  # noqa: E402
 from body_analysis.pose import MediaPipePoseEstimator  # noqa: E402
 from body_analysis.regressor import MeasurementCorrector  # noqa: E402
-from body_analysis.types import AnalysisError, AnalysisInput, Clothing, Gender, MeasurementType as M  # noqa: E402
+from body_analysis.clothing import ClothingDetector  # noqa: E402
+from body_analysis.types import AnalysisError, AnalysisInput, Gender, MeasurementType as M, Region  # noqa: E402
 
 IMAGE_W, IMAGE_H = 960, 1280
 CAMERA_DISTANCE_M = 2.5
@@ -339,7 +340,6 @@ CONDITIONS: dict[str, dict[str, float] | None] = {
     "tight": {"top": 0.005, "pants": 0.005},
     "loose": {"top": 0.04, "pants": 0.04},
 }
-CLOTHING_FLAG = {"underwear": Clothing.UNDERWEAR, "tight": Clothing.TIGHT, "loose": Clothing.LOOSE}
 
 
 def dress(body: Body, offsets: dict[str, float] | None) -> Body:
@@ -391,7 +391,7 @@ class InsightRule:
     margin: float
     higher_is_positive: bool
     two_sided: bool  # shows an opposite sentence when clearly on the other side (long legs / long torso)
-    hidden_when_loose: bool = True
+    regions: tuple[Region, ...] = ()  # hidden when loose clothing is detected in any of these regions
 
     def truth_side(self, m, h) -> int:
         """+1 / -1: which side of the threshold the body really is on (no margin)."""
@@ -410,10 +410,10 @@ class InsightRule:
 
 
 INSIGHT_RULES = {
-    "leg_proportion": InsightRule(lambda m, h: m[M.INSEAM] / h, 0.46, 0.01, True, two_sided=True),
-    "broad_shoulders": InsightRule(lambda m, h: m[M.SHOULDER_WIDTH] / h, 0.255, 0.01, True, two_sided=False),
-    "lower_body_volume": InsightRule(lambda m, h: m[M.HIP] / m[M.CHEST], 1.05, 0.05, True, two_sided=False),
-    "defined_waist": InsightRule(lambda m, h: m[M.WAIST] / m[M.HIP], 0.75, 0.05, False, two_sided=False),
+    "leg_proportion": InsightRule(lambda m, h: m[M.INSEAM] / h, 0.46, 0.01, True, True, (Region.BOTTOM,)),
+    "broad_shoulders": InsightRule(lambda m, h: m[M.SHOULDER_WIDTH] / h, 0.255, 0.01, True, False, (Region.TOP,)),
+    "lower_body_volume": InsightRule(lambda m, h: m[M.HIP] / m[M.CHEST], 1.05, 0.05, True, False, (Region.TOP, Region.BOTTOM)),
+    "defined_waist": InsightRule(lambda m, h: m[M.WAIST] / m[M.HIP], 0.75, 0.05, False, False, (Region.TOP, Region.BOTTOM)),
 }
 
 
@@ -423,7 +423,7 @@ def insight_table(insight_rows: list[dict], modes: list[str]) -> list[str]:
         "",
         "Per body: *correct* = a sentence is shown and matches the true body; *wrong* = a sentence is shown",
         "and contradicts it; *missed* = the true body qualifies for a sentence but none is shown (inside the",
-        "margin, or hidden because of loose clothing).",
+        "margin, or hidden because loose clothing was detected in its region).",
         "",
         "| Condition | Insight | Correct | Wrong on screen | Missed |",
         "|---|---|---|---|---|",
@@ -440,6 +440,17 @@ def insight_table(insight_rows: list[dict], modes: list[str]) -> list[str]:
     return lines + [""]
 
 
+def detection_table(detections: list[dict]) -> list[str]:
+    lines = ["### Detected clothing", "", "| Simulated condition | Bodies | Top flagged loose | Bottom flagged loose |", "|---|---|---|---|"]
+    for condition in CONDITIONS:
+        data = [d for d in detections if d["condition"] == condition]
+        if data:
+            top = sum(d["clothing"].top_loose for d in data)
+            bottom = sum(d["clothing"].bottom_loose for d in data)
+            lines.append(f"| {condition} | {len(data)} | {top} | {bottom} |")
+    return lines + [""]
+
+
 # --- main -------------------------------------------------------------------------------------
 
 def main() -> int:
@@ -453,11 +464,13 @@ def main() -> int:
     print("loading Anny and generating bodies…", flush=True)
     bodies = make_bodies(BODIES[: args.bodies])
     estimator = MediaPipePoseEstimator()
-    # "geometry" = pure geometric pipeline; "learned" = + the shipped learned correction (if any)
-    pipelines = {"geometry": BodyAnalysisPipeline(estimator)}
+    # Both pipelines detect clothing; "learned" also applies the learned measurement correction.
+    detector = ClothingDetector.load()
+    pipelines = {"geometry": BodyAnalysisPipeline(estimator, None, detector)}
     corrector = MeasurementCorrector.load()
     if corrector is not None:
-        pipelines["learned"] = BodyAnalysisPipeline(estimator, corrector)
+        pipelines["learned"] = BodyAnalysisPipeline(estimator, corrector, detector)
+    detections = []
     modes = [f"{c} / {p}" for c in CONDITIONS for p in pipelines]
 
     rows, insight_rows = [], []
@@ -466,7 +479,7 @@ def main() -> int:
         for condition, offsets in CONDITIONS.items():
             dressed = dress(body, offsets)
             front, side = render(dressed, "front"), render(dressed, "side")
-            input_ = AnalysisInput(round(height_cm, 1), None, body.gender, CLOTHING_FLAG[condition])
+            input_ = AnalysisInput(round(height_cm, 1), None, body.gender)  # clothing is detected
             for pipeline_name, pipeline in pipelines.items():
                 mode = f"{condition} / {pipeline_name}"
                 try:
@@ -482,6 +495,8 @@ def main() -> int:
                         name = f"{body.name}_{condition}_{view}_overlay.png"
                         cv2.imwrite(str(args.out / name), cv2.cvtColor(overlay, cv2.COLOR_RGB2BGR))
                 predicted = {m.type: m.value_cm for m in result.measurements}
+                if pipeline_name == "geometry":
+                    detections.append({"condition": condition, "offsets": offsets, "clothing": result.clothing})
                 for type_ in EVALUATED:
                     if type_ not in predicted or not np.isfinite(truth[type_]):
                         continue
@@ -494,7 +509,7 @@ def main() -> int:
                         "error_cm": round(predicted[type_] - truth[type_], 1),
                     })
                 for name, rule in INSIGHT_RULES.items():
-                    hidden = rule.hidden_when_loose and condition == "loose"
+                    hidden = bool(set(rule.regions) & result.clothing.loose_regions)
                     insight_rows.append({
                         "mode": mode,
                         "insight": name,
@@ -510,7 +525,9 @@ def main() -> int:
         writer.writeheader()
         writer.writerows(rows)
 
-    summary = "\n".join(summarise(rows, [b.name for b in bodies], modes) + insight_table(insight_rows, modes))
+    summary = "\n".join(
+        summarise(rows, [b.name for b in bodies], modes) + insight_table(insight_rows, modes) + detection_table(detections)
+    )
     (args.out / "summary.md").write_text(summary + "\n", encoding="utf-8")
     print(summary)
     print(f"\n{len(bodies)} bodies × {len(modes)} conditions in {time.time() - started:.0f} s → {args.out}")

@@ -1,7 +1,8 @@
 import numpy as np
 import pytest
 
-from body_analysis import AnalysisError, AnalysisInput, BodyAnalysisPipeline, Clothing, Confidence, Gender, MeasurementType
+from body_analysis import AnalysisError, AnalysisInput, BodyAnalysisPipeline, Confidence, Gender, MeasurementType
+from body_analysis.types import ClothingAssessment
 from body_analysis.pipeline import decode_image
 
 from . import synthetic as syn
@@ -20,10 +21,22 @@ class FakeEstimator:
 IMAGE = np.zeros((10, 10, 3), np.uint8)
 
 
-def run(front, side=None, **input_kwargs):
+class FakeDetector:
+    """Reports a fixed clothing assessment."""
+
+    version = "fake-clothing"
+
+    def __init__(self, assessment: ClothingAssessment):
+        self.assessment = assessment
+
+    def assess(self, features, gender):
+        return self.assessment
+
+
+def run(front, side=None, detector=None, **input_kwargs):
     """Runs the pipeline with fake poses. `side` defaults to the mannequin's side view."""
     side = side if side is not None else syn.side_pose()
-    pipeline = BodyAnalysisPipeline(FakeEstimator(front, side))
+    pipeline = BodyAnalysisPipeline(FakeEstimator(front, side), detector=detector)
     input_ = AnalysisInput(height_cm=syn.HEIGHT_CM, **input_kwargs)
     result, _ = pipeline.analyze_images(IMAGE, IMAGE, input_)
     return result
@@ -41,11 +54,31 @@ def test_ideal_input_keeps_base_confidence_and_no_warnings():
         assert m.value_cm * 2 == int(m.value_cm * 2)  # 0.5 cm steps
 
 
-def test_loose_clothing_still_works_but_lowers_circumferences():
-    result = run(syn.front_pose(), syn.side_pose(), weight_kg=65, clothing=Clothing.LOOSE)
-    assert "loose_clothing" in result.warnings
-    assert confidence(result, MeasurementType.CHEST) is Confidence.LOW
-    assert confidence(result, MeasurementType.INSEAM) is Confidence.HIGH
+def test_detected_loose_top_warns_and_lowers_only_upper_body():
+    detector = FakeDetector(ClothingAssessment(top_loose=True, top_probability=0.9, bottom_probability=0.1))
+    result = run(syn.front_pose(), weight_kg=65, detector=detector)
+    assert result.warnings == ["loose_top"]
+    assert confidence(result, MeasurementType.CHEST) is Confidence.LOW  # medium → low
+    assert confidence(result, MeasurementType.SHOULDER_WIDTH) is Confidence.MEDIUM  # high → medium
+    assert confidence(result, MeasurementType.INSEAM) is Confidence.HIGH  # legs untouched
+    assert result.clothing.to_dict()["top"] == "loose"
+    assert result.pipeline_version.endswith("+fake-clothing")
+
+
+def test_detected_loose_bottom_lowers_legs():
+    result = run(syn.front_pose(), weight_kg=65, detector=FakeDetector(ClothingAssessment(bottom_loose=True)))
+    assert result.warnings == ["loose_bottom"]
+    assert confidence(result, MeasurementType.INSEAM) is Confidence.MEDIUM
+    assert confidence(result, MeasurementType.HIP) is Confidence.LOW
+    assert confidence(result, MeasurementType.CHEST) is Confidence.MEDIUM
+
+
+def test_without_detector_clothing_is_assumed_fitted():
+    result = run(syn.front_pose(), weight_kg=65)
+    assert result.clothing == ClothingAssessment()
+    assert result.to_dict()["clothing"] == {
+        "top": "fitted", "bottom": "fitted", "top_loose_probability": None, "bottom_loose_probability": None,
+    }
 
 
 def test_side_photo_is_required():

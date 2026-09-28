@@ -17,10 +17,11 @@ _pipeline: BodyAnalysisPipeline | None = None
 def get_pipeline() -> BodyAnalysisPipeline:
     global _pipeline
     if _pipeline is None:
+        from body_analysis.clothing import ClothingDetector
         from body_analysis.pose import MediaPipePoseEstimator
         from body_analysis.regressor import MeasurementCorrector
 
-        _pipeline = BodyAnalysisPipeline(MediaPipePoseEstimator(), MeasurementCorrector.load())
+        _pipeline = BodyAnalysisPipeline(MediaPipePoseEstimator(), MeasurementCorrector.load(), ClothingDetector.load())
     return _pipeline
 
 

@@ -7,15 +7,15 @@ import numpy as np
 from .geometry import largest_component, vertical_extent
 from .measurer import RawMeasurements, measure
 from .pose import PoseEstimator, PoseResult
+from .clothing import ClothingDetector
 from .regressor import MeasurementCorrector
 from .types import (
     AnalysisError,
     AnalysisInput,
     AnalysisResult,
-    Clothing,
+    ClothingAssessment,
     Confidence,
     Gender,
-    Group,
     Measurement,
     MeasurementType,
 )
@@ -83,19 +83,21 @@ def check_quality(pose: PoseResult | None, view: str) -> PoseResult:
     return pose
 
 
-def score_confidence(type_: MeasurementType, clothing: Clothing, mean_visibility: float) -> Confidence:
+def score_confidence(type_: MeasurementType, clothing: ClothingAssessment, mean_visibility: float) -> Confidence:
     confidence = type_.base_confidence
-    if clothing is Clothing.LOOSE and type_.group is Group.CIRCUMFERENCE:
+    if type_ in clothing.affected():
         confidence = confidence.downgrade()
     if mean_visibility < LOW_VISIBILITY:
         confidence = confidence.downgrade()
     return confidence
 
 
-def build_warnings(input_: AnalysisInput, raw: RawMeasurements) -> list[str]:
+def build_warnings(input_: AnalysisInput, clothing: ClothingAssessment, raw: RawMeasurements) -> list[str]:
     warnings = []
-    if input_.clothing is Clothing.LOOSE:
-        warnings.append("loose_clothing")
+    if clothing.top_loose:
+        warnings.append("loose_top")
+    if clothing.bottom_loose:
+        warnings.append("loose_bottom")
     if input_.weight_kg is None:
         warnings.append("no_weight")
     return warnings + raw.warnings
@@ -111,10 +113,17 @@ def _derived_from(values: dict[MeasurementType, float], height_cm: float) -> dic
 
 
 class BodyAnalysisPipeline:
-    def __init__(self, estimator: PoseEstimator, corrector: MeasurementCorrector | None = None):
-        """`corrector`: optional learned correction (MeasurementCorrector.load()); None = pure geometry."""
+    def __init__(
+        self,
+        estimator: PoseEstimator,
+        corrector: MeasurementCorrector | None = None,
+        detector: ClothingDetector | None = None,
+    ):
+        """`corrector`: learned correction (MeasurementCorrector.load()); None = pure geometry.
+        `detector`: loose-clothing detector (ClothingDetector.load()); None = assume fitted clothing."""
         self.estimator = estimator
         self.corrector = corrector
+        self.detector = detector
 
     def analyze_images(
         self,
@@ -129,16 +138,20 @@ class BodyAnalysisPipeline:
 
         raw = measure(front, side, input_.height_cm)
         version = PIPELINE_VERSION
-        if self.corrector is not None and self.corrector.applies_to(input_):
-            raw.values = self.corrector.correct(raw.values, raw.features, input_)
+        clothing = ClothingAssessment()
+        if self.detector is not None:
+            clothing = self.detector.assess(raw.features, input_.gender)
+            version += f"+{self.detector.version}"
+        if self.corrector is not None:
+            raw.values = self.corrector.correct(raw.values, raw.features, input_, skip=clothing.affected())
             raw.derived.update(_derived_from(raw.values, input_.height_cm))
-            version = f"{PIPELINE_VERSION}+{self.corrector.version}"
+            version += f"+{self.corrector.version}"
         mean_visibility = float(np.mean([front.landmarks[n].visibility for n in REQUIRED_LANDMARKS]))
         measurements = [
             Measurement(
                 type=type_,
                 value_cm=round(value * 2) / 2,  # 0.5 cm steps
-                confidence=score_confidence(type_, input_.clothing, mean_visibility),
+                confidence=score_confidence(type_, clothing, mean_visibility),
             )
             for type_, value in raw.values.items()
             if type_ is not MeasurementType.UNDERBUST or input_.gender is Gender.FEMALE
@@ -147,8 +160,9 @@ class BodyAnalysisPipeline:
         result = AnalysisResult(
             measurements=measurements,
             derived=raw.derived,
-            warnings=build_warnings(input_, raw),
+            warnings=build_warnings(input_, clothing, raw),
             pipeline_version=version,
+            clothing=clothing,
         )
         return result, raw
 

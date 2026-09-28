@@ -33,10 +33,11 @@ def post(client, **overrides):
 
 
 def test_analyze_returns_measurements(client):
-    response = post(client, weight_kg="65", gender="female", clothing="tight")
+    response = post(client, weight_kg="65", gender="female", clothing="tight")  # clothing: ignored (old clients)
     assert response.status_code == 200
     body = response.json()
-    assert body["inputs"] == {"height_cm": 170.0, "weight_kg": 65.0, "gender": "female", "clothing": "tight"}
+    assert body["inputs"] == {"height_cm": 170.0, "weight_kg": 65.0, "gender": "female"}
+    assert body["clothing"]["top"] in ("fitted", "loose")
     types = {m["type"] for m in body["measurements"]}
     assert {"chest", "waist", "hip", "inseam", "underbust"} <= types
     assert body["pipeline_version"] and body["analysis_id"]
@@ -58,7 +59,7 @@ def test_quality_gate_errors_are_422(client):
     assert body["hint"]
 
 
-@pytest.mark.parametrize("field, value", [("height_cm", "90"), ("height_cm", "abc"), ("weight_kg", "500"), ("clothing", "coat")])
+@pytest.mark.parametrize("field, value", [("height_cm", "90"), ("height_cm", "abc"), ("weight_kg", "500"), ("gender", "robot")])
 def test_invalid_fields_are_400(client, field, value):
     response = post(client, **{field: value})
     assert response.status_code == 400

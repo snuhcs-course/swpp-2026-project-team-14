@@ -28,7 +28,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from body_analysis.regressor import DEFAULT_MODEL_PATH, input_features  # noqa: E402
-from body_analysis.types import AnalysisInput, Clothing, Gender, MeasurementType as M  # noqa: E402
+from body_analysis.types import AnalysisInput, Gender, MeasurementType as M  # noqa: E402
 
 EVALUATED = [
     M.SHOULDER_WIDTH, M.SLEEVE_LENGTH, M.TORSO_LENGTH, M.RISE, M.INSEAM, M.OUTSEAM,
@@ -60,7 +60,6 @@ def to_matrix(rows: list[dict], names: list[str], with_weight: bool) -> np.ndarr
             height_cm=float(r["height_cm"]),
             weight_kg=float(r["weight_kg"]) if with_weight else None,
             gender=Gender(r["gender"]),
-            clothing=Clothing(r["condition"]),
         )
         values = {**{k: r.get(k) for k in names}, **input_features(inp)}
         for j, name in enumerate(names):
@@ -205,7 +204,7 @@ def main() -> int:
     if args.export:
         DEFAULT_MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
         payload = {
-            "version": "ridge-1",
+            "version": "ridge-2",
             "trained_on": f"{len(bodies) - len(test_bodies)} synthetic Anny bodies, conditions {list(DEPLOY_CONDITIONS)}",
             "conditions": list(DEPLOY_CONDITIONS),
             "target": "measurement_cm / height_cm",
