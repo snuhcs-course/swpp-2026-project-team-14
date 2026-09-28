@@ -33,10 +33,9 @@ import androidx.compose.ui.unit.dp
 import com.swpp.stylemate.data.AnalysisInput
 import com.swpp.stylemate.data.BodyMeasurement
 import com.swpp.stylemate.data.BodyProfile
-import com.swpp.stylemate.data.ClothingType
+import com.swpp.stylemate.data.DetectedClothing
 import com.swpp.stylemate.data.Confidence
 import com.swpp.stylemate.data.Gender
-import com.swpp.stylemate.data.MeasurementGroup
 import com.swpp.stylemate.data.MeasurementType
 import com.swpp.stylemate.data.PreferredFit
 import com.swpp.stylemate.data.buildInsights
@@ -65,19 +64,15 @@ fun MyProfileScreen(
             return@Column
         }
 
+        Spacer(Modifier.height(16.dp))
+        BodyFigureCard(measurements = profile.measurements, gender = profile.input.gender, onEdit = null)
+
+        InsightSection(buildInsights(profile))
+
+        AllMeasurementsSection(profile.measurements, onClick = null)
+
         SectionTitle("기본 정보")
         InfoCard(profile)
-
-        val insights = buildInsights(profile)
-        if (insights.isNotEmpty()) {
-            SectionTitle("체형 인사이트")
-            insights.forEach { InsightCard(it) }
-        }
-
-        MeasurementGroup.entries.forEach { group ->
-            SectionTitle(group.label, "cm")
-            MeasurementCard(items = profile.measurements.filter { it.type.group == group }, onClick = null)
-        }
 
         Spacer(Modifier.height(12.dp))
         Text(
@@ -130,7 +125,7 @@ private fun InfoCard(profile: BodyProfile) {
     val rows = listOf(
         "키" to "${profile.input.heightCm} cm",
         "몸무게" to (profile.input.weightKg?.let { "$it kg" } ?: "입력 안 함"),
-        "촬영 복장" to profile.input.clothing.label,
+        "촬영 복장" to "자동 판단 · ${profile.clothing.label}",
         "선호 핏" to profile.preferredFit.label,
         "선호 스타일" to profile.preferredStyles.ifEmpty { listOf("선택 안 함") }.joinToString(", "),
     )
@@ -149,25 +144,11 @@ private fun InfoCard(profile: BodyProfile) {
     }
 }
 
-@Composable
-private fun InsightCard(text: String) {
-    Text(
-        text,
-        style = MaterialTheme.typography.bodyMedium,
-        modifier = Modifier
-            .padding(bottom = 8.dp)
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f))
-            .padding(14.dp),
-    )
-}
-
 @Preview(showBackground = true, heightDp = 1800)
 @Composable
 private fun MyProfilePreview() {
     val profile = BodyProfile(
-        input = AnalysisInput(172, 65, Gender.MALE, ClothingType.TIGHT),
+        input = AnalysisInput(172, 65, Gender.MALE),
         measurements = listOf(
             BodyMeasurement(MeasurementType.SHOULDER_WIDTH, 45.0, Confidence.HIGH),
             BodyMeasurement(MeasurementType.INSEAM, 80.0, Confidence.HIGH),
@@ -177,6 +158,7 @@ private fun MyProfilePreview() {
         ),
         preferredFit = PreferredFit.LOOSE,
         preferredStyles = listOf("미니멀", "캐주얼"),
+        clothing = DetectedClothing(),
     )
     StyleMateTheme { MyProfileScreen(profile, onReanalyze = {}, onDelete = {}) }
 }

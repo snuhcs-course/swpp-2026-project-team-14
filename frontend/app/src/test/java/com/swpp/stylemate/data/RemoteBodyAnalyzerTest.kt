@@ -5,6 +5,7 @@ import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Before
@@ -13,7 +14,7 @@ import org.junit.Test
 class RemoteBodyAnalyzerTest {
 
     private lateinit var server: MockWebServer
-    private val input = AnalysisInput(172, 65, Gender.FEMALE, ClothingType.LOOSE)
+    private val input = AnalysisInput(172, 65, Gender.FEMALE)
     private val photos = BodyPhotos(byteArrayOf(1, 2, 3), byteArrayOf(4, 5, 6))
 
     @Before
@@ -45,7 +46,9 @@ class RemoteBodyAnalyzerTest {
                       {"type": "shoulder_width", "value_cm": 40.5, "confidence": "high"},
                       {"type": "chest", "value_cm": 92.0, "confidence": "low"},
                       {"type": "future_measurement", "value_cm": 1.0, "confidence": "low"}],
-                    "derived": {}, "warnings": ["loose_clothing", "arms_touching_body"]}""",
+                    "clothing": {"top": "loose", "bottom": "fitted",
+                                 "top_loose_probability": 0.91, "bottom_loose_probability": 0.12},
+                    "derived": {}, "warnings": ["loose_top", "arms_touching_body"]}""",
             ),
         )
         val result = analyzer().analyze(input, photos)
@@ -57,7 +60,14 @@ class RemoteBodyAnalyzerTest {
             ),
             result.measurements, // unknown types from a newer server are skipped
         )
-        assertEquals(listOf(warningText("loose_clothing"), warningText("arms_touching_body")), result.warnings)
+        assertEquals(listOf(warningText("loose_top"), warningText("arms_touching_body")), result.warnings)
+        assertEquals(DetectedClothing(topLoose = true, bottomLoose = false), result.clothing)
+    }
+
+    @Test
+    fun missingClothing_meansFitted() = runBlocking {
+        server.enqueue(MockResponse().setBody("""{"measurements": [], "warnings": []}"""))
+        assertEquals(DetectedClothing(), analyzer().analyze(input, photos).clothing)
     }
 
     @Test
@@ -71,8 +81,9 @@ class RemoteBodyAnalyzerTest {
         listOf(
             "name=\"front_photo\"", "name=\"side_photo\"",
             "name=\"height_cm\"", "172", "name=\"weight_kg\"", "65",
-            "name=\"gender\"", "female", "name=\"clothing\"", "loose",
+            "name=\"gender\"", "female",
         ).forEach { assertTrue(it, it in body) }
+        assertFalse("clothing is detected by the server, not sent", "name=\"clothing\"" in body)
     }
 
     @Test

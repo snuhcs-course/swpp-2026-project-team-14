@@ -10,6 +10,11 @@
 - Users are guided to wear **underwear or tight clothing**; loose clothing still works but lowers confidence.
 - Privacy requirements are stricter because photos may show underwear.
 
+**Rev. 4 changes (2026-09-28), after trying the prototype:**
+- Users are **no longer asked what they wore**. The server detects loose tops and bottoms from the silhouette (`06-clothing-detection.md`) and warns per region.
+- Results and My Profile show a **cartoon body figure**: key measurements are pinned next to it, and tapping any body part shows that measurement.
+- Insights are cards led by a **body-shape type** (하체 볼륨형 / 상체 볼륨형 / 허리 라인형 / 일자형).
+
 ## 1. User stories and acceptance criteria
 
 **US-B1 — Measure my body during onboarding**
@@ -22,29 +27,30 @@
   - use a plain background
 - AC2: I add a **front photo and a side photo (both required)** from the camera or the gallery, and I see previews. "분석하기" stays disabled until both are added.
 - AC3: Height is required (100–220 cm). Weight (30–200 kg) and gender (for size charts) are optional.
-- AC4: I say what I wore: underwear / tight clothing / everyday-loose clothing.
+- AC4: I am not asked what I wore. The input screen says underwear or tight clothing gives the best accuracy and that loose clothing is detected automatically.
 - AC5: While analysis runs I see a progress state. On success I see results within 5 s (p95, server path).
 - AC6: If a photo is unusable (no person, several people, body cut off, wrong view), I get a specific retake hint.
 - AC7: I can skip and create the profile later from My Profile.
 
 **US-B2 — Review and correct the measurements**
 *As a user, I want to see each estimated measurement and fix wrong ones.*
-- AC1: Measurements are grouped into lengths and circumferences, each with a confidence badge (high / medium / low).
-- AC2: If I wore loose clothing, a warning says circumference accuracy is reduced and suggests retaking in tight clothing. The analysis still returns results.
+- AC1: A body figure matching my gender (female / male / neutral) shows 어깨너비·가슴둘레·허리둘레·엉덩이둘레·안쪽 다리길이 as always-visible chips. Every other measurement is a highlighted dot; tapping it shows its name, description, value and confidence badge. The full list (lengths and circumferences) is available, collapsed, below the insights.
+- AC2: If the server detects a loose top and/or bottom, a warning names the affected measurements and suggests retaking in underwear or tight clothing. Only the affected measurements lose confidence. The analysis still returns results.
 - AC3: If I gave no weight, a warning says circumferences would be more accurate with it.
-- AC4: Tapping a value opens an editor. An edited value is marked "직접 수정함" and treated as ground truth.
+- AC4: "수정" on the tapped part (or tapping a row in the full list) opens an editor. An edited value is marked "직접 수정함" and treated as ground truth.
 - AC5: I choose a preferred fit (slim / regular / loose) and up to 3 styles (미니멀, 캐주얼, 스트릿, 러블리, 클래식, 스포티). A 4th style cannot be selected.
 - AC6: "옷장 등록하고 시작하기" saves the profile and opens the main app.
 
 **US-B3 — See my profile and insights (My Profile tab)**
-- AC1: Shows basic info, the confirmed measurements, and 2–4 styling insights derived from them.
+- AC1: Shows the same body figure and insight cards as the results screen (read-only), the full list collapsed, and basic info including the detected clothing ("자동 판단 · 몸에 붙는 옷 / 헐렁한 상의 …").
+- The results screen shows the same insight cards directly below the figure, before the profile is saved.
 - AC2: Insights use neutral, styling-only wording. No weight/health/"obesity" terms.
 - AC3: A disclaimer states the values are approximate styling estimates, not medical measurements.
-- AC4: If the photos were taken in loose clothing, all proportion insights (leg proportion, broad shoulders, lower-body volume, defined waist) are hidden, and a note suggests retaking in tight clothing. An insight is shown again if the user typed its values in themselves. Evidence: `04-synthetic-benchmark.md` §8.
+- AC4: An insight is hidden when loose clothing was detected in a region it depends on (body type: top and bottom; leg proportion: bottom; shoulders: top), and a note suggests retaking in tight clothing. An insight is shown again if the user typed its values in themselves. Evidence: `04-synthetic-benchmark.md` §8.
 - AC5: An insight is only shown when its ratio is clearly past the rule's threshold (margin ≈ measurement error). Near the threshold nothing is shown rather than a possibly wrong sentence. Evidence: `04-synthetic-benchmark.md` §9.
 
 **US-B4 — Re-measure**
-- AC1: "체형 다시 분석하기" reopens the flow pre-filled with my height, weight, gender, clothing and preferences.
+- AC1: "체형 다시 분석하기" reopens the flow pre-filled with my height, weight, gender and preferences.
 - AC2: The previous profile stays until the new one is confirmed. Leaving the flow keeps the old profile.
 
 **US-B5 — Privacy of body photos**
@@ -79,7 +85,7 @@ Expected accuracy assumes underwear or tight clothing. It is validated in the be
 
 **Confidence rules** (v1, implemented in the prototype's `FakeBodyAnalyzer.confidenceFor` and to be reused by the server):
 - Start from the expected accuracy above.
-- Downgrade one level for circumferences when clothing is "everyday / loose".
+- Downgrade one level for the measurements a detected loose garment distorts: top → neck, shoulder width, chest, underbust, waist, armhole, bicep, torso length; bottom → hip, thigh, calf, inseam, rise (`LOOSE_AFFECTS`, same table on server and app).
 - The real pipeline additionally lowers confidence for poor landmark visibility, crop or angle.
 
 **Derived styling features** (computed from the measurements, used by recommendation):
@@ -96,7 +102,7 @@ Expected accuracy assumes underwear or tight clothing. It is validated in the be
 | NFR-B1 | Analysis latency (server, CPU) | p95 ≤ 5 s including upload on Wi-Fi; inference ≤ 1.5 s for two photos |
 | NFR-B2 | Robustness | ≥ 90 % of valid photos produce results; invalid photos get a specific retake reason |
 | NFR-B3 | Accuracy, tight clothing, both photos (vs. tape) | lengths MAE ≤ 2.5 cm; chest/waist/hip MAE ≤ 4 cm; low-confidence items reported but not targeted |
-| NFR-B4 | Loose-clothing behaviour | still returns all measurements; circumference confidence lowered; warning shown in 100 % of loose cases |
+| NFR-B4 | Loose-clothing behaviour | detected without asking the user (synthetic held-out: top recall 1.00, bottom 0.96, false alarms ≤ 1.1 %); still returns all measurements; affected confidence lowered; warning shown whenever detected |
 | NFR-B5 | Consistency | same person, two sessions: lengths within 2 cm, chest/waist/hip within 3 cm |
 | NFR-B6 | Privacy | photos never persisted, never sent to third parties; HTTPS only |
 | NFR-B7 | Usefulness | user correction rate tracked in beta; target < 30 % of high-confidence fields edited |
@@ -116,23 +122,27 @@ Expected accuracy assumes underwear or tight clothing. It is validated in the be
 ```
 first launch
   └▶ [체형 촬영 가이드]  A-pose illustration (front / side), what to wear, privacy note   (건너뛰기 → main)
-       └▶ [체형 분석 입력]  front photo* / side photo* (camera or album), clothing type,
-             height* / weight / gender  →  "분석하기" (enabled when front photo + valid height)
+       └▶ [체형 분석 입력]  front photo* / side photo* (camera or album), "wear tight clothing" tip,
+             height* / weight / gender  →  "분석하기" (enabled when both photos + valid height)
              └▶ [분석 중]
-                  └▶ [AI가 추정한 체형]  warnings, lengths, circumferences (confidence badges, tap to edit),
-                        선호 핏, 선호 스타일 (≤ 3)  →  "옷장 등록하고 시작하기"
+                  └▶ [AI가 추정한 체형]  warnings → body figure (5 pinned values, tap a part → detail + 수정)
+                        → 체형 인사이트 → 전체 치수 보기 (collapsed) → 선호 핏, 선호 스타일 (≤ 3)
+                        →  "옷장 등록하고 시작하기"
                           └▶ main app, bottom nav: 홈 | 옷장 | 마이프로필
-[마이프로필]  basic info, insights, measurements, disclaimer, "체형 다시 분석하기", "체형 프로필 삭제"
+[마이프로필]  body figure, insights, 전체 치수 (collapsed), basic info, disclaimer, "체형 다시 분석하기", "체형 프로필 삭제"
 ```
 
 Code structure:
 
 | File | Role |
 |---|---|
-| `data/BodyMeasurements.kt` | `MeasurementType` (§2 table), `Confidence`, `ClothingType`, `BodyProfile`, `toggleStyle` |
-| `data/BodyAnalyzer.kt` | `BodyAnalyzer` interface, `FakeBodyAnalyzer` (placeholder values + real confidence rules), `buildInsights` |
+| `data/BodyMeasurements.kt` | `MeasurementType` (§2 table), `Confidence`, `KEY_MEASUREMENTS`, `DetectedClothing` + `LOOSE_AFFECTS`, `BodyProfile`, `toggleStyle` |
+| `data/BodyFigureGeometry.kt` | pure figure geometry: proportions per gender, `hotspotFor(type, gender)`, tap hit-testing (unit-tested) |
+| `data/BodyAnalyzer.kt` | `BodyAnalyzer` interface, `FakeBodyAnalyzer` (placeholder values + real confidence rules), `BodyShape`, `buildInsights` → `Insight` cards |
 | `ui/profile/BodyProfileViewModel.kt` | `SetupState` / `AppState` as `StateFlow`; drops photos right after analysis |
 | `ui/profile/*Screen.kt` | Guide, input, analyzing, review, My Profile |
+| `ui/profile/BodyFigure.kt` | Canvas-drawn figure, pinned key chips, detail card |
+| `ui/profile/BodyResultComponents.kt` | insight cards, collapsible full measurement list |
 | `ui/StyleMateApp.kt` | switches between setup flow and bottom-nav tabs (home / wardrobe are placeholders for P8, P11, P12) |
 
 **Implemented (2026-09-24):** `RemoteBodyAnalyzer` (OkHttp) posts both photos to the endpoint in §7.
@@ -151,7 +161,7 @@ Code structure:
 │   ├ RemoteBodyAnalyzer (OkHttp → Django)  default│
 │   └ FakeBodyAnalyzer   (previews / tests)        │
 └───────────────┬──────────────────────────────────┘
-                │ HTTPS multipart: front, side?, height, weight?, gender, clothing
+                │ HTTPS multipart: front, side, height, weight?, gender
 ┌───────────────▼──────── Django backend ──────────┐
 │ profiles app (DRF): analyze / confirm / get / delete │
 │ BodyProfile model (MySQL)                        │
@@ -164,7 +174,8 @@ Code structure:
 │ → Measurer: front widths + side depths at landmark-  │
 │   defined heights → ellipse/regression circumference │
 │   → lengths from landmarks, scaled by height         │
-│ → Calibrator (regressor trained on BodyM, Option 2)  │
+│ → ClothingDetector (loose top / bottom, logistic)    │
+│ → Calibrator (ridge correction, fitted regions only) │
 │ → ConfidenceScorer + warnings                        │
 └──────────────────────────────────────────────────────┘
 ```
@@ -180,7 +191,7 @@ Architectural decisions:
 
 | Method | Path | Body | Response |
 |---|---|---|---|
-| POST | `/api/body-profile/analyze/` | multipart: `front_photo` (req), `side_photo` (req), `height_cm` (req), `weight_kg`, `gender` (`female`/`male`/`unspecified`), `clothing` (`underwear`/`tight`/`loose`) | `200 {draft}` or `422 {"error", "hint"}` |
+| POST | `/api/body-profile/analyze/` | multipart: `front_photo` (req), `side_photo` (req), `height_cm` (req), `weight_kg`, `gender` (`female`/`male`/`unspecified`). A `clothing` field from older app builds is ignored. | `200 {draft}` or `422 {"error", "hint"}` |
 | PUT | `/api/body-profile/` | confirmed profile (draft + edits + preferences) | `200 {profile}` |
 | GET | `/api/body-profile/` | — | `200 {profile}` / `404` |
 | DELETE | `/api/body-profile/` | — | `204` |
@@ -188,22 +199,23 @@ Architectural decisions:
 Error responses:
 - **`422`** (with Korean `hint`): `front_photo_required`, `side_photo_required`, `invalid_image`, `no_person`, `multiple_people`, `not_frontal`, `not_side_view`, `body_cropped`.
   - Orientation is checked before visibility, so a side photo uploaded as the front gets "정면으로 바라보고", not "전신이 나오게".
-- **`400`:** `invalid_field` for height outside 100–220, weight outside 30–200, or an unknown gender/clothing value.
+- **`400`:** `invalid_field` for height outside 100–220, weight outside 30–200, or an unknown gender value.
 - **`413`:** `photo_too_large` above 8 MB.
 
 Draft response:
 ```json
 {
   "analysis_id": "b1f3…",
-  "pipeline_version": "baseline-1.0",
-  "inputs": {"height_cm": 172, "weight_kg": 65, "gender": "male", "clothing": "loose"},
+  "pipeline_version": "baseline-geometric-1.0+clothing-1+ridge-2",
+  "inputs": {"height_cm": 172, "weight_kg": 65, "gender": "male"},
   "measurements": [
     {"type": "shoulder_width", "value_cm": 44.5, "confidence": "high"},
     {"type": "chest",          "value_cm": 95.5, "confidence": "low"},
     {"type": "inseam",         "value_cm": 78.0, "confidence": "high"}
   ],
   "derived": {"shoulder_hip_ratio": 0.48, "waist_hip_ratio": 0.85, "torso_leg_ratio": 0.58},
-  "warnings": ["loose_clothing"]
+  "warnings": ["loose_top"],
+  "clothing": {"top": "loose", "bottom": "fitted", "top_loose_probability": 0.93, "bottom_loose_probability": 0.04}
 }
 ```
 
@@ -215,7 +227,7 @@ class BodyProfile(models.Model):
     height_cm = models.PositiveSmallIntegerField()
     weight_kg = models.PositiveSmallIntegerField(null=True)
     gender = models.CharField(max_length=12, default="unspecified")
-    clothing = models.CharField(max_length=12)          # what the user wore in the photos
+    clothing = models.JSONField()                       # detected: {"top": "fitted|loose", "bottom": …}
 
     # [{type, value_cm, confidence, source: "ai" | "user"}] — types from §2
     measurements = models.JSONField()
@@ -249,7 +261,9 @@ class StylingProfile:
 **Implemented (Iteration 1, `frontend/app/src/test/.../BodyMeasurementsTest.kt`, 7 tests passing):**
 - style selection refuses a 4th style
 - underwear + both photos keeps base confidence
-- loose clothing lowers only circumferences and adds the warning
+- a detected loose top / bottom lowers only the affected measurements and adds `loose_top` / `loose_bottom`
+- insights: body-type classification, per-region hiding, margins, neutral wording (`InsightsTest`)
+- every measurement has a tappable place on each figure, and tapping a part's centre selects it (`BodyFigureGeometryTest`)
 - underbust only for female
 - no warnings for ideal input
 
@@ -261,7 +275,7 @@ class StylingProfile:
   - legs and arms
   - derived ratios
 - **Pipeline:**
-  - confidence rules (ideal, loose clothing)
+  - confidence rules (ideal, detected loose top / bottom)
   - a missing side photo is rejected with `side_photo_required`
   - underbust only for female
   - API-shaped output
@@ -275,5 +289,5 @@ Known limitation found by the tests: a waist that is flat over several cm leaves
 **Planned:**
 - **Server unit (pytest):** serializer validation; no photo is persisted after a request.
 - **Integration:** analyze → confirm → get → delete round trip.
-- **UI (Compose test):** state transitions; "분석하기" disabled without both photos and a valid height; 4th style chip disabled; warning banner shown for loose clothing.
+- **UI (Compose test):** state transitions; "분석하기" disabled without both photos and a valid height; 4th style chip disabled; warning banner shown for detected loose clothing.
 - **Smoke:** Galaxy S23 against a dev server.

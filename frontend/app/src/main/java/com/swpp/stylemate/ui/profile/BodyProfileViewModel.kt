@@ -10,7 +10,7 @@ import com.swpp.stylemate.data.BodyAnalyzer
 import com.swpp.stylemate.data.BodyMeasurement
 import com.swpp.stylemate.data.BodyPhotos
 import com.swpp.stylemate.data.BodyProfile
-import com.swpp.stylemate.data.ClothingType
+import com.swpp.stylemate.data.DetectedClothing
 import com.swpp.stylemate.data.Gender
 import com.swpp.stylemate.data.RemoteBodyAnalyzer
 import com.swpp.stylemate.data.MeasurementType
@@ -36,10 +36,11 @@ data class SetupState(
     val heightText: String = "",
     val weightText: String = "",
     val gender: Gender = Gender.UNSPECIFIED,
-    val clothing: ClothingType = ClothingType.UNDERWEAR,
     val lastInput: AnalysisInput? = null,
     val measurements: List<BodyMeasurement> = emptyList(),
     val warnings: List<String> = emptyList(),
+    /** What the server detected the user wore in the photos. */
+    val detectedClothing: DetectedClothing = DetectedClothing(),
     val preferredFit: PreferredFit = PreferredFit.REGULAR,
     val preferredStyles: List<String> = emptyList(),
     /** Retake hint from the last failed analysis, shown on the input screen. */
@@ -87,8 +88,6 @@ class BodyProfileViewModel(
 
     fun setGender(gender: Gender) = _setup.update { it.copy(gender = gender) }
 
-    fun setClothing(clothing: ClothingType) = _setup.update { it.copy(clothing = clothing) }
-
     fun analyze() {
         val state = _setup.value
         val height = state.heightCm ?: return
@@ -99,7 +98,6 @@ class BodyProfileViewModel(
             heightCm = height,
             weightKg = state.weightKg,
             gender = state.gender,
-            clothing = state.clothing,
         )
         _setup.update { it.copy(step = SetupStep.ANALYZING, errorMessage = null) }
         viewModelScope.launch {
@@ -115,6 +113,7 @@ class BodyProfileViewModel(
                         lastInput = input,
                         measurements = result.measurements,
                         warnings = result.warnings,
+                        detectedClothing = result.clothing,
                     )
                 }
             } catch (e: BodyAnalysisException) {
@@ -146,6 +145,7 @@ class BodyProfileViewModel(
             measurements = state.measurements,
             preferredFit = state.preferredFit,
             preferredStyles = state.preferredStyles,
+            clothing = state.detectedClothing,
         )
         _app.update { it.copy(profile = profile, setupVisible = false) }
     }
@@ -162,7 +162,6 @@ class BodyProfileViewModel(
                 heightText = profile.input.heightCm.toString(),
                 weightText = profile.input.weightKg?.toString().orEmpty(),
                 gender = profile.input.gender,
-                clothing = profile.input.clothing,
                 preferredFit = profile.preferredFit,
                 preferredStyles = profile.preferredStyles,
             )

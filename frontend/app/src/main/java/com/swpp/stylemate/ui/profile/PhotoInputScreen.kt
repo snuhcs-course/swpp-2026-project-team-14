@@ -25,10 +25,10 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -40,7 +40,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -54,12 +53,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.swpp.stylemate.data.ClothingType
 import com.swpp.stylemate.data.Gender
 import com.swpp.stylemate.ui.theme.StyleMateTheme
 import kotlinx.coroutines.Dispatchers
@@ -74,7 +71,6 @@ fun PhotoInputScreen(
     onHeight: (String) -> Unit,
     onWeight: (String) -> Unit,
     onGender: (Gender) -> Unit,
-    onClothing: (ClothingType) -> Unit,
     onAnalyze: () -> Unit,
 ) {
     SetupScaffold(
@@ -108,8 +104,8 @@ fun PhotoInputScreen(
                 )
             }
 
-            SectionTitle("촬영할 때 입은 옷")
-            ClothingSelector(selected = state.clothing, onSelect = onClothing)
+            Spacer(Modifier.height(12.dp))
+            ClothingTip()
 
             SectionTitle("기본 정보", "키는 치수 계산의 기준이 돼요")
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -227,32 +223,24 @@ private fun SmallOutlinedButton(text: String, modifier: Modifier, onClick: () ->
     }
 }
 
+/** Clothing is detected automatically; this only tells users what gives the best result. */
 @Composable
-private fun ClothingSelector(selected: ClothingType, onSelect: (ClothingType) -> Unit) {
-    Column(
-        Modifier
+private fun ClothingTip() {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainer),
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
     ) {
-        ClothingType.entries.forEach { type ->
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .selectable(selected = type == selected, role = Role.RadioButton) { onSelect(type) }
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
-            ) {
-                RadioButton(selected = type == selected, onClick = null, modifier = Modifier.padding(8.dp))
-                Text(type.label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-                Text(
-                    type.description,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (type == ClothingType.LOOSE) MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(end = 8.dp),
-                )
-            }
-        }
+        Text("👕", style = MaterialTheme.typography.titleMedium)
+        Spacer(Modifier.width(12.dp))
+        Text(
+            "속옷이나 몸에 딱 붙는 옷을 입고 찍어야 가장 정확해요. 헐렁한 옷은 자동으로 감지해서 알려드려요.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
@@ -326,9 +314,9 @@ private suspend fun decodeDownscaled(context: Context, uri: Uri, maxSide: Int = 
 private fun PhotoInputPreview() {
     StyleMateTheme {
         PhotoInputScreen(
-            state = SetupState(heightText = "172", clothing = ClothingType.LOOSE),
+            state = SetupState(heightText = "172"),
             onBack = {}, onPhoto = { _, _ -> }, onHeight = {}, onWeight = {},
-            onGender = {}, onClothing = {}, onAnalyze = {},
+            onGender = {}, onAnalyze = {},
         )
     }
 }

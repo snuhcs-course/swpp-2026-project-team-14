@@ -33,7 +33,7 @@ import androidx.compose.ui.unit.dp
 import com.swpp.stylemate.ui.theme.StyleMateTheme
 
 private val CAPTURE_TIPS = listOf(
-    "속옷이나 몸에 딱 붙는 옷을 입어주세요. 헐렁한 옷도 되지만 정확도가 낮아져요.",
+    "속옷이나 몸에 딱 붙는 옷을 입어주세요. 헐렁한 옷을 입으면 자동으로 알려드려요.",
     "팔을 몸에서 살짝 떼고(A자 자세) 정면을 바라보고 서주세요.",
     "머리부터 발끝까지 전신이 화면에 모두 나오게 찍어주세요.",
     "휴대폰은 허리 높이에 두고, 밝고 단순한 배경에서 찍어주세요.",

@@ -56,11 +56,45 @@ enum class Gender(val label: String) {
     UNSPECIFIED("선택 안 함"),
 }
 
-/** What the user wore in the photos. Loose clothing hides the body outline. */
-enum class ClothingType(val label: String, val description: String) {
-    UNDERWEAR("속옷", "가장 정확해요"),
-    TIGHT("몸에 붙는 옷", "레깅스·타이트한 티셔츠"),
-    LOOSE("평상복·헐렁한 옷", "정확도가 낮아져요"),
+/** Always visible on the body figure; the rest are shown when their body part is tapped. */
+val KEY_MEASUREMENTS = listOf(
+    MeasurementType.SHOULDER_WIDTH,
+    MeasurementType.CHEST,
+    MeasurementType.WAIST,
+    MeasurementType.HIP,
+    MeasurementType.INSEAM,
+)
+
+enum class ClothingRegion { TOP, BOTTOM }
+
+/** Measurements a loose garment in each region distorts. Mirrors LOOSE_AFFECTS in the backend. */
+val LOOSE_AFFECTS: Map<ClothingRegion, Set<MeasurementType>> = mapOf(
+    ClothingRegion.TOP to setOf(
+        MeasurementType.NECK, MeasurementType.SHOULDER_WIDTH, MeasurementType.CHEST,
+        MeasurementType.UNDERBUST, MeasurementType.WAIST, MeasurementType.ARMHOLE,
+        MeasurementType.BICEP, MeasurementType.TORSO_LENGTH,
+    ),
+    ClothingRegion.BOTTOM to setOf(
+        MeasurementType.HIP, MeasurementType.THIGH, MeasurementType.CALF,
+        MeasurementType.INSEAM, MeasurementType.RISE,
+    ),
+)
+
+/** Clothing the server detected in the photos (users are no longer asked what they wore). */
+data class DetectedClothing(val topLoose: Boolean = false, val bottomLoose: Boolean = false) {
+    val anyLoose: Boolean get() = topLoose || bottomLoose
+
+    fun affects(type: MeasurementType): Boolean =
+        (topLoose && type in LOOSE_AFFECTS.getValue(ClothingRegion.TOP)) ||
+            (bottomLoose && type in LOOSE_AFFECTS.getValue(ClothingRegion.BOTTOM))
+
+    val label: String
+        get() = when {
+            topLoose && bottomLoose -> "헐렁한 상·하의"
+            topLoose -> "헐렁한 상의"
+            bottomLoose -> "헐렁한 하의"
+            else -> "몸에 붙는 옷"
+        }
 }
 
 enum class PreferredFit(val label: String) {
@@ -83,12 +117,12 @@ data class AnalysisInput(
     val heightCm: Int,
     val weightKg: Int?,
     val gender: Gender,
-    val clothing: ClothingType,
 )
 
 data class AnalysisResult(
     val measurements: List<BodyMeasurement>,
     val warnings: List<String>,
+    val clothing: DetectedClothing = DetectedClothing(),
 )
 
 /** Confirmed profile. This structured state is what recommendation and chat editing reuse. */
@@ -97,6 +131,7 @@ data class BodyProfile(
     val measurements: List<BodyMeasurement>,
     val preferredFit: PreferredFit,
     val preferredStyles: List<String>,
+    val clothing: DetectedClothing = DetectedClothing(),
 ) {
     fun valueOf(type: MeasurementType): Double? =
         measurements.firstOrNull { it.type == type }?.valueCm

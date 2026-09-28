@@ -10,11 +10,7 @@ private val PHOTOS = BodyPhotos(ByteArray(0), ByteArray(0))
 
 class BodyMeasurementsTest {
 
-    private fun input(
-        clothing: ClothingType = ClothingType.UNDERWEAR,
-        weightKg: Int? = 65,
-        gender: Gender = Gender.MALE,
-    ) = AnalysisInput(172, weightKg, gender, clothing)
+    private fun input(weightKg: Int? = 65, gender: Gender = Gender.MALE) = AnalysisInput(172, weightKg, gender)
 
     @Test
     fun toggleStyle_addsAndRemoves() {
@@ -30,18 +26,35 @@ class BodyMeasurementsTest {
     }
 
     @Test
-    fun underwear_keepsBaseConfidence() {
+    fun fittedClothing_keepsBaseConfidence() {
         MeasurementType.entries.forEach {
-            assertEquals(it.baseConfidence, FakeBodyAnalyzer.confidenceFor(it, input()))
+            assertEquals(it.baseConfidence, FakeBodyAnalyzer.confidenceFor(it, DetectedClothing()))
         }
     }
 
     @Test
-    fun looseClothing_lowersCircumferencesOnly() {
-        val loose = input(clothing = ClothingType.LOOSE)
-        assertEquals(Confidence.LOW, FakeBodyAnalyzer.confidenceFor(MeasurementType.CHEST, loose))
-        assertEquals(Confidence.HIGH, FakeBodyAnalyzer.confidenceFor(MeasurementType.INSEAM, loose))
-        assertTrue(FakeBodyAnalyzer.warningsFor(loose).any { "헐렁한" in it })
+    fun looseTop_lowersOnlyUpperBody() {
+        val looseTop = DetectedClothing(topLoose = true)
+        assertEquals(Confidence.LOW, FakeBodyAnalyzer.confidenceFor(MeasurementType.CHEST, looseTop))
+        assertEquals(Confidence.HIGH, FakeBodyAnalyzer.confidenceFor(MeasurementType.INSEAM, looseTop))
+        assertEquals(listOf(warningText("loose_top")), FakeBodyAnalyzer.warningsFor(input(), looseTop))
+        assertTrue(warningText("loose_top").contains("속옷이나 몸에 붙는 옷"))
+    }
+
+    @Test
+    fun looseBottom_lowersLegs() {
+        val looseBottom = DetectedClothing(bottomLoose = true)
+        assertEquals(Confidence.MEDIUM, FakeBodyAnalyzer.confidenceFor(MeasurementType.INSEAM, looseBottom))
+        assertEquals(Confidence.HIGH, FakeBodyAnalyzer.confidenceFor(MeasurementType.SHOULDER_WIDTH, looseBottom))
+        assertEquals("헐렁한 하의", looseBottom.label)
+        assertEquals("헐렁한 상·하의", DetectedClothing(true, true).label)
+    }
+
+    @Test
+    fun looseAffects_coversEveryCircumferenceExceptWrist() {
+        val covered = LOOSE_AFFECTS.values.flatten().toSet()
+        MeasurementType.entries.filter { it.group == MeasurementGroup.CIRCUMFERENCE && it != MeasurementType.WRIST }
+            .forEach { assertTrue(it.name, it in covered) }
     }
 
     @Test

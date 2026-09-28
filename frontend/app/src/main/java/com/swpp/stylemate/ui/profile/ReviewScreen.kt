@@ -50,14 +50,14 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.swpp.stylemate.data.AnalysisInput
 import com.swpp.stylemate.data.BodyMeasurement
-import com.swpp.stylemate.data.ClothingType
+import com.swpp.stylemate.data.DetectedClothing
 import com.swpp.stylemate.data.FakeBodyAnalyzer
 import com.swpp.stylemate.data.Gender
 import com.swpp.stylemate.data.MAX_STYLES
-import com.swpp.stylemate.data.MeasurementGroup
 import com.swpp.stylemate.data.MeasurementType
 import com.swpp.stylemate.data.PreferredFit
 import com.swpp.stylemate.data.STYLE_OPTIONS
+import com.swpp.stylemate.data.buildInsights
 import com.swpp.stylemate.ui.theme.StyleMateTheme
 
 @Composable
@@ -110,19 +110,25 @@ fun ReviewScreen(
                 .padding(horizontal = 20.dp),
         ) {
             Text(
-                "사진으로 추정한 대략적인 값이에요. 다르다면 눌러서 직접 고쳐주세요.",
+                "사진으로 추정한 값이에요. 몸의 부위를 누르면 치수를 보고 고칠 수 있어요.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             state.warnings.forEach { WarningBanner(it) }
+            Spacer(Modifier.height(16.dp))
 
-            MeasurementGroup.entries.forEach { group ->
-                SectionTitle(group.label, "cm")
-                MeasurementCard(
-                    items = state.measurements.filter { it.type.group == group },
-                    onClick = { editing = it },
-                )
+            BodyFigureCard(
+                measurements = state.measurements,
+                gender = state.lastInput?.gender ?: state.gender,
+                onEdit = { editing = it },
+            )
+
+            val heightCm = state.lastInput?.heightCm ?: state.heightCm
+            if (heightCm != null) {
+                InsightSection(buildInsights(state.measurements, heightCm, state.detectedClothing))
             }
+
+            AllMeasurementsSection(state.measurements, onClick = { editing = it })
 
             SectionTitle("선호 핏")
             FitSelector(selected = state.preferredFit, onSelect = onFit)
@@ -286,15 +292,19 @@ fun formatCm(value: Double): String = "${formatNumber(value)} cm"
 @Preview(showBackground = true, heightDp = 1600)
 @Composable
 private fun ReviewPreview() {
-    val input = AnalysisInput(172, 65, Gender.MALE, ClothingType.LOOSE)
-    val measurements = MeasurementType.entries
-        .filter { it != MeasurementType.UNDERBUST }
-        .map { BodyMeasurement(it, 40.0, FakeBodyAnalyzer.confidenceFor(it, input)) }
+    val input = AnalysisInput(172, 65, Gender.MALE)
+    val clothing = DetectedClothing(topLoose = true)
+    val measurements = FakeBodyAnalyzer.MALE_RATIOS
+        .filterKeys { it != MeasurementType.UNDERBUST }
+        .map { (type, ratio) -> BodyMeasurement(type, ratio * 172, FakeBodyAnalyzer.confidenceFor(type, clothing)) }
     StyleMateTheme {
         ReviewScreen(
             state = SetupState(
+                lastInput = input,
+                gender = input.gender,
                 measurements = measurements,
-                warnings = FakeBodyAnalyzer.warningsFor(input),
+                detectedClothing = clothing,
+                warnings = FakeBodyAnalyzer.warningsFor(input, clothing),
                 preferredStyles = listOf("미니멀", "캐주얼"),
             ),
             onRetake = {}, onEdit = { _, _ -> }, onFit = {}, onToggleStyle = {}, onConfirm = {},

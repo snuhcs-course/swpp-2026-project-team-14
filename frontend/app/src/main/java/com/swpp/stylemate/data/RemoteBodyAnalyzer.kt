@@ -32,7 +32,6 @@ class RemoteBodyAnalyzer(
                 .addFormDataPart("side_photo", "side.jpg", photos.sideJpeg.toRequestBody(jpeg))
                 .addFormDataPart("height_cm", input.heightCm.toString())
                 .addFormDataPart("gender", input.gender.name.lowercase())
-                .addFormDataPart("clothing", input.clothing.name.lowercase())
                 .apply { input.weightKg?.let { addFormDataPart("weight_kg", it.toString()) } }
                 .build()
             val request = Request.Builder().url(endpoint).post(body).build()
@@ -79,14 +78,20 @@ class RemoteBodyAnalyzer(
             }
             val codes = json.optJSONArray("warnings")
             val warnings = (0 until (codes?.length() ?: 0)).map { warningText(codes!!.getString(it)) }
-            return AnalysisResult(measurements, warnings.distinct())
+            val clothing = json.optJSONObject("clothing")?.let {
+                DetectedClothing(topLoose = it.optString("top") == "loose", bottomLoose = it.optString("bottom") == "loose")
+            } ?: DetectedClothing()
+            return AnalysisResult(measurements, warnings.distinct(), clothing)
         }
     }
 }
 
+private const val RETAKE_TIGHT = "속옷이나 몸에 붙는 옷으로 다시 찍으면 더 정확해요."
+
 /** User-facing text for backend warning codes. */
 fun warningText(code: String): String = when (code) {
-    "loose_clothing" -> "헐렁한 옷을 입은 사진이라 둘레 치수의 정확도가 낮아요. 속옷이나 몸에 붙는 옷을 입고 다시 찍으면 더 정확해져요."
+    "loose_top" -> "상의가 헐렁한 것 같아요. 가슴·허리 등 상체 둘레가 정확하지 않을 수 있어요. $RETAKE_TIGHT"
+    "loose_bottom" -> "하의가 헐렁한 것 같아요. 엉덩이·허벅지·다리 길이가 정확하지 않을 수 있어요. $RETAKE_TIGHT"
     "no_weight" -> "몸무게를 입력하면 둘레 치수가 더 정확해져요."
     "arms_touching_body" -> "팔이 몸에 붙어 있어 일부 팔 치수를 재지 못했어요. 팔을 몸에서 조금 더 떼고 찍어주세요."
     "crotch_not_found" -> "다리 사이가 잘 보이지 않아 다리 길이가 부정확할 수 있어요. 다리를 조금 벌리고 찍어주세요."

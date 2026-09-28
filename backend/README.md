@@ -72,7 +72,7 @@ set DJANGO_DEBUG=1
 Quick check with the synthetic renders:
 
 ```bash
-curl -X POST http://127.0.0.1:8000/api/body-profile/analyze/ -F front_photo=@private/synthetic_benchmark/m_avg_front.png -F side_photo=@private/synthetic_benchmark/m_avg_side.png -F height_cm=168 -F gender=male -F clothing=tight
+curl -X POST http://127.0.0.1:8000/api/body-profile/analyze/ -F front_photo=@private/synthetic_benchmark/m_avg_front.png -F side_photo=@private/synthetic_benchmark/m_avg_side.png -F height_cm=168 -F gender=male
 ```
 
 `frontend/app/src/test/resources/analyze_response_*.json` are real responses captured this way. The Android `ServerContractTest` parses them, so re-capture them when the API changes.

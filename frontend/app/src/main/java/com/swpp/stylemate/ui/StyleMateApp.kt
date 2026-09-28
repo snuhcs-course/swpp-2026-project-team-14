@@ -74,7 +74,6 @@ private fun ProfileSetupFlow(viewModel: BodyProfileViewModel, canCancel: Boolean
                 onHeight = viewModel::setHeight,
                 onWeight = viewModel::setWeight,
                 onGender = viewModel::setGender,
-                onClothing = viewModel::setClothing,
                 onAnalyze = viewModel::analyze,
             )
         }

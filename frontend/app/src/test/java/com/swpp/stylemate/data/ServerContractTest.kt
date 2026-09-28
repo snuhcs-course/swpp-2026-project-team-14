@@ -21,6 +21,9 @@ class ServerContractTest {
         assertTrue(result.measurements.size >= 12)
         assertTrue(result.measurements.any { it.type == MeasurementType.CHEST })
         assertTrue(result.measurements.all { it.valueCm > 0 })
+        // the synthetic render wears nothing loose; the clothing object must be read, not defaulted
+        assertTrue(fixture("analyze_response_200.json").contains("\"clothing\""))
+        assertEquals(DetectedClothing(), result.clothing)
     }
 
     @Test

@@ -1,6 +1,7 @@
 # Body Analysis — Learned Measurement Correction (Option 2)
 
 > Owner: Dongkun Moon · 2026-09-24 · Model: `ridge-1` (`backend/body_analysis/models/measurement_corrector.json`)
+> **Update 2026-09-28:** the shipped model is now `ridge-2`, retrained without the clothing input because clothing is detected automatically. It is skipped per region when loose clothing is detected. Results and the cost (≤ 0.2 cm) are in `06-clothing-detection.md` §5; the tables below are for `ridge-1`.
 > Scripts: `backend/scripts/generate_dataset.py`, `backend/scripts/train_corrector.py` · Wiki target: *Testing Documentation → AI Module Testing* and *Design Documentation → AI model*
 
 ## 1. Why
