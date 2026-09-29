@@ -9,14 +9,37 @@
 - 데이터 모델·입력 규칙: [4. 최종 옷 레코드](#4-최종-옷-레코드)
 - API 계약·JSON 예시: [6. API 초안](#6-api-초안)
 - 입력 화면: [화면 설계](design.md)
+- 처리 순서·실패 복구·현재 구현 범위: [등록 데이터 흐름](wardrobe-flow.md)
 
 주요 데이터 구분: `fit_type`은 의류의 디자인상 여유감, `dimensions`는 출처가 명시된 실측 치수, 소재·착용 특성은 사용자 선택 입력으로 관리한다.
 
 ## 1. 적용 범위
 
-[design.md](design.md)의 옷장 화면을 구현하기 위한 공통 기준이다. 현재 저장소에는 이 문서의 정식 모델·API·인증·S3·AI 연동이 구현되어 있지 않다. local-dev/의 테스트 모델과 API는 연결 검증용이며 이 계약과 별개다. 아래 경로·값·제한은 구현 계약을 논의하기 위한 초안이다.
+로컬 구현 예외: `POST /api/wardrobe/analyze/`는 Gemini `gemini-3.1-flash-lite`로 사진의 시각적 특징을 분석한다. 아래 정식 API 초안과 구분되는 개인 개발 API다. 분석 결과와 사진 경로는 MySQL 초안에 저장하고 사진 파일은 `.local/wardrobe-media/`에 저장한다. `saved=false` 초안은 옷장 목록에서 제외한다. 상세 실행은 [로컬 환경](local-development.md)을 따른다.
+
+요청은 JPEG/PNG/WebP 이미지 바이트와 해당 Content-Type이다. 최대 5 MiB·1,200만 픽셀·단일 프레임만 허용하고 긴 변 1536px 이하 JPEG로 변환하여 메타데이터를 제외한다. 응답은 초안 `id`, `model`, 허용된 시각적 필드만 담는 `attributes`, 한글 `display` 목록이다. AR dimensions는 이 요청에 보내지 않으며 AI 응답으로 덮어쓰지 않는다. 종류가 AR 선택과 다르면 앱에서 확인 문구를 표시한다.
+
+Gemini에는 JSON Schema를 지정하고 서버가 필드·enum·분류별 적용 범위를 재검증한다. 누락·추가 필드, 치수·소재·신축성 등 금지 필드, 잘못된 분류 조합은 거부한다. 옷 없음·여러 벌·미지원 종류·판별 불가는 422, 잘못된 이미지는 400/413/415, 키 미설정은 503, 요청 제한은 429, 잘못된 공급자 응답은 502, 시간 초과는 504다. 외부 응답 원문·키·이미지는 로그나 API 오류에 포함하지 않는다. 실호출 품질·지연시간은 아직 검증 전이다.
+
+[design.md](design.md)의 옷장 화면을 구현하기 위한 공통 기준이다. local-dev/에는 분석·편집·MySQL 저장·조회가 구현되어 있다. 아래 정식 계약의 사용자 식별·S3·분리된 초안 모델은 미구현이며 팀 공통 BE와 통합 시 적용한다. 아래 경로·값·제한은 구현 계약을 논의하기 위한 초안이다.
 
 핵심 처리 흐름은 `사진 한 장 → 특징 분석 → 사용자 수정 → 최종 저장 → 옷장 조회`다. 체형 분석·코디 추천·외부 상품 추천은 구현 범위 밖이며, 추천 기능은 확정 저장된 옷 ID와 특징을 사용한다.
+
+### 로컬 편집·저장 계약
+
+| 요청 | 동작 |
+| --- | --- |
+| `GET /api/wardrobe/options/` | 한국어 표시명·enum·분류별 치수 기준 제공 |
+| `PUT /api/wardrobe/items/{id}/` | 초안 확정 저장 또는 저장된 옷 전체 수정 |
+| `GET /api/wardrobe/items/` | `saved=true`인 옷만 최신 생성 순서로 반환 |
+| `GET /api/wardrobe/items/{id}/` | 단일 옷 정보 조회 |
+| `GET /api/wardrobe/items/{id}/image/` | 저장한 옷의 정규화 JPEG 반환 |
+
+PUT 본문은 `attributes`, `dimensions`, `user_properties`, `notes` 네 필드를 모두 포함한다. `attributes`는 위 시각적 필드이며 `user_properties`에는 material_note·touch·stretch·sheerness·thickness·seasons만 허용한다. 원본 AI 제안은 서버의 `original_attributes`에 별도 유지한다. 메모는 최대 2,000자, 줄바꿈을 그대로 보관한다.
+
+치수는 현재 분류에 적용 가능한 항목만 저장한다. 변경하지 않은 AR 값은 `arcore_manual` 출처를 유지하고, 사용자가 입력하거나 수정한 값은 `user_measured`, `method=unspecified`로 저장하여 측정 기준을 임의로 확정하지 않는다. 분류 변경 시 폼의 무효 항목을 초기화한다. 치수가 필요 없으면 null로 보낸다.
+
+같은 초안 ID로 반복 저장해도 옷이 중복 생성되지 않는다. 저장 실패 시 편집값을 유지하여 재시도할 수 있다. 잘못된 입력은 400, 16 KiB 초과 JSON은 413, 없는 ID는 404다. 사진·메모·키 원문을 오류 응답에 넣지 않는다. 로컬 API에는 인증·동시 편집 충돌 제어·초안 자동 청소가 없으므로 공용 서비스에 배포하지 않는다. 목록과 저장된 옷은 앱 재실행 후 서버에서 복원하지만 미저장 편집 상태의 프로세스 종료 복구는 보장하지 않는다.
 
 ## 2. 데이터 저장과 소유권
 
@@ -125,8 +148,9 @@ seasons는 사용자 또는 상품이 제시하는 착용 계절이며 기온 �
 }
 ```
 
-- value: 유한한 양수, 소수 첫째 자리까지. 0·음수·단위 포함 문자열은 거부한다. 신체와 옷 종류가 다양하므로 임의의 보편적 정상 범위를 하드코딩하지 않는다.
+- value: 유한한 양수, 소수 둘째 자리까지 반올림한다. 화면은 `55.10 cm`처럼 두 자리를 표시하며 JSON number는 후행 0을 생략할 수 있다. 0·음수·단위 포함 문자열은 거부한다. 신체와 옷 종류가 다양하므로 임의의 보편적 정상 범위를 하드코딩하지 않는다.
 - source: `user_measured`(사용자가 실제 측정), `product_chart`(해당 상품·사이즈 치수표). 보정되지 않은 `ai_estimated`는 허용하지 않는다.
+- 로컬 AR 실험의 추가 source는 `arcore_manual`이다. 사용자가 사진 위 지정한 두 점을 촬영 시점의 AR 수평 평면에 투영한 추정치로, `user_measured`와 구분한다. 정확도 검증 전이므로 추천의 확정 실측으로 자동 사용하지 않는다. 정식 서버의 허용값 확장은 추후 계약에 함께 반영해야 한다.
 - method: 아래 표의 측정 방법 코드. 치수표 기준이 불명확하면 `unspecified`로 저장하고 자동 치수 비교에서는 제외한다.
 - reference: 출처 메모 또는 URL, 선택값. product_chart의 reference는 선택 입력이며 상품·참조 행에 대한 메모를 남길 수 있다. URL을 저장했다고 자동 수집하지 않는다.
 - AI가 치수표를 읽는 기능은 이번 범위 밖이다. 향후 추가해도 OCR 값은 사용자 확인과 해당 상품·사이즈 매칭 후 반영한다.
@@ -142,8 +166,8 @@ seasons는 사용자 또는 상품이 제시하는 착용 계절이며 기온 �
 | `total_length` | 총장 | `back_neck_to_hem`: 뒤 목둘레 봉제선 중앙에서 밑단까지; 칼라 제외 | 앞뒤 길이차·다른 시작점의 치수표 주의 |
 | `sleeve_length` | 소매길이 | `shoulder_seam_to_cuff`: 어깨 봉제점에서 소매 끝까지; `center_back_via_shoulder_to_cuff`: 뒤 목 중심에서 어깨를 거쳐 소매 끝까지 | method로 구분하며 서로 직접 비교하지 않음 |
 | `hem_width_half` | 상의 밑단 단면 | `flat_body_hem`: 몸판 밑단 좌우 직선 | 한쪽 바짓단과 구분 |
-| `cuff_width_half` | 소매부리 단면 | `flat_sleeve_opening`: 닫힌 소매 끝을 평평하게 편 좌우 직선 | 소매 끝 둘레와 구분, 민소매는 null |
-| `armhole_straight` | 암홀 직선 | `armhole_top_to_underarm_straight`: 일반 소매의 어깨·암홀 교점에서 겨드랑이 봉제점까지 직선 | 암홀 곡선 길이나 팔 둘레가 아님; 가오리·래글런은 null 가능 |
+| `cuff_width_half` | 소매끝 | `flat_sleeve_opening`: 닫힌 소매 끝을 평평하게 편 좌우 직선 | 소매 끝 둘레와 구분, 민소매는 null |
+| `armhole_straight` | 암홀 | `armhole_top_to_underarm_straight`: 일반 소매의 어깨·암홀 교점에서 겨드랑이 봉제점까지 직선 | 암홀 곡선 길이나 팔 둘레가 아님; 가오리·래글런은 null 가능 |
 
 민소매의 sleeve_length는 0이 아니라 null이다. 소매길이는 측정 시작점이 어깨 봉제점인지 등 중심인지에 따라 구분한다. [Proper Cloth의 측정 안내](https://propercloth.com/reference/how-to-measure-a-dress-shirt/)에서도 등 중심을 거치는 방법을 사용하므로 출처의 방법을 함께 확인한다.
 
@@ -205,6 +229,7 @@ material_note·touch·stretch·sheerness·thickness·seasons·dimensions는 AI �
 | `category` | 문자열 | 네 가지 허용값 중 하나, 필수 |
 | `subcategory` | nullable 문자열 | 종류 사전의 category 종속 관계 검증 |
 | 색상·핏 등 3절 속성 | nullable 문자열 또는 배열 | 3절의 적용 범위·허용값·개수 검증 |
+| `notes` | 문자열 | 사용자 메모, 선택, 최대 2,000자, 줄바꿈 유지, 빈 문자열로 삭제, AI에 전송하지 않음 |
 | `dimensions` | nullable JSON 객체 | unit + 적용 가능한 치수 객체, 출처·방법 포함 |
 | `attribute_sources` | JSON 객체 | 서버가 관리하는 필드별 AI 제안·사용자 입력 출처 |
 | `created_at`, `updated_at` | 날짜·시간 | 서버 설정, UTC ISO 8601 |
@@ -228,7 +253,7 @@ image_url은 조회 때 만드는 만료 URL이며 DB 영구 식별자는 image_
 
 ## 5. 임시 등록과 화면 상태
 
-GarmentDraft 제안 필드: `id`(추측하기 어려운 ID), `owner_id`, `image_key`, `status`, `suggested_attributes`, `error_code`, `garment_id`(최종 저장 후 연결), `created_at`, `expires_at`.
+GarmentDraft 제안 필드: `id`(추측하기 어려운 ID), `owner_id`, `image_key`, `status`, `suggested_attributes`, `error_code`, `garment_id`(최종 저장 후 연결), `created_at`, `expires_at`, `upload_request_key`, `image_hash`, `analysis_attempt_id`, `analysis_started_at`. 마지막 네 필드는 업로드 중복 요청 방지와 분석 중단 복구를 위한 서버 내부 필드다.
 
 서버 상태는 `uploaded → analyzing → ready / analysis_failed → saved`로 둔다. 클라이언트의 사진 선택 상태는 서버 상태가 아니다. `analysis_failed`에서도 사용자가 필수값을 입력하면 저장할 수 있다. 업로드가 실패하여 draft가 없으면 저장할 수 없다.
 
@@ -241,11 +266,12 @@ GarmentDraft 제안 필드: `id`(추측하기 어려운 ID), `owner_id`, `image_
 
 ## 6. API 초안
 
-모든 요청의 사용자 식별 방식은 팀 인증 계약에 맞춘다. 앱에서 AI나 S3 비밀 키를 직접 사용하지 않는다. 최종 경로·공통 오류 포맷은 기본 BE 담당자와 조정한다.
+모든 요청의 사용자 식별 방식은 팀 인증 계약에 맞춘다. 앱에서 AI나 S3 비밀 키를 직접 사용하지 않는다. 최종 경로·공통 오류 포맷은 기본 BE 담당자와 조정한다. 업로드 중복 요청 키와 분석 시도 상태의 세부 절차는 [데이터 흐름](wardrobe-flow.md)을 따른다.
 
 | Method | 경로 | 요청·성공 응답 |
 | --- | --- | --- |
-| POST | `/api/wardrobe/drafts/` | multipart의 `image` 업로드 → 201, draft ID·상태·미리보기 URL |
+| POST | `/api/wardrobe/drafts/` | multipart `image` + Idempotency-Key → 201, draft ID·상태·만료 시각·미리보기 URL. 동일 업로드 재요청은 기존 초안 200 |
+| GET | `/api/wardrobe/drafts/{id}/` | 200, draft_id·status·expires_at·상태별 attributes/error_code/garment_id. 복귀·응답 유실 후 복구 |
 | POST | `/api/wardrobe/drafts/{id}/analyze/` | 업로드된 사진 분석 또는 실패 재시도 → 200, 상태·제안 특징 |
 | POST | `/api/wardrobe/garments/` | draft ID·최종 특징 → 201, 저장된 옷 |
 | GET | `/api/wardrobe/garments/` | 선택 query: category, q, page → 200, 목록 |
@@ -418,7 +444,7 @@ product_chart reference는 출처 형식을 설명하는 가상 예시다. 출�
 | Android·Django 실제 패키지 구조 | 기본 FE·BE 담당자 | 공통 구조 안에 wardrobe 기능 배치 |
 | 사용자·인증·ID 정책 | 기본 BE 담당자 | 익명 사용자 토큰, 서버가 owner 결정 |
 | 특징 목록·null 의미 | 추천 담당자 | 3절의 확장 속성과 실측 출처, 확정 옷 ID만 추천에 사용 |
-| AI 제공자·모델·비용·처리 시간 | AI 연동 담당 | 아직 미선정, 실제 사진으로 평가 |
+| AI 제공자·모델·비용·처리 시간 | AI 연동 담당 | Gemini gemini-3.1-flash-lite 선정·로컬 연결, 실제 비용·지연·품질 검증 전 |
 | S3 설정·사진 정리·DB 연결 | BE·인프라 담당자 | 서버에서 접근, 미저장 초안 24시간 |
 | 공통 테마·내비게이션 | FE 담당자 | 기존 시안의 공통 요소 재사용 |
 | 삭제된 옷을 참조하는 코디 | 추천·코디북 담당자 | 저장 코디의 표시·삭제 정책 합의 필요 |

@@ -1,6 +1,7 @@
 # Local development state and credentials
 .local/
 .venv/
+# Gemini and other server credentials (all directories)
 .env
 .env.*
 !.env.example

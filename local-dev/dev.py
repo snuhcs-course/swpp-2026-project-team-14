@@ -200,7 +200,7 @@ def main():
         start_database(config)
         manage('check')
         manage('makemigrations', '--check', '--dry-run')
-        manage('test', 'probe', '--noinput')
+        manage('test', 'probe', 'wardrobe', '--noinput')
     else:
         try:
             root_connection(config).close()

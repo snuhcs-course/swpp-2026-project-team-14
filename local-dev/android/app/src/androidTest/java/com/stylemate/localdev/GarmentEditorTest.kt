@@ -1,0 +1,64 @@
+package com.stylemate.localdev
+
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.test.*
+import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.test.platform.app.InstrumentationRegistry
+import org.json.JSONObject
+import org.junit.Assert.*
+import org.junit.Rule
+import org.junit.Test
+
+class GarmentEditorTest {
+    @get:Rule val compose = createComposeRule()
+    private fun fixture() = JSONObject(InstrumentationRegistry.getInstrumentation().context.assets
+        .open("wardrobe-editor.json").bufferedReader().use { it.readText() })
+
+    @Test fun editedMeasurementsAndMemoAreSentWithoutOverwritingOtherEstimates() {
+        val fixture = fixture()
+        var submitted: JSONObject? = null
+        val dimensions = JSONObject("""{"unit":"cm","chest_width_half":{"value":55.12,"source":"arcore_manual","method":"flat_underarm_to_underarm","reference":null},"total_length":{"value":65.34,"source":"arcore_manual","method":"back_neck_to_hem","reference":null}}""")
+        compose.setContent { MaterialTheme { Column(Modifier.verticalScroll(rememberScrollState())) {
+            GarmentEditor("draft", fixture.getJSONObject("attributes"), dimensions, JSONObject(), "",
+                fixture.getJSONObject("catalog"), false, false, null, { submitted = it })
+        } } }
+        compose.onNodeWithText("이름").performTextReplacement("내 흰 티셔츠")
+        compose.onNodeWithText("가슴 단면").performScrollTo().performTextReplacement("56.78")
+        compose.onNodeWithText("메모").performScrollTo().performTextInput("찬물 세탁\n여행용")
+        compose.onNodeWithText("옷장에 추가").performScrollTo().performClick()
+        compose.runOnIdle {
+            val payload = requireNotNull(submitted)
+            assertEquals("내 흰 티셔츠", payload.getJSONObject("attributes").getString("name"))
+            assertEquals("찬물 세탁\n여행용", payload.getString("notes"))
+            val chest = payload.getJSONObject("dimensions").getJSONObject("chest_width_half")
+            assertEquals(56.78, chest.getDouble("value"), 0.00001)
+            assertEquals("user_measured", chest.getString("source"))
+            assertEquals("unspecified", chest.getString("method"))
+            assertEquals("arcore_manual", payload.getJSONObject("dimensions").getJSONObject("total_length").getString("source"))
+        }
+    }
+
+    @Test fun invalidMeasurementBlocksSaveAndChangingCategoryClearsMeasurements() {
+        val fixture = fixture()
+        var submitted: JSONObject? = null
+        compose.setContent { MaterialTheme { Column(Modifier.verticalScroll(rememberScrollState())) {
+            GarmentEditor("draft", fixture.getJSONObject("attributes"), null, JSONObject(), "기존 메모",
+                fixture.getJSONObject("catalog"), false, true, null, { submitted = it })
+        } } }
+        compose.onNodeWithText("가슴 단면").performScrollTo().performTextInput("12.345")
+        compose.onNodeWithText("저장하기").performScrollTo().assertIsNotEnabled()
+        compose.onNodeWithText("분류: 상의").performScrollTo().performClick()
+        compose.onNodeWithText("신발").performClick()
+        compose.onNodeWithText("가슴 단면").assertDoesNotExist()
+        compose.onNodeWithText("저장하기").performScrollTo().performClick()
+        compose.runOnIdle {
+            assertTrue(requireNotNull(submitted).isNull("dimensions"))
+            assertEquals("기존 메모", requireNotNull(submitted).getString("notes"))
+            assertTrue(requireNotNull(submitted).getJSONObject("attributes").isNull("subcategory"))
+        }
+    }
+}
