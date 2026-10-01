@@ -106,6 +106,17 @@ Outputs go to `private/synthetic_benchmark/`:
 
 The first run spends about 1–2 minutes compiling Anny's skinning kernels.
 
+### Demo photos with real accuracy (정확도 %)
+
+```bash
+.venv\Scripts\python scripts/export_benchmark_reference.py
+```
+
+This writes the 8 benchmark bodies as demo photos to `private/benchmark_photos/` (git-ignored) and their true measurements to `body_analysis/models/benchmark_reference.json` (committed).
+- Each photo carries a small marker in its top-left corner. The server recognises it, paints it out before analysis, and returns the body's true measurements as `reference`.
+- The app then shows "정확도 98.7%" (100 − relative error) per measurement. Other photos have no marker, so they never get an accuracy %.
+- Enter the body's true height for a fair comparison. The script prints it, e.g. `f_avg` 160.0 cm and `m_avg` 168.2 cm.
+
 ## Learned correction model
 
 The server applies `body_analysis/models/measurement_corrector.json`, a ridge regression per measurement trained on 240 synthetic bodies, on top of the geometry (underwear and tight clothing only).

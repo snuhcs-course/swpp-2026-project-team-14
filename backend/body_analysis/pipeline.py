@@ -8,6 +8,7 @@ from .geometry import largest_component, vertical_extent
 from .measurer import RawMeasurements, measure
 from .pose import PoseEstimator, PoseResult
 from .clothing import ClothingDetector
+from .reference import ReferenceSet, erase_marker
 from .regressor import MeasurementCorrector
 from .types import (
     AnalysisError,
@@ -126,12 +127,16 @@ class BodyAnalysisPipeline:
         estimator: PoseEstimator,
         corrector: MeasurementCorrector | None = None,
         detector: ClothingDetector | None = None,
+        references: ReferenceSet | None = None,
     ):
         """`corrector`: learned correction (MeasurementCorrector.load()); None = pure geometry.
-        `detector`: loose-clothing detector (ClothingDetector.load()); None = assume fitted clothing."""
+        `detector`: loose-clothing detector (ClothingDetector.load()); None = assume fitted clothing.
+        `references`: benchmark bodies with known measurements (ReferenceSet.load()); None = never
+        report a reference."""
         self.estimator = estimator
         self.corrector = corrector
         self.detector = detector
+        self.references = references
 
     def analyze_images(
         self,
@@ -141,6 +146,10 @@ class BodyAnalysisPipeline:
     ) -> tuple[AnalysisResult, RawMeasurements]:
         if side_rgb is None:
             raise AnalysisError("side_photo_required", "side")
+        reference = None
+        if self.references is not None:
+            reference = self.references.match(front_rgb, side_rgb)
+            front_rgb, side_rgb = erase_marker(front_rgb), erase_marker(side_rgb)  # no-op without a marker
         front = check_quality(self.estimator.estimate(front_rgb), "front")
         side = check_quality(self.estimator.estimate(side_rgb), "side")
 
@@ -175,6 +184,7 @@ class BodyAnalysisPipeline:
             warnings=build_warnings(input_, clothing, raw),
             pipeline_version=version,
             clothing=clothing,
+            reference=reference,
         )
         return result, raw
 

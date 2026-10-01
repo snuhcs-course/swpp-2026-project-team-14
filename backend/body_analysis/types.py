@@ -8,6 +8,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:  # reference.py imports this module
+    from .reference import Reference
 
 
 class Confidence(str, Enum):
@@ -175,6 +179,8 @@ class AnalysisResult:
     warnings: list[str] = field(default_factory=list)
     pipeline_version: str = ""
     clothing: ClothingAssessment = field(default_factory=ClothingAssessment)
+    # True measurements when the photos are one of our benchmark bodies (body_analysis/reference.py)
+    reference: Reference | None = None
 
     def value(self, type_: MeasurementType) -> float | None:
         return next((m.value_cm for m in self.measurements if m.type is type_), None)
@@ -186,6 +192,7 @@ class AnalysisResult:
             "derived": self.derived,
             "warnings": self.warnings,
             "clothing": self.clothing.to_dict(),
+            "reference": self.reference.to_dict() if self.reference is not None else None,
         }
 
 

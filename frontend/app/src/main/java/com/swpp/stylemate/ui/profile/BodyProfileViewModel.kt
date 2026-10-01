@@ -15,6 +15,7 @@ import com.swpp.stylemate.data.Gender
 import com.swpp.stylemate.data.RemoteBodyAnalyzer
 import com.swpp.stylemate.data.MeasurementType
 import com.swpp.stylemate.data.PreferredFit
+import com.swpp.stylemate.data.ReferenceMeasurements
 import com.swpp.stylemate.data.toggleStyle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -41,6 +42,8 @@ data class SetupState(
     val warnings: List<String> = emptyList(),
     /** What the server detected the user wore in the photos. */
     val detectedClothing: DetectedClothing = DetectedClothing(),
+    /** True measurements when the photos were one of our benchmark bodies (shows accuracy %). */
+    val reference: ReferenceMeasurements? = null,
     val preferredFit: PreferredFit = PreferredFit.REGULAR,
     val preferredStyles: List<String> = emptyList(),
     /** Retake hint from the last failed analysis, shown on the input screen. */
@@ -114,6 +117,7 @@ class BodyProfileViewModel(
                         measurements = result.measurements,
                         warnings = result.warnings,
                         detectedClothing = result.clothing,
+                        reference = result.reference,
                     )
                 }
             } catch (e: BodyAnalysisException) {
@@ -146,6 +150,7 @@ class BodyProfileViewModel(
             preferredFit = state.preferredFit,
             preferredStyles = state.preferredStyles,
             clothing = state.detectedClothing,
+            reference = state.reference,
         )
         _app.update { it.copy(profile = profile, setupVisible = false) }
     }

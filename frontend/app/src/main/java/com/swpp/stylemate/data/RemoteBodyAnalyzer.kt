@@ -81,7 +81,17 @@ class RemoteBodyAnalyzer(
             val clothing = json.optJSONObject("clothing")?.let {
                 DetectedClothing(topLoose = it.optString("top") == "loose", bottomLoose = it.optString("bottom") == "loose")
             } ?: DetectedClothing()
-            return AnalysisResult(measurements, warnings.distinct(), clothing)
+            val reference = json.optJSONObject("reference")?.let { ref ->
+                val values = ref.optJSONObject("measurements")
+                ReferenceMeasurements(
+                    body = ref.optString("body"),
+                    heightCm = ref.optDouble("height_cm"),
+                    values = values?.keys()?.asSequence()
+                        ?.mapNotNull { key -> byKey[key]?.let { it to values.getDouble(key) } }
+                        ?.toMap().orEmpty(),
+                )
+            }
+            return AnalysisResult(measurements, warnings.distinct(), clothing, reference)
         }
     }
 }

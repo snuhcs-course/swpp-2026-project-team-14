@@ -29,6 +29,37 @@ import androidx.compose.ui.unit.dp
 import com.swpp.stylemate.data.BodyMeasurement
 import com.swpp.stylemate.data.Insight
 import com.swpp.stylemate.data.MeasurementGroup
+import com.swpp.stylemate.data.ReferenceMeasurements
+import kotlin.math.abs
+
+/**
+ * Shown when the photos were one of our benchmark bodies: the accuracy % compares with that body's
+ * true measurements, which only holds if the user entered its true height.
+ */
+@Composable
+fun ReferenceNote(reference: ReferenceMeasurements, enteredHeightCm: Int?) {
+    val heightOff = enteredHeightCm != null && abs(enteredHeightCm - reference.heightCm) > 1.0
+    Column(
+        Modifier
+            .padding(top = 12.dp)
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .padding(12.dp),
+    ) {
+        Text(
+            "벤치마크 모델 ${reference.body} 사진이에요. 실제 치수와 비교한 정확도를 보여줘요.",
+            style = MaterialTheme.typography.bodySmall,
+        )
+        if (heightOff) {
+            Text(
+                "이 모델의 실제 키는 ${formatCm(reference.heightCm)}예요. 키를 다르게 입력하면 정확도가 낮게 나와요.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
+    }
+}
 
 /** "체형 인사이트" cards, shown right below the body figure. */
 @Composable
@@ -65,7 +96,11 @@ private fun InsightCard(insight: Insight) {
 
 /** Every measurement grouped by kind, collapsed by default (the figure already shows them). */
 @Composable
-fun AllMeasurementsSection(measurements: List<BodyMeasurement>, onClick: ((BodyMeasurement) -> Unit)?) {
+fun AllMeasurementsSection(
+    measurements: List<BodyMeasurement>,
+    onClick: ((BodyMeasurement) -> Unit)?,
+    reference: ReferenceMeasurements? = null,
+) {
     var expanded by rememberSaveable { mutableStateOf(false) }
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -93,7 +128,7 @@ fun AllMeasurementsSection(measurements: List<BodyMeasurement>, onClick: ((BodyM
                 val items = measurements.filter { it.type.group == group }
                 if (items.isNotEmpty()) {
                     SectionTitle(group.label, "cm")
-                    MeasurementCard(items = items, onClick = onClick)
+                    MeasurementCard(items = items, onClick = onClick, reference = reference)
                 }
             }
         }

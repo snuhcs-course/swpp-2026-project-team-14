@@ -56,6 +56,7 @@ import com.swpp.stylemate.data.Gender
 import com.swpp.stylemate.data.MAX_STYLES
 import com.swpp.stylemate.data.MeasurementType
 import com.swpp.stylemate.data.PreferredFit
+import com.swpp.stylemate.data.ReferenceMeasurements
 import com.swpp.stylemate.data.STYLE_OPTIONS
 import com.swpp.stylemate.data.buildInsights
 import com.swpp.stylemate.ui.theme.StyleMateTheme
@@ -116,12 +117,14 @@ fun ReviewScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             state.warnings.forEach { WarningBanner(it) }
+            state.reference?.let { ReferenceNote(it, state.lastInput?.heightCm) }
             Spacer(Modifier.height(16.dp))
 
             BodyFigureCard(
                 measurements = state.measurements,
                 gender = state.lastInput?.gender ?: state.gender,
                 onEdit = { editing = it },
+                reference = state.reference,
             )
 
             val heightCm = state.lastInput?.heightCm ?: state.heightCm
@@ -129,7 +132,7 @@ fun ReviewScreen(
                 InsightSection(buildInsights(state.measurements, heightCm, state.detectedClothing))
             }
 
-            AllMeasurementsSection(state.measurements, onClick = { editing = it })
+            AllMeasurementsSection(state.measurements, onClick = { editing = it }, reference = state.reference)
 
             SectionTitle("선호 핏")
             FitSelector(selected = state.preferredFit, onSelect = onFit)
@@ -174,7 +177,11 @@ fun WarningBanner(text: String) {
 }
 
 @Composable
-fun MeasurementCard(items: List<BodyMeasurement>, onClick: ((BodyMeasurement) -> Unit)?) {
+fun MeasurementCard(
+    items: List<BodyMeasurement>,
+    onClick: ((BodyMeasurement) -> Unit)?,
+    reference: ReferenceMeasurements? = null,
+) {
     Column(
         Modifier
             .clip(RoundedCornerShape(16.dp))
@@ -191,11 +198,7 @@ fun MeasurementCard(items: List<BodyMeasurement>, onClick: ((BodyMeasurement) ->
             ) {
                 Column(Modifier.weight(1f)) {
                     Text(item.type.label, style = MaterialTheme.typography.bodyLarge)
-                    if (item.editedByUser) {
-                        Text("직접 수정함", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
-                    } else {
-                        ConfidenceBadge(item.confidence)
-                    }
+                    MeasurementStatus(item, reference)
                 }
                 Box(
                     Modifier
