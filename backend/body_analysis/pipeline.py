@@ -41,6 +41,8 @@ def decode_image(data: bytes) -> np.ndarray:
     """Decodes JPEG/PNG bytes to an RGB array, downscaled to MAX_SIDE_PX. Never touches disk."""
     import cv2
 
+    if not data:  # cv2.imdecode raises (→ 500) on an empty buffer instead of returning None
+        raise AnalysisError("invalid_image")
     array = np.frombuffer(data, dtype=np.uint8)
     bgr = cv2.imdecode(array, cv2.IMREAD_COLOR)
     if bgr is None:
@@ -59,6 +61,12 @@ def check_quality(pose: PoseResult | None, view: str) -> PoseResult:
     if pose.num_people > 1:
         raise AnalysisError("multiple_people", view)
     lm = pose.landmarks
+    # Upside-down or sideways photos still find a pose, but every measurement would be nonsense
+    # (an upside-down front photo gave a 176 cm chest). The head must be clearly above the ankles.
+    ankle_x = (lm["left_ankle"].x + lm["right_ankle"].x) / 2
+    ankle_y = (lm["left_ankle"].y + lm["right_ankle"].y) / 2
+    if lm["nose"].y >= ankle_y or abs(lm["nose"].x - ankle_x) > (ankle_y - lm["nose"].y):
+        raise AnalysisError("not_upright", view)
     mask = largest_component(pose.mask)
     top, bottom = vertical_extent(mask)
 

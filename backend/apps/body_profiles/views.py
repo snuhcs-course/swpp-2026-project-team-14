@@ -56,7 +56,7 @@ def analyze(request):
         if weight is None:
             return _bad_request("weight_kg", "몸무게는 30~200kg 사이로 입력해주세요.")
     try:
-        gender = Gender(request.POST.get("gender", Gender.UNSPECIFIED.value))
+        gender = Gender(request.POST.get("gender") or Gender.UNSPECIFIED.value)
     except ValueError as error:
         return _bad_request("gender", str(error))
     # A "clothing" field sent by older app builds is ignored: clothing is now detected from the photos.
