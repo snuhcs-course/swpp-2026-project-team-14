@@ -71,6 +71,7 @@ private fun ProfileSetupFlow(viewModel: BodyProfileViewModel, canCancel: Boolean
                 state = state,
                 onBack = viewModel::backToGuide,
                 onPhoto = viewModel::setPhoto,
+                onPhotoError = viewModel::showError,
                 onHeight = viewModel::setHeight,
                 onWeight = viewModel::setWeight,
                 onGender = viewModel::setGender,

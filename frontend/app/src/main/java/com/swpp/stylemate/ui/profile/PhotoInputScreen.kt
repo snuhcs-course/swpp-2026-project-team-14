@@ -8,6 +8,7 @@ import android.net.Uri
 import androidx.core.content.FileProvider
 import androidx.exifinterface.media.ExifInterface
 import java.io.File
+import java.io.IOException
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -68,6 +69,7 @@ fun PhotoInputScreen(
     state: SetupState,
     onBack: () -> Unit,
     onPhoto: (PhotoSlot, Bitmap?) -> Unit,
+    onPhotoError: (String) -> Unit,
     onHeight: (String) -> Unit,
     onWeight: (String) -> Unit,
     onGender: (Gender) -> Unit,
@@ -94,12 +96,14 @@ fun PhotoInputScreen(
                     label = "정면",
                     bitmap = state.frontPhoto,
                     onPicked = { onPhoto(PhotoSlot.FRONT, it) },
+                    onPickFailed = { onPhotoError(PHOTO_LOAD_ERROR) },
                     modifier = Modifier.weight(1f),
                 )
                 PhotoSlotCard(
                     label = "측면",
                     bitmap = state.sidePhoto,
                     onPicked = { onPhoto(PhotoSlot.SIDE, it) },
+                    onPickFailed = { onPhotoError(PHOTO_LOAD_ERROR) },
                     modifier = Modifier.weight(1f),
                 )
             }
@@ -140,6 +144,7 @@ private fun PhotoSlotCard(
     label: String,
     bitmap: Bitmap?,
     onPicked: (Bitmap?) -> Unit,
+    onPickFailed: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -148,7 +153,7 @@ private fun PhotoSlotCard(
     val captureFile = remember { File(context.cacheDir, "body_photos/$label.jpg") }
     val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { saved ->
         scope.launch {
-            if (saved) onPicked(decodeDownscaled(context, Uri.fromFile(captureFile)))
+            if (saved) decodeDownscaled(context, Uri.fromFile(captureFile))?.let(onPicked) ?: onPickFailed()
             withContext(Dispatchers.IO) { captureFile.delete() }
         }
     }
@@ -158,7 +163,8 @@ private fun PhotoSlotCard(
         cameraLauncher.launch(uri)
     }
     val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-        if (uri != null) scope.launch { onPicked(decodeDownscaled(context, uri)) }
+        // A failed decode keeps the previous photo and shows a message instead of clearing it.
+        if (uri != null) scope.launch { decodeDownscaled(context, uri)?.let(onPicked) ?: onPickFailed() }
     }
 
     Column(modifier) {
@@ -284,30 +290,47 @@ private fun NumberField(
     )
 }
 
+private const val PHOTO_LOAD_ERROR = "사진을 불러오지 못했어요. 다른 사진을 선택하거나 다시 찍어주세요."
+
 /**
  * Decodes a photo at most ~1280 px on the long side (enough for body analysis) and turns it upright.
  * Phone cameras often store photos sideways with an EXIF orientation tag that BitmapFactory ignores;
  * a sideways body would be rejected by the pose model.
+ * Returns null instead of throwing when the photo cannot be read (unsupported or broken file, a cloud
+ * photo that is not downloaded, revoked access): an exception here would crash the app.
  */
 private suspend fun decodeDownscaled(context: Context, uri: Uri, maxSide: Int = 1280): Bitmap? =
     withContext(Dispatchers.IO) {
-        val resolver = context.contentResolver
-        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
-        var sample = 1
-        while (maxOf(bounds.outWidth, bounds.outHeight) / sample > maxSide) sample *= 2
-        val options = BitmapFactory.Options().apply { inSampleSize = sample }
-        val bitmap = resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) }
-            ?: return@withContext null
-        val degrees = resolver.openInputStream(uri)?.use { ExifInterface(it).rotationDegrees } ?: 0
-        if (degrees == 0) {
-            bitmap
-        } else {
-            val matrix = Matrix().apply { postRotate(degrees.toFloat()) }
-            Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
-                .also { if (it !== bitmap) bitmap.recycle() }
+        try {
+            decodeUpright(context, uri, maxSide)
+        } catch (e: IOException) {
+            null
+        } catch (e: SecurityException) {
+            null
+        } catch (e: OutOfMemoryError) {
+            null
         }
     }
+
+private fun decodeUpright(context: Context, uri: Uri, maxSide: Int): Bitmap? {
+    val resolver = context.contentResolver
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
+    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null // not an image we can read
+    var sample = 1
+    while (maxOf(bounds.outWidth, bounds.outHeight) / sample > maxSide) sample *= 2
+    val options = BitmapFactory.Options().apply { inSampleSize = sample }
+    val bitmap = resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) }
+        ?: return null
+    val degrees = resolver.openInputStream(uri)?.use { ExifInterface(it).rotationDegrees } ?: 0
+    return if (degrees == 0) {
+        bitmap
+    } else {
+        val matrix = Matrix().apply { postRotate(degrees.toFloat()) }
+        Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+            .also { if (it !== bitmap) bitmap.recycle() }
+    }
+}
 
 @Preview(showBackground = true, heightDp = 1100)
 @Composable
@@ -315,7 +338,7 @@ private fun PhotoInputPreview() {
     StyleMateTheme {
         PhotoInputScreen(
             state = SetupState(heightText = "172"),
-            onBack = {}, onPhoto = { _, _ -> }, onHeight = {}, onWeight = {},
+            onBack = {}, onPhoto = { _, _ -> }, onPhotoError = {}, onHeight = {}, onWeight = {},
             onGender = {}, onAnalyze = {},
         )
     }
