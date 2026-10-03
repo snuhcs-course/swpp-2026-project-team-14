@@ -18,13 +18,14 @@ swpp-2026-project-team-14/
 |   |   |       `-- CaptureFiles.kt               # 옷 사진 임시 캐시 관리
 |   |   `-- ui/
 |   |       |-- StyleMateApp.kt                   # 온보딩·홈·옷장·마이프로필 탭
+|   |       |-- components/ScreenComponents.kt   # 체형·옷장 공통 상단바·하단 버튼·섹션 제목
 |   |       |-- theme/Theme.kt                    # 크림·테라코타 공통 테마
 |   |       |-- profile/                         # 체형 촬영·수정·프로필 화면
 |   |       `-- wardrobe/
-|   |           |-- WardrobeScreen.kt            # 옷장 목록·촬영·편집 연결
+|   |           |-- WardrobeScreen.kt            # 옷장 목록·사진 확인·치수 요약·편집 연결
 |   |           |-- WardrobeViewModel.kt         # 목록·저장 상태
 |   |           |-- GarmentAnalysisViewModel.kt  # 분석 진행·실패 상태
-|   |           |-- GarmentEditor.kt             # 특징·실측·착용 정보·메모 편집
+|   |           |-- GarmentEditor.kt             # 특징·실측·착용 정보·메모 편집과 하단 고정 저장
 |   |           `-- capture/
 |   |               |-- MeasurementActivity.kt  # 실측 촬영·측정점 확인·수정
 |   |               `-- MeasurementCamera.kt    # AR 카메라·촬영 프레임 고정
@@ -57,6 +58,8 @@ swpp-2026-project-team-14/
 ```
 
 체형 분석 확인 → 옷장 탭 → AR 촬영 → 자동 점 확인 → cm 계산 → Gemini 이름·분류·색상 분석 → 사용자 편집 → MySQL 저장 순서다. 체형과 옷장 API는 같은 서버 주소를 사용한다.
+
+체형·옷장 화면은 공통 `ScreenScaffold`·`PrimaryActionBar`·`SectionTitle`과 `StyleMateTheme`를 사용한다. 글꼴·여백·카드 기준은 [디자인](design.md#3-공통-디자인-기준--현재-구현)에 정리한다.
 
 옷장의 `pattern`·상대 기장 `length`는 제거했다. 치수와 측정 출처는 저장하지만 측정점 좌표·누끼 미리보기는 저장하지 않는다. 체형 사진은 메모리 처리 후 폐기하며 옷 사진만 옷장 저장소에 보관한다.
 

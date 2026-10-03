@@ -4,6 +4,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -121,7 +122,7 @@ private fun MainTabs(viewModel: BodyProfileViewModel) {
     ) { padding ->
         when (tab) {
             Tab.HOME -> Placeholder("오늘의 코디", "홈 대시보드는 P8 담당 화면이에요.", Modifier.padding(padding))
-            Tab.WARDROBE -> Box(Modifier.padding(padding)) { WardrobeRoute() }
+            Tab.WARDROBE -> Box(Modifier.padding(padding).consumeWindowInsets(padding)) { WardrobeRoute() }
             Tab.PROFILE -> MyProfileScreen(
                 profile = app.profile,
                 onReanalyze = viewModel::startReanalysis,

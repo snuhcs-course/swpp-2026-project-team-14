@@ -2,6 +2,8 @@ package com.swpp.stylemate.ui.wardrobe.capture
 
 import com.swpp.stylemate.data.wardrobe.*
 import com.swpp.stylemate.ui.theme.StyleMateTheme
+import com.swpp.stylemate.ui.components.ScreenScaffold
+import com.swpp.stylemate.ui.wardrobe.MeasurementSummary
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -11,6 +13,7 @@ import android.os.SystemClock
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -22,6 +25,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
@@ -105,11 +109,21 @@ class MeasurementActivity : ComponentActivity() {
         }
         setContent {
             StyleMateTheme {
-                Scaffold { padding ->
+                val captured = snapshot
+                ScreenScaffold(
+                    title = if (captured == null) "촬영하기" else "치수 확인",
+                    primaryLabel = if (captured == null) { if (capturing) "촬영 중" else "촬영" }
+                                   else if (saving) "사진 준비 중" else "확인",
+                    primaryEnabled = if (captured == null) ready && !capturing
+                                     else measurements.isNotEmpty() && first == null && !saving && !landmarkBusy,
+                    onPrimary = {
+                        if (captured == null) { capturing = true; renderer.captureRequested.set(true) }
+                        else finishMeasurement(captured)
+                    },
+                    onBack = { finish() },
+                    navigationEnabled = !saving,
+                ) { padding ->
                     Column(Modifier.fillMaxSize().padding(padding)) {
-                        TextButton(onClick = { finish() }, enabled = !saving) { Text("취소") }
-                        Text("옷 실측", Modifier.padding(horizontal = 16.dp), style = MaterialTheme.typography.titleLarge)
-                        val captured = snapshot
                         if (captured == null) LiveCamera() else FrozenMeasurement(captured)
                     }
                 }
@@ -183,17 +197,18 @@ class MeasurementActivity : ComponentActivity() {
                 delay(500)
             }
         }
-        Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             (landmarkTypes.toList() + (null to "직접 지정")).forEach { (type, label) ->
-                FilterChip(selected = landmarkType == type, onClick = {
+                CaptureChip(selected = landmarkType == type, onClick = {
                     landmarkEpoch++; livePairs = emptyMap(); landmarkType = type; fieldIndex = 0
                     category = landmarkCategory(type)
                     retryAfter = 0; landmarkStatus = ""
                 }, label = { Text(label) })
             }
         }
-        Text("옷을 평평하게 펴세요. 상의는 뒷면을 촬영하세요.", Modifier.padding(16.dp))
-        Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+        Text("옷을 평평하게 펴세요. 상의는 뒷면을 촬영하세요.", Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+            style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Box(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 20.dp).clip(RoundedCornerShape(16.dp)), contentAlignment = Alignment.Center) {
             AndroidView(factory = { surface }, modifier = Modifier.fillMaxSize())
             Canvas(Modifier.fillMaxSize()) {
                 livePairs.values.forEach { path ->
@@ -204,22 +219,19 @@ class MeasurementActivity : ComponentActivity() {
             }
             Text("+", color = if (ready) Color.Green else Color.White, style = MaterialTheme.typography.headlineLarge)
         }
-        if (landmarkStatus.isNotEmpty()) Text(landmarkStatus, Modifier.padding(horizontal = 16.dp))
-        Text(status, Modifier.padding(16.dp))
-        Button(onClick = { capturing = true; renderer.captureRequested.set(true) },
-            enabled = ready && !capturing, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-            Text(if (capturing) "촬영 중" else "촬영")
-        }
+        if (landmarkStatus.isNotEmpty()) Text(landmarkStatus, Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(status, Modifier.padding(horizontal = 20.dp, vertical = 8.dp), style = MaterialTheme.typography.bodyMedium)
     }
 
     @Composable
     private fun ColumnScope.FrozenMeasurement(captured: MeasurementSnapshot) {
         LaunchedEffect(captured, landmarkType, removeBackground) { detectFrozen(captured) }
-        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(16.dp),
+        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf("top" to "상의", "outerwear" to "아우터", "bottom" to "하의").forEach { (code, label) ->
-                    FilterChip(selected = category == code, enabled = !saving && !landmarkBusy, onClick = {
+                    CaptureChip(selected = category == code, enabled = !saving && !landmarkBusy, onClick = {
                         if (category != code) {
                             category = code; fieldIndex = 0; first = null; measurements.clear()
                             landmarkType = when (code) { "bottom" -> "trousers"; "top" -> "short_sleeve_top"; else -> "long_sleeve_outerwear" }
@@ -229,29 +241,33 @@ class MeasurementActivity : ComponentActivity() {
             }
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 landmarkTypes.filterKeys { landmarkCategory(it) == category }.forEach { (type, label) ->
-                    FilterChip(selected = landmarkType == type, enabled = !saving && !landmarkBusy, onClick = {
+                    CaptureChip(selected = landmarkType == type, enabled = !saving && !landmarkBusy, onClick = {
                         if (landmarkType != type) {
                             landmarkType = type; fieldIndex = 0; first = null; measurements.clear()
                         }
                     }, label = { Text(label) })
                 }
             }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Switch(checked = removeBackground, onCheckedChange = { removeBackground = it }, enabled = !saving && !landmarkBusy)
-                Text("배경 제외")
+            Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
+                Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("배경 제외", Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+                    Switch(checked = removeBackground, onCheckedChange = { removeBackground = it }, enabled = !saving && !landmarkBusy)
+                }
             }
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 fields.forEachIndexed { index, field ->
-                    FilterChip(selected = fieldIndex == index, enabled = !saving && !landmarkBusy, onClick = { fieldIndex = index; first = null },
+                    CaptureChip(selected = fieldIndex == index, enabled = !saving && !landmarkBusy, onClick = { fieldIndex = index; first = null },
                         label = { Text(field.label + if (measurements.containsKey(field.key)) " ✓" else "") })
                 }
             }
             val field = fields[fieldIndex]
             if (landmarkBusy) LinearProgressIndicator(Modifier.fillMaxWidth())
-            if (landmarkStatus.isNotEmpty()) Text(landmarkStatus)
-            Text(field.guide)
-            Text(if (first == null) "시작점을 찍으세요." else "끝점을 찍으세요.")
+            if (landmarkStatus.isNotEmpty()) Text(landmarkStatus, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(field.guide, style = MaterialTheme.typography.bodyMedium)
+            Text(if (first == null) "시작점을 찍으세요." else "끝점을 찍으세요.",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Box(Modifier.fillMaxWidth().aspectRatio(captured.bitmap.width.toFloat() / captured.bitmap.height)
+                .clip(RoundedCornerShape(16.dp))
                 .pointerInput(field.key, first, saving, landmarkBusy) {
                     detectTapGestures { position ->
                         if (!saving && !landmarkBusy) selectPoint(captured, Offset(position.x / size.width, position.y / size.height))
@@ -269,22 +285,27 @@ class MeasurementActivity : ComponentActivity() {
                 }
             }
             if (status.isNotEmpty()) Text(status)
-            if (measurements.isNotEmpty()) Text("추정 치수", style = MaterialTheme.typography.titleSmall)
-            measurements.values.forEach { Text("${it.field.label}: ${String.format(Locale.KOREA, "%.2f", it.cm)} cm") }
+            MeasurementSummary(measurements.values.map { it.field.label to String.format(Locale.KOREA, "%.2f", it.cm) })
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = { first = null; measurements.remove(field.key) }, enabled = !saving && !landmarkBusy) { Text("지우기") }
+                OutlinedButton(onClick = { first = null; measurements.remove(field.key) }, enabled = !saving && !landmarkBusy,
+                    shape = RoundedCornerShape(12.dp), modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("지우기") }
                 OutlinedButton(onClick = {
                     landmarkEpoch++; first = null; fieldIndex = 0; measurements.clear(); snapshot = null; ready = false
                     landmarkBusy = false; landmarkStatus = ""; livePairs = emptyMap(); processedPreview = null
                     status = "바닥을 다시 인식해 주세요."
                     startAr()
-                }, enabled = !saving) { Text("재촬영") }
+                }, enabled = !saving, shape = RoundedCornerShape(12.dp), modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("재촬영") }
             }
+            Spacer(Modifier.height(16.dp))
         }
-        Button(onClick = { finishMeasurement(captured) }, enabled = measurements.isNotEmpty() && first == null && !saving && !landmarkBusy,
-            modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-            Text(if (saving) "사진 준비 중" else "확인")
-        }
+    }
+
+    @Composable
+    private fun CaptureChip(selected: Boolean, onClick: () -> Unit, enabled: Boolean = true, label: @Composable () -> Unit) {
+        FilterChip(selected = selected, onClick = onClick, enabled = enabled, label = label,
+            shape = RoundedCornerShape(50), colors = FilterChipDefaults.filterChipColors(
+                selectedContainerColor = MaterialTheme.colorScheme.primary,
+                selectedLabelColor = MaterialTheme.colorScheme.onPrimary))
     }
 
     private fun detectPreview(preview: LandmarkPreview) {

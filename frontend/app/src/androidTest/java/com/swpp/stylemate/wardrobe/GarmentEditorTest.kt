@@ -3,11 +3,7 @@ package com.swpp.stylemate.wardrobe
 import com.swpp.stylemate.data.wardrobe.*
 import com.swpp.stylemate.ui.wardrobe.*
 
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.ui.Modifier
+import com.swpp.stylemate.ui.theme.StyleMateTheme
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.test.platform.app.InstrumentationRegistry
@@ -25,13 +21,13 @@ class GarmentEditorTest {
         val fixture = fixture()
         val attributes = fixture.getJSONObject("attributes").put("category", "bottom").put("subcategory", JSONObject.NULL)
         var submitted: JSONObject? = null
-        compose.setContent { MaterialTheme { Column(Modifier.verticalScroll(rememberScrollState())) {
+        compose.setContent { StyleMateTheme {
             GarmentEditor("minimal", attributes, null, JSONObject(), "", fixture.getJSONObject("catalog"),
                 false, false, null, { submitted = it })
-        } } }
+        } }
         compose.onNodeWithText("종류: 미입력").assertDoesNotExist()
         compose.onNodeWithText("허리 단면").performScrollTo().performTextInput("37.25")
-        compose.onNodeWithText("옷장에 추가").performScrollTo().performClick()
+        compose.onNodeWithText("옷장에 추가").assertIsDisplayed().performClick()
         compose.runOnIdle {
             assertEquals(37.25, requireNotNull(submitted).getJSONObject("dimensions").getJSONObject("waist_width_half").getDouble("value"), .0001)
         }
@@ -41,14 +37,14 @@ class GarmentEditorTest {
         val fixture = fixture()
         var submitted: JSONObject? = null
         val dimensions = JSONObject("""{"unit":"cm","chest_width_half":{"value":55.12,"source":"arcore_assisted","method":"flat_underarm_to_underarm","reference":null},"total_length":{"value":65.34,"source":"arcore_manual","method":"back_neck_to_hem","reference":null},"shoulder_width":{"value":45.12,"source":"arcore_assisted","method":"flat_shoulder_seam_to_seam","reference":null}}""")
-        compose.setContent { MaterialTheme { Column(Modifier.verticalScroll(rememberScrollState())) {
+        compose.setContent { StyleMateTheme {
             GarmentEditor("draft", fixture.getJSONObject("attributes"), dimensions, JSONObject(), "",
                 fixture.getJSONObject("catalog"), false, false, null, { submitted = it })
-        } } }
+        } }
         compose.onNodeWithText("이름").performTextReplacement("내 흰 티셔츠")
         compose.onNodeWithText("가슴 단면").performScrollTo().performTextReplacement("56.78")
         compose.onNodeWithText("메모").performScrollTo().performTextInput("찬물 세탁\n여행용")
-        compose.onNodeWithText("옷장에 추가").performScrollTo().performClick()
+        compose.onNodeWithText("옷장에 추가").assertIsDisplayed().performClick()
         compose.runOnIdle {
             val payload = requireNotNull(submitted)
             assertEquals("내 흰 티셔츠", payload.getJSONObject("attributes").getString("name"))
@@ -65,16 +61,16 @@ class GarmentEditorTest {
     @Test fun invalidMeasurementBlocksSaveAndChangingCategoryClearsMeasurements() {
         val fixture = fixture()
         var submitted: JSONObject? = null
-        compose.setContent { MaterialTheme { Column(Modifier.verticalScroll(rememberScrollState())) {
+        compose.setContent { StyleMateTheme {
             GarmentEditor("draft", fixture.getJSONObject("attributes"), null, JSONObject(), "기존 메모",
                 fixture.getJSONObject("catalog"), false, true, null, { submitted = it })
-        } } }
+        } }
         compose.onNodeWithText("가슴 단면").performScrollTo().performTextInput("12.345")
-        compose.onNodeWithText("저장하기").performScrollTo().assertIsNotEnabled()
+        compose.onNodeWithText("저장하기").assertIsDisplayed().assertIsNotEnabled()
         compose.onNodeWithText("분류: 상의").performScrollTo().performClick()
         compose.onNodeWithText("신발").performClick()
         compose.onNodeWithText("가슴 단면").assertDoesNotExist()
-        compose.onNodeWithText("저장하기").performScrollTo().performClick()
+        compose.onNodeWithText("저장하기").assertIsDisplayed().performClick()
         compose.runOnIdle {
             assertTrue(requireNotNull(submitted).isNull("dimensions"))
             assertEquals("기존 메모", requireNotNull(submitted).getString("notes"))

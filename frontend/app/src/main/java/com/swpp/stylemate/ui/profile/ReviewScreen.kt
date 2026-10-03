@@ -1,5 +1,8 @@
 package com.swpp.stylemate.ui.profile
 
+import com.swpp.stylemate.ui.components.ScreenScaffold
+import com.swpp.stylemate.ui.components.SectionTitle
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -95,7 +98,7 @@ fun ReviewScreen(
 ) {
     var editing by remember { mutableStateOf<BodyMeasurement?>(null) }
 
-    SetupScaffold(
+    ScreenScaffold(
         title = "AI가 추정한 체형",
         onBack = onRetake,
         actionLabel = "다시 찍기",

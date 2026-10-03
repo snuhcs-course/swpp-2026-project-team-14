@@ -1,5 +1,8 @@
 package com.swpp.stylemate.ui.profile
 
+import com.swpp.stylemate.ui.components.ScreenScaffold
+import com.swpp.stylemate.ui.components.SectionTitle
+
 import android.Manifest
 import android.content.pm.PackageManager
 import androidx.core.content.ContextCompat
@@ -78,7 +81,7 @@ fun PhotoInputScreen(
     onGender: (Gender) -> Unit,
     onAnalyze: () -> Unit,
 ) {
-    SetupScaffold(
+    ScreenScaffold(
         title = "체형 분석",
         onBack = onBack,
         primaryLabel = "분석하기",

@@ -12,6 +12,7 @@ import android.provider.Settings
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
@@ -19,6 +20,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
@@ -32,6 +34,10 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.font.FontWeight
+import com.swpp.stylemate.ui.components.PrimaryActionBar
+import com.swpp.stylemate.ui.components.ScreenScaffold
+import com.swpp.stylemate.ui.components.SectionTitle
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -166,60 +172,70 @@ fun WardrobeRoute() {
             onItemClick = { wardrobeModel.clearSaveState(); editingId = it.id },
             loading = wardrobe.loading, onRefresh = { wardrobeModel.refresh() })
     } else {
-        Scaffold(contentWindowInsets = WindowInsets(0)) { insets ->
-            Column(Modifier.fillMaxSize().padding(insets).imePadding().verticalScroll(rememberScrollState()).padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                TextButton(onClick = { discard(); editingId = null; wardrobeModel.clearSaveState() }, enabled = !wardrobe.saving) { Text("옷장으로 돌아가기") }
-                if (editingId != null) {
-                    if (editing != null) {
-                        GarmentPhoto(editing.getString("image_url"), editing.getJSONObject("attributes").getString("name"))
-                        wardrobe.catalog?.let { catalog ->
-                            GarmentEditor(editing.getString("id"), editing.getJSONObject("attributes"), editing.optJSONObject("dimensions"),
-                                editing.getJSONObject("user_properties"), editing.getString("notes"), catalog,
-                                wardrobe.saving || wardrobe.loading, true, wardrobe.saveError,
-                                onSave = { wardrobeModel.save(editing.getString("id"), it) })
+        val result = if (editingId == null) analysis.result else null
+        val record = editing ?: result
+        val catalog = wardrobe.catalog
+        val measurements = selectedMeasurements?.let { JSONObject(it) }
+        val measuredCategory = measurements?.optString("category")
+        val attrs = record?.getJSONObject("attributes")
+        val sameCategory = measuredCategory == attrs?.optString("category") || measuredCategory == "top" && attrs?.optString("category") == "outerwear"
+        val back = { discard(); editingId = null; wardrobeModel.clearSaveState() }
+        if (record != null && catalog != null) {
+            GarmentEditor(
+                record.getString("id"), record.getJSONObject("attributes"),
+                if (editing != null) editing.optJSONObject("dimensions") else if (sameCategory) measurements?.optJSONObject("dimensions") else null,
+                if (editing != null) editing.getJSONObject("user_properties") else JSONObject(),
+                if (editing != null) editing.getString("notes") else "", catalog,
+                wardrobe.saving || wardrobe.loading, editing != null, wardrobe.saveError,
+                onSave = { wardrobeModel.save(record.getString("id"), it) }, onBack = back,
+                photo = {
+                    if (editing != null) GarmentPhoto(editing.getString("image_url"), editing.getJSONObject("attributes").getString("name"))
+                    else {
+                        PhotoFrame {
+                            preview?.let { Image(it, "촬영한 옷 사진", Modifier.fillMaxSize(), contentScale = ContentScale.Fit) }
+                            if (previewLoading) CircularProgressIndicator()
                         }
-                    } else if (wardrobe.loading) CircularProgressIndicator()
-                    else Text("옷 정보를 불러오지 못했습니다.")
-                } else {
-                    Box(Modifier.fillMaxWidth().aspectRatio(1f).background(MaterialTheme.colorScheme.surface), contentAlignment = Alignment.Center) {
-                        preview?.let { Image(it, "촬영한 옷 사진", Modifier.fillMaxSize(), contentScale = ContentScale.Fit) }
-                        if (previewLoading) CircularProgressIndicator()
+                        if (measurements != null && !sameCategory) Text("옷 종류가 달라 치수를 다시 입력해 주세요.",
+                            Modifier.padding(top = 12.dp), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
                     }
-                    message?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-                    val result = analysis.result
-                    if (result == null) {
-                        selectedMeasurements?.let { payload ->
-                            Text("추정 치수", style = MaterialTheme.typography.titleMedium)
-                            val dimensions = remember(payload) { JSONObject(payload).getJSONObject("dimensions") }
-                            (topMeasurementFields + bottomMeasurementFields).distinctBy { it.key }.forEach { field ->
+                },
+            )
+        } else {
+            ScreenScaffold(
+                title = if (editingId != null) "옷 정보" else "촬영한 옷",
+                primaryLabel = if (editingId != null || result != null) null else if (analysis.busy) "분석 중" else "분석하기",
+                primaryEnabled = !analysis.busy && !measurementBusy && preview != null,
+                onPrimary = { selected?.let { analysisModel.analyze(context, it) } },
+                onBack = back,
+                actionLabel = if (editingId == null && result == null) "다시 촬영" else null,
+                onAction = { takePhoto() },
+                navigationEnabled = !wardrobe.saving && !analysis.busy && !measurementBusy,
+                contentWindowInsets = WindowInsets(0),
+            ) { padding ->
+                Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
+                    if (editingId == null) {
+                        PhotoFrame {
+                            preview?.let { Image(it, "촬영한 옷 사진", Modifier.fillMaxSize(), contentScale = ContentScale.Fit) }
+                            if (previewLoading) CircularProgressIndicator()
+                        }
+                        message?.let { Text(it, Modifier.padding(top = 12.dp), color = MaterialTheme.colorScheme.error) }
+                        measurements?.getJSONObject("dimensions")?.let { dimensions ->
+                            MeasurementSummary((topMeasurementFields + bottomMeasurementFields).distinctBy { it.key }.mapNotNull { field ->
                                 dimensions.optJSONObject(field.key)?.let { value ->
-                                    Text("${field.label}: ${String.format(java.util.Locale.KOREA, "%.2f", value.getDouble("value"))} cm")
+                                    field.label to String.format(java.util.Locale.KOREA, "%.2f", value.getDouble("value"))
                                 }
-                            }
+                            })
                         }
-                        Button(onClick = { selected?.let { analysisModel.analyze(context, it) } },
-                            enabled = !analysis.busy && !measurementBusy && preview != null,
-                            modifier = Modifier.fillMaxWidth()) { Text(if (analysis.busy) "분석 중" else "분석하기") }
-                        if (analysis.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
-                        analysis.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-                        Button(onClick = { takePhoto() }, enabled = !measurementBusy && !analysis.busy, modifier = Modifier.fillMaxWidth()) { Text("다시 촬영") }
-                    } else {
-                        val measurements = selectedMeasurements?.let { JSONObject(it) }
-                        val attrs = result.getJSONObject("attributes")
-                        val measuredCategory = measurements?.optString("category")
-                        val sameCategory = measuredCategory == attrs.optString("category") || measuredCategory == "top" && attrs.optString("category") == "outerwear"
-                        if (measurements != null && !sameCategory) Text("옷 종류가 달라 치수를 다시 입력해 주세요.", color = MaterialTheme.colorScheme.error)
-                        wardrobe.catalog?.let { catalog ->
-                            GarmentEditor(result.getString("id"), attrs, if (sameCategory) measurements?.optJSONObject("dimensions") else null,
-                                JSONObject(), "", catalog, wardrobe.saving || wardrobe.loading, false, wardrobe.saveError,
-                                onSave = { wardrobeModel.save(result.getString("id"), it) })
-                        }
+                        if (analysis.busy) LinearProgressIndicator(Modifier.fillMaxWidth().padding(top = 16.dp))
+                        analysis.error?.let { Text(it, Modifier.padding(top = 12.dp), color = MaterialTheme.colorScheme.error) }
+                    } else if (wardrobe.loading) {
+                        Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+                    } else Text("옷 정보를 불러오지 못했습니다.", style = MaterialTheme.typography.bodyMedium)
+                    if (catalog == null) {
+                        wardrobe.error?.let { Text(it, Modifier.padding(top = 12.dp), color = MaterialTheme.colorScheme.error) }
+                        TextButton(onClick = { wardrobeModel.refresh() }, enabled = !wardrobe.loading) { Text("다시 불러오기") }
                     }
-                }
-                if (wardrobe.catalog == null) {
-                    wardrobe.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-                    TextButton(onClick = { wardrobeModel.refresh() }, enabled = !wardrobe.loading) { Text("다시 불러오기") }
+                    Spacer(Modifier.height(24.dp))
                 }
             }
         }
@@ -238,48 +254,52 @@ fun WardrobeScreen(items: List<WardrobeItem>, message: String?, cameraBusy: Bool
     Scaffold(
         contentWindowInsets = WindowInsets(0),
         bottomBar = {
-            Surface(shadowElevation = 4.dp) {
-              Column(Modifier.padding(20.dp)) {
-                Button(onClick = onCapture, enabled = !cameraBusy,
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) {
-                    Text(if (cameraBusy) "촬영 중" else "촬영하기")
-                }
-              }
-            }
+            PrimaryActionBar(if (cameraBusy) "촬영 중" else "촬영하기", !cameraBusy, onCapture)
         },
     ) { insets ->
-        Column(Modifier.fillMaxSize().padding(insets).padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Spacer(Modifier.height(8.dp))
-            Text("내 옷장", style = MaterialTheme.typography.headlineMedium)
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("총 ${items.size}벌", style = MaterialTheme.typography.bodyMedium)
+        Column(Modifier.fillMaxSize().padding(insets).padding(horizontal = 20.dp)) {
+            Spacer(Modifier.height(16.dp))
+            Text("내 옷장", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Text("총 ${items.size}벌", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 TextButton(onClick = onRefresh, enabled = !loading) { Text("새로고침") }
             }
             if (loading) LinearProgressIndicator(Modifier.fillMaxWidth())
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 categories.forEach { (code, label) ->
-                    FilterChip(selected = category == code, onClick = { category = code }, label = { Text(label) })
+                    FilterChip(selected = category == code, onClick = { category = code }, label = { Text(label) },
+                        shape = RoundedCornerShape(50), colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = MaterialTheme.colorScheme.primary,
+                            selectedLabelColor = MaterialTheme.colorScheme.onPrimary))
                 }
             }
-            message?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            message?.let { Text(it, Modifier.padding(vertical = 8.dp), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error) }
+            Spacer(Modifier.height(8.dp))
             if (visible.isEmpty()) {
                 Column(Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(if (items.isEmpty()) "아직 등록된 옷이 없습니다" else "이 카테고리에 등록된 옷이 없습니다", style = MaterialTheme.typography.titleMedium)
+                    Text(if (items.isEmpty()) "아직 등록된 옷이 없습니다" else "이 카테고리에 등록된 옷이 없습니다", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(8.dp))
-                    Text("옷 한 벌이 잘 보이도록 촬영해 주세요.")
+                    Text("옷 한 벌이 잘 보이도록 촬영해 주세요.", style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             } else {
                 LazyVerticalGrid(columns = GridCells.Fixed(columns), modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(bottom = 12.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     items(visible, key = { it.id }) { garment ->
-                        Card(onClick = { onItemClick(garment) }) {
+                        Card(onClick = { onItemClick(garment) }, shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
                             Box(Modifier.fillMaxWidth().aspectRatio(1f), contentAlignment = Alignment.Center) {
                                 if (garment.thumbnail != null) Image(garment.thumbnail, garment.name, Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
                                 else if (garment.imageUrl != null) GarmentPhoto(garment.imageUrl, garment.name)
                                 else Text("사진 없음", style = MaterialTheme.typography.labelSmall)
                             }
-                            Text(garment.name, Modifier.padding(horizontal = 8.dp), maxLines = 2, overflow = TextOverflow.Ellipsis)
-                            garment.style?.let { Text(it, Modifier.padding(8.dp), style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                            Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text(garment.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold,
+                                    minLines = 2, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                Text(garment.style.orEmpty(), style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            }
                         }
                     }
                 }
@@ -299,9 +319,38 @@ private fun GarmentPhoto(path: String, name: String) {
         catch (_: Exception) { bitmap = null }
         finally { loading = false }
     }
-    Box(Modifier.fillMaxWidth().aspectRatio(1f), contentAlignment = Alignment.Center) {
+    PhotoFrame {
         bitmap?.let { Image(it, name, Modifier.fillMaxSize(), contentScale = ContentScale.Fit) }
         if (loading) CircularProgressIndicator()
         else if (bitmap == null) Text("사진을 불러오지 못했습니다.")
+    }
+}
+
+@Composable
+private fun PhotoFrame(content: @Composable BoxScope.() -> Unit) {
+    Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainer,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
+        Box(Modifier.fillMaxWidth().aspectRatio(1f), contentAlignment = Alignment.Center, content = content)
+    }
+}
+
+@Composable
+fun MeasurementSummary(values: List<Pair<String, String>>) {
+    if (values.isEmpty()) return
+    SectionTitle("추정 치수", "cm")
+    Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
+        Column {
+            values.forEachIndexed { index, (label, value) ->
+                if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+                    Spacer(Modifier.width(8.dp))
+                    Surface(shape = RoundedCornerShape(50), color = MaterialTheme.colorScheme.surfaceVariant,
+                        contentColor = MaterialTheme.colorScheme.onSurface) {
+                        Text("$value cm", Modifier.padding(horizontal = 14.dp, vertical = 6.dp), fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
     }
 }
