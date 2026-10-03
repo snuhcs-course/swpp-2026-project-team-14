@@ -47,7 +47,6 @@ Iteration 1 prototypes the riskiest part first: **estimating garment measurement
 | Can users trust it? | Every value is editable and labelled with confidence. Loose clothing triggers a warning instead of silently wrong numbers. |
 
 Known limitations in this demo:
-- **No database yet.** The confirmed profile lives in app memory and is lost when the app is closed. Saving it is part of the backend/storage integration.
 - The 홈 and 옷장 tabs are placeholders.
 - The accuracy numbers come from synthetic bodies and are optimistic.
 - The results-screen design is still under discussion.
