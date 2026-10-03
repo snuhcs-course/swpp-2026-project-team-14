@@ -36,31 +36,10 @@
         "flats": "플랫",
         "heels": "힐"
       },
-      "colors": {
-        "black": "검정",
-        "white": "흰색",
-        "gray": "회색",
-        "ivory": "아이보리",
-        "beige": "베이지",
-        "brown": "갈색",
-        "navy": "네이비",
-        "blue": "파랑",
-        "green": "초록",
-        "khaki": "카키",
-        "red": "빨강",
-        "orange": "주황",
-        "yellow": "노랑",
-        "pink": "분홍",
-        "purple": "보라",
-        "silver": "은색",
-        "gold": "금색",
-        "other": "기타"
-      },
       "styles": {
         "minimal": "미니멀",
         "casual": "캐주얼",
         "street": "스트릿",
-        "lovely": "러블리",
         "classic": "클래식",
         "sporty": "스포티",
         "formal": "포멀",
@@ -72,13 +51,6 @@
         "regular": "레귤러",
         "loose": "루즈",
         "oversized": "오버사이즈"
-      },
-      "sleeve_length": {
-        "sleeveless": "민소매",
-        "short": "반팔",
-        "elbow": "팔꿈치길이",
-        "three_quarter": "7부",
-        "long": "긴팔"
       },
       "leg_shape": {
         "skinny": "밀착",
@@ -112,7 +84,6 @@
       "colors": "색상",
       "styles": "스타일",
       "fit_type": "핏",
-      "sleeve_length": "소매",
       "leg_shape": "바지형태",
       "rise_type": "허리선",
       "skirt_shape": "스커트형태"
@@ -158,8 +129,27 @@
       }
     },
     "array_limits": {
-      "colors": 3,
+      "colors": 5,
       "styles": 3
+    },
+    "color_palette": {
+      "#202020": "검정",
+      "#FFFFFF": "흰색",
+      "#808080": "회색",
+      "#FFFFF0": "아이보리",
+      "#D6BE9A": "베이지",
+      "#795548": "갈색",
+      "#24344B": "네이비",
+      "#3975C6": "파랑",
+      "#4F7952": "초록",
+      "#7B8052": "카키",
+      "#C83C3C": "빨강",
+      "#E88A3D": "주황",
+      "#E8C547": "노랑",
+      "#E8A0B0": "분홍",
+      "#9165AD": "보라",
+      "#C0C0C0": "은색",
+      "#C9A447": "금색"
     },
     "dimensions": {
       "top": {
@@ -228,11 +218,10 @@
     "category": "top",
     "subcategory": "tshirt",
     "colors": [
-      "white"
+      "#FFFFFF"
     ],
     "styles": [],
     "fit_type": null,
-    "sleeve_length": null,
     "leg_shape": null,
     "rise_type": null,
     "skirt_shape": null,

@@ -69,6 +69,7 @@ fun WardrobeRoute() {
     val wardrobeModel: WardrobeViewModel = viewModel()
     val wardrobe by wardrobeModel.state.collectAsStateWithLifecycle()
     var editingId by rememberSaveable { mutableStateOf<String?>(null) }
+    var savedPhoto by remember(editingId) { mutableStateOf<ImageBitmap?>(null) }
     LaunchedEffect(selected) { analysisModel.select(selected) }
     LaunchedEffect(wardrobe.savedId) {
         if (wardrobe.savedId != null) {
@@ -189,8 +190,10 @@ fun WardrobeRoute() {
                 if (editing != null) editing.getString("notes") else "", catalog,
                 wardrobe.saving || wardrobe.loading, editing != null, wardrobe.saveError,
                 onSave = { wardrobeModel.save(record.getString("id"), it) }, onBack = back,
+                image = if (editing != null) savedPhoto else preview,
                 photo = {
-                    if (editing != null) GarmentPhoto(editing.getString("image_url"), editing.getJSONObject("attributes").getString("name"))
+                    if (editing != null) GarmentPhoto(editing.getString("image_url"), editing.getJSONObject("attributes").getString("name"),
+                        onLoaded = { savedPhoto = it })
                     else {
                         PhotoFrame {
                             preview?.let { Image(it, "촬영한 옷 사진", Modifier.fillMaxSize(), contentScale = ContentScale.Fit) }
@@ -316,14 +319,16 @@ fun WardrobeScreen(items: List<WardrobeItem>, message: String?, cameraBusy: Bool
 
 
 @Composable
-private fun GarmentPhoto(path: String, name: String) {
+private fun GarmentPhoto(path: String, name: String, onLoaded: (ImageBitmap?) -> Unit = {}) {
     var bitmap by remember(path) { mutableStateOf<ImageBitmap?>(null) }
     var loading by remember(path) { mutableStateOf(true) }
     LaunchedEffect(path) {
+        onLoaded(null)
         try { bitmap = WardrobeRepository.thumbnail(path) }
         catch (error: kotlinx.coroutines.CancellationException) { throw error }
         catch (_: Exception) { bitmap = null }
         finally { loading = false }
+        onLoaded(bitmap)
     }
     PhotoFrame {
         bitmap?.let { Image(it, name, Modifier.fillMaxSize(), contentScale = ContentScale.Fit) }

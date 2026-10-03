@@ -9,8 +9,8 @@
 | 선택 예시 | 저장할 값 |
 | --- | --- |
 | `wide_leg_jeans` 와이드 청바지 | category=bottom, subcategory=jeans, leg_shape=wide |
-| `long_sleeve_t_shirt` 긴팔 티셔츠 | category=top, subcategory=tshirt, sleeve_length=long |
-| `crewneck_t_shirt` 라운드넥 반팔 | category=top, subcategory=tshirt, sleeve_length=short |
+| `long_sleeve_t_shirt` 긴팔 티셔츠 | category=top, subcategory=tshirt |
+| `crewneck_t_shirt` 라운드넥 반팔 | category=top, subcategory=tshirt |
 | `flannel_shirt` 플라넬 셔츠 | category=top, subcategory=shirt |
 
 각 표의 category·subcategory와 명시된 시각적 특징만 프리셋으로 적용한다. 그 외 속성은 기존의 유효한 값을 유지하며 추정 기본값을 추가하지 않는다. 구현할 프리셋의 변환 규칙은 FE에서 명시하고 계약 검사로 검증한다. 프리셋 원본 코드는 API에 전송하지 않는다.
@@ -192,6 +192,6 @@
 ## 5. 미분류 및 확장 규칙
 
 - subcategory는 해당 category의 표에 명시된 그룹 또는 other, null을 허용한다. 목록 밖 종류임이 확인된 경우 other, 판별하지 못한 경우 null로 저장한다.
-- 프리셋 목록이 모든 속성 조합을 열거하지는 않는다. 소매·실루엣 등 독립 속성으로 다양한 조합을 표현한다.
+- 프리셋 목록이 모든 속성 조합을 열거하지는 않는다. 실루엣 등 독립 속성으로 다양한 조합을 표현한다. 반팔·긴팔 같은 상세 명칭은 이름에 남길 수 있지만 소매 선택 속성은 저장하지 않는다.
 - 원피스·점프슈트·액세서리는 현행 네 카테고리에 포함하지 않는다. 추천 슬롯과 UI 필터를 확장할 때 추가한다.
 - 프리셋 변경은 FE 검색·선택·표시 및 정규화 규칙에 반영한다. 저장 category·subcategory·속성의 변경은 BE 검증과 추천 계약도 함께 변경한다.

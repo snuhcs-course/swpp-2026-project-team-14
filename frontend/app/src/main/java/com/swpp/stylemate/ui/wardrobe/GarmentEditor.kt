@@ -13,6 +13,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.text.font.FontWeight
 import com.swpp.stylemate.ui.components.ScreenScaffold
 import com.swpp.stylemate.ui.components.SectionTitle
@@ -31,11 +32,9 @@ private fun attributeChoices(attributes: JSONObject, catalog: JSONObject, field:
     val category = attributes.optString("category")
     val subcategory = attributes.code("subcategory")
     if (field == "subcategory") return catalog.getJSONObject("subcategories").getJSONObject(category)
-    val top = category in setOf("top", "outerwear")
     val pants = category == "bottom" && subcategory in setOf("jeans", "slacks", "pants", "active_pants", "shorts")
     val skirt = category == "bottom" && subcategory == "skirt"
-    if ((field == "sleeve_length" && !top) ||
-        (field == "leg_shape" && !pants) || (field == "skirt_shape" && !skirt) ||
+    if ((field == "leg_shape" && !pants) || (field == "skirt_shape" && !skirt) ||
         (field == "rise_type" && category != "bottom") ||
         (field == "fit_type" && category == "shoes")) return JSONObject()
     return catalog.getJSONObject("enums").getJSONObject(field)
@@ -48,8 +47,7 @@ private fun dimensionChoices(attributes: JSONObject, catalog: JSONObject): JSONO
     val fields = catalog.getJSONObject("dimensions").getJSONObject(if (category == "bottom") "bottom" else "top")
     return JSONObject().apply {
         fields.keysList().filter { key ->
-            !(category == "bottom" && subcategory == "skirt" && key !in setOf("waist_width_half", "hip_width_half", "total_length")) &&
-                !(attributes.code("sleeve_length") == "sleeveless" && key in setOf("sleeve_length", "cuff_width_half"))
+            !(category == "bottom" && subcategory == "skirt" && key !in setOf("waist_width_half", "hip_width_half", "total_length"))
         }.forEach { put(it, fields.get(it)) }
     }
 }
@@ -58,7 +56,7 @@ private fun dimensionChoices(attributes: JSONObject, catalog: JSONObject): JSONO
 fun GarmentEditor(id: String, initialAttributes: JSONObject, initialDimensions: JSONObject?,
                   initialNotes: String, catalog: JSONObject,
                   busy: Boolean, saved: Boolean, error: String?, onSave: (JSONObject) -> Unit,
-                  onBack: (() -> Unit)? = null, photo: @Composable () -> Unit = {}) {
+                  onBack: (() -> Unit)? = null, image: ImageBitmap? = null, photo: @Composable () -> Unit = {}) {
     var attributesText by rememberSaveable(id) { mutableStateOf(initialAttributes.toString()) }
     var notes by rememberSaveable(id) { mutableStateOf(initialNotes) }
     var dimensionText by rememberSaveable(id) {
@@ -115,7 +113,7 @@ fun GarmentEditor(id: String, initialAttributes: JSONObject, initialDimensions: 
             .put("notes", notes))
     }
 
-    val primary = setOf("category", "colors")
+    val primary = setOf("category")
     @Composable fun attribute(field: String) {
         val choices = attributeChoices(attributes, catalog, field)
         if (choices.length() > 0) ChoiceField(catalog.getJSONObject("labels").getString(field), choices,
@@ -142,6 +140,12 @@ fun GarmentEditor(id: String, initialAttributes: JSONObject, initialDimensions: 
                 }, label = { Text("이름") }, singleLine = true, enabled = !busy,
                     shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth())
                 primary.forEach { attribute(it) }
+                val colorValues = attributes.getJSONArray("colors")
+                val palette = catalog.getJSONObject("color_palette")
+                WardrobeColorField((0 until colorValues.length()).map { colorValues.getString(it) },
+                    palette.keysList().associateWith { palette.getString(it) },
+                    catalog.getJSONObject("array_limits").getInt("colors"), image, !busy,
+                    onChange = { updateAttribute("colors", JSONArray(it)) })
             }
             ExpandSection("상세 정보", extra) { extra = !extra }
             if (extra) EditorSection {

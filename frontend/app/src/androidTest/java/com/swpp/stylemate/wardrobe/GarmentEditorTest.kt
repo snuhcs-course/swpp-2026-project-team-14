@@ -44,7 +44,7 @@ class GarmentEditorTest {
         compose.onNodeWithText("AR 추정").assertDoesNotExist()
         compose.onNodeWithText("착용 정보").assertDoesNotExist()
         compose.onNodeWithText("상세 정보").performScrollTo().performClick()
-        listOf("격식:", "여밈:", "디테일:", "어깨:", "넥라인:").forEach {
+        listOf("격식:", "여밈:", "디테일:", "어깨:", "넥라인:", "소매:").forEach {
             compose.onNodeWithText(it, substring = true).assertDoesNotExist()
         }
         compose.onNodeWithText("핏: 미입력").performScrollTo().assertIsDisplayed()

@@ -1,7 +1,7 @@
 """User-editable fields; these are never sent to Gemini."""
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
-from .schema import ARRAY_LIMITS, ENUMS, FIELD_LABELS, SUBCATEGORIES, validate_attributes
+from .schema import ARRAY_LIMITS, COLOR_PALETTE, ENUMS, FIELD_LABELS, SUBCATEGORIES, validate_attributes
 
 
 TOP_DIMENSIONS = {
@@ -27,8 +27,7 @@ BOTTOM_DIMENSIONS = {
 def dimension_fields(attributes):
     category = attributes['category']
     if category in ('top', 'outerwear'):
-        return {k: v for k, v in TOP_DIMENSIONS.items()
-                if attributes['sleeve_length'] != 'sleeveless' or k not in ('sleeve_length', 'cuff_width_half')}
+        return TOP_DIMENSIONS
     if category == 'bottom':
         return {k: v for k, v in BOTTOM_DIMENSIONS.items()
                 if attributes['subcategory'] != 'skirt' or k in ('waist_width_half', 'hip_width_half', 'total_length')}
@@ -37,7 +36,7 @@ def dimension_fields(attributes):
 
 def catalog():
     return {'enums': ENUMS, 'labels': FIELD_LABELS, 'subcategories': SUBCATEGORIES,
-            'array_limits': ARRAY_LIMITS,
+            'array_limits': ARRAY_LIMITS, 'color_palette': COLOR_PALETTE,
             'dimensions': {group: {key: {'label': value[0], 'method': value[1]} for key, value in fields.items()}
                            for group, fields in (('top', TOP_DIMENSIONS), ('bottom', BOTTOM_DIMENSIONS))}}
 

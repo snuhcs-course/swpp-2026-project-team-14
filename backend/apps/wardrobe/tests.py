@@ -8,7 +8,7 @@ from django.test import SimpleTestCase, TestCase, TransactionTestCase, override_
 from PIL import Image
 
 from .analysis import AnalysisError, MAX_IMAGE_BYTES, MODEL, analyze_image, prepare_image
-from .schema import AI_FIELDS, ARRAY_LIMITS, ENUMS, validate_attributes
+from .schema import AI_FIELDS, ARRAY_LIMITS, COLOR_PALETTE, ENUMS, validate_ai_attributes, validate_attributes
 
 
 def photo():
@@ -19,7 +19,7 @@ def photo():
 
 def attributes():
     result = {key: [] if key in ARRAY_LIMITS else None for key in ENUMS}
-    result.update(name='흰색 티셔츠', category='top', subcategory='tshirt', colors=['white'])
+    result.update(name='흰색 티셔츠', category='top', subcategory='tshirt', colors=['#FFFFFF'])
     return result
 
 
@@ -62,16 +62,30 @@ class SchemaTests(SimpleTestCase):
 
     def test_rejects_nonvisual_or_unknown_fields(self):
         for key in ('dimensions', 'material_note', 'touch', 'stretch', 'sheerness', 'seasons', 'thickness',
-                    'owner_id', 'pattern', 'length', 'formality', 'closure', 'details', 'shoulder_construction', 'neckline'):
+                    'owner_id', 'pattern', 'length', 'formality', 'closure', 'details', 'shoulder_construction', 'neckline', 'sleeve_length'):
             with self.subTest(key=key), self.assertRaises(ValueError):
                 validate_attributes(dict(attributes(), **{key: None}))
 
     def test_rejects_invalid_enums_duplicates_and_category_conflicts(self):
-        for changes in ({'colors': ['white', 'white']}, {'colors': ['beige', 'white', 'black', 'blue']},
+        for changes in ({'colors': ['#FFFFFF', '#ffffff']}, {'colors': list(COLOR_PALETTE)[:6]},
+                        {'colors': ['white']}, {'colors': ['#FFF']}, {'colors': ['#FFFFFG']}, {'styles': ['lovely']},
                         {'fit_type': 'huge'}, {'subcategory': 'jeans'}, {'leg_shape': 'wide'},
                         {'name': ' '}, {'category': None}, {'colors': [3]}):
             with self.subTest(changes=changes), self.assertRaises(ValueError):
                 validate_attributes(dict(attributes(), **changes))
+
+    def test_photo_colors_are_normalized_without_palette_quantization(self):
+        self.assertEqual(validate_attributes(dict(attributes(), colors=['#ab125f']))['colors'], ['#AB125F'])
+        self.assertEqual(validate_attributes(dict(attributes(), colors=[]))['colors'], [])
+        self.assertEqual(len(validate_attributes(dict(attributes(), colors=list(COLOR_PALETTE)[:5]))['colors']), 5)
+
+    def test_ai_requires_one_or_two_palette_colors(self):
+        data = {key: attributes()[key] for key in AI_FIELDS}
+        for colors in (['#FFFFFF'], ['#FFFFFF', '#C83C3C']):
+            self.assertEqual(validate_ai_attributes(dict(data, colors=colors))['colors'], colors)
+        for colors in ([], ['#123456'], ['#ffffff'], ['#FFFFFF'] * 2, list(COLOR_PALETTE)[:3]):
+            with self.subTest(colors=colors), self.assertRaises(ValueError):
+                validate_ai_attributes(dict(data, colors=colors))
 
     def test_applicable_bottom_fields(self):
         result = dict(attributes(), category='bottom', subcategory='jeans', leg_shape='wide')
@@ -81,13 +95,44 @@ class SchemaTests(SimpleTestCase):
 
 
 class AttributeMigrationTests(TransactionTestCase):
+    def test_palette_migration_keeps_custom_colors_measurements_and_original_provenance(self):
+        from django.db import connection
+        from django.db.migrations.executor import MigrationExecutor
+        from .models import Garment
+
+        before = [('wardrobe', '0003_simplify_garment_attributes')]
+        after = [('wardrobe', '0004_color_palette_and_optional_attributes')]
+        executor = MigrationExecutor(connection)
+        executor.migrate(before)
+        try:
+            OldGarment = executor.loader.project_state(before).apps.get_model('wardrobe', 'Garment')
+            previous = dict(attributes(), colors=['white', 'red', 'other', '#ab125f', '#AB125F'],
+                            styles=['lovely', 'casual'], sleeve_length='long')
+            original = dict(previous, colors=['black'], styles=['lovely'])
+            dimensions = {'unit': 'cm', 'sleeve_length': {
+                'value': 61.25, 'source': 'arcore_assisted', 'method': 'shoulder_seam_to_cuff', 'reference': None}}
+            ids = [OldGarment.objects.create(attributes=previous, original_attributes=original,
+                dimensions=dimensions, saved=saved, notes='메모', image='garments/example.jpg').pk
+                for saved in (False, True)]
+        finally:
+            MigrationExecutor(connection).migrate(after)
+        for item_id in ids:
+            garment = Garment.objects.get(pk=item_id)
+            self.assertEqual(garment.attributes, dict(attributes(),
+                colors=['#FFFFFF', '#C83C3C', '#AB125F'], styles=['casual']))
+            self.assertEqual(garment.original_attributes, dict(attributes(), colors=['#202020']))
+            self.assertEqual(garment.dimensions, dimensions)
+            self.assertEqual(garment.notes, '메모')
+            self.assertEqual(garment.image.name, 'garments/example.jpg')
+        self.assertEqual(Garment.objects.filter(saved=True).count(), 1)
+
     def test_simplification_migrates_saved_and_draft_records_without_losing_measurements(self):
         from django.db import connection
         from django.db.migrations.executor import MigrationExecutor
         from .models import Garment
 
         before = [('wardrobe', '0002_remove_pattern_and_length')]
-        after = [('wardrobe', '0003_simplify_garment_attributes')]
+        after = [('wardrobe', '0004_color_palette_and_optional_attributes')]
         executor = MigrationExecutor(connection)
         executor.migrate(before)
         try:
@@ -172,6 +217,9 @@ class GeminiTests(SimpleTestCase):
         self.assertIn('responseJsonSchema', body['generationConfig'])
         schema = body['generationConfig']['responseJsonSchema']['properties']['attributes']
         self.assertEqual(set(schema['properties']), {'name', 'category', 'colors'})
+        self.assertEqual(schema['properties']['colors']['maxItems'], 2)
+        self.assertEqual(schema['properties']['colors']['minItems'], 1)
+        self.assertEqual(schema['properties']['colors']['items']['enum'], list(COLOR_PALETTE))
         self.assertIsNone(analyze_image(photo(), 'test-secret')['fit_type'])
         self.assertEqual(opener.return_value.open.call_args.kwargs['timeout'], 30)
 
@@ -204,7 +252,7 @@ class GeminiTests(SimpleTestCase):
     def test_optional_visual_fields_are_not_generated_and_bottom_dimensions_remain_editable(self, opener):
         from .editor import dimension_fields
         self.mock_response(opener, envelope({'image_status': 'single', 'attributes': {
-            'name': '검정 바지', 'category': 'bottom', 'colors': ['black']}}))
+            'name': '검정 바지', 'category': 'bottom', 'colors': ['#202020']}}))
         result = analyze_image(photo(), 'test-key')
         self.assertIsNone(result['subcategory'])
         self.assertIsNone(result['fit_type'])
@@ -276,7 +324,7 @@ class WardrobePersistenceTests(AnalysisEndpointTests):
         return response.json()['id']
 
     def payload(self):
-        return {'attributes': dict(attributes(), name='수정한 티셔츠', colors=['black']),
+        return {'attributes': dict(attributes(), name='수정한 티셔츠', colors=['#202020']),
                 'dimensions': {'unit': 'cm', 'chest_width_half': {
                     'value': 55.127, 'source': 'arcore_manual', 'method': 'flat_underarm_to_underarm',
                     'reference': '사용자 지정점'}},
@@ -289,10 +337,13 @@ class WardrobePersistenceTests(AnalysisEndpointTests):
         self.assertEqual(self.client.get(f'/api/wardrobe/items/{item_id}/image/').status_code, 404)
         url = f'/api/wardrobe/items/{item_id}/'
         payload = self.payload()
+        payload['attributes']['colors'] = ['#FFFFFF', '#a12b3c']
         response = self.client.put(url, json.dumps(payload), content_type='application/json')
         self.assertEqual(response.status_code, 200)
         record = response.json()
         self.assertTrue(record['saved'])
+        self.assertEqual(record['attributes']['colors'], ['#FFFFFF', '#A12B3C'])
+        self.assertEqual(Garment.objects.get(pk=item_id).original_attributes['colors'], ['#FFFFFF'])
         self.assertEqual(record['dimensions']['chest_width_half']['value'], 55.13)
         self.assertEqual(record['notes'], payload['notes'])
         self.assertNotIn('user_properties', record)
@@ -339,7 +390,9 @@ class WardrobePersistenceTests(AnalysisEndpointTests):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()['enums']['category'], ENUMS['category'])
         self.assertEqual(set(response.json()['enums']), {
-            'category', 'subcategory', 'colors', 'styles', 'fit_type', 'sleeve_length', 'leg_shape', 'rise_type', 'skirt_shape'})
+            'category', 'subcategory', 'styles', 'fit_type', 'leg_shape', 'rise_type', 'skirt_shape'})
+        self.assertEqual(response.json()['color_palette'], COLOR_PALETTE)
+        self.assertNotIn('lovely', response.json()['enums']['styles'])
         self.assertNotIn('user_enums', response.json())
         self.assertNotIn('user_labels', response.json())
 

@@ -25,12 +25,13 @@ swpp-2026-project-team-14/
 |   |           |-- WardrobeScreen.kt            # 옷장 목록·오류 재시도·카드 정렬·사진 확인·편집 연결
 |   |           |-- WardrobeViewModel.kt         # 목록·저장 상태
 |   |           |-- GarmentAnalysisViewModel.kt  # 분석 진행·실패 상태
+|   |           |-- WardrobeColorField.kt       # 색상표·사진 좌표 변환·픽셀 색상 선택
 |   |           |-- GarmentEditor.kt             # 특징·실측·메모 편집과 하단 고정 저장
 |   |           `-- capture/
 |   |               |-- MeasurementActivity.kt  # 실측 촬영·측정점 확인·수정
 |   |               `-- MeasurementCamera.kt    # AR 카메라·촬영 프레임 고정
 |   |-- test/java/com/swpp/stylemate/             # 체형 계약·실측 기하 단위 검사
-|   `-- androidTest/java/com/swpp/stylemate/      # 옷장 UI·탭 연결·측정점 검사
+|   `-- androidTest/java/com/swpp/stylemate/      # 옷장 UI·사진 색상 선택·탭 연결·측정점 검사
 |-- backend/
 |   |-- config/
 |   |   |-- settings.py                          # 공통 API·MySQL·사진·모델 설정
@@ -43,7 +44,7 @@ swpp-2026-project-team-14/
 |   |       |-- views.py                         # 분석 초안·저장·수정·조회
 |   |       |-- analysis.py                      # Gemini 호출·이미지 검증
 |   |       |-- landmarks.py                     # HRNet 추론·측정 경로 복원
-|   |       |-- schema.py                        # 이름·카테고리·색상과 선택 속성
+|   |       |-- schema.py                        # 이름·분류·HEX 색상표·선택 속성 검증
 |   |       |-- editor.py                        # 실측·사용자 입력 검증
 |   |       |-- models.py                        # 사진 경로·옷 JSON·메모 저장
 |   |       |-- migrations/                      # 옷장 테이블 생성·JSON 구조 변경
@@ -60,6 +61,6 @@ swpp-2026-project-team-14/
 
 체형·옷장 화면은 공통 `ScreenScaffold`·`PrimaryActionBar`·`SectionTitle`과 `StyleMateTheme`를 사용한다. 글꼴·여백·카드 기준은 [디자인](design.md#3-공통-디자인-기준--현재-구현)에 정리한다.
 
-옷장의 `pattern`·상대 기장 `length`·착용 정보와 격식·여밈·디테일·어깨 구조·넥라인 속성은 제거했다. 마이그레이션은 기존 속성 JSON을 정리하고 `user_properties` 컬럼을 삭제한다. 어깨너비 등 치수와 측정 출처는 유지하며 측정점 좌표는 저장하지 않는다. 원본 사진에 HRNet을 적용하고 누끼 모델은 사용하지 않는다. 체형 사진은 메모리 처리 후 폐기하며 옷 사진만 옷장 저장소에 보관한다.
+옷장의 `pattern`·상대 기장 `length`·착용 정보와 격식·여밈·디테일·어깨 구조·넥라인 속성은 제거했다. 러블리·소매 선택 속성도 제거하고, 색상은 HEX 배열로 저장한다. 마이그레이션은 색 이름을 색상값으로 변환하며 기존 속성 JSON을 정리하고 `user_properties` 컬럼을 삭제한다. 어깨너비 등 치수와 측정 출처는 유지하며 측정점 좌표는 저장하지 않는다. 원본 사진에 HRNet을 적용하고 누끼 모델은 사용하지 않는다. 체형 사진은 메모리 처리 후 폐기하며 옷 사진만 옷장 저장소에 보관한다.
 
 체형 분석·자동 측정점에는 DB가 필요 없다. 옷장 분석 초안·목록·저장에는 MySQL 연결이 필요하며 미설정 시 503을 반환한다. S3·사용자 구분·체형 프로필 영구 저장·추천 치수 비교는 미구현이다. 실행 설정은 [local-development.md](local-development.md), 계약은 [wardrobe-spec.md](wardrobe-spec.md)를 따른다.
