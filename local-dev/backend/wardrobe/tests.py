@@ -19,7 +19,7 @@ def photo():
 
 def attributes():
     result = {key: [] if key in ARRAY_LIMITS else None for key in ENUMS}
-    result.update(name='흰색 티셔츠', category='top', subcategory='tshirt', colors=['white'], pattern='solid')
+    result.update(name='흰색 티셔츠', category='top', subcategory='tshirt', colors=['white'])
     return result
 
 
@@ -33,22 +33,46 @@ class SchemaTests(SimpleTestCase):
         self.assertEqual(validate_attributes(attributes())['subcategory'], 'tshirt')
 
     def test_rejects_nonvisual_or_unknown_fields(self):
-        for key in ('dimensions', 'material_note', 'stretch', 'seasons', 'thickness', 'owner_id'):
+        for key in ('dimensions', 'material_note', 'stretch', 'seasons', 'thickness', 'owner_id', 'pattern', 'length'):
             with self.subTest(key=key), self.assertRaises(ValueError):
                 validate_attributes(dict(attributes(), **{key: None}))
 
     def test_rejects_invalid_enums_duplicates_and_category_conflicts(self):
         for changes in ({'colors': ['white', 'white']}, {'colors': ['beige', 'white', 'black', 'blue']},
                         {'fit_type': 'huge'}, {'subcategory': 'jeans'}, {'leg_shape': 'wide'},
-                        {'length': 'maxi'}, {'name': ' '}, {'category': None}, {'colors': [3]}):
+                        {'name': ' '}, {'category': None}, {'colors': [3]}):
             with self.subTest(changes=changes), self.assertRaises(ValueError):
                 validate_attributes(dict(attributes(), **changes))
 
     def test_applicable_bottom_fields(self):
-        result = dict(attributes(), category='bottom', subcategory='jeans', leg_shape='wide', length='full')
+        result = dict(attributes(), category='bottom', subcategory='jeans', leg_shape='wide')
         self.assertEqual(validate_attributes(result)['leg_shape'], 'wide')
         with self.assertRaises(ValueError):
             validate_attributes(dict(result, neckline='crew'))
+
+
+class AttributeMigrationTests(TestCase):
+    def test_removes_old_fields_without_changing_measurements_or_other_data(self):
+        from importlib import import_module
+        from django.apps import apps
+        from django.db import connection
+        from .models import Garment
+
+        previous = dict(attributes(), pattern='graphic', length='regular')
+        dimensions = {'unit': 'cm', 'total_length': {
+            'value': 68.43, 'source': 'arcore_assisted', 'method': 'back_neck_to_hem', 'reference': None}}
+        garment = Garment.objects.create(image='garments/example.jpg', attributes=previous,
+            original_attributes=previous, dimensions=dimensions, notes='보존할 메모', saved=True)
+        migration = import_module('wardrobe.migrations.0002_remove_pattern_and_length')
+        with connection.schema_editor(atomic=False) as editor:
+            migration.remove_pattern_and_length(apps, editor)
+        garment.refresh_from_db()
+        self.assertEqual(garment.attributes, attributes())
+        self.assertEqual(garment.original_attributes, attributes())
+        self.assertEqual(garment.dimensions, dimensions)
+        self.assertEqual(garment.notes, '보존할 메모')
+        self.assertTrue(garment.saved)
+        self.assertEqual(garment.image.name, 'garments/example.jpg')
 
 
 class ImageTests(SimpleTestCase):

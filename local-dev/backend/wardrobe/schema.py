@@ -15,11 +15,9 @@ ENUMS = {
     'category': options('top:상의 bottom:하의 outerwear:아우터 shoes:신발'),
     'subcategory': {key: label for group in SUBCATEGORIES.values() for key, label in group.items()},
     'colors': options('black:검정 white:흰색 gray:회색 ivory:아이보리 beige:베이지 brown:갈색 navy:네이비 blue:파랑 green:초록 khaki:카키 red:빨강 orange:주황 yellow:노랑 pink:분홍 purple:보라 silver:은색 gold:금색 other:기타'),
-    'pattern': options('solid:무지 stripe:줄무늬 check:체크 dot:도트 graphic:그래픽 floral:꽃무늬 animal:동물무늬 camouflage:위장무늬 color_block:배색 other:기타'),
     'styles': options('minimal:미니멀 casual:캐주얼 street:스트릿 lovely:러블리 classic:클래식 sporty:스포티 formal:포멀 workwear:워크웨어'),
     'formality': options('relaxed:편한차림 casual:일상캐주얼 smart_casual:단정한캐주얼 formal:격식있는차림'),
     'fit_type': options('skinny:스키니 slim:슬림 regular:레귤러 loose:루즈 oversized:오버사이즈'),
-    'length': options('cropped:크롭 semi_cropped:세미크롭 regular:기본 long:긴기장 short:짧음 knee:무릎길이 full:긴기장 mini:미니 midi:미디 maxi:맥시'),
     'sleeve_length': options('sleeveless:민소매 short:반팔 elbow:팔꿈치길이 three_quarter:7부 long:긴팔'),
     'neckline': options('crew:라운드넥 v_neck:브이넥 scoop:깊은둥근넥 square:스퀘어넥 boat:보트넥 henley:헨리넥 polo:폴로 shirt_collar:셔츠칼라 open_collar:오픈칼라 band_collar:밴드칼라 turtleneck:터틀넥 mock_neck:반목 hooded:후드 other:기타'),
     'shoulder_construction': options('set_in:일반어깨선 drop_shoulder:드롭숄더 raglan:래글런 dolman:가오리형 other:기타'),
@@ -29,7 +27,7 @@ ENUMS = {
     'closure': options('pullover:풀오버 button:단추 zip:전체지퍼 half_zip:부분지퍼 wrap:랩 open_front:앞트임 other:기타'),
     'details': options('cargo_pockets:카고포켓 ruffle:러플 pleats:주름 cable_knit:꽈배기 side_stripe:옆선배색 cuffed_hem:조인밑단 drawstring:조임끈 elastic_waist:허리밴딩'),
 }
-FIELD_LABELS = options('name:이름 category:분류 subcategory:종류 colors:색상 pattern:패턴 styles:스타일 formality:격식 fit_type:핏 length:기장 sleeve_length:소매 neckline:넥라인 shoulder_construction:어깨 leg_shape:바지형태 rise_type:허리선 skirt_shape:스커트형태 closure:여밈 details:디테일')
+FIELD_LABELS = options('name:이름 category:분류 subcategory:종류 colors:색상 styles:스타일 formality:격식 fit_type:핏 sleeve_length:소매 neckline:넥라인 shoulder_construction:어깨 leg_shape:바지형태 rise_type:허리선 skirt_shape:스커트형태 closure:여밈 details:디테일')
 ARRAY_LIMITS = {'colors': 3, 'styles': 3, 'details': 8}
 PROPERTIES = {'name': {'type': 'string', 'minLength': 1, 'maxLength': 80}}
 for field, values in ENUMS.items():
@@ -78,18 +76,14 @@ def validate_attributes(data):
     top_fields = ['sleeve_length', 'neckline', 'shoulder_construction']
     bottom_fields = ['leg_shape', 'rise_type', 'skirt_shape']
     excluded = []
-    allowed_lengths = []
     if category in ('top', 'outerwear'):
         excluded = bottom_fields
-        allowed_lengths = ['cropped', 'semi_cropped', 'regular', 'long']
     elif category == 'bottom':
         excluded = top_fields
         if subcategory == 'skirt':
             excluded += ['leg_shape']
-            allowed_lengths = ['mini', 'knee', 'midi', 'maxi']
         elif subcategory in ('jeans', 'slacks', 'pants', 'active_pants', 'shorts'):
             excluded += ['skirt_shape']
-            allowed_lengths = ['short', 'knee', 'cropped', 'full']
         else:
             excluded += ['leg_shape', 'skirt_shape']
     else:
@@ -98,8 +92,6 @@ def validate_attributes(data):
             raise ValueError('Shoe details not supported')
     if any(data[field] is not None for field in excluded):
         raise ValueError('Inapplicable attribute')
-    if data['length'] is not None and data['length'] not in allowed_lengths:
-        raise ValueError('Inapplicable length')
     return dict(data, name=data['name'].strip())
 
 

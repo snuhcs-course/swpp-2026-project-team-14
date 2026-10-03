@@ -11,7 +11,7 @@
 - 입력 화면: [화면 설계](design.md)
 - 처리 순서·실패 복구·현재 구현 범위: [등록 데이터 흐름](wardrobe-flow.md)
 
-2026-10-03 로컬 변경: Gemini 자동 분석은 `name`, `category`, `colors`만 요청한다. 기존 나머지 외관 필드는 사용자 선택 입력으로 유지하며 AI가 생성하지 않는다. 색상 키는 기존 데이터와 호환되는 `colors` 배열을 유지한다.
+2026-10-03 로컬 변경: Gemini 자동 분석은 `name`, `category`, `colors`만 요청한다. `pattern`과 상대 기장 `length`는 저장·편집 스키마에서 제거한다. 길이는 `dimensions.total_length` 등 실측으로 관리한다. 나머지 외관 필드는 사용자 선택 입력으로 유지하며 AI가 생성하지 않는다. 색상 키는 기존 데이터와 호환되는 `colors` 배열을 유지한다.
 
 주요 데이터 구분: `fit_type`은 의류의 디자인상 여유감, `dimensions`는 출처가 명시된 실측 치수, 소재·착용 특성은 사용자 선택 입력으로 관리한다.
 
@@ -95,22 +95,18 @@ Gemini는 프리셋 코드 대신 이름·상위 카테고리·색상만 반환�
 | 필드 | 허용값: 표시명 | 규칙 |
 | --- | --- | --- |
 | `colors` | `black`: 검정, `white`: 흰색, `gray`: 회색, `ivory`: 아이보리, `beige`: 베이지, `brown`: 갈색, `navy`: 네이비, `blue`: 파랑, `green`: 초록, `khaki`: 카키, `red`: 빨강, `orange`: 주황, `yellow`: 노랑, `pink`: 분홍, `purple`: 보라, `silver`: 은색, `gold`: 금색, `other`: 기타 | 최대 3개, 대표색 우선 |
-| `pattern` | `solid`: 무지, `stripe`: 줄무늬, `check`: 체크, `dot`: 도트, `graphic`: 그래픽, `floral`: 꽃무늬, `animal`: 동물무늬, `camouflage`: 위장무늬, `color_block`: 배색, `other`: 기타 | 대표 무늬 한 개 |
 | `styles` | `minimal`: 미니멀, `casual`: 캐주얼, `street`: 스트릿, `lovely`: 러블리, `classic`: 클래식, `sporty`: 스포티, `formal`: 포멀, `workwear`: 워크웨어 | 최대 3개, 대표 스타일 우선 |
 | `formality` | `relaxed`: 편한 차림, `casual`: 일상 캐주얼, `smart_casual`: 단정한 캐주얼, `formal`: 격식 있는 차림 | 사진 제안 가능, 장소 적합성 보증 아님 |
 
-신발에도 색상·무늬·스타일·격식은 적용한다. 신발의 발 치수·발볼·라스트 비교는 별도 기능이며 의류 치수로 대체하지 않는다.
+신발에도 색상·스타일·격식은 적용한다. 신발의 발 치수·발볼·라스트 비교는 별도 기능이며 의류 치수로 대체하지 않는다.
 
-### 3.4. 핏·기장·형태
+### 3.4. 핏·형태
 
 기존 `fit`은 **`fit_type`으로 변경하고 의류의 디자인상 여유감을 나타내는 필드로 정의한다.** `dimensions`는 실측 정보를 관리하며 fit_type을 포함하지 않는다. `oversized`는 디자인 분류이며 특정 사용자에 대한 실제 착용 여유를 보장하지 않는다.
 
 | 필드 | 적용 범위 | 허용값: 표시명 |
 | --- | --- | --- |
 | `fit_type` | 상의·하의·아우터 | `skinny`: 스키니, `slim`: 슬림, `regular`: 레귤러, `loose`: 루즈, `oversized`: 오버사이즈 |
-| `length` | 상의·아우터 | `cropped`: 크롭, `semi_cropped`: 세미크롭, `regular`: 기본, `long`: 긴 기장 |
-| `length` | 바지·반바지·active_pants | `short`: 짧음, `knee`: 무릎 부근 디자인, `cropped`: 발목 위 디자인, `full`: 긴 기장 디자인 |
-| `length` | 스커트 | `mini`: 미니, `knee`: 무릎 길이, `midi`: 미디, `maxi`: 맥시 |
 | `sleeve_length` | 상의·아우터 | `sleeveless`: 민소매, `short`: 반팔, `elbow`: 팔꿈치 길이, `three_quarter`: 7부, `long`: 긴팔 |
 | `neckline` | 상의·아우터 | `crew`: 라운드넥, `v_neck`: 브이넥, `scoop`: 깊은 둥근 넥, `square`: 스퀘어넥, `boat`: 보트넥, `henley`: 헨리넥, `polo`: 폴로, `shirt_collar`: 셔츠 칼라, `open_collar`: 오픈칼라, `band_collar`: 밴드칼라, `turtleneck`: 터틀넥, `mock_neck`: 반목, `hooded`: 후드, `other`: 기타 |
 | `shoulder_construction` | 상의·아우터 | `set_in`: 일반 어깨선, `drop_shoulder`: 드롭숄더, `raglan`: 래글런, `dolman`: 돌먼·가오리형, `other`: 기타 |
@@ -120,7 +116,7 @@ Gemini는 프리셋 코드 대신 이름·상위 카테고리·색상만 반환�
 | `closure` | 신발 외 | `pullover`: 풀오버, `button`: 단추, `zip`: 전체 지퍼, `half_zip`: 부분 지퍼, `wrap`: 랩·여밈, `open_front`: 앞 트임, `other`: 기타 |
 | `details` | 신발 외 | `cargo_pockets`: 카고 포켓, `ruffle`: 러플, `pleats`: 주름, `cable_knit`: 꽈배기 편직, `side_stripe`: 옆선 배색, `cuffed_hem`: 조인 밑단, `drawstring`: 조임끈, `elastic_waist`: 허리 밴딩 |
 
-`details`는 최대 8개 배열, 나머지는 단일값 또는 null이다. 신발에는 이 표의 단일 필드를 null, details를 []로 둔다. subcategory가 other 또는 null인 하의는 leg_shape·skirt_shape·세분 기장을 추측하지 않고 null로 둔다. 사진의 기장 분류는 옷의 디자인에 대한 제안이며 특정 사용자의 신체상 착용 위치를 보장하지 않는다.
+`details`는 최대 8개 배열, 나머지는 단일값 또는 null이다. 신발에는 이 표의 단일 필드를 null, details를 []로 둔다. subcategory가 other 또는 null인 하의는 leg_shape·skirt_shape를 추측하지 않고 null로 둔다. 착용 시 기장감은 실측과 사용자 체형을 함께 비교해야 한다.
 
 ### 3.5. 소재·착용 특성 — 사용자 지정
 
@@ -218,8 +214,8 @@ material_note·touch·stretch·sheerness·thickness·seasons·dimensions는 AI �
 | 추천 목적 | 우선 적용 데이터 | 데이터 부재 시 처리 |
 | --- | --- | --- |
 | 상하의·신발 구성 | category·실제 소유 옷 ID | 슬롯을 알 수 없는 옷 제외 |
-| 색·스타일 조합 | colors·pattern·styles·formality | 미확인 속성은 점수 계산에서 제외 |
-| 원하는 실루엣 | fit_type·leg_shape·length·neckline·sleeve_length | 알려진 속성·사용자 선호로 추천 |
+| 색·스타일 조합 | colors·styles·formality | 미확인 속성은 점수 계산에서 제외 |
+| 원하는 실루엣 | fit_type·leg_shape·neckline·sleeve_length | 알려진 속성·사용자 선호로 추천 |
 | 착용 여유 참고 | 같은 기준의 실측 + 사용자 확인 신체 치수 + stretch | 사이즈 적합 판정 생략, 코디 추천은 계속 |
 | 날씨·계절 | 사용자 지정 seasons·thickness·sheerness 및 요청 날씨 | 미입력 속성은 판단에서 제외 |
 
@@ -319,9 +315,7 @@ GarmentDraft 제안 필드: `id`(추측하기 어려운 ID), `owner_id`, `image_
   "colors": [
     "white"
   ],
-  "pattern": "solid",
   "fit_type": "loose",
-  "length": "regular",
   "sleeve_length": "long",
   "neckline": "crew",
   "shoulder_construction": "drop_shoulder",
@@ -374,7 +368,6 @@ product_chart reference는 출처 형식을 설명하는 가상 예시다. 출�
   "fit_type": "loose",
   "leg_shape": "wide",
   "rise_type": "high",
-  "length": "full",
   "styles": [
     "casual"
   ],

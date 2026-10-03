@@ -28,15 +28,7 @@ private fun attributeChoices(attributes: JSONObject, catalog: JSONObject, field:
         (field == "leg_shape" && !pants) || (field == "skirt_shape" && !skirt) ||
         (field == "rise_type" && category != "bottom") ||
         (field in setOf("fit_type", "closure", "details") && category == "shoes")) return JSONObject()
-    val all = catalog.getJSONObject("enums").getJSONObject(field)
-    if (field != "length") return all
-    val allowed = when {
-        top -> setOf("cropped", "semi_cropped", "regular", "long")
-        pants -> setOf("short", "knee", "cropped", "full")
-        skirt -> setOf("mini", "knee", "midi", "maxi")
-        else -> emptySet()
-    }
-    return JSONObject().apply { all.keysList().filter { it in allowed }.forEach { put(it, all.get(it)) } }
+    return catalog.getJSONObject("enums").getJSONObject(field)
 }
 
 private fun dimensionChoices(attributes: JSONObject, catalog: JSONObject): JSONObject {

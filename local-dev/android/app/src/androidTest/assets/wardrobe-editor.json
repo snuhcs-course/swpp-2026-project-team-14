@@ -56,18 +56,6 @@
         "gold": "금색",
         "other": "기타"
       },
-      "pattern": {
-        "solid": "무지",
-        "stripe": "줄무늬",
-        "check": "체크",
-        "dot": "도트",
-        "graphic": "그래픽",
-        "floral": "꽃무늬",
-        "animal": "동물무늬",
-        "camouflage": "위장무늬",
-        "color_block": "배색",
-        "other": "기타"
-      },
       "styles": {
         "minimal": "미니멀",
         "casual": "캐주얼",
@@ -90,18 +78,6 @@
         "regular": "레귤러",
         "loose": "루즈",
         "oversized": "오버사이즈"
-      },
-      "length": {
-        "cropped": "크롭",
-        "semi_cropped": "세미크롭",
-        "regular": "기본",
-        "long": "긴기장",
-        "short": "짧음",
-        "knee": "무릎길이",
-        "full": "긴기장",
-        "mini": "미니",
-        "midi": "미디",
-        "maxi": "맥시"
       },
       "sleeve_length": {
         "sleeveless": "민소매",
@@ -182,11 +158,9 @@
       "category": "분류",
       "subcategory": "종류",
       "colors": "색상",
-      "pattern": "패턴",
       "styles": "스타일",
       "formality": "격식",
       "fit_type": "핏",
-      "length": "기장",
       "sleeve_length": "소매",
       "neckline": "넥라인",
       "shoulder_construction": "어깨",
@@ -354,11 +328,9 @@
     "colors": [
       "white"
     ],
-    "pattern": "solid",
     "styles": [],
     "formality": null,
     "fit_type": null,
-    "length": null,
     "sleeve_length": null,
     "neckline": null,
     "shoulder_construction": null,

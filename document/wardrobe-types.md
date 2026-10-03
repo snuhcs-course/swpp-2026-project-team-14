@@ -30,7 +30,7 @@
 | `long_sleeve_t_shirt` | 긴팔 티셔츠 | 긴팔 기본 티셔츠, 넥라인 별도 |
 | `sleeveless_top` | 민소매 상의 | 소매가 없는 상의의 넓은 분류 |
 | `tank_top` | 탱크탑 | 어깨 끈이 있는 민소매 탑; 해당 형태가 확인된 경우 sleeveless_top보다 우선 적용 |
-| `cropped_top` | 크롭탑 | 짧은 몸판의 기본 탑; 구체적 종류가 있으면 그 종류와 length로 표현 |
+| `cropped_top` | 크롭탑 | 짧은 몸판의 기본 탑; 구체적 종류가 있으면 그 종류와 실측 total_length로 표현 |
 | `henley_neck_shirt` | 헨리넥 티셔츠 | 칼라 없이 목 아래 짧은 단추 여밈 |
 | `pique_polo_shirt` | 피케 폴로 셔츠 | 칼라·짧은 단추 여밈의 피케 조직 폴로 |
 | `polo_shirt` | 폴로 셔츠 | 폴로 형태는 알지만 피케 조직은 확인하지 못함 |
@@ -136,7 +136,7 @@
 | `bermuda_shorts` | 버뮤다 팬츠 | 무릎 부근까지 오는 디자인의 반바지 |
 | `short_shorts` | 숏팬츠·핫팬츠 | 짧은 디자인의 반바지 |
 
-소재·기장에 따라 복수 종류에 해당하는 경우 대표 종류 하나를 저장하고 추가 특징은 사용자 지정 material_note·length로 표현한다.
+소재·기장에 따라 복수 종류에 해당하는 경우 대표 종류 하나를 저장하고 추가 특징은 사용자 지정 material_note·dimensions.total_length로 표현한다.
 
 ### 스커트 — `skirt`
 

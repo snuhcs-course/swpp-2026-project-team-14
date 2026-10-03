@@ -38,7 +38,7 @@ swpp-2026-project-team-14/
 |           |-- foreground.py                   # U²-Net 배경 제거·의상 영역 추출
 |           |-- test_landmarks.py               # 좌표 변환·입력 제한·탐지 API 검증
 |           |-- models.py                       # 초안·저장된 옷, 원본 분석·치수·메모 모델
-|           |-- migrations/                     # MySQL 옷장 테이블 생성
+|           |-- migrations/                     # MySQL 옷장 테이블 생성·기존 JSON 필드 정리
 |           |-- editor.py                       # 편집 선택지, 사용자 입력·치수 검증
 |           |-- schema.py                       # Gemini 3개 필드 검증, 수동 입력 사전·한글 표시명
 |           `-- tests.py                        # 분석·입력 검증, MySQL 저장·수정·재조회 테스트
