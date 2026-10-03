@@ -22,7 +22,7 @@ swpp-2026-project-team-14/
 |   |       |-- theme/Theme.kt                    # 크림·테라코타 공통 테마
 |   |       |-- profile/                         # 체형 촬영·수정·프로필 화면
 |   |       `-- wardrobe/
-|   |           |-- WardrobeScreen.kt            # 옷장 목록·사진 확인·치수 요약·편집 연결
+|   |           |-- WardrobeScreen.kt            # 옷장 목록·오류 재시도·카드 정렬·사진 확인·편집 연결
 |   |           |-- WardrobeViewModel.kt         # 목록·저장 상태
 |   |           |-- GarmentAnalysisViewModel.kt  # 분석 진행·실패 상태
 |   |           |-- GarmentEditor.kt             # 특징·실측·메모 편집과 하단 고정 저장

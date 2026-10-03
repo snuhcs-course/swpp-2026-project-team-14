@@ -33,6 +33,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
 import com.swpp.stylemate.ui.components.PrimaryActionBar
@@ -170,7 +171,8 @@ fun WardrobeRoute() {
         WardrobeScreen(items = items, message = message ?: wardrobe.error, cameraBusy = measurementBusy,
             onCapture = { wardrobeModel.clearSaveState(); takePhoto() },
             onItemClick = { wardrobeModel.clearSaveState(); editingId = it.id },
-            loading = wardrobe.loading, onRefresh = { wardrobeModel.refresh() })
+            loading = wardrobe.loading,
+            onRetry = if (wardrobe.error != null) ({ wardrobeModel.refresh() }) else null)
     } else {
         val result = if (editingId == null) analysis.result else null
         val record = editing ?: result
@@ -244,12 +246,15 @@ fun WardrobeRoute() {
 @Composable
 fun WardrobeScreen(items: List<WardrobeItem>, message: String?, cameraBusy: Boolean,
                    onCapture: () -> Unit,
-                   onItemClick: (WardrobeItem) -> Unit = {}, loading: Boolean = false, onRefresh: () -> Unit = {}) {
+                   onItemClick: (WardrobeItem) -> Unit = {}, loading: Boolean = false, onRetry: (() -> Unit)? = null) {
     var category by rememberSaveable { mutableStateOf("all") }
     val categories = listOf("all" to "전체", "top" to "상의", "bottom" to "하의", "outerwear" to "아우터", "shoes" to "신발")
     val visible = items.filter { category == "all" || it.category == category }
     val configuration = LocalConfiguration.current
     val columns = if (configuration.screenWidthDp < 352 || configuration.fontScale > 1.3f) 2 else 3
+    val nameStyle = MaterialTheme.typography.bodyMedium
+    val detailStyle = MaterialTheme.typography.bodySmall
+    val cardTextHeight = with(LocalDensity.current) { nameStyle.lineHeight.toDp() * 2 + detailStyle.lineHeight.toDp() } + 4.dp
     Scaffold(
         contentWindowInsets = WindowInsets(0),
         bottomBar = {
@@ -259,10 +264,8 @@ fun WardrobeScreen(items: List<WardrobeItem>, message: String?, cameraBusy: Bool
         Column(Modifier.fillMaxSize().padding(insets).padding(horizontal = 20.dp)) {
             Spacer(Modifier.height(16.dp))
             Text("내 옷장", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text("총 ${items.size}벌", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                TextButton(onClick = onRefresh, enabled = !loading) { Text("새로고침") }
-            }
+            Text("총 ${items.size}벌", Modifier.padding(top = 4.dp, bottom = 8.dp),
+                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (loading) LinearProgressIndicator(Modifier.fillMaxWidth())
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 categories.forEach { (code, label) ->
@@ -273,6 +276,7 @@ fun WardrobeScreen(items: List<WardrobeItem>, message: String?, cameraBusy: Bool
                 }
             }
             message?.let { Text(it, Modifier.padding(vertical = 8.dp), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error) }
+            if (onRetry != null) TextButton(onClick = onRetry, enabled = !loading) { Text("다시 불러오기") }
             Spacer(Modifier.height(8.dp))
             if (visible.isEmpty()) {
                 Column(Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
@@ -293,11 +297,14 @@ fun WardrobeScreen(items: List<WardrobeItem>, message: String?, cameraBusy: Bool
                                 else if (garment.imageUrl != null) GarmentPhoto(garment.imageUrl, garment.name)
                                 else Text("사진 없음", style = MaterialTheme.typography.labelSmall)
                             }
-                            Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Text(garment.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold,
-                                    minLines = 2, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                                Text(garment.style.orEmpty(), style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Column(Modifier.fillMaxWidth().padding(12.dp).heightIn(min = cardTextHeight),
+                                verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically)) {
+                                Text(garment.name, style = nameStyle, fontWeight = FontWeight.SemiBold,
+                                    maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                garment.style?.takeIf { it.isNotBlank() }?.let { style ->
+                                    Text(style, style = detailStyle, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                }
                             }
                         }
                     }
