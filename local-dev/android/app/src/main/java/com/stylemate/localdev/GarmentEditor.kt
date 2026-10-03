@@ -42,7 +42,7 @@ private fun attributeChoices(attributes: JSONObject, catalog: JSONObject, field:
 private fun dimensionChoices(attributes: JSONObject, catalog: JSONObject): JSONObject {
     val category = attributes.optString("category")
     val subcategory = attributes.code("subcategory")
-    if (category == "shoes" || category == "bottom" && subcategory in setOf(null, "other")) return JSONObject()
+    if (category == "shoes") return JSONObject()
     val fields = catalog.getJSONObject("dimensions").getJSONObject(if (category == "bottom") "bottom" else "top")
     return JSONObject().apply {
         fields.keysList().filter { key ->
@@ -102,7 +102,7 @@ fun GarmentEditor(id: String, initialAttributes: JSONObject, initialDimensions: 
     OutlinedTextField(value = attributes.optString("name"), onValueChange = {
         if (it.length <= 80) attributesText = JSONObject(attributesText).put("name", it).toString()
     }, label = { Text("이름") }, singleLine = true, enabled = !busy, modifier = Modifier.fillMaxWidth())
-    val primary = setOf("category", "subcategory", "colors", "fit_type", "length")
+    val primary = setOf("category", "colors")
     @Composable fun attribute(field: String) {
         val choices = attributeChoices(attributes, catalog, field)
         if (choices.length() > 0) ChoiceField(catalog.getJSONObject("labels").getString(field), choices,
@@ -117,7 +117,7 @@ fun GarmentEditor(id: String, initialAttributes: JSONObject, initialDimensions: 
         dimensions.keysList().forEach { field ->
             val text = inputs.optString(field)
             val original = initialDimensions?.optJSONObject(field)
-            val isEstimate = original?.optString("source") == "arcore_manual" && text.toDoubleOrNull() == original.optDouble("value")
+            val isEstimate = original != null && original.optString("source") in setOf("arcore_manual", "arcore_assisted") && text.toDoubleOrNull() == original.optDouble("value")
             OutlinedTextField(value = text, onValueChange = {
                 if (it.length <= 16) dimensionText = JSONObject(dimensionText).put(field, it).toString()
             }, label = { Text(dimensions.getJSONObject(field).getString("label")) }, suffix = { Text("cm") },

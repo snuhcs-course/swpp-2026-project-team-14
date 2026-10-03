@@ -4,6 +4,7 @@ from wardrobe import views as wardrobe
 
 urlpatterns = [
     path('api/wardrobe/analyze/', wardrobe.analyze),
+    path('api/wardrobe/landmarks/', wardrobe.landmarks),
     path('api/wardrobe/options/', wardrobe.editor_options),
     path('api/wardrobe/items/', wardrobe.items),
     path('api/wardrobe/items/<uuid:item_id>/', wardrobe.item),

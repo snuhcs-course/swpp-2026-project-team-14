@@ -10,38 +10,45 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.Locale
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 
 data class MeasurementSnapshot(val bitmap: Bitmap, val geometry: MeasurementGeometry,
-    val planePolygon: List<MeasurePoint>, val timestamp: Long) {
-    fun point(u: Float, v: Float): MeasurePoint? = geometry.point(u, v)?.takeIf { point ->
-        // The detected horizontal plane polygon is frozen with the image; do not extrapolate beyond it.
-        var inside = false
-        var previous = planePolygon.last()
-        for (current in planePolygon) {
-            if ((current.z > point.z) != (previous.z > point.z) &&
-                point.x < (previous.x - current.x) * (point.z - current.z) /
-                (previous.z - current.z) + current.x) inside = !inside
-            previous = current
-        }
-        inside
-    }
+    val timestamp: Long, val tiltDegrees: Float) {
+    // The garment is assumed to lie on the same flat floor, including beyond the observed polygon.
+    fun point(u: Float, v: Float): MeasurePoint? = geometry.point(u, v)
 }
+
+data class LandmarkPreview(val bitmap: Bitmap, val pose: Pose)
 
 /** ARCore owns the camera. The framebuffer and metric plane are captured from the same frame. */
 class MeasurementCamera(
     private val rotation: () -> Int,
     private val onStatus: (String, Boolean) -> Unit,
     private val onCapture: (MeasurementSnapshot) -> Unit,
+    private val onPreview: (LandmarkPreview) -> Unit = { it.bitmap.recycle() },
 ) : GLSurfaceView.Renderer {
     @Volatile var session: Session? = null
+    @Volatile private var latestPose: Pose? = null
     val captureRequested = AtomicBoolean(false)
+    val previewRequested = AtomicBoolean(false)
+    private val maximumCaptureTiltDegrees = 75f
+    private val maximumPreviewTranslationMeters = .02
+    private val minimumPreviewAxisCosine = .9986 // About three degrees, including roll.
     private var width = 1
     private var height = 1
     private var texture = 0
     private var program = 0
-    private var lastStatus = ""
+    @Volatile private var lastStatus = ""
+    fun resetStatus() { lastStatus = ""; latestPose = null }
+    fun matchesPreview(pose: Pose): Boolean {
+        val current = latestPose ?: return false
+        val translation = current.translation.zip(pose.translation).sumOf { (a, b) -> ((a - b) * (a - b)).toDouble() }
+        fun dotAxis(axis: Int) = current.getTransformedAxis(axis, 1f).zip(pose.getTransformedAxis(axis, 1f)).sumOf { (a, b) -> (a * b).toDouble() }
+        return translation < maximumPreviewTranslationMeters * maximumPreviewTranslationMeters &&
+            dotAxis(2) > minimumPreviewAxisCosine && dotAxis(0) > minimumPreviewAxisCosine
+    }
     private val vertices = buffer(floatArrayOf(-1f, -1f, 1f, -1f, -1f, 1f, 1f, 1f))
     private val uv = buffer(FloatArray(8))
 
@@ -86,6 +93,7 @@ class MeasurementCamera(
             frame.transformCoordinates2d(Coordinates2d.OPENGL_NORMALIZED_DEVICE_COORDINATES,
                 vertices, Coordinates2d.TEXTURE_NORMALIZED, uv)
             drawBackground()
+            latestPose = frame.camera.pose.takeIf { frame.camera.trackingState == TrackingState.TRACKING }
             val hit = if (frame.camera.trackingState == TrackingState.TRACKING) {
                 frame.hitTest(width / 2f, height / 2f).firstOrNull {
                     val plane = it.trackable as? Plane
@@ -93,14 +101,24 @@ class MeasurementCamera(
                         plane.trackingState == TrackingState.TRACKING && plane.isPoseInPolygon(it.hitPose)
                 }
             } else null
-            status(if (hit == null) "옷 주변 바닥을 천천히 비추세요. 중앙 +를 같은 바닥에 맞추세요."
-                else "바닥 인식됨 · 옷 전체가 보이도록 위에서 촬영하세요.", hit != null)
+            val plane = hit?.trackable as? Plane
+            val center = plane?.centerPose
+            val normal = center?.getTransformedAxis(1, 1f)
+            val pose = frame.camera.pose
+            val forward = pose.getTransformedAxis(2, -1f)
+            val tiltDegrees = if (normal != null) captureTiltDegrees(
+                MeasurePoint(forward[0], forward[1], forward[2]), MeasurePoint(normal[0], normal[1], normal[2])) else null
+            val canCapture = tiltDegrees != null && tiltDegrees < maximumCaptureTiltDegrees
+            status(when {
+                tiltDegrees == null -> "주변 바닥을 천천히 비추세요."
+                !canCapture -> "옷을 위에서 비추세요."
+                else -> String.format(Locale.KOREA, "기울기 %.0f°", tiltDegrees)
+            }, canCapture)
             if (captureRequested.getAndSet(false)) {
-                if (hit == null) {
+                if (!canCapture || center == null || normal == null) {
                     status("바닥 추적이 끊겼습니다. 다시 인식한 뒤 촬영해 주세요.", false)
                     return
                 }
-                val plane = hit.trackable as Plane
                 val view = FloatArray(16)
                 val projection = FloatArray(16)
                 val vp = FloatArray(16)
@@ -109,18 +127,12 @@ class MeasurementCamera(
                 frame.camera.getProjectionMatrix(projection, 0, 0.01f, 100f)
                 Matrix.multiplyMM(vp, 0, projection, 0, view, 0)
                 check(Matrix.invertM(inverse, 0, vp, 0))
-                val center = plane.centerPose
-                val normal = center.getTransformedAxis(1, 1f)
                 val geometry = MeasurementGeometry(inverse, MeasurePoint(center.tx(), center.ty(), center.tz()),
                     MeasurePoint(normal[0], normal[1], normal[2]))
                 check(geometry.point(0.5f, 0.5f) != null) { "옷을 더 위에서 내려다보며 촬영해 주세요." }
-                val polygon = plane.polygon
-                val points = (0 until polygon.limit() step 2).map { index ->
-                    val p = center.transformPoint(floatArrayOf(polygon[index], 0f, polygon[index + 1]))
-                    MeasurePoint(p[0], p[1], p[2])
-                }
-                check(points.size >= 3)
-                onCapture(MeasurementSnapshot(readBitmap(), geometry, points, frame.timestamp))
+                onCapture(MeasurementSnapshot(readBitmap(), geometry, frame.timestamp, tiltDegrees))
+            } else if (previewRequested.getAndSet(false)) {
+                onPreview(LandmarkPreview(readBitmap(), frame.camera.pose))
             }
         } catch (_: com.google.ar.core.exceptions.CameraNotAvailableException) {
             status("카메라를 사용할 수 없습니다. 화면을 나갔다가 다시 열어 주세요.", false)

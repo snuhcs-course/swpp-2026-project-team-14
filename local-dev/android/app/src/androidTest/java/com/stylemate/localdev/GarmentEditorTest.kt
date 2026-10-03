@@ -18,10 +18,26 @@ class GarmentEditorTest {
     private fun fixture() = JSONObject(InstrumentationRegistry.getInstrumentation().context.assets
         .open("wardrobe-editor.json").bufferedReader().use { it.readText() })
 
+    @Test fun compactAnalysisStillAllowsBottomMeasurementsWithoutSubtype() {
+        val fixture = fixture()
+        val attributes = fixture.getJSONObject("attributes").put("category", "bottom").put("subcategory", JSONObject.NULL)
+        var submitted: JSONObject? = null
+        compose.setContent { MaterialTheme { Column(Modifier.verticalScroll(rememberScrollState())) {
+            GarmentEditor("minimal", attributes, null, JSONObject(), "", fixture.getJSONObject("catalog"),
+                false, false, null, { submitted = it })
+        } } }
+        compose.onNodeWithText("종류: 미입력").assertDoesNotExist()
+        compose.onNodeWithText("허리 단면").performScrollTo().performTextInput("37.25")
+        compose.onNodeWithText("옷장에 추가").performScrollTo().performClick()
+        compose.runOnIdle {
+            assertEquals(37.25, requireNotNull(submitted).getJSONObject("dimensions").getJSONObject("waist_width_half").getDouble("value"), .0001)
+        }
+    }
+
     @Test fun editedMeasurementsAndMemoAreSentWithoutOverwritingOtherEstimates() {
         val fixture = fixture()
         var submitted: JSONObject? = null
-        val dimensions = JSONObject("""{"unit":"cm","chest_width_half":{"value":55.12,"source":"arcore_manual","method":"flat_underarm_to_underarm","reference":null},"total_length":{"value":65.34,"source":"arcore_manual","method":"back_neck_to_hem","reference":null}}""")
+        val dimensions = JSONObject("""{"unit":"cm","chest_width_half":{"value":55.12,"source":"arcore_assisted","method":"flat_underarm_to_underarm","reference":null},"total_length":{"value":65.34,"source":"arcore_manual","method":"back_neck_to_hem","reference":null},"shoulder_width":{"value":45.12,"source":"arcore_assisted","method":"flat_shoulder_seam_to_seam","reference":null}}""")
         compose.setContent { MaterialTheme { Column(Modifier.verticalScroll(rememberScrollState())) {
             GarmentEditor("draft", fixture.getJSONObject("attributes"), dimensions, JSONObject(), "",
                 fixture.getJSONObject("catalog"), false, false, null, { submitted = it })
@@ -39,6 +55,7 @@ class GarmentEditorTest {
             assertEquals("user_measured", chest.getString("source"))
             assertEquals("unspecified", chest.getString("method"))
             assertEquals("arcore_manual", payload.getJSONObject("dimensions").getJSONObject("total_length").getString("source"))
+            assertEquals("arcore_assisted", payload.getJSONObject("dimensions").getJSONObject("shoulder_width").getString("source"))
         }
     }
 

@@ -39,14 +39,23 @@ for field, values in ENUMS.items():
     else:
         PROPERTIES[field] = {'type': ['string', 'null'], 'enum': [*values, None]}
 PROPERTIES['category'] = {'type': 'string', 'enum': list(SUBCATEGORIES)}
+# Gemini extracts only these fields. The remaining catalog is optional user input.
+AI_FIELDS = ('name', 'category', 'colors')
 SCHEMA = {
     'type': 'object', 'additionalProperties': False,
     'properties': {
         'image_status': {'type': 'string', 'enum': ['single', 'no_garment', 'multiple', 'unsupported', 'unclear']},
         'attributes': {'type': ['object', 'null'], 'additionalProperties': False,
-                       'properties': PROPERTIES, 'required': list(PROPERTIES)},
+                       'properties': {key: PROPERTIES[key] for key in AI_FIELDS}, 'required': list(AI_FIELDS)},
     }, 'required': ['image_status', 'attributes'],
 }
+
+
+def validate_ai_attributes(data):
+    if not isinstance(data, dict) or set(data) != set(AI_FIELDS):
+        raise ValueError('Unexpected AI fields')
+    defaults = {key: [] if key in ARRAY_LIMITS else None for key in ENUMS}
+    return validate_attributes({**defaults, **data})
 
 
 def validate_attributes(data):

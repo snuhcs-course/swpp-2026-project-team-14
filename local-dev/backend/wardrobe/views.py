@@ -12,10 +12,31 @@ from django.views.decorators.http import require_GET, require_http_methods, requ
 from .analysis import AnalysisError, MAX_IMAGE_BYTES, MODEL, analyze_image, prepare_image
 from .editor import catalog, validate_record
 from .models import Garment
+from .landmarks import MAX_FRAME_BYTES, detect
 from .schema import display_attributes
 
 # Local loopback development only; bound concurrent paid requests and image decode memory.
 ANALYSIS_SLOTS = BoundedSemaphore(1)
+
+
+@require_POST
+def landmarks(request):
+    if request.content_type not in ('image/jpeg', 'image/png', 'image/webp'):
+        return JsonResponse({'error': 'IMAGE_REQUIRED'}, status=415)
+    if not ANALYSIS_SLOTS.acquire(blocking=False):
+        return JsonResponse({'error': 'AI_BUSY'}, status=429)
+    try:
+        background = request.GET.get('background', 'keep')
+        if background not in ('keep', 'remove'):
+            return JsonResponse({'error': 'INVALID_BACKGROUND_MODE'}, status=400)
+        result = detect(request.read(MAX_FRAME_BYTES + 1), request.GET.get('garment'), background == 'remove')
+        response = JsonResponse(result)
+        response['Cache-Control'] = 'no-store'
+        return response
+    except AnalysisError as error:
+        return JsonResponse({'error': error.code}, status=error.status)
+    finally:
+        ANALYSIS_SLOTS.release()
 
 
 @require_POST

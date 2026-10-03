@@ -8,7 +8,7 @@ from django.test import SimpleTestCase, TestCase, override_settings
 from PIL import Image
 
 from .analysis import AnalysisError, MAX_IMAGE_BYTES, MODEL, analyze_image, prepare_image
-from .schema import ARRAY_LIMITS, ENUMS, validate_attributes
+from .schema import AI_FIELDS, ARRAY_LIMITS, ENUMS, validate_attributes
 
 
 def photo():
@@ -24,7 +24,7 @@ def attributes():
 
 
 def envelope(data=None, finish='STOP'):
-    result = data if data is not None else {'image_status': 'single', 'attributes': attributes()}
+    result = data if data is not None else {'image_status': 'single', 'attributes': {k: attributes()[k] for k in AI_FIELDS}}
     return json.dumps({'candidates': [{'finishReason': finish, 'content': {'parts': [{'text': json.dumps(result)}]}}]}).encode()
 
 
@@ -83,6 +83,9 @@ class GeminiTests(SimpleTestCase):
         body = json.loads(request.data)
         self.assertEqual(body['contents'][0]['parts'][0]['inlineData']['mimeType'], 'image/jpeg')
         self.assertIn('responseJsonSchema', body['generationConfig'])
+        schema = body['generationConfig']['responseJsonSchema']['properties']['attributes']
+        self.assertEqual(set(schema['properties']), {'name', 'category', 'colors'})
+        self.assertIsNone(analyze_image(photo(), 'test-secret')['fit_type'])
         self.assertEqual(opener.return_value.open.call_args.kwargs['timeout'], 30)
 
     @patch('wardrobe.analysis.build_opener')
@@ -109,6 +112,19 @@ class GeminiTests(SimpleTestCase):
             with self.assertRaises(AnalysisError) as error:
                 analyze_image(photo(), 'test-key')
             self.assertEqual(error.exception.status, 422)
+
+    @patch('wardrobe.analysis.build_opener')
+    def test_optional_visual_fields_are_not_generated_and_bottom_dimensions_remain_editable(self, opener):
+        from .editor import dimension_fields
+        self.mock_response(opener, envelope({'image_status': 'single', 'attributes': {
+            'name': '검정 바지', 'category': 'bottom', 'colors': ['black']}}))
+        result = analyze_image(photo(), 'test-key')
+        self.assertIsNone(result['subcategory'])
+        self.assertIsNone(result['fit_type'])
+        self.assertIn('waist_width_half', dimension_fields(result))
+        self.mock_response(opener, envelope({'image_status': 'single', 'attributes': attributes()}))
+        with self.assertRaises(AnalysisError):
+            analyze_image(photo(), 'test-key')
 
     @patch('wardrobe.analysis.build_opener')
     def test_provider_failures_are_sanitized_and_not_retried(self, opener):

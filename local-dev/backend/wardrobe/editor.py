@@ -40,7 +40,7 @@ def dimension_fields(attributes):
     if category in ('top', 'outerwear'):
         return {k: v for k, v in TOP_DIMENSIONS.items()
                 if attributes['sleeve_length'] != 'sleeveless' or k not in ('sleeve_length', 'cuff_width_half')}
-    if category == 'bottom' and attributes['subcategory'] not in (None, 'other'):
+    if category == 'bottom':
         return {k: v for k, v in BOTTOM_DIMENSIONS.items()
                 if attributes['subcategory'] != 'skirt' or k in ('waist_width_half', 'hip_width_half', 'total_length')}
     return {}
@@ -103,7 +103,7 @@ def validate_record(data):
             methods = {fields[key][1], 'unspecified'}
             if key == 'sleeve_length':
                 methods.add('center_back_via_shoulder_to_cuff')
-            if item['source'] not in ('arcore_manual', 'user_measured', 'product_chart') or item['method'] not in methods:
+            if item['source'] not in ('arcore_manual', 'arcore_assisted', 'user_measured', 'product_chart') or item['method'] not in methods:
                 raise ValueError('Invalid source or method')
             if item['reference'] is not None and (not isinstance(item['reference'], str) or len(item['reference']) > 500):
                 raise ValueError('Invalid reference')

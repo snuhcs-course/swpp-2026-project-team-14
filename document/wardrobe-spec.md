@@ -11,6 +11,8 @@
 - 입력 화면: [화면 설계](design.md)
 - 처리 순서·실패 복구·현재 구현 범위: [등록 데이터 흐름](wardrobe-flow.md)
 
+2026-10-03 로컬 변경: Gemini 자동 분석은 `name`, `category`, `colors`만 요청한다. 기존 나머지 외관 필드는 사용자 선택 입력으로 유지하며 AI가 생성하지 않는다. 색상 키는 기존 데이터와 호환되는 `colors` 배열을 유지한다.
+
 주요 데이터 구분: `fit_type`은 의류의 디자인상 여유감, `dimensions`는 출처가 명시된 실측 치수, 소재·착용 특성은 사용자 선택 입력으로 관리한다.
 
 ## 1. 적용 범위
@@ -19,7 +21,7 @@
 
 요청은 JPEG/PNG/WebP 이미지 바이트와 해당 Content-Type이다. 최대 5 MiB·1,200만 픽셀·단일 프레임만 허용하고 긴 변 1536px 이하 JPEG로 변환하여 메타데이터를 제외한다. 응답은 초안 `id`, `model`, 허용된 시각적 필드만 담는 `attributes`, 한글 `display` 목록이다. AR dimensions는 이 요청에 보내지 않으며 AI 응답으로 덮어쓰지 않는다. 종류가 AR 선택과 다르면 앱에서 확인 문구를 표시한다.
 
-Gemini에는 JSON Schema를 지정하고 서버가 필드·enum·분류별 적용 범위를 재검증한다. 누락·추가 필드, 치수·소재·신축성 등 금지 필드, 잘못된 분류 조합은 거부한다. 옷 없음·여러 벌·미지원 종류·판별 불가는 422, 잘못된 이미지는 400/413/415, 키 미설정은 503, 요청 제한은 429, 잘못된 공급자 응답은 502, 시간 초과는 504다. 외부 응답 원문·키·이미지는 로그나 API 오류에 포함하지 않는다. 실호출 품질·지연시간은 아직 검증 전이다.
+Gemini에는 name·category·colors 전용 JSON Schema를 지정하고 서버가 필드·enum을 재검증한다. 누락·추가 필드, 치수·소재·신축성 등 금지 필드, 잘못된 분류 조합은 거부한다. 옷 없음·여러 벌·미지원 종류·판별 불가는 422, 잘못된 이미지는 400/413/415, 키 미설정은 503, 요청 제한은 429, 잘못된 공급자 응답은 502, 시간 초과는 504다. 외부 응답 원문·키·이미지는 로그나 API 오류에 포함하지 않는다. 실호출 품질·지연시간은 아직 검증 전이다.
 
 [design.md](design.md)의 옷장 화면을 구현하기 위한 공통 기준이다. local-dev/에는 분석·편집·MySQL 저장·조회가 구현되어 있다. 아래 정식 계약의 사용자 식별·S3·분리된 초안 모델은 미구현이며 팀 공통 BE와 통합 시 적용한다. 아래 경로·값·제한은 구현 계약을 논의하기 위한 초안이다.
 
@@ -37,7 +39,15 @@ Gemini에는 JSON Schema를 지정하고 서버가 필드·enum·분류별 적�
 
 PUT 본문은 `attributes`, `dimensions`, `user_properties`, `notes` 네 필드를 모두 포함한다. `attributes`는 위 시각적 필드이며 `user_properties`에는 material_note·touch·stretch·sheerness·thickness·seasons만 허용한다. 원본 AI 제안은 서버의 `original_attributes`에 별도 유지한다. 메모는 최대 2,000자, 줄바꿈을 그대로 보관한다.
 
-치수는 현재 분류에 적용 가능한 항목만 저장한다. 변경하지 않은 AR 값은 `arcore_manual` 출처를 유지하고, 사용자가 입력하거나 수정한 값은 `user_measured`, `method=unspecified`로 저장하여 측정 기준을 임의로 확정하지 않는다. 분류 변경 시 폼의 무효 항목을 초기화한다. 치수가 필요 없으면 null로 보낸다.
+치수는 현재 분류에 적용 가능한 항목만 저장한다. 변경하지 않은 AR 값은 `arcore_manual` 또는 `arcore_assisted` 출처를 유지하고, 사용자가 숫자를 입력하거나 수정한 값은 `user_measured`, `method=unspecified`로 저장하여 측정 기준을 임의로 확정하지 않는다. 분류 변경 시 폼의 무효 항목을 초기화한다. 치수가 필요 없으면 null로 보낸다.
+
+측정점 탐지 API는 `POST /api/wardrobe/landmarks/?garment={종류}&background=keep|remove`다. 종류는 `short_sleeve_top`(반팔), `long_sleeve_top`(긴팔), `short_sleeve_outerwear`(반팔 아우터), `long_sleeve_outerwear`(긴팔 아우터), `trousers`(바지), `shorts`(반바지), `skirt`(스커트)다. 본문은 JPEG·PNG·WebP 단일 이미지이며 최대 1 MiB·100만 픽셀이다.
+
+응답은 `model`, `garment`, `elapsed_ms`, `points`(종류 내 1부터 시작하는 id·x·y·score), `suggestions`(치수별 2~8개의 순서 있는 좌표), `background_removed`, `preview_jpeg`, `fallback_fields`다. `fallback_fields`는 누끼에서 누락되어 원본 추론으로 보완한 치수 목록이다. 좌표는 원본 요청 사진의 좌상단 기준 0~1이며 crop·letterbox를 역변환한다. `preview_jpeg`는 배경 제거가 적용된 경우에만 같은 뷰포트 비율의 JPEG를 base64로 반환한다. 원본 사진은 변경하지 않는다. score는 heatmap 점수로 정확도 확률이 아니다.
+
+상의·아우터는 어깨·가슴·총장·소매길이·밑단·소매끝·암홀, 바지·반바지는 허리·엉덩이·허벅지·앞밑위·인심·총장·한쪽 밑단, 스커트는 허리·엉덩이·총장을 자동 제안한다. 경로에 필요한 점을 찾지 못하면 해당 항목을 생략한다. 허벅지 외곽점은 가랑이 높이에서 허리선과 평행한 선과 바깥 윤곽의 교점으로 유도한다. 엉덩이 폭·앞밑위 등은 학습된 기준점에 따른 근사이며 최대 폭이나 실제 곡선을 보증하지 않는다.
+
+cm는 Android가 촬영 프레임의 AR 평면·카메라 행렬로 계산한다. 탐지 요청 사진·누끼·결과는 DB에 저장하지 않는다. 잘못된 종류·배경 모드는 400, 크기 초과 413, 형식 오류 415, 동시 작업 429, 모델 미준비·추론 실패 503이다. 빈 suggestions도 정상이며 직접 지정으로 보완한다.
 
 같은 초안 ID로 반복 저장해도 옷이 중복 생성되지 않는다. 저장 실패 시 편집값을 유지하여 재시도할 수 있다. 잘못된 입력은 400, 16 KiB 초과 JSON은 413, 없는 ID는 404다. 사진·메모·키 원문을 오류 응답에 넣지 않는다. 로컬 API에는 인증·동시 편집 충돌 제어·초안 자동 청소가 없으므로 공용 서비스에 배포하지 않는다. 목록과 저장된 옷은 앱 재실행 후 서버에서 복원하지만 미저장 편집 상태의 프로세스 종료 복구는 보장하지 않는다.
 
@@ -63,8 +73,8 @@ PUT 본문은 `attributes`, `dimensions`, `user_properties`, `notes` 네 필드�
 
 | 데이터 묶음 | 예 | 수집 방법 | 추천에서의 역할 |
 | --- | --- | --- | --- |
-| 종류·외관 | 티셔츠, 색상, 넥라인, 소매 | 사진 AI 제안 + 사용자 수정 | 코디 슬롯·색 조합·스타일 |
-| 디자인 실루엣 | 오버사이즈 디자인, 와이드 레그 | 사진 AI 제안 + 상품 정보·사용자 확인 | 원하는 실루엣에 대한 선호 점수 |
+| 종류·외관 | 티셔츠, 색상, 넥라인, 소매 | 이름·색상·상위 분류만 AI 제안, 세부 속성은 사용자 입력 | 코디 슬롯·색 조합·스타일 |
+| 디자인 실루엣 | 오버사이즈 디자인, 와이드 레그 | 상품 정보·사용자 입력 | 원하는 실루엣에 대한 선호 점수 |
 | 의류 실측 | 가슴 단면 55 cm, 인심 74 cm | 직접 측정 또는 해당 상품·사이즈의 치수표 | 실제 치수가 있는 경우에만 여유량 비교 |
 | 소재·착용 특성 | 소재 메모, 촉감, 신축성, 비침, 두께, 계절 | 사용자가 경험·상품 정보를 참고하여 직접 지정 | 날씨·활동·선호 조건의 보조 판단 |
 
@@ -76,7 +86,7 @@ PUT 본문은 `attributes`, `dimensions`, `user_properties`, `notes` 네 필드�
 
 [옷 종류 사전](wardrobe-types.md)의 상세 명칭은 검색·선택용 프리셋으로 유지한다. 예를 들어 사용자가 `와이드 청바지`를 선택하면 `category=bottom`, `subcategory=jeans`, `leg_shape=wide`로 변환한다. 이후 실루엣을 수정하면 상세 표시명도 현재 속성으로 다시 구성한다. 과거 프리셋 코드와의 충돌 검사는 필요하지 않다.
 
-AI는 프리셋 코드 대신 정규화된 종류와 시각적 속성을 반환한다. 소재를 전제로 하는 프리셋은 사용자가 선택할 수 있지만, AI가 소재를 확정하는 경로로 사용하지 않는다. 확인하기 어려운 subcategory는 null로 둔다. 카디건·후드 집업·셔켓은 사전에 따라 outerwear로 분류한다.
+Gemini는 프리셋 코드 대신 이름·상위 카테고리·색상만 반환한다. 소재를 전제로 하는 프리셋은 사용자가 선택할 수 있지만, AI가 소재를 확정하는 경로로 사용하지 않는다. 확인하기 어려운 subcategory는 null로 둔다. 카디건·후드 집업·셔켓은 사전에 따라 outerwear로 분류한다.
 
 ### 3.3. 공통 외관 속성
 
@@ -150,7 +160,7 @@ seasons는 사용자 또는 상품이 제시하는 착용 계절이며 기온 �
 
 - value: 유한한 양수, 소수 둘째 자리까지 반올림한다. 화면은 `55.10 cm`처럼 두 자리를 표시하며 JSON number는 후행 0을 생략할 수 있다. 0·음수·단위 포함 문자열은 거부한다. 신체와 옷 종류가 다양하므로 임의의 보편적 정상 범위를 하드코딩하지 않는다.
 - source: `user_measured`(사용자가 실제 측정), `product_chart`(해당 상품·사이즈 치수표). 보정되지 않은 `ai_estimated`는 허용하지 않는다.
-- 로컬 AR 실험의 추가 source는 `arcore_manual`이다. 사용자가 사진 위 지정한 두 점을 촬영 시점의 AR 수평 평면에 투영한 추정치로, `user_measured`와 구분한다. 정확도 검증 전이므로 추천의 확정 실측으로 자동 사용하지 않는다. 정식 서버의 허용값 확장은 추후 계약에 함께 반영해야 한다.
+- 로컬 AR 실험의 추가 source는 `arcore_manual`(사용자 지정점), `arcore_assisted`(모델 제안점을 사용자 확인)다. 경로의 각 점을 촬영 시점의 AR 수평 평면에 투영하고 구간 거리를 합산한 추정치로, `user_measured`와 구분한다. 자동 제안점을 사진에서 다시 지정하면 `arcore_manual`, 숫자로 수정하면 `user_measured`가 된다. 정확도 검증 전이므로 추천의 확정 실측으로 자동 사용하지 않는다. 정식 서버의 허용값 확장은 추후 계약에 함께 반영해야 한다.
 - method: 아래 표의 측정 방법 코드. 치수표 기준이 불명확하면 `unspecified`로 저장하고 자동 치수 비교에서는 제외한다.
 - reference: 출처 메모 또는 URL, 선택값. product_chart의 reference는 선택 입력이며 상품·참조 행에 대한 메모를 남길 수 있다. URL을 저장했다고 자동 수집하지 않는다.
 - AI가 치수표를 읽는 기능은 이번 범위 밖이다. 향후 추가해도 OCR 값은 사용자 확인과 해당 상품·사이즈 매칭 후 반영한다.
@@ -189,13 +199,13 @@ seasons는 사용자 또는 상품이 제시하는 착용 계절이며 기온 �
 
 가슴·허리·힙 단면 × 2는 상황에 따라 의류 둘레의 근사치가 될 뿐, 사용자의 신체 정면 너비나 신체 둘레/2와 동일한 물리량이 아니다. 신축·주름·곡선·신체 입체 형태·측정 위치를 함께 고려한다. 앞밑위 하나로 배꼽 기준 위치, 인심 하나로 곱창 주름 발생을 확정하지 않는다.
 
-적용하지 않는 치수 키는 전달하지 않는다. 적용 가능한 미측정 치수는 null로 둘 수 있다. 신발 또는 subcategory 미상 하의는 dimensions=null이다. FE는 category·subcategory·소매 구조에 맞는 입력만 보여주고 BE가 같은 규칙을 검증한다.
+적용하지 않는 치수 키는 전달하지 않는다. 적용 가능한 미측정 치수는 null로 둘 수 있다. 신발은 dimensions=null이다. 로컬 구현에서는 하의 subcategory가 미입력이어도 치수를 저장할 수 있다. FE는 category·subcategory·소매 구조에 맞는 입력만 보여주고 BE가 같은 규칙을 검증한다.
 
 ### 3.7. AI 출력 범위와 입력 출처
 
 AI 분석 응답의 attributes는 다음 필드만 허용한다.
 
-`name`, `category`, `subcategory`, `colors`, `pattern`, `styles`, `formality`, `fit_type`, `length`, `sleeve_length`, `neckline`, `shoulder_construction`, `leg_shape`, `rise_type`, `skirt_shape`, `closure`, `details`.
+`name`, `category`, `colors`. 성공 시 이름·카테고리는 필수이고 색상은 최대 3개다. 추가 필드는 거부한다. Django는 기존 편집·DB 계약을 유지하기 위해 요청하지 않은 선택 필드를 null 또는 []로 채운다. 이는 AI 추정값이 아니며 사용자만 입력한다.
 
 material_note·touch·stretch·sheerness·thickness·seasons·dimensions는 AI 응답에 포함할 수 없다. BE에서 별도 AI 출력 스키마로 검사하며 금지 필드가 포함된 결과를 최종 저장값으로 사용하지 않는다. 재분석 결과로 기존 사용자 입력을 덮어쓰지 않는다.
 
@@ -281,33 +291,20 @@ GarmentDraft 제안 필드: `id`(추측하기 어려운 ID), `owner_id`, `image_
 
 `PATCH`에서 owner, image_key, ID는 수정할 수 없다. 부분 수정은 기존 값과 합친 최종 상태를 검증한다. category·subcategory 변경으로 무효가 된 특징·치수는 클라이언트가 null/[] 또는 유효한 값으로 함께 보내야 한다. BE는 병합 후 최종 종류·속성의 적용 범위을 검사한다.
 
-### 분석 응답 예시 — 사진에서 제안 가능한 값만
+### Gemini 응답 예시
 
 ```json
 {
-  "draft_id": "draft-example",
-  "status": "ready",
+  "image_status": "single",
   "attributes": {
     "name": "화이트 긴팔 티셔츠",
     "category": "top",
-    "subcategory": "tshirt",
-    "colors": [
-      "white"
-    ],
-    "pattern": "solid",
-    "fit_type": "loose",
-    "length": "regular",
-    "sleeve_length": "long",
-    "neckline": "crew",
-    "shoulder_construction": "drop_shoulder",
-    "styles": [
-      "casual"
-    ]
+    "colors": ["white"]
   }
 }
 ```
 
-분석 단계에서는 이름·카테고리도 null일 수 있다. 최종 저장 때만 필수값을 요구한다. 옷이 없거나 지원하지 않는 종류면 해당 오류를 반환한다. 생성 시점에 선택 필드 생략은 미입력으로 정규화한다.
+옷 없음·여러 벌·미지원·판별 불가는 별도 image_status와 attributes=null로 반환한다. 로컬 Django 응답에는 초안 ID와 편집용 null 기본값이 추가된다. dimensions·메모는 Gemini에 요청하지 않는다.
 
 ### 최종 저장 예시 — 상의와 실제 측정값
 
