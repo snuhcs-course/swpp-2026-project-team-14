@@ -45,7 +45,7 @@ def run(front, side=None, detector=None, **input_kwargs):
 
 
 def confidence(result, type_):
-    return next(m.confidence for m in result.measurements if m.type is type_)
+    return next((m.confidence for m in result.measurements if m.type is type_), None)
 
 
 def test_ideal_input_keeps_base_confidence_and_no_warnings():
@@ -65,6 +65,9 @@ def test_detected_loose_top_warns_and_lowers_only_upper_body():
     assert confidence(result, MeasurementType.INSEAM) is Confidence.HIGH  # legs untouched
     assert result.clothing.to_dict()["top"] == "loose"
     assert result.pipeline_version.endswith("+fake-clothing")
+    # a loose sleeve covers the upper arm: the bicep would be the sleeve, so it is left out
+    assert confidence(result, MeasurementType.BICEP) is None
+    assert confidence(result, MeasurementType.WRIST) is not None  # the wrist is not under the sleeve
 
 
 def test_detected_loose_bottom_lowers_legs():

@@ -150,6 +150,10 @@ class BodyAnalysisPipeline:
         if self.detector is not None:
             clothing = self.detector.assess(raw.features, input_.gender)
             version += f"+{self.detector.version}"
+        if clothing.top_loose:
+            # A loose sleeve covers the upper arm, so the "bicep" would be the sleeve (a 53 cm bicep for a
+            # 25 cm arm in the benchmark). Leave it out, as when the arms touch the body.
+            raw.values.pop(MeasurementType.BICEP, None)
         if self.corrector is not None:
             raw.values = self.corrector.correct(raw.values, raw.features, input_, skip=clothing.affected())
             raw.derived.update(_derived_from(raw.values, input_.height_cm))

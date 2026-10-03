@@ -400,7 +400,7 @@ private fun DetailCard(type: MeasurementType?, measurement: BodyMeasurement?, on
             measurement == null -> Column {
                 Text(type.label, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                 Text(
-                    "이번 사진에서는 이 부위를 재지 못했어요. 팔을 몸에서 조금 떼고 다시 찍어보세요.",
+                    "이번 사진에서는 이 부위를 재지 못했어요. 위의 안내에 따라 다시 찍으면 잴 수 있어요.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
