@@ -25,7 +25,7 @@ swpp-2026-project-team-14/
 |   |           |-- WardrobeScreen.kt            # 옷장 목록·사진 확인·치수 요약·편집 연결
 |   |           |-- WardrobeViewModel.kt         # 목록·저장 상태
 |   |           |-- GarmentAnalysisViewModel.kt  # 분석 진행·실패 상태
-|   |           |-- GarmentEditor.kt             # 특징·실측·착용 정보·메모 편집과 하단 고정 저장
+|   |           |-- GarmentEditor.kt             # 특징·실측·메모 편집과 하단 고정 저장
 |   |           `-- capture/
 |   |               |-- MeasurementActivity.kt  # 실측 촬영·측정점 확인·수정
 |   |               `-- MeasurementCamera.kt    # AR 카메라·촬영 프레임 고정
@@ -43,16 +43,15 @@ swpp-2026-project-team-14/
 |   |       |-- views.py                         # 분석 초안·저장·수정·조회
 |   |       |-- analysis.py                      # Gemini 호출·이미지 검증
 |   |       |-- landmarks.py                     # HRNet 추론·측정 경로 복원
-|   |       |-- foreground.py                    # U²-Net 누끼·의상 영역 추출
 |   |       |-- schema.py                        # 이름·카테고리·색상과 선택 속성
 |   |       |-- editor.py                        # 실측·사용자 입력 검증
 |   |       |-- models.py                        # 사진 경로·옷 JSON·메모 저장
 |   |       |-- migrations/                      # 옷장 테이블 생성·JSON 구조 변경
 |   |       |-- tests.py                         # AI 계약·DB 저장·재조회 검사
-|   |       `-- test_landmarks.py                # 자동 측정점·누끼 변환 검사
+|   |       `-- test_landmarks.py                # 원본 사진의 자동 측정점·좌표 변환 검사
 |   |-- body_analysis/                           # MediaPipe 체형 분석
-|   |-- wardrobe/garment-landmarks/              # HRNet·U²-Net 가중치·메타데이터·라이선스
-|   |-- scripts/prepare_landmarks.py             # HRNet ONNX 변환·U²-Net 준비
+|   |-- wardrobe/garment-landmarks/              # HRNet 가중치·메타데이터·라이선스
+|   |-- scripts/prepare_landmarks.py             # HRNet ONNX 변환
 |   `-- tests/                                   # 체형 분석·공통 API 회귀 검사
 `-- docs/wardrobe/                               # 옷장 설계·실행 안내
 ```
@@ -61,6 +60,6 @@ swpp-2026-project-team-14/
 
 체형·옷장 화면은 공통 `ScreenScaffold`·`PrimaryActionBar`·`SectionTitle`과 `StyleMateTheme`를 사용한다. 글꼴·여백·카드 기준은 [디자인](design.md#3-공통-디자인-기준--현재-구현)에 정리한다.
 
-옷장의 `pattern`·상대 기장 `length`는 제거했다. 치수와 측정 출처는 저장하지만 측정점 좌표·누끼 미리보기는 저장하지 않는다. 체형 사진은 메모리 처리 후 폐기하며 옷 사진만 옷장 저장소에 보관한다.
+옷장의 `pattern`·상대 기장 `length`·착용 정보와 격식·여밈·디테일·어깨 구조·넥라인 속성은 제거했다. 마이그레이션은 기존 속성 JSON을 정리하고 `user_properties` 컬럼을 삭제한다. 어깨너비 등 치수와 측정 출처는 유지하며 측정점 좌표는 저장하지 않는다. 원본 사진에 HRNet을 적용하고 누끼 모델은 사용하지 않는다. 체형 사진은 메모리 처리 후 폐기하며 옷 사진만 옷장 저장소에 보관한다.
 
 체형 분석·자동 측정점에는 DB가 필요 없다. 옷장 분석 초안·목록·저장에는 MySQL 연결이 필요하며 미설정 시 503을 반환한다. S3·사용자 구분·체형 프로필 영구 저장·추천 치수 비교는 미구현이다. 실행 설정은 [local-development.md](local-development.md), 계약은 [wardrobe-spec.md](wardrobe-spec.md)를 따른다.

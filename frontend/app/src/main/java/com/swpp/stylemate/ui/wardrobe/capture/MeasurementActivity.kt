@@ -8,7 +8,6 @@ import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.opengl.GLSurfaceView
-import android.graphics.Bitmap
 import android.os.SystemClock
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -72,8 +71,6 @@ class MeasurementActivity : ComponentActivity() {
     private var landmarkEpoch = 0
     private var lastPreviewTime = 0L
     private var livePose: com.google.ar.core.Pose? = null
-    private var removeBackground by mutableStateOf(true)
-    private var processedPreview by mutableStateOf<Bitmap?>(null)
     private var retryAfter = 0L
     private var fieldIndex by mutableIntStateOf(0)
     private var first by mutableStateOf<Offset?>(null)
@@ -221,12 +218,12 @@ class MeasurementActivity : ComponentActivity() {
         }
         if (landmarkStatus.isNotEmpty()) Text(landmarkStatus, Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(status, Modifier.padding(horizontal = 20.dp, vertical = 8.dp), style = MaterialTheme.typography.bodyMedium)
+        if (status.isNotEmpty()) Text(status, Modifier.padding(horizontal = 20.dp, vertical = 8.dp), style = MaterialTheme.typography.bodyMedium)
     }
 
     @Composable
     private fun ColumnScope.FrozenMeasurement(captured: MeasurementSnapshot) {
-        LaunchedEffect(captured, landmarkType, removeBackground) { detectFrozen(captured) }
+        LaunchedEffect(captured, landmarkType) { detectFrozen(captured) }
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -248,12 +245,6 @@ class MeasurementActivity : ComponentActivity() {
                     }, label = { Text(label) })
                 }
             }
-            Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
-                Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("배경 제외", Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-                    Switch(checked = removeBackground, onCheckedChange = { removeBackground = it }, enabled = !saving && !landmarkBusy)
-                }
-            }
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 fields.forEachIndexed { index, field ->
                     CaptureChip(selected = fieldIndex == index, enabled = !saving && !landmarkBusy, onClick = { fieldIndex = index; first = null },
@@ -273,7 +264,7 @@ class MeasurementActivity : ComponentActivity() {
                         if (!saving && !landmarkBusy) selectPoint(captured, Offset(position.x / size.width, position.y / size.height))
                     }
                 }) {
-                Image((processedPreview ?: captured.bitmap).asImageBitmap(), "측정할 옷 사진", Modifier.fillMaxSize())
+                Image(captured.bitmap.asImageBitmap(), "측정할 옷 사진", Modifier.fillMaxSize())
                 Canvas(Modifier.fillMaxSize()) {
                     measurements.values.forEach { measurement ->
                         val points = measurement.points.map { Offset(it.x * size.width, it.y * size.height) }
@@ -291,7 +282,7 @@ class MeasurementActivity : ComponentActivity() {
                     shape = RoundedCornerShape(12.dp), modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("지우기") }
                 OutlinedButton(onClick = {
                     landmarkEpoch++; first = null; fieldIndex = 0; measurements.clear(); snapshot = null; ready = false
-                    landmarkBusy = false; landmarkStatus = ""; livePairs = emptyMap(); processedPreview = null
+                    landmarkBusy = false; landmarkStatus = ""; livePairs = emptyMap()
                     status = "바닥을 다시 인식해 주세요."
                     startAr()
                 }, enabled = !saving, shape = RoundedCornerShape(12.dp), modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("재촬영") }
@@ -340,14 +331,12 @@ class MeasurementActivity : ComponentActivity() {
         val type = landmarkType ?: run { landmarkBusy = false; landmarkStatus = ""; return }
         val epoch = ++landmarkEpoch
         landmarkBusy = true
-        processedPreview = null
         landmarkStatus = "점 찾는 중"
         measurements.keys.filter { measurements[it]?.assisted == true }.toList().forEach { measurements.remove(it) }
         try {
             liveJob?.join()
-            val result = GarmentLandmarks.detect(captured.bitmap, type, removeBackground)
+            val result = GarmentLandmarks.detect(captured.bitmap, type)
             if (epoch != landmarkEpoch || snapshot !== captured) return
-            processedPreview = result.preview
             result.suggestions.forEach { (key, path) ->
                 if (measurements[key]?.assisted == false) return@forEach
                 val field = fields.find { it.key == key } ?: return@forEach
@@ -356,8 +345,7 @@ class MeasurementActivity : ComponentActivity() {
                 if (cm.isFinite() && cm > 0) measurements[key] = SelectedMeasurement(field,
                     path.points.map { Offset(it.x, it.y) }, cm, assisted = true)
             }
-            landmarkStatus = if (removeBackground && !result.backgroundRemoved) "배경 분리 실패 · 원본에서 탐지했습니다."
-                else if (measurements.isEmpty()) "점을 직접 지정해 주세요." else "점 위치를 확인하세요."
+            landmarkStatus = if (measurements.isEmpty()) "점을 직접 지정해 주세요." else "점 위치를 확인하세요."
         } catch (error: CancellationException) { throw error }
         catch (error: Exception) { if (epoch == landmarkEpoch) landmarkStatus = error.message ?: "점을 직접 지정해 주세요." }
         finally { if (epoch == landmarkEpoch) landmarkBusy = false }

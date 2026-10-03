@@ -184,7 +184,6 @@ fun WardrobeRoute() {
             GarmentEditor(
                 record.getString("id"), record.getJSONObject("attributes"),
                 if (editing != null) editing.optJSONObject("dimensions") else if (sameCategory) measurements?.optJSONObject("dimensions") else null,
-                if (editing != null) editing.getJSONObject("user_properties") else JSONObject(),
                 if (editing != null) editing.getString("notes") else "", catalog,
                 wardrobe.saving || wardrobe.loading, editing != null, wardrobe.saveError,
                 onSave = { wardrobeModel.save(record.getString("id"), it) }, onBack = back,

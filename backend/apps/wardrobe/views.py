@@ -37,10 +37,7 @@ def landmarks(request):
     if not ANALYSIS_SLOTS.acquire(blocking=False):
         return JsonResponse({'error': 'AI_BUSY'}, status=429)
     try:
-        background = request.GET.get('background', 'keep')
-        if background not in ('keep', 'remove'):
-            return JsonResponse({'error': 'INVALID_BACKGROUND_MODE'}, status=400)
-        result = detect(request.read(MAX_FRAME_BYTES + 1), request.GET.get('garment'), background == 'remove')
+        result = detect(request.read(MAX_FRAME_BYTES + 1), request.GET.get('garment'))
         response = JsonResponse(result)
         response['Cache-Control'] = 'no-store'
         return response
@@ -80,7 +77,7 @@ def analyze(request):
 
 def serialize(garment):
     return {'id': str(garment.id), 'attributes': garment.attributes, 'dimensions': garment.dimensions,
-            'user_properties': garment.user_properties, 'notes': garment.notes,
+            'notes': garment.notes,
             'image_url': f'/api/wardrobe/items/{garment.id}/image/', 'saved': garment.saved}
 
 

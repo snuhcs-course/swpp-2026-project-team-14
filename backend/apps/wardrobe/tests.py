@@ -61,7 +61,8 @@ class SchemaTests(SimpleTestCase):
         self.assertEqual(validate_attributes(attributes())['subcategory'], 'tshirt')
 
     def test_rejects_nonvisual_or_unknown_fields(self):
-        for key in ('dimensions', 'material_note', 'stretch', 'seasons', 'thickness', 'owner_id', 'pattern', 'length'):
+        for key in ('dimensions', 'material_note', 'touch', 'stretch', 'sheerness', 'seasons', 'thickness',
+                    'owner_id', 'pattern', 'length', 'formality', 'closure', 'details', 'shoulder_construction', 'neckline'):
             with self.subTest(key=key), self.assertRaises(ValueError):
                 validate_attributes(dict(attributes(), **{key: None}))
 
@@ -76,10 +77,44 @@ class SchemaTests(SimpleTestCase):
         result = dict(attributes(), category='bottom', subcategory='jeans', leg_shape='wide')
         self.assertEqual(validate_attributes(result)['leg_shape'], 'wide')
         with self.assertRaises(ValueError):
-            validate_attributes(dict(result, neckline='crew'))
+            validate_attributes(dict(result, sleeve_length='long'))
 
 
 class AttributeMigrationTests(TransactionTestCase):
+    def test_simplification_migrates_saved_and_draft_records_without_losing_measurements(self):
+        from django.db import connection
+        from django.db.migrations.executor import MigrationExecutor
+        from .models import Garment
+
+        before = [('wardrobe', '0002_remove_pattern_and_length')]
+        after = [('wardrobe', '0003_simplify_garment_attributes')]
+        executor = MigrationExecutor(connection)
+        executor.migrate(before)
+        try:
+            OldGarment = executor.loader.project_state(before).apps.get_model('wardrobe', 'Garment')
+            previous = dict(attributes(), formality='casual', neckline='crew', closure='pullover',
+                            details=['ruffle'], shoulder_construction='set_in')
+            dimensions = {'unit': 'cm', 'shoulder_width': {
+                'value': 45.12, 'source': 'arcore_assisted', 'method': 'flat_shoulder_seam_to_seam', 'reference': None}}
+            ids = [OldGarment.objects.create(image='garments/example.jpg', attributes=previous,
+                original_attributes=previous, dimensions=dimensions, notes='보존할 메모', saved=saved,
+                user_properties={'material_note': '면', 'touch': 'soft', 'seasons': ['spring']}).pk
+                for saved in (False, True)]
+        finally:
+            MigrationExecutor(connection).migrate(after)
+        for item_id in ids:
+            garment = Garment.objects.get(pk=item_id)
+            self.assertEqual(garment.attributes, attributes())
+            self.assertEqual(garment.original_attributes, attributes())
+            self.assertEqual(garment.dimensions, dimensions)
+            self.assertEqual(garment.notes, '보존할 메모')
+            self.assertEqual(garment.image.name, 'garments/example.jpg')
+            self.assertEqual(self.client.get(f'/api/wardrobe/items/{item_id}/').status_code, 200)
+        self.assertEqual(Garment.objects.filter(saved=True).count(), 1)
+        with connection.cursor() as cursor:
+            columns = {column.name for column in connection.introspection.get_table_description(cursor, Garment._meta.db_table)}
+        self.assertNotIn('user_properties', columns)
+
     def test_removes_old_fields_without_changing_measurements_or_other_data(self):
         from importlib import import_module
         from django.apps import apps
@@ -245,7 +280,6 @@ class WardrobePersistenceTests(AnalysisEndpointTests):
                 'dimensions': {'unit': 'cm', 'chest_width_half': {
                     'value': 55.127, 'source': 'arcore_manual', 'method': 'flat_underarm_to_underarm',
                     'reference': '사용자 지정점'}},
-                'user_properties': {'material_note': '면 100%', 'seasons': ['spring']},
                 'notes': '세탁은 찬물로.\n여행 갈 때 챙기기.'}
 
     def test_analyze_edit_save_list_photo_and_update_round_trip(self):
@@ -261,7 +295,7 @@ class WardrobePersistenceTests(AnalysisEndpointTests):
         self.assertTrue(record['saved'])
         self.assertEqual(record['dimensions']['chest_width_half']['value'], 55.13)
         self.assertEqual(record['notes'], payload['notes'])
-        self.assertEqual(record['user_properties']['material_note'], '면 100%')
+        self.assertNotIn('user_properties', record)
         self.assertEqual(self.client.get('/api/wardrobe/items/').json()['items'], [record])
         self.assertEqual(self.client.get(url).json(), record)
         image = self.client.get(record['image_url'])
@@ -300,12 +334,14 @@ class WardrobePersistenceTests(AnalysisEndpointTests):
             response = self.client.put(url, json.dumps(payload), content_type='application/json')
             self.assertEqual(response.status_code, 400)
 
-    def test_catalog_matches_visual_and_user_fields(self):
+    def test_catalog_contains_only_supported_fields(self):
         response = self.client.get('/api/wardrobe/options/')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()['enums']['category'], ENUMS['category'])
-        self.assertNotIn('stretch', response.json()['enums'])
-        self.assertIn('stretch', response.json()['user_enums'])
+        self.assertEqual(set(response.json()['enums']), {
+            'category', 'subcategory', 'colors', 'styles', 'fit_type', 'sleeve_length', 'leg_shape', 'rise_type', 'skirt_shape'})
+        self.assertNotIn('user_enums', response.json())
+        self.assertNotIn('user_labels', response.json())
 
     def test_malformed_json_and_oversized_request(self):
         item_id = self.draft()

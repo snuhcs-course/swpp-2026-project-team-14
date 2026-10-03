@@ -1,6 +1,6 @@
 # 옷 종류 사전
 
-상태: 팀 합의 전 제안 v0.3 · 관련 문서: [스키마](wardrobe-spec.md), [화면 설계](design.md)
+상태: 팀 합의 전 제안 v0.4 · 관련 문서: [스키마](wardrobe-spec.md), [화면 설계](design.md)
 
 ## 분류 체계 및 적용 기준
 
@@ -10,12 +10,12 @@
 | --- | --- |
 | `wide_leg_jeans` 와이드 청바지 | category=bottom, subcategory=jeans, leg_shape=wide |
 | `long_sleeve_t_shirt` 긴팔 티셔츠 | category=top, subcategory=tshirt, sleeve_length=long |
-| `crewneck_t_shirt` 라운드넥 반팔 | category=top, subcategory=tshirt, neckline=crew, sleeve_length=short |
-| `flannel_shirt` 플라넬 셔츠 | category=top, subcategory=shirt; 사용자 선택에 근거한 material_note=플라넬 |
+| `crewneck_t_shirt` 라운드넥 반팔 | category=top, subcategory=tshirt, sleeve_length=short |
+| `flannel_shirt` 플라넬 셔츠 | category=top, subcategory=shirt |
 
 각 표의 category·subcategory와 명시된 시각적 특징만 프리셋으로 적용한다. 그 외 속성은 기존의 유효한 값을 유지하며 추정 기본값을 추가하지 않는다. 구현할 프리셋의 변환 규칙은 FE에서 명시하고 계약 검사로 검증한다. 프리셋 원본 코드는 API에 전송하지 않는다.
 
-소재를 포함하는 종류는 사용자의 직접 선택에 한해 소재 메모를 제안하며, 기존 메모가 있으면 덮어쓰기 전 확인한다. AI는 material_note를 생성하거나 사진만으로 플라넬·시폰·피케 등의 소재를 확정할 수 없다. 시각적으로 불명확한 경우 상위 종류만 반환한다. 데님처럼 통상적인 종류 표현도 원단 성분·혼용률을 의미하지 않는다.
+종류 설명에 쓰인 소재명은 별도 저장 속성이 아니다. AI는 사진만으로 플라넬·시폰·피케 등의 소재를 확정할 수 없다. 시각적으로 불명확한 경우 상위 종류만 반환한다. 데님처럼 통상적인 종류 표현도 원단 성분·혼용률을 의미하지 않는다.
 
 한국어 표시명으로 검색하며, 상세 항목을 생략하고 상위 종류만 선택할 수 있다. 속성을 수정하면 표시명을 현재 값에 맞춰 갱신하므로 프리셋 이름과 속성을 중복 저장하지 않는다.
 
@@ -27,7 +27,7 @@
 | --- | --- | --- |
 | `crewneck_t_shirt` | 라운드넥 반팔 티셔츠 | 둥근 넥라인, 반팔 |
 | `v_neck_t_shirt` | 브이넥 반팔 티셔츠 | V자 넥라인, 반팔 |
-| `long_sleeve_t_shirt` | 긴팔 티셔츠 | 긴팔 기본 티셔츠, 넥라인 별도 |
+| `long_sleeve_t_shirt` | 긴팔 티셔츠 | 긴팔 기본 티셔츠, 목 형태가 다양한 종류 |
 | `sleeveless_top` | 민소매 상의 | 소매가 없는 상의의 넓은 분류 |
 | `tank_top` | 탱크탑 | 어깨 끈이 있는 민소매 탑; 해당 형태가 확인된 경우 sleeveless_top보다 우선 적용 |
 | `cropped_top` | 크롭탑 | 짧은 몸판의 기본 탑; 구체적 종류가 있으면 그 종류와 실측 total_length로 표현 |
@@ -53,7 +53,7 @@
 | `chiffon_blouse` | 시폰 블라우스 | 얇고 비치는 시폰 조직의 블라우스 |
 | `ruffle_blouse` | 러플·프릴 블라우스 | 러플 장식이 있는 블라우스 |
 
-시폰과 러플이 동시에 있으면 사용자가 고른 대표 종류를 저장하고 다른 특징은 사용자 지정 material_note 또는 details에 기록한다.
+시폰과 러플이 동시에 있으면 사용자가 고른 대표 종류를 저장하고 별도로 남길 설명은 메모에 기록할 수 있다.
 
 ### 스웨트셔츠 — `sweatshirt`
 
@@ -69,7 +69,7 @@
 | --- | --- | --- |
 | `hoodie_pullover` | 풀오버 후드티 | 앞 전체가 열리지 않는 후드 상의 |
 
-후드 집업은 분류 중복 방지를 위해 outerwear에 배정한다. 실제 착용 시 레이어 역할은 별도 속성으로 관리한다.
+후드 집업은 분류 중복 방지를 위해 outerwear에 배정한다. 레이어 역할은 별도 저장하지 않는다.
 
 ### 니트웨어 — `knitwear`
 
@@ -80,7 +80,7 @@
 | `turtleneck_knit` | 터틀넥·목폴라 니트 | 높게 올라와 접을 수 있는 목 부분 |
 | `mock_neck_knit` | 반목·모크넥 니트 | 접지 않는 짧은 높은 목 부분 |
 | `knit_vest` | 니트 조끼 | 소매 없는 니트 |
-| `cable_knit_sweater` | 케이블·꽈배기 니트 | 꼬인 줄 모양의 편직 무늬; 넥라인 별도 |
+| `cable_knit_sweater` | 케이블·꽈배기 니트 | 꼬인 줄 모양의 편직 무늬; 목 형태가 다양한 종류 |
 
 ## 2. 하의 — `bottom`
 
@@ -136,7 +136,7 @@
 | `bermuda_shorts` | 버뮤다 팬츠 | 무릎 부근까지 오는 디자인의 반바지 |
 | `short_shorts` | 숏팬츠·핫팬츠 | 짧은 디자인의 반바지 |
 
-소재·기장에 따라 복수 종류에 해당하는 경우 대표 종류 하나를 저장하고 추가 특징은 사용자 지정 material_note·dimensions.total_length로 표현한다.
+소재·기장에 따라 복수 종류에 해당하는 경우 대표 종류 하나를 저장하고 실제 길이는 dimensions.total_length로 기록하고 추가 설명은 메모에 남길 수 있다.
 
 ### 스커트 — `skirt`
 
@@ -192,6 +192,6 @@
 ## 5. 미분류 및 확장 규칙
 
 - subcategory는 해당 category의 표에 명시된 그룹 또는 other, null을 허용한다. 목록 밖 종류임이 확인된 경우 other, 판별하지 못한 경우 null로 저장한다.
-- 프리셋 목록이 모든 속성 조합을 열거하지는 않는다. 소매·넥라인·실루엣 등 독립 속성으로 다양한 조합을 표현한다.
+- 프리셋 목록이 모든 속성 조합을 열거하지는 않는다. 소매·실루엣 등 독립 속성으로 다양한 조합을 표현한다.
 - 원피스·점프슈트·액세서리는 현행 네 카테고리에 포함하지 않는다. 추천 슬롯과 UI 필터를 확장할 때 추가한다.
 - 프리셋 변경은 FE 검색·선택·표시 및 정규화 규칙에 반영한다. 저장 category·subcategory·속성의 변경은 BE 검증과 추천 계약도 함께 변경한다.

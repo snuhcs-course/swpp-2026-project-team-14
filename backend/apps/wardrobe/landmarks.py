@@ -1,6 +1,5 @@
 """GarmentIQ HRNet inference. Predict image points; ARCore remains the cm reference."""
 import hashlib
-import base64
 import json
 from io import BytesIO
 from pathlib import Path
@@ -161,63 +160,16 @@ def decode(heatmaps, garment, transform):
     return points, suggestions
 
 
-def restore_viewport(points, suggestions, box, size):
-    left, top, right, bottom = box
-    width, height = size
-    def restore(point):
-        return [round((left + point[0] * (right - left)) / width, 6),
-                round((top + point[1] * (bottom - top)) / height, 6)]
-    restored = []
-    for point in points:
-        x, y = restore((point['x'], point['y']))
-        restored.append(dict(point, x=x, y=y))
-    return restored, {key: [restore(point) for point in path] for key, path in suggestions.items()}
-
-
-def detect(raw, garment, remove_background=False):
+def detect(raw, garment):
     if garment not in GARMENTS:
         raise AnalysisError('INVALID_GARMENT_TYPE', 400)
     started = perf_counter()
-    image = read_frame(raw)
-    original = image
-    size = image.size
-    box, removed = (0, 0, *size), False
-    if remove_background:
-        from .foreground import foreground_crop
-        image, box, removed = foreground_crop(image)
-    tensor, transform = image_tensor(image)
+    tensor, transform = prepare_frame(raw)
     engine = session()
     try:
         heatmaps = engine.run(['heatmaps'], {'image': tensor})[0]
     except Exception as error:
         raise AnalysisError('LANDMARK_FAILED', 503) from error
     points, suggestions = decode(heatmaps, garment, transform)
-    points, suggestions = restore_viewport(points, suggestions, box, size)
-    fallback_fields = []
-    expected = set(GARMENTS[garment][2])
-    if garment in ('trousers', 'shorts'):
-        expected.add('thigh_width_half')
-    if removed and expected - set(suggestions):
-        # Segmentation can erase cuffs/edges. Recover missing paths from the original frame.
-        original_tensor, original_transform = image_tensor(original)
-        try:
-            original_maps = engine.run(['heatmaps'], {'image': original_tensor})[0]
-            _, original_suggestions = decode(original_maps, garment, original_transform)
-            for field, path in original_suggestions.items():
-                if field not in suggestions:
-                    suggestions[field] = path
-                    fallback_fields.append(field)
-        except Exception:
-            pass  # Retain the successfully detected crop paths if optional recovery fails.
-    preview = None
-    if removed:
-        # Keep the viewport's dimensions and origin for the Android overlay and AR rays.
-        canvas = Image.new('RGB', size, 'white')
-        canvas.paste(image, (box[0], box[1]))
-        canvas.thumbnail((768, 768))
-        output = BytesIO()
-        canvas.save(output, 'JPEG', quality=80)
-        preview = base64.b64encode(output.getvalue()).decode('ascii')
     return {'model': MODEL_ID, 'garment': garment, 'points': points, 'suggestions': suggestions,
-            'background_removed': removed, 'preview_jpeg': preview, 'fallback_fields': fallback_fields,
             'elapsed_ms': round((perf_counter() - started) * 1000)}

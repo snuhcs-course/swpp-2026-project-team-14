@@ -66,12 +66,6 @@
         "formal": "포멀",
         "workwear": "워크웨어"
       },
-      "formality": {
-        "relaxed": "편한차림",
-        "casual": "일상캐주얼",
-        "smart_casual": "단정한캐주얼",
-        "formal": "격식있는차림"
-      },
       "fit_type": {
         "skinny": "스키니",
         "slim": "슬림",
@@ -85,29 +79,6 @@
         "elbow": "팔꿈치길이",
         "three_quarter": "7부",
         "long": "긴팔"
-      },
-      "neckline": {
-        "crew": "라운드넥",
-        "v_neck": "브이넥",
-        "scoop": "깊은둥근넥",
-        "square": "스퀘어넥",
-        "boat": "보트넥",
-        "henley": "헨리넥",
-        "polo": "폴로",
-        "shirt_collar": "셔츠칼라",
-        "open_collar": "오픈칼라",
-        "band_collar": "밴드칼라",
-        "turtleneck": "터틀넥",
-        "mock_neck": "반목",
-        "hooded": "후드",
-        "other": "기타"
-      },
-      "shoulder_construction": {
-        "set_in": "일반어깨선",
-        "drop_shoulder": "드롭숄더",
-        "raglan": "래글런",
-        "dolman": "가오리형",
-        "other": "기타"
       },
       "leg_shape": {
         "skinny": "밀착",
@@ -132,25 +103,6 @@
         "pleated": "플리츠",
         "pencil": "펜슬",
         "other": "기타"
-      },
-      "closure": {
-        "pullover": "풀오버",
-        "button": "단추",
-        "zip": "전체지퍼",
-        "half_zip": "부분지퍼",
-        "wrap": "랩",
-        "open_front": "앞트임",
-        "other": "기타"
-      },
-      "details": {
-        "cargo_pockets": "카고포켓",
-        "ruffle": "러플",
-        "pleats": "주름",
-        "cable_knit": "꽈배기",
-        "side_stripe": "옆선배색",
-        "cuffed_hem": "조인밑단",
-        "drawstring": "조임끈",
-        "elastic_waist": "허리밴딩"
       }
     },
     "labels": {
@@ -159,16 +111,11 @@
       "subcategory": "종류",
       "colors": "색상",
       "styles": "스타일",
-      "formality": "격식",
       "fit_type": "핏",
       "sleeve_length": "소매",
-      "neckline": "넥라인",
-      "shoulder_construction": "어깨",
       "leg_shape": "바지형태",
       "rise_type": "허리선",
-      "skirt_shape": "스커트형태",
-      "closure": "여밈",
-      "details": "디테일"
+      "skirt_shape": "스커트형태"
     },
     "subcategories": {
       "top": {
@@ -212,52 +159,7 @@
     },
     "array_limits": {
       "colors": 3,
-      "styles": 3,
-      "details": 8
-    },
-    "user_enums": {
-      "touch": {
-        "soft": "부드러움",
-        "slightly_soft": "약간 부드러움",
-        "normal": "보통",
-        "slightly_stiff": "약간 뻣뻣함",
-        "stiff": "뻣뻣함"
-      },
-      "stretch": {
-        "none": "없음",
-        "almost_none": "거의 없음",
-        "moderate": "보통",
-        "slight": "약간 있음",
-        "present": "있음"
-      },
-      "sheerness": {
-        "present": "있음",
-        "slight": "약간 있음",
-        "moderate": "보통",
-        "almost_none": "거의 없음",
-        "none": "없음"
-      },
-      "thickness": {
-        "thin": "얇음",
-        "slightly_thin": "약간 얇음",
-        "medium": "보통",
-        "slightly_thick": "약간 두꺼움",
-        "thick": "두꺼움"
-      },
-      "seasons": {
-        "spring": "봄",
-        "summer": "여름",
-        "autumn": "가을",
-        "winter": "겨울"
-      }
-    },
-    "user_labels": {
-      "material_note": "소재",
-      "touch": "촉감",
-      "stretch": "신축성",
-      "sheerness": "비침",
-      "thickness": "두께",
-      "seasons": "계절"
+      "styles": 3
     },
     "dimensions": {
       "top": {
@@ -329,16 +231,11 @@
       "white"
     ],
     "styles": [],
-    "formality": null,
     "fit_type": null,
     "sleeve_length": null,
-    "neckline": null,
-    "shoulder_construction": null,
     "leg_shape": null,
     "rise_type": null,
     "skirt_shape": null,
-    "closure": null,
-    "details": [],
     "name": "흰색 티셔츠"
   }
 }

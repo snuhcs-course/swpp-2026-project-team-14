@@ -22,7 +22,7 @@ class GarmentEditorTest {
         val attributes = fixture.getJSONObject("attributes").put("category", "bottom").put("subcategory", JSONObject.NULL)
         var submitted: JSONObject? = null
         compose.setContent { StyleMateTheme {
-            GarmentEditor("minimal", attributes, null, JSONObject(), "", fixture.getJSONObject("catalog"),
+            GarmentEditor("minimal", attributes, null, "", fixture.getJSONObject("catalog"),
                 false, false, null, { submitted = it })
         } }
         compose.onNodeWithText("종류: 미입력").assertDoesNotExist()
@@ -38,10 +38,18 @@ class GarmentEditorTest {
         var submitted: JSONObject? = null
         val dimensions = JSONObject("""{"unit":"cm","chest_width_half":{"value":55.12,"source":"arcore_assisted","method":"flat_underarm_to_underarm","reference":null},"total_length":{"value":65.34,"source":"arcore_manual","method":"back_neck_to_hem","reference":null},"shoulder_width":{"value":45.12,"source":"arcore_assisted","method":"flat_shoulder_seam_to_seam","reference":null}}""")
         compose.setContent { StyleMateTheme {
-            GarmentEditor("draft", fixture.getJSONObject("attributes"), dimensions, JSONObject(), "",
+            GarmentEditor("draft", fixture.getJSONObject("attributes"), dimensions, "",
                 fixture.getJSONObject("catalog"), false, false, null, { submitted = it })
         } }
-        compose.onNodeWithText("이름").performTextReplacement("내 흰 티셔츠")
+        compose.onNodeWithText("AR 추정").assertDoesNotExist()
+        compose.onNodeWithText("착용 정보").assertDoesNotExist()
+        compose.onNodeWithText("상세 정보").performScrollTo().performClick()
+        listOf("격식:", "여밈:", "디테일:", "어깨:", "넥라인:").forEach {
+            compose.onNodeWithText(it, substring = true).assertDoesNotExist()
+        }
+        compose.onNodeWithText("핏: 미입력").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("상세 정보").performScrollTo().performClick()
+        compose.onNodeWithText("이름").performScrollTo().performTextReplacement("내 흰 티셔츠")
         compose.onNodeWithText("가슴 단면").performScrollTo().performTextReplacement("56.78")
         compose.onNodeWithText("메모").performScrollTo().performTextInput("찬물 세탁\n여행용")
         compose.onNodeWithText("옷장에 추가").assertIsDisplayed().performClick()
@@ -49,6 +57,7 @@ class GarmentEditorTest {
             val payload = requireNotNull(submitted)
             assertEquals("내 흰 티셔츠", payload.getJSONObject("attributes").getString("name"))
             assertEquals("찬물 세탁\n여행용", payload.getString("notes"))
+            assertFalse(payload.has("user_properties"))
             val chest = payload.getJSONObject("dimensions").getJSONObject("chest_width_half")
             assertEquals(56.78, chest.getDouble("value"), 0.00001)
             assertEquals("user_measured", chest.getString("source"))
@@ -62,7 +71,7 @@ class GarmentEditorTest {
         val fixture = fixture()
         var submitted: JSONObject? = null
         compose.setContent { StyleMateTheme {
-            GarmentEditor("draft", fixture.getJSONObject("attributes"), null, JSONObject(), "기존 메모",
+            GarmentEditor("draft", fixture.getJSONObject("attributes"), null, "기존 메모",
                 fixture.getJSONObject("catalog"), false, true, null, { submitted = it })
         } }
         compose.onNodeWithText("가슴 단면").performScrollTo().performTextInput("12.345")

@@ -7,7 +7,7 @@ from PIL import Image
 
 from .analysis import AnalysisError
 from .editor import TOP_DIMENSIONS, validate_record
-from .landmarks import MAX_FRAME_BYTES, decode, detect, prepare_frame, restore_viewport
+from .landmarks import MAX_FRAME_BYTES, decode, detect, prepare_frame
 from .tests import attributes, photo
 from .views import ANALYSIS_SLOTS
 
@@ -66,6 +66,8 @@ class LandmarkTests(SimpleTestCase):
         self.assertEqual(response['Cache-Control'], 'no-store')
         self.assertEqual(response.json()['suggestions']['shoulder_width'], [[.25, .25], [.75, .25]])
         self.assertNotIn('dimensions', response.json())
+        self.assertEqual(set(response.json()), {'model', 'garment', 'points', 'suggestions', 'elapsed_ms'})
+        engine.return_value.run.assert_called_once()
         self.assertEqual(self.client.get('/api/wardrobe/landmarks/').status_code, 405)
         self.assertEqual(self.client.post('/api/wardrobe/landmarks/', '{}', content_type='application/json').status_code, 415)
 
@@ -87,7 +89,7 @@ class LandmarkTests(SimpleTestCase):
         measurement = {'value': 45.123, 'source': 'arcore_assisted',
                        'method': TOP_DIMENSIONS['shoulder_width'][1], 'reference': 'HRNet'}
         result = validate_record({'attributes': attributes(), 'dimensions': {'unit': 'cm', 'shoulder_width': measurement},
-                                  'user_properties': {}, 'notes': ''})
+                                  'notes': ''})
         self.assertEqual(result['dimensions']['shoulder_width'], dict(measurement, value=45.12))
 
     def test_top_landmarks_supply_all_seven_measurements_and_preserve_sleeve_path(self):
@@ -116,53 +118,3 @@ class LandmarkTests(SimpleTestCase):
         thigh = values['thigh_width_half']
         self.assertAlmostEqual(thigh[0][1], thigh[1][1], places=5)
         self.assertLess(thigh[0][0], thigh[1][0])
-
-    def test_crop_coordinates_restore_to_original_viewport_including_intermediate_points(self):
-        points = [{'id': 1, 'x': .25, 'y': .75, 'score': .9}]
-        paths = {'sleeve_length': [[0, 0], [.25, .75], [1, 1]]}
-        restored, suggestions = restore_viewport(points, paths, (100, 200, 500, 800), (800, 1000))
-        self.assertEqual(suggestions['sleeve_length'], [[.125, .2], [.25, .65], [.625, .8]])
-        self.assertEqual((restored[0]['x'], restored[0]['y']), (.25, .65))
-
-    @patch('apps.wardrobe.foreground.session')
-    def test_foreground_mask_crops_without_changing_coordinate_reference_and_empty_mask_falls_back(self, engine):
-        from .foreground import foreground_crop
-        prediction = np.zeros((1, 1, 320, 320), dtype=np.float32)
-        prediction[0, 0, 80:240, 80:240] = 1
-        engine.return_value.run.return_value = [prediction]
-        image = Image.new('RGB', (640, 480), 'red')
-        crop, box, applied = foreground_crop(image)
-        self.assertTrue(applied)
-        self.assertEqual(crop.size, (box[2] - box[0], box[3] - box[1]))
-        self.assertEqual(crop.getpixel((0, 0)), (255, 255, 255))
-        self.assertEqual(crop.getpixel((crop.width // 2, crop.height // 2)), (255, 0, 0))
-        engine.return_value.run.return_value = [np.zeros_like(prediction)]
-        crop, box, applied = foreground_crop(image)
-        self.assertFalse(applied)
-        self.assertIs(crop, image)
-
-    @patch('apps.wardrobe.views.detect')
-    def test_background_mode_reaches_detector_and_invalid_mode_is_rejected(self, detector):
-        detector.return_value = {'suggestions': {}, 'background_removed': True}
-        response = self.client.post('/api/wardrobe/landmarks/?garment=trousers&background=remove', photo(), content_type='image/jpeg')
-        self.assertEqual(response.status_code, 200)
-        self.assertTrue(detector.call_args.args[2])
-        response = self.client.post('/api/wardrobe/landmarks/?garment=trousers&background=bad', photo(), content_type='image/jpeg')
-        self.assertEqual(response.status_code, 400)
-
-    @patch('apps.wardrobe.foreground.foreground_crop')
-    @patch('apps.wardrobe.landmarks.session')
-    def test_missing_cutout_measurements_recover_from_original_without_crop_offset(self, engine, foreground):
-        foreground.return_value = (Image.new('RGB', (12, 16), 'white'), (6, 8, 18, 24), True)
-        cropped = np.zeros((1, 294, 96, 72), dtype=np.float32)
-        original = np.zeros_like(cropped)
-        cropped[0, 6, 24, 18] = cropped[0, 24, 24, 54] = .9
-        original[0, 22, 48, 54] = original[0, 21, 60, 45] = .9
-        engine.return_value.run.side_effect = [[cropped], [original]]
-        result = detect(photo(), 'short_sleeve_top', True)
-        self.assertEqual(result['fallback_fields'], ['cuff_width_half'])
-        self.assertEqual(result['suggestions']['cuff_width_half'][0], [.75, .5])
-        self.assertEqual(result['suggestions']['shoulder_width'][0], [.375, .375])
-        import base64
-        preview = Image.open(BytesIO(base64.b64decode(result['preview_jpeg'])))
-        self.assertEqual(preview.size, (24, 32))

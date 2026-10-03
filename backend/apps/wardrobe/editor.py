@@ -1,20 +1,9 @@
 """User-editable fields; these are never sent to Gemini."""
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
-from .schema import ARRAY_LIMITS, ENUMS, FIELD_LABELS, SUBCATEGORIES, options, validate_attributes
+from .schema import ARRAY_LIMITS, ENUMS, FIELD_LABELS, SUBCATEGORIES, validate_attributes
 
 
-USER_ENUMS = {
-    'touch': options('soft:부드러움 slightly_soft:약간부드러움 normal:보통 slightly_stiff:약간뻣뻣함 stiff:뻣뻣함'),
-    'stretch': options('none:없음 almost_none:거의없음 moderate:보통 slight:약간있음 present:있음'),
-    'sheerness': options('present:있음 slight:약간있음 moderate:보통 almost_none:거의없음 none:없음'),
-    'thickness': options('thin:얇음 slightly_thin:약간얇음 medium:보통 slightly_thick:약간두꺼움 thick:두꺼움'),
-    'seasons': options('spring:봄 summer:여름 autumn:가을 winter:겨울'),
-}
-USER_LABELS = options('material_note:소재 touch:촉감 stretch:신축성 sheerness:비침 thickness:두께 seasons:계절')
-for choices in USER_ENUMS.values():
-    for code, label in choices.items():
-        choices[code] = label.replace('약간', '약간 ').replace('거의', '거의 ')
 TOP_DIMENSIONS = {
     'shoulder_width': ('어깨너비', 'flat_shoulder_seam_to_seam'),
     'chest_width_half': ('가슴 단면', 'flat_underarm_to_underarm'),
@@ -48,35 +37,18 @@ def dimension_fields(attributes):
 
 def catalog():
     return {'enums': ENUMS, 'labels': FIELD_LABELS, 'subcategories': SUBCATEGORIES,
-            'array_limits': ARRAY_LIMITS, 'user_enums': USER_ENUMS, 'user_labels': USER_LABELS,
+            'array_limits': ARRAY_LIMITS,
             'dimensions': {group: {key: {'label': value[0], 'method': value[1]} for key, value in fields.items()}
                            for group, fields in (('top', TOP_DIMENSIONS), ('bottom', BOTTOM_DIMENSIONS))}}
 
 
 def validate_record(data):
-    if not isinstance(data, dict) or set(data) != {'attributes', 'dimensions', 'user_properties', 'notes'}:
+    if not isinstance(data, dict) or set(data) != {'attributes', 'dimensions', 'notes'}:
         raise ValueError('Invalid fields')
     attributes = validate_attributes(data['attributes'])
     notes = data['notes']
     if not isinstance(notes, str) or len(notes) > 2000:
         raise ValueError('Invalid notes')
-    properties = data['user_properties']
-    if not isinstance(properties, dict) or set(properties) - set(USER_LABELS):
-        raise ValueError('Invalid user properties')
-    properties = dict(properties)
-    material = properties.get('material_note')
-    if material is not None and (not isinstance(material, str) or len(material) > 200):
-        raise ValueError('Invalid material note')
-    properties['material_note'] = material.strip() or None if material is not None else None
-    for key, values in USER_ENUMS.items():
-        value = properties.get(key, [] if key == 'seasons' else None)
-        if key == 'seasons':
-            if (not isinstance(value, list) or len(value) > 4
-                    or any(not isinstance(v, str) or v not in values for v in value) or len(set(value)) != len(value)):
-                raise ValueError('Invalid seasons')
-        elif value is not None and (not isinstance(value, str) or value not in values):
-            raise ValueError('Invalid user property')
-        properties[key] = value
     raw = data['dimensions']
     dimensions = None
     if raw is not None:
@@ -110,4 +82,4 @@ def validate_record(data):
             dimensions[key] = dict(item, value=float(number))
         if len(dimensions) == 1:
             dimensions = None
-    return {'attributes': attributes, 'dimensions': dimensions, 'user_properties': properties, 'notes': notes}
+    return {'attributes': attributes, 'dimensions': dimensions, 'notes': notes}

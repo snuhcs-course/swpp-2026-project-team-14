@@ -9,7 +9,6 @@ class Garment(models.Model):
     original_attributes = models.JSONField()
     attributes = models.JSONField()
     dimensions = models.JSONField(null=True, default=None)
-    user_properties = models.JSONField(default=dict)
     notes = models.TextField(blank=True, default='')
     saved = models.BooleanField(default=False, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)

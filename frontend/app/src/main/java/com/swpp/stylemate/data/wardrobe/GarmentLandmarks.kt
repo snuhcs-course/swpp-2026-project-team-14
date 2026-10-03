@@ -1,9 +1,7 @@
 package com.swpp.stylemate.data.wardrobe
 
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import com.swpp.stylemate.BuildConfig
-import android.util.Base64
 import java.io.ByteArrayOutputStream
 import java.net.HttpURLConnection
 import java.net.URI
@@ -13,21 +11,20 @@ import org.json.JSONObject
 
 data class LandmarkPoint(val x: Float, val y: Float)
 data class LandmarkPath(val points: List<LandmarkPoint>)
-data class LandmarkResult(val suggestions: Map<String, LandmarkPath>, val elapsedMs: Long, val backgroundRemoved: Boolean, val preview: Bitmap? = null)
+data class LandmarkResult(val suggestions: Map<String, LandmarkPath>, val elapsedMs: Long)
 
 /** All positions refer to the uploaded viewport; the server never produces cm values. */
 object GarmentLandmarks {
-    suspend fun detect(bitmap: Bitmap, garment: String, removeBackground: Boolean = false): LandmarkResult = withContext(Dispatchers.IO) {
+    suspend fun detect(bitmap: Bitmap, garment: String): LandmarkResult = withContext(Dispatchers.IO) {
         require(garment in landmarkTypes)
         val scale = minOf(1f, 768f / maxOf(bitmap.width, bitmap.height))
         val reduced = Bitmap.createScaledBitmap(bitmap, maxOf(1, (bitmap.width * scale).toInt()), maxOf(1, (bitmap.height * scale).toInt()), true)
         val bytes = try { ByteArrayOutputStream().use { out -> check(reduced.compress(Bitmap.CompressFormat.JPEG, 85, out)); out.toByteArray() } }
                     finally { if (reduced !== bitmap) reduced.recycle() }
-        val background = if (removeBackground) "remove" else "keep"
-        val connection = URI("${BuildConfig.API_BASE_URL.trimEnd('/')}/api/wardrobe/landmarks/?garment=$garment&background=$background").toURL().openConnection() as HttpURLConnection
+        val connection = URI("${BuildConfig.API_BASE_URL.trimEnd('/')}/api/wardrobe/landmarks/?garment=$garment").toURL().openConnection() as HttpURLConnection
         try {
             connection.connectTimeout = 2_000
-            connection.readTimeout = if (removeBackground) 30_000 else 8_000
+            connection.readTimeout = 8_000
             connection.instanceFollowRedirects = false
             connection.requestMethod = "POST"
             connection.doOutput = true
@@ -72,13 +69,6 @@ object GarmentLandmarks {
             }
             LandmarkPath((0 until pair.length()).map { point(it) })
         }
-        val preview = if (data.isNull("preview_jpeg")) null else {
-            val bytes = Base64.decode(data.getString("preview_jpeg"), Base64.DEFAULT)
-            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
-            check(bounds.outWidth in 1..768 && bounds.outHeight in 1..768)
-            checkNotNull(BitmapFactory.decodeByteArray(bytes, 0, bytes.size))
-        }
-        return LandmarkResult(suggestions, data.optLong("elapsed_ms"), data.optBoolean("background_removed"), preview)
+        return LandmarkResult(suggestions, data.optLong("elapsed_ms"))
     }
 }

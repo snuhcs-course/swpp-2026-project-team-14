@@ -162,7 +162,7 @@ Once the MySQL database and account exist and `.env` is filled in:
 .\.venv\Scripts\python.exe manage.py runserver 127.0.0.1:8000
 ```
 
-Photos default to `private/wardrobe-media/`; HRNet/U2-Net weights belong in `wardrobe/garment-landmarks/`.
+Photos default to `private/wardrobe-media/`; HRNet weights belong in `wardrobe/garment-landmarks/`.
 Run `scripts/prepare_landmarks.py` in a separate conversion environment to prepare weights.
 See [common app setup](../docs/wardrobe/local-development.md) for model preparation and Android USB configuration.
 
@@ -174,4 +174,4 @@ Wardrobe tests use an isolated in-memory SQLite database, without real MySQL or 
 
 The cluster needs MySQL configuration, migrations, persistent photo/model volumes and file access for uid 10001
 before wardrobe persistence can run. Authentication and S3 are not integrated yet. The existing 1 Gi memory
-limit was sized for body analysis; remeasure it with HRNet/U2-Net before wardrobe deployment.
+limit was sized for body analysis; remeasure it with HRNet before wardrobe deployment.

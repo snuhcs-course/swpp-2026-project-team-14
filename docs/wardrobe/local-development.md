@@ -42,7 +42,7 @@ MySQL에 사용할 DB와 계정을 준비한 뒤 `.env`를 입력하고 다음 �
 .\.venv\Scripts\python.exe manage.py migrate
 ```
 
-DB 계정 입력·실제 DB 연결·마이그레이션은 사용자 요청으로 보류했다. 기존 개인 테스트 DB와 사진은 이관하지 않는다.
+현재 PC의 MySQL 연결과 초기 마이그레이션을 확인했다. 새 스키마 변경을 반영할 때는 위 `migrate` 명령을 실행한다. 기존 개인 테스트 DB와 사진은 이관하지 않는다.
 
 기본 사진 저장 위치는 `backend/private/wardrobe-media/`, 옷장 모델은 `backend/wardrobe/garment-landmarks/`다. 필요하면 `WARDROBE_MEDIA_ROOT`, `WARDROBE_MODEL_DIR`에 절대 경로를 지정한다. S3는 아직 연결하지 않았다.
 
@@ -68,7 +68,7 @@ USB 연결 후 실행한다. USB를 다시 연결하면 재설정한다.
 
 체형 모델은 `backend/README.md`에 따라 `backend/models/pose_landmarker_heavy.task`에 준비한다.
 
-옷장 자동 측정점은 GarmentIQ HRNet, 배경 제외는 U²-Net을 사용한다. 서버에서는 ONNX Runtime으로 CPU 추론하며 PyTorch는 최초 변환에만 필요하다. 현재 모델 파일은 이미 공통 모델 경로로 옮겼다.
+옷장 자동 측정점은 원본 사진에 GarmentIQ HRNet을 적용한다. 서버에서는 ONNX Runtime으로 CPU 추론하며 PyTorch는 최초 변환에만 필요하다. 현재 모델 파일은 이미 공통 모델 경로로 옮겼다.
 
 새 환경에서 모델을 변환할 때만 다음 명령을 `backend/`에서 실행한다.
 
@@ -79,7 +79,7 @@ python -m venv private/model-export-venv
 .\private\model-export-venv\Scripts\python.exe scripts/prepare_landmarks.py
 ```
 
-스크립트는 고정 revision·SHA-256으로 소스와 가중치를 확인한다. 결과 `hrnet.onnx`·`manifest.json`·`u2net.onnx`·라이선스는 `wardrobe/garment-landmarks/`에 생성하며 Git에서 제외한다. U²-Net만 필요하면 `.venv/Scripts/python.exe scripts/prepare_landmarks.py --foreground-only`를 실행한다.
+스크립트는 고정 revision·SHA-256으로 소스와 가중치를 확인한다. 결과 `hrnet.onnx`·`manifest.json`·라이선스는 `wardrobe/garment-landmarks/`에 생성하며 Git에서 제외한다.
 
 모델은 2D 측정점을 제안하고 Android의 ARCore가 고정된 촬영 프레임에서 광선·바닥 평면 교점을 계산하여 cm로 변환한다. 기준 물체·고정 촬영 높이·별도 높이 입력은 사용하지 않는다. 옷 전체가 같은 평면에 있다는 가정이며 실제 치수 정확도는 별도로 검증해야 한다. Gemini는 이름·분류·색상만 분석한다.
 
@@ -106,4 +106,4 @@ python -m venv private/model-export-venv
 
 기존 GHCR·ArgoCD·k3s 흐름을 사용한다. 옷장 저장을 배포하려면 MySQL 환경변수·마이그레이션, 모델 볼륨과 사진 영구 볼륨, uid 10001의 접근 권한이 필요하다. `.env`나 사진·가중치를 이미지에 복사하지 않는다.
 
-현재 배포의 1Gi 메모리 제한은 체형 모델 기준이다. HRNet·U²-Net 동시 로드 시 사용량을 다시 측정해야 한다. 사용자 구분·인증, S3, 옷 삭제·초안 정리·체형 프로필 영구 저장은 아직 구현하지 않았다. 공용 옷장 배포는 이 항목들을 확인한 뒤 진행한다.
+현재 배포의 1Gi 메모리 제한은 체형 모델 기준이다. 체형 모델과 HRNet 동시 로드 시 사용량을 다시 측정해야 한다. 사용자 구분·인증, S3, 옷 삭제·초안 정리·체형 프로필 영구 저장은 아직 구현하지 않았다. 공용 옷장 배포는 이 항목들을 확인한 뒤 진행한다.

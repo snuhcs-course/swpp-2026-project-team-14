@@ -11,7 +11,6 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
 import java.util.concurrent.atomic.AtomicBoolean
-import java.util.Locale
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 
@@ -113,7 +112,7 @@ class MeasurementCamera(
             status(when {
                 tiltDegrees == null -> "주변 바닥을 천천히 비추세요."
                 !canCapture -> "옷을 위에서 비추세요."
-                else -> String.format(Locale.KOREA, "기울기 %.0f°", tiltDegrees)
+                else -> ""
             }, canCapture)
             if (captureRequested.getAndSet(false)) {
                 if (!canCapture || center == null || normal == null) {

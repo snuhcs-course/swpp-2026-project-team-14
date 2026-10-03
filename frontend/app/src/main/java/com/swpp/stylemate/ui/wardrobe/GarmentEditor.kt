@@ -34,10 +34,10 @@ private fun attributeChoices(attributes: JSONObject, catalog: JSONObject, field:
     val top = category in setOf("top", "outerwear")
     val pants = category == "bottom" && subcategory in setOf("jeans", "slacks", "pants", "active_pants", "shorts")
     val skirt = category == "bottom" && subcategory == "skirt"
-    if ((field in setOf("sleeve_length", "neckline", "shoulder_construction") && !top) ||
+    if ((field == "sleeve_length" && !top) ||
         (field == "leg_shape" && !pants) || (field == "skirt_shape" && !skirt) ||
         (field == "rise_type" && category != "bottom") ||
-        (field in setOf("fit_type", "closure", "details") && category == "shoes")) return JSONObject()
+        (field == "fit_type" && category == "shoes")) return JSONObject()
     return catalog.getJSONObject("enums").getJSONObject(field)
 }
 
@@ -56,11 +56,10 @@ private fun dimensionChoices(attributes: JSONObject, catalog: JSONObject): JSONO
 
 @Composable
 fun GarmentEditor(id: String, initialAttributes: JSONObject, initialDimensions: JSONObject?,
-                  initialProperties: JSONObject, initialNotes: String, catalog: JSONObject,
+                  initialNotes: String, catalog: JSONObject,
                   busy: Boolean, saved: Boolean, error: String?, onSave: (JSONObject) -> Unit,
                   onBack: (() -> Unit)? = null, photo: @Composable () -> Unit = {}) {
     var attributesText by rememberSaveable(id) { mutableStateOf(initialAttributes.toString()) }
-    var propertiesText by rememberSaveable(id) { mutableStateOf(initialProperties.toString()) }
     var notes by rememberSaveable(id) { mutableStateOf(initialNotes) }
     var dimensionText by rememberSaveable(id) {
         mutableStateOf(JSONObject().apply {
@@ -70,9 +69,7 @@ fun GarmentEditor(id: String, initialAttributes: JSONObject, initialDimensions: 
         }.toString())
     }
     var extra by rememberSaveable(id) { mutableStateOf(false) }
-    var personal by rememberSaveable(id) { mutableStateOf(false) }
     val attributes = remember(attributesText) { JSONObject(attributesText) }
-    val properties = remember(propertiesText) { JSONObject(propertiesText) }
     val inputs = remember(dimensionText) { JSONObject(dimensionText) }
     val dimensions = dimensionChoices(attributes, catalog)
     val numberPattern = Regex("[0-9]+(?:\\.[0-9]{0,2})?")
@@ -115,7 +112,7 @@ fun GarmentEditor(id: String, initialAttributes: JSONObject, initialDimensions: 
             }
         }
         onSave(JSONObject().put("attributes", attributes).put("dimensions", if (result.length() == 1) JSONObject.NULL else result)
-            .put("user_properties", properties).put("notes", notes))
+            .put("notes", notes))
     }
 
     val primary = setOf("category", "colors")
@@ -155,28 +152,15 @@ fun GarmentEditor(id: String, initialAttributes: JSONObject, initialDimensions: 
                 EditorSection {
                     dimensions.keysList().forEach { field ->
                         val text = inputs.optString(field)
-                        val original = initialDimensions?.optJSONObject(field)
-                        val isEstimate = original != null && original.optString("source") in setOf("arcore_manual", "arcore_assisted") && text.toDoubleOrNull() == original.optDouble("value")
                         OutlinedTextField(value = text, onValueChange = {
                             if (it.length <= 16) dimensionText = JSONObject(dimensionText).put(field, it).toString()
                         }, label = { Text(dimensions.getJSONObject(field).getString("label")) }, suffix = { Text("cm") },
                             supportingText = if (!validNumber(text)) ({ Text("소수 둘째 자리까지 양수를 입력해 주세요.") })
-                                             else if (isEstimate) ({ Text("AR 추정") }) else null,
+                                             else null,
                             isError = !validNumber(text), singleLine = true, enabled = !busy,
                             shape = RoundedCornerShape(12.dp),
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), modifier = Modifier.fillMaxWidth())
                     }
-                }
-            }
-            ExpandSection("착용 정보", personal) { personal = !personal }
-            if (personal) EditorSection {
-                OutlinedTextField(value = properties.code("material_note") ?: "", onValueChange = {
-                    if (it.length <= 200) propertiesText = JSONObject(propertiesText).put("material_note", it).toString()
-                }, label = { Text("소재") }, enabled = !busy, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth())
-                catalog.getJSONObject("user_enums").keysList().forEach { field ->
-                    ChoiceField(catalog.getJSONObject("user_labels").getString(field), catalog.getJSONObject("user_enums").getJSONObject(field),
-                        properties.opt(field), if (field == "seasons") 4 else 0, !busy,
-                        onChange = { propertiesText = JSONObject(propertiesText).put(field, it).toString() })
                 }
             }
             Spacer(Modifier.height(20.dp))

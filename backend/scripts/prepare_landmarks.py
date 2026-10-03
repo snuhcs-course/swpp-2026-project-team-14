@@ -2,7 +2,6 @@
 import hashlib
 import importlib.util
 import json
-import shutil
 from pathlib import Path
 from urllib.request import urlopen
 
@@ -13,7 +12,6 @@ REVISION = '5f02016e9ad3a4aa171fa9199423a437170f5afe'
 SOURCE_REVISION = '6eba6d65f462647b48e9eed24440d609e9e671d6'
 WEIGHTS_SHA = '5b29ada40632cb5ce1aaa38e4896054329c42d0f6c6649a5b9d0b53e41ee04f6'
 SOURCE_SHA = 'd7e9ad5c5f170619033bb271406c28fb3adbe86de51018156e0d02a4a5bd813a'
-FOREGROUND_SHA = '8d10d2f3bb75ae3b6d527c77944fc5e7dcd94b29809d47a739a7a728a912b491'
 
 
 def digest(path):
@@ -32,18 +30,6 @@ def download(name, url, expected=None):
             raise ValueError(f'Checksum mismatch: {name}')
         temporary.replace(path)
     return path
-
-
-def prepare_foreground():
-    BUILD.mkdir(parents=True, exist_ok=True)
-    DEST.mkdir(parents=True, exist_ok=True)
-    target = DEST / 'u2net.onnx'
-    if not target.exists() or digest(target) != FOREGROUND_SHA:
-        weights = download('u2net.onnx', 'https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2net.onnx', FOREGROUND_SHA)
-        shutil.copyfile(weights, target)
-    license_file = download('U2NET-LICENSE', 'https://raw.githubusercontent.com/xuebinqin/U-2-Net/master/LICENSE')
-    shutil.copyfile(license_file, DEST / 'U2NET-LICENSE')
-    print(f'Foreground model ready: {target}')
 
 
 def main():
@@ -76,15 +62,7 @@ def main():
     (DEST / 'LICENSE').write_bytes(license_file.read_bytes())
     (DEST / 'manifest.json').write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8')
     print(f'Ready: {DEST}')
-    prepare_foreground()
 
 
 if __name__ == '__main__':
-    import argparse
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--foreground-only', action='store_true', help='Download U2Net without re-exporting HRNet.')
-    args = parser.parse_args()
-    if args.foreground_only:
-        prepare_foreground()
-    else:
-        main()
+    main()
