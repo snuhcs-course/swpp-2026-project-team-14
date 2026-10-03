@@ -5,7 +5,7 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
-// Body-analysis API base URL. Default = the dev server on the host PC as seen from the emulator.
+// Shared body-analysis and wardrobe API. Default = the host PC as seen from the emulator.
 // For a real phone, add `stylemate.apiBaseUrl=http://<PC LAN IP>:8000` to local.properties.
 val localProperties = Properties().apply {
     rootProject.file("local.properties").takeIf { it.exists() }?.inputStream()?.use { load(it) }
@@ -20,9 +20,10 @@ android {
         applicationId = "com.swpp.stylemate"
         minSdk = 26
         targetSdk = 36
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         versionCode = 1
         versionName = "0.1-prototype"
-        buildConfigField("String", "BODY_API_BASE_URL", "\"$apiBaseUrl\"")
+        buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrl\"")
     }
 
     buildTypes {
@@ -45,6 +46,12 @@ android {
 }
 
 dependencies {
+    implementation("com.google.ar:core:1.48.0")
+    androidTestImplementation(platform(libs.androidx.compose.bom))
+    androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)

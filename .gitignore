@@ -1,5 +1,4 @@
-# Local development state and credentials
-.local/
+# Python environments and server credentials
 .venv/
 # Gemini and other server credentials (all directories)
 .env
