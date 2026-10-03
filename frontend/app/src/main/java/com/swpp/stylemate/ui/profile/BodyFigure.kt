@@ -59,6 +59,7 @@ import com.swpp.stylemate.data.Hotspot
 import com.swpp.stylemate.data.KEY_MEASUREMENTS
 import com.swpp.stylemate.data.MeasurementType
 import com.swpp.stylemate.data.Point
+import com.swpp.stylemate.data.ReferenceMeasurements
 import com.swpp.stylemate.data.hotspotAt
 import com.swpp.stylemate.data.hotspotFor
 import com.swpp.stylemate.ui.theme.StyleMateTheme
@@ -108,6 +109,7 @@ fun BodyFigureCard(
     gender: Gender,
     onEdit: ((BodyMeasurement) -> Unit)?,
     modifier: Modifier = Modifier,
+    reference: ReferenceMeasurements? = null,
 ) {
     var selected by remember { mutableStateOf<MeasurementType?>(null) }
     val byType = measurements.associateBy { it.type }
@@ -147,7 +149,7 @@ fun BodyFigureCard(
             }
         }
         Spacer(Modifier.height(8.dp))
-        DetailCard(selected, selected?.let { byType[it] }, onEdit)
+        DetailCard(selected, selected?.let { byType[it] }, onEdit, reference)
     }
 }
 
@@ -381,7 +383,12 @@ private fun MeasurementType.shortLabel(): String = when (this) {
 }
 
 @Composable
-private fun DetailCard(type: MeasurementType?, measurement: BodyMeasurement?, onEdit: ((BodyMeasurement) -> Unit)?) {
+private fun DetailCard(
+    type: MeasurementType?,
+    measurement: BodyMeasurement?,
+    onEdit: ((BodyMeasurement) -> Unit)?,
+    reference: ReferenceMeasurements?,
+) {
     Box(
         Modifier
             .fillMaxWidth()
@@ -414,10 +421,13 @@ private fun DetailCard(type: MeasurementType?, measurement: BodyMeasurement?, on
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Spacer(Modifier.height(4.dp))
-                    if (measurement.editedByUser) {
-                        Text("직접 수정함", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
-                    } else {
-                        ConfidenceBadge(measurement.confidence)
+                    MeasurementStatus(measurement, reference)
+                    reference?.values?.get(type)?.let { truth ->
+                        Text(
+                            "실제 ${formatCm(truth)}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                 }
                 Column(horizontalAlignment = Alignment.End) {

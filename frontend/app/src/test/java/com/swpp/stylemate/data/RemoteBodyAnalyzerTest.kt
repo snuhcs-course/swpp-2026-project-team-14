@@ -65,9 +65,26 @@ class RemoteBodyAnalyzerTest {
     }
 
     @Test
+    fun benchmarkPhotos_parseTrueMeasurements() = runBlocking {
+        server.enqueue(
+            MockResponse().setBody(
+                """{"measurements": [{"type": "waist", "value_cm": 81.0, "confidence": "medium"}], "warnings": [],
+                    "reference": {"body": "m_avg", "height_cm": 168.2,
+                                  "measurements": {"waist": 80.0, "chest": 100.2, "future_measurement": 1.0}}}""",
+            ),
+        )
+        val reference = analyzer().analyze(input, photos).reference!!
+        assertEquals("m_avg", reference.body)
+        assertEquals(168.2, reference.heightCm, 1e-9)
+        assertEquals(mapOf(MeasurementType.WAIST to 80.0, MeasurementType.CHEST to 100.2), reference.values)
+    }
+
+    @Test
     fun missingClothing_meansFitted() = runBlocking {
         server.enqueue(MockResponse().setBody("""{"measurements": [], "warnings": []}"""))
-        assertEquals(DetectedClothing(), analyzer().analyze(input, photos).clothing)
+        val result = analyzer().analyze(input, photos)
+        assertEquals(DetectedClothing(), result.clothing)
+        assertEquals(null, result.reference) // ordinary photos never get an accuracy
     }
 
     @Test

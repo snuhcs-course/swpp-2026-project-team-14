@@ -24,6 +24,18 @@ class ServerContractTest {
         // the synthetic render wears nothing loose; the clothing object must be read, not defaulted
         assertTrue(fixture("analyze_response_200.json").contains("\"clothing\""))
         assertEquals(DetectedClothing(), result.clothing)
+        assertEquals(null, result.reference) // an ordinary (unmarked) photo
+    }
+
+    @Test
+    fun benchmarkPhotoResponse_carriesTrueMeasurements() {
+        val result = RemoteBodyAnalyzer.parseResponse(200, fixture("analyze_response_200_benchmark.json"))
+        val reference = result.reference!!
+        assertEquals("m_avg", reference.body)
+        assertTrue(reference.values.size >= 12)
+        val accuracies = result.measurements.mapNotNull { reference.accuracyPercent(it) }
+        assertTrue(accuracies.size >= 12)
+        assertTrue("benchmark accuracy should be high, was $accuracies", accuracies.average() > 95.0)
     }
 
     @Test

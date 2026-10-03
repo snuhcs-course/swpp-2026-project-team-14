@@ -1,5 +1,8 @@
 package com.swpp.stylemate.data
 
+import java.util.Locale
+import kotlin.math.abs
+
 /** Measurement groups shown as separate sections on the result screen. */
 enum class MeasurementGroup(val label: String) {
     LENGTH("길이"),
@@ -119,10 +122,30 @@ data class AnalysisInput(
     val gender: Gender,
 )
 
+/**
+ * True measurements of one of our benchmark bodies, sent by the server only when the photos are
+ * those benchmark renders (backend/body_analysis/reference.py). The app then shows real accuracy
+ * per measurement; for every other photo it keeps the confidence badge.
+ */
+data class ReferenceMeasurements(
+    val body: String,
+    val heightCm: Double,
+    val values: Map<MeasurementType, Double>,
+) {
+    /** 100 − relative error in %, or null if this measurement has no true value. */
+    fun accuracyPercent(measurement: BodyMeasurement): Double? {
+        val truth = values[measurement.type] ?: return null
+        return (100.0 - abs(measurement.valueCm - truth) / truth * 100.0).coerceAtLeast(0.0)
+    }
+}
+
+fun formatPercent(value: Double): String = String.format(Locale.US, "%.1f%%", value)
+
 data class AnalysisResult(
     val measurements: List<BodyMeasurement>,
     val warnings: List<String>,
     val clothing: DetectedClothing = DetectedClothing(),
+    val reference: ReferenceMeasurements? = null,
 )
 
 /** Confirmed profile. This structured state is what recommendation and chat editing reuse. */
@@ -132,6 +155,7 @@ data class BodyProfile(
     val preferredFit: PreferredFit,
     val preferredStyles: List<String>,
     val clothing: DetectedClothing = DetectedClothing(),
+    val reference: ReferenceMeasurements? = null,
 ) {
     fun valueOf(type: MeasurementType): Double? =
         measurements.firstOrNull { it.type == type }?.valueCm

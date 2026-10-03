@@ -64,12 +64,18 @@ fun MyProfileScreen(
             return@Column
         }
 
+        profile.reference?.let { ReferenceNote(it, profile.input.heightCm) }
         Spacer(Modifier.height(16.dp))
-        BodyFigureCard(measurements = profile.measurements, gender = profile.input.gender, onEdit = null)
+        BodyFigureCard(
+            measurements = profile.measurements,
+            gender = profile.input.gender,
+            onEdit = null,
+            reference = profile.reference,
+        )
 
         InsightSection(buildInsights(profile))
 
-        AllMeasurementsSection(profile.measurements, onClick = null)
+        AllMeasurementsSection(profile.measurements, onClick = null, reference = profile.reference)
 
         SectionTitle("기본 정보")
         InfoCard(profile)
