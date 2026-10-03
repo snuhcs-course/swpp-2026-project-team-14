@@ -35,6 +35,7 @@ So the question was removed. The server now decides, separately for the **top** 
 | Warning | `loose_top`: "상의가 헐렁한 것 같아요. 가슴·허리 등 상체 둘레가 정확하지 않을 수 있어요." | `loose_bottom`: "하의가 헐렁한 것 같아요. 엉덩이·허벅지·다리 길이가 정확하지 않을 수 있어요." |
 | Confidence lowered one level | neck, shoulder width, chest, underbust, waist, armhole, bicep, torso length | hip, thigh, calf, inseam, rise |
 | Learned correction | skipped for those measurements (geometry kept) | skipped for those measurements |
+| Left out | bicep (the loose sleeve covers the upper arm: in the benchmark it read 53 cm for a 25 cm arm) | – |
 | Insights hidden (unless the user edited the values) | body type, shoulders | body type, leg proportion |
 
 Both warnings end with "속옷이나 몸에 붙는 옷으로 다시 찍으면 더 정확해요." The mapping is `LOOSE_AFFECTS` in `body_analysis/types.py`, mirrored in the app's `data/BodyMeasurements.kt`.

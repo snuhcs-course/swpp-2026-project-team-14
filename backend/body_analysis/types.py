@@ -199,6 +199,7 @@ class AnalysisError(Exception):
         "body_cropped": "머리부터 발끝까지 전신이 나오게 찍어주세요.",
         "not_frontal": "정면 사진은 카메라를 정면으로 바라보고 찍어주세요.",
         "not_side_view": "측면 사진은 몸을 옆으로 돌려 찍어주세요.",
+        "not_upright": "사진이 뒤집혀 있거나 옆으로 누워 있어요. 사람이 똑바로 서 있게 찍어주세요.",
         "side_photo_required": "정면과 측면 사진이 모두 필요해요.",
         "front_photo_required": "정면과 측면 사진이 모두 필요해요.",
     }

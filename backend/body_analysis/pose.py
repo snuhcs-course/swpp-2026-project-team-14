@@ -77,16 +77,22 @@ class MediaPipePoseEstimator:
 
     def estimate(self, image_rgb: np.ndarray) -> PoseResult | None:
         h, w = image_rgb.shape[:2]
+        # MediaPipe aborts the whole process (image_frame.cc "1 == ChannelSize()") when reading the
+        # segmentation mask of an image whose width is not a multiple of 4, so pad the right edge
+        # with at most 3 replicated columns and crop the mask back afterwards.
+        padded_w = -(-w // 4) * 4
+        if padded_w != w:
+            image_rgb = np.pad(image_rgb, ((0, 0), (0, padded_w - w), (0, 0)), mode="edge")
         image = self._mp.Image(image_format=self._mp.ImageFormat.SRGB, data=np.ascontiguousarray(image_rgb))
         result = self._landmarker.detect(image)
         if not result.pose_landmarks:
             return None
         points = result.pose_landmarks[0]
         landmarks = {
-            name: Landmark(points[i].x * w, points[i].y * h, float(points[i].visibility or 0.0))
+            name: Landmark(points[i].x * padded_w, points[i].y * h, float(points[i].visibility or 0.0))
             for name, i in LANDMARK_INDEX.items()
         }
-        mask = result.segmentation_masks[0].numpy_view().squeeze() > self._mask_threshold
+        mask = result.segmentation_masks[0].numpy_view().squeeze()[:, :w] > self._mask_threshold
         return PoseResult(landmarks=landmarks, mask=mask, num_people=len(result.pose_landmarks))
 
     def close(self) -> None:

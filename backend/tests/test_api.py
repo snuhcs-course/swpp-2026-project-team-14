@@ -67,3 +67,15 @@ def test_invalid_fields_are_400(client, field, value):
 
 def test_get_is_not_allowed(client):
     assert client.get(URL).status_code == 405
+
+
+def test_empty_photo_file_is_a_retake_hint_not_a_server_error(client):
+    response = post(client, front_photo=SimpleUploadedFile("front.jpg", b"", content_type="image/jpeg"))
+    assert response.status_code == 422
+    assert response.json()["error"] == "invalid_image"
+
+
+def test_empty_gender_means_unspecified(client):
+    response = post(client, gender="")
+    assert response.status_code == 200
+    assert response.json()["inputs"]["gender"] == "unspecified"

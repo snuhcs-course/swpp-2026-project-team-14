@@ -59,6 +59,7 @@ import com.swpp.stylemate.data.PreferredFit
 import com.swpp.stylemate.data.STYLE_OPTIONS
 import com.swpp.stylemate.data.buildInsights
 import com.swpp.stylemate.ui.theme.StyleMateTheme
+import java.util.Locale
 
 @Composable
 fun AnalyzingScreen() {
@@ -285,7 +286,7 @@ private fun EditMeasurementDialog(
 }
 
 private fun formatNumber(value: Double): String =
-    if (value % 1.0 == 0.0) value.toInt().toString() else "%.1f".format(value)
+    if (value % 1.0 == 0.0) value.toInt().toString() else "%.1f".format(Locale.US, value) // "." even where the locale writes ","
 
 fun formatCm(value: Double): String = "${formatNumber(value)} cm"
 

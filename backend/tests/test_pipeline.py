@@ -1,3 +1,5 @@
+from dataclasses import replace
+
 import numpy as np
 import pytest
 
@@ -43,7 +45,7 @@ def run(front, side=None, detector=None, **input_kwargs):
 
 
 def confidence(result, type_):
-    return next(m.confidence for m in result.measurements if m.type is type_)
+    return next((m.confidence for m in result.measurements if m.type is type_), None)
 
 
 def test_ideal_input_keeps_base_confidence_and_no_warnings():
@@ -63,6 +65,9 @@ def test_detected_loose_top_warns_and_lowers_only_upper_body():
     assert confidence(result, MeasurementType.INSEAM) is Confidence.HIGH  # legs untouched
     assert result.clothing.to_dict()["top"] == "loose"
     assert result.pipeline_version.endswith("+fake-clothing")
+    # a loose sleeve covers the upper arm: the bicep would be the sleeve, so it is left out
+    assert confidence(result, MeasurementType.BICEP) is None
+    assert confidence(result, MeasurementType.WRIST) is not None  # the wrist is not under the sleeve
 
 
 def test_detected_loose_bottom_lowers_legs():
@@ -120,15 +125,38 @@ def test_quality_gate_rejects_bad_front_photos(front, code):
     assert error.value.hint
 
 
+def _turned(pose, rotate):
+    """The same pose with its landmarks rotated in the image (`rotate(x, y, w, h)` → new x, y)."""
+    h, w = pose.mask.shape
+    landmarks = {k: replace(v, x=rotate(v.x, v.y, w, h)[0], y=rotate(v.x, v.y, w, h)[1]) for k, v in pose.landmarks.items()}
+    return replace(pose, landmarks=landmarks)
+
+
+@pytest.mark.parametrize(
+    "rotate",
+    [
+        lambda x, y, w, h: (w - x, h - y),  # upside down
+        lambda x, y, w, h: (h - y, x),  # lying on its side
+        lambda x, y, w, h: (y, w - x),  # lying on the other side
+    ],
+)
+def test_quality_gate_rejects_photos_that_are_not_upright(rotate):
+    with pytest.raises(AnalysisError) as error:
+        run(_turned(syn.front_pose(), rotate))
+    assert error.value.code == "not_upright"
+    assert "뒤집혀" in error.value.hint
+
+
 def test_quality_gate_rejects_front_photo_given_as_side():
     with pytest.raises(AnalysisError) as error:
         run(syn.front_pose(), syn.front_pose())
     assert (error.value.code, error.value.photo) == ("not_side_view", "side")
 
 
-def test_decode_rejects_non_images():
+@pytest.mark.parametrize("data", [b"not an image", b""])
+def test_decode_rejects_non_images(data):
     with pytest.raises(AnalysisError) as error:
-        decode_image(b"not an image")
+        decode_image(data)
     assert error.value.code == "invalid_image"
 
 
