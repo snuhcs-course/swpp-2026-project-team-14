@@ -34,11 +34,16 @@ jobs:
           cache: pip
           cache-dependency-path: backend/requirements*.txt
 
+      - name: MySQL client build dependencies
+        run: sudo apt-get update && sudo apt-get install -y default-libmysqlclient-dev pkg-config
+
       - name: Install dependencies
         run: pip install -r requirements-dev.txt
 
       - name: Run tests
-        run: python -m pytest -q
+        run: |
+          python -m pytest -q
+          python manage.py test apps.wardrobe --settings=config.test_settings --noinput
 
   image:
     # Builds the production image and checks that the pose model loads inside it

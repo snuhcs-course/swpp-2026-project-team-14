@@ -1,4 +1,4 @@
-# StyleMate backend — body analysis
+# StyleMate backend
 
 The team backend: a Django project (`config/` + `apps/`) deployed to the team14 Kubernetes namespace by
 `.github/workflows/backend-release.yaml` → GHCR image → ArgoCD (`infra/`).
@@ -13,11 +13,11 @@ The team backend: a Django project (`config/` + `apps/`) deployed to the team14 
 It is a plain Python package with no Django dependency.
 Design: [`docs/body-analysis/02-design.md`](../docs/body-analysis/02-design.md).
 
-## Setup (Windows, Python 3.11)
+## Setup (Windows, Python 3.12)
 
 ```bash
 cd backend
-py -3.11 -m venv .venv
+py -3.12 -m venv .venv
 .venv\Scripts\python -m pip install -r requirements-dev.txt
 mkdir models
 curl -L -o models/pose_landmarker_heavy.task https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_heavy/float16/latest/pose_landmarker_heavy.task
@@ -58,7 +58,7 @@ curl -H "Host: localhost" http://localhost:8000/healthz/
 New Django apps go in `apps/` and are registered in `config/settings.py` / `config/urls.py` (layout: wiki → Directory Structure).
 
 ```bash
-set DJANGO_DEBUG=1
+$env:DJANGO_DEBUG="1"
 .venv\Scripts\python manage.py runserver 0.0.0.0:8000
 ```
 
@@ -143,3 +143,35 @@ The server applies `body_analysis/models/measurement_corrector.json`, a ridge re
 | `cli.py` | local runner with debug overlays |
 
 Django side: `config/` (settings, root URLs, `/healthz/`, `/api/hello/`), `apps/body_profiles/` (analyze endpoint, pipeline singleton).
+
+
+## Wardrobe integration
+
+`apps/wardrobe/` runs in the same Django project as body analysis, through `manage.py` and `config.wsgi`.
+The endpoints under `/api/wardrobe/` provide analysis drafts, landmarks, editor options, saved garments and images.
+
+Copy `.env.example` to `.env` inside `backend/` and enter your MySQL account/database and Gemini key.
+`python-dotenv` loads this file; deployment environment variables take precedence. Credentials are git-ignored.
+Leave `MYSQL_DATABASE` empty to run body analysis and landmarks without a DB. Persistence endpoints return
+`503 DATABASE_NOT_CONFIGURED` until configured, before any paid Gemini call.
+
+Once the MySQL database and account exist and `.env` is filled in:
+
+```powershell
+.\.venv\Scripts\python.exe manage.py migrate
+.\.venv\Scripts\python.exe manage.py runserver 127.0.0.1:8000
+```
+
+Photos default to `private/wardrobe-media/`; HRNet weights belong in `wardrobe/garment-landmarks/`.
+Run `scripts/prepare_landmarks.py` in a separate conversion environment to prepare weights.
+See [common app setup](../docs/wardrobe/local-development.md) for model preparation and Android USB configuration.
+
+Wardrobe tests use an isolated in-memory SQLite database, without real MySQL or Gemini calls:
+
+```powershell
+.\.venv\Scripts\python.exe manage.py test apps.wardrobe --settings=config.test_settings --noinput
+```
+
+The cluster needs MySQL configuration, migrations, persistent photo/model volumes and file access for uid 10001
+before wardrobe persistence can run. Authentication and S3 are not integrated yet. The existing 1 Gi memory
+limit was sized for body analysis; remeasure it with HRNet before wardrobe deployment.

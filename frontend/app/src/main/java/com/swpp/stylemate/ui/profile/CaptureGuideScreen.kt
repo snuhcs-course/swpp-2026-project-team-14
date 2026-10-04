@@ -1,5 +1,7 @@
 package com.swpp.stylemate.ui.profile
 
+import com.swpp.stylemate.ui.components.ScreenScaffold
+
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -42,7 +44,7 @@ private val CAPTURE_TIPS = listOf(
 
 @Composable
 fun CaptureGuideScreen(onStart: () -> Unit, onSkip: () -> Unit) {
-    SetupScaffold(
+    ScreenScaffold(
         title = "체형 촬영 가이드",
         actionLabel = "건너뛰기",
         onAction = onSkip,
