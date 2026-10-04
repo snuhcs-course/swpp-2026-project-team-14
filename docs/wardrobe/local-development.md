@@ -70,7 +70,11 @@ USB 연결 후 실행한다. USB를 다시 연결하면 재설정한다.
 
 옷장 자동 측정점은 원본 사진에 GarmentIQ HRNet을 적용한다. 서버에서는 ONNX Runtime으로 CPU 추론하며 PyTorch는 최초 변환에만 필요하다. 현재 모델 파일은 이미 공통 모델 경로로 옮겼다.
 
-새 환경에서 모델을 변환할 때만 다음 명령을 `backend/`에서 실행한다.
+Docker 배포에서는 이미지 빌드 단계가 공개된 원본 가중치와 모델 코드를 다운로드·검증하고 ONNX로 변환한다. 최종 이미지에는 `hrnet.onnx`·`manifest.json`·라이선스만 포함하며 PyTorch와 변환 도구는 포함하지 않는다. 별도 모델 업로드·Git LFS·모델 볼륨 없이 기본 경로에서 실행한다. 모델 경로에 빈 볼륨을 연결하면 이미지에 포함된 파일이 가려지므로 연결하지 않는다.
+
+원본은 [Hugging Face의 고정 HRNet 가중치](https://huggingface.co/lygitdata/garmentiq/resolve/5f02016e9ad3a4aa171fa9199423a437170f5afe/hrnet.pth)와 [GarmentIQ 모델 정의](https://github.com/lygitdata/GarmentIQ/blob/6eba6d65f462647b48e9eed24440d609e9e671d6/src/garmentiq/landmark/detection/model_definition.py)를 사용한다. 다운로드 주소와 체크섬은 `backend/scripts/prepare_landmarks.py`에서 관리한다.
+
+Docker 없이 새 로컬 환경에서 모델을 준비할 때만 다음 명령을 `backend/`에서 실행한다.
 
 ```powershell
 python -m venv private/model-export-venv
@@ -104,6 +108,8 @@ python -m venv private/model-export-venv
 
 ## 배포와 남은 범위
 
-기존 GHCR·ArgoCD·k3s 흐름을 사용한다. 옷장 저장을 배포하려면 MySQL 환경변수·마이그레이션, 모델 볼륨과 사진 영구 볼륨, uid 10001의 접근 권한이 필요하다. `.env`나 사진·가중치를 이미지에 복사하지 않는다.
+기존 GHCR·ArgoCD·k3s 흐름을 사용한다. 옷장 저장을 배포하려면 MySQL 환경변수·마이그레이션, 사진 영구 볼륨과 uid 10001의 쓰기 권한이 필요하다. HRNet 모델은 Docker 빌드에서 준비하며 기본 `WARDROBE_MODEL_DIR=/app/wardrobe/garment-landmarks`를 사용한다. `.env`·사진·PC의 모델 파일은 Docker 빌드 컨텍스트에서 제외한다.
+
+최초 빌드에는 원본 다운로드와 ONNX 변환 시간이 추가되며 GitHub·Hugging Face·패키지 저장소 접속이 필요하다. 다운로드·체크섬 검증·변환에 실패하면 이미지 빌드도 실패한다. Backend CI는 이미지 내부에서 HRNet의 체크섬·입출력 크기와 실제 추론을 확인한다.
 
 현재 배포의 1Gi 메모리 제한은 체형 모델 기준이다. 체형 모델과 HRNet 동시 로드 시 사용량을 다시 측정해야 한다. 사용자 구분·인증, S3, 옷 삭제·초안 정리·체형 프로필 영구 저장은 아직 구현하지 않았다. 공용 옷장 배포는 이 항목들을 확인한 뒤 진행한다.

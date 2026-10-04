@@ -1,8 +1,12 @@
 .venv/
 private/
 models/
+wardrobe/
+.env
+.env.*
 tests/
-scripts/
+scripts/*
+!scripts/prepare_landmarks.py
 **/__pycache__/
 .pytest_cache/
 *.md
