@@ -1,4 +1,4 @@
-"""Download pinned GarmentIQ weights and export once; run in a separate torch environment."""
+"""Download pinned GarmentIQ weights and export in Docker's build stage or a separate torch environment."""
 import hashlib
 import importlib.util
 import json
@@ -12,6 +12,7 @@ REVISION = '5f02016e9ad3a4aa171fa9199423a437170f5afe'
 SOURCE_REVISION = '6eba6d65f462647b48e9eed24440d609e9e671d6'
 WEIGHTS_SHA = '5b29ada40632cb5ce1aaa38e4896054329c42d0f6c6649a5b9d0b53e41ee04f6'
 SOURCE_SHA = 'd7e9ad5c5f170619033bb271406c28fb3adbe86de51018156e0d02a4a5bd813a'
+LICENSE_SHA = '0ce765cb4942d3c6efef3dbd913d5d039ff0a8ad618ef911960a6926693f032b'
 
 
 def digest(path):
@@ -40,7 +41,7 @@ def main():
     source = download('model_definition.py',
                       f'https://raw.githubusercontent.com/lygitdata/GarmentIQ/{SOURCE_REVISION}/src/garmentiq/landmark/detection/model_definition.py', SOURCE_SHA)
     weights = download('hrnet.pth', f'https://huggingface.co/lygitdata/garmentiq/resolve/{REVISION}/hrnet.pth', WEIGHTS_SHA)
-    license_file = download('LICENSE', f'https://raw.githubusercontent.com/lygitdata/GarmentIQ/{SOURCE_REVISION}/LICENSE')
+    license_file = download('LICENSE', f'https://raw.githubusercontent.com/lygitdata/GarmentIQ/{SOURCE_REVISION}/LICENSE', LICENSE_SHA)
     spec = importlib.util.spec_from_file_location('garmentiq_model', source)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)

@@ -52,7 +52,7 @@ swpp-2026-project-team-14/
 |   |       `-- test_landmarks.py                # 원본 사진의 자동 측정점·좌표 변환 검사
 |   |-- body_analysis/                           # MediaPipe 체형 분석
 |   |-- wardrobe/garment-landmarks/              # HRNet 가중치·메타데이터·라이선스
-|   |-- scripts/prepare_landmarks.py             # HRNet ONNX 변환
+|   |-- scripts/prepare_landmarks.py             # 빌드 시 HRNet 다운로드·검증·ONNX 변환
 |   `-- tests/                                   # 체형 분석·공통 API 회귀 검사
 `-- docs/wardrobe/                               # 옷장 설계·실행 안내
 ```

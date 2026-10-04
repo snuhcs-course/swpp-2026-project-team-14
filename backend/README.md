@@ -172,6 +172,11 @@ Wardrobe tests use an isolated in-memory SQLite database, without real MySQL or 
 .\.venv\Scripts\python.exe manage.py test apps.wardrobe --settings=config.test_settings --noinput
 ```
 
-The cluster needs MySQL configuration, migrations, persistent photo/model volumes and file access for uid 10001
+The Docker build downloads checksum-verified GarmentIQ source/weights and exports HRNet in a separate build
+stage. The final image includes ONNX weights, metadata and the license at `/app/wardrobe/garment-landmarks`,
+without PyTorch or export dependencies. No manual model upload or model volume is needed; do not mount an
+empty volume over this directory. Backend CI checks actual HRNet inference inside the image.
+
+The cluster needs MySQL configuration, migrations, a persistent photo volume and write access for uid 10001
 before wardrobe persistence can run. Authentication and S3 are not integrated yet. The existing 1 Gi memory
 limit was sized for body analysis; remeasure it with HRNet before wardrobe deployment.
