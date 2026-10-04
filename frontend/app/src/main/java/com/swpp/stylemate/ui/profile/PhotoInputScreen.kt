@@ -1,5 +1,11 @@
 package com.swpp.stylemate.ui.profile
 
+import com.swpp.stylemate.ui.components.ScreenScaffold
+import com.swpp.stylemate.ui.components.SectionTitle
+
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -75,7 +81,7 @@ fun PhotoInputScreen(
     onGender: (Gender) -> Unit,
     onAnalyze: () -> Unit,
 ) {
-    SetupScaffold(
+    ScreenScaffold(
         title = "체형 분석",
         onBack = onBack,
         primaryLabel = "분석하기",
@@ -157,10 +163,18 @@ private fun PhotoSlotCard(
             withContext(Dispatchers.IO) { captureFile.delete() }
         }
     }
-    fun launchCamera() {
+    fun capture() {
         captureFile.parentFile?.mkdirs()
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.photos", captureFile)
-        cameraLauncher.launch(uri)
+        try { cameraLauncher.launch(uri) }
+        catch (_: Exception) { captureFile.delete(); onPickFailed() }
+    }
+    val cameraPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) capture() else onPickFailed()
+    }
+    fun launchCamera() {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) capture()
+        else cameraPermission.launch(Manifest.permission.CAMERA)
     }
     val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         // A failed decode keeps the previous photo and shows a message instead of clearing it.

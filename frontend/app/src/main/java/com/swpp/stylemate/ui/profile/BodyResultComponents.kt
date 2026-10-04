@@ -1,5 +1,7 @@
 package com.swpp.stylemate.ui.profile
 
+import com.swpp.stylemate.ui.components.SectionTitle
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable

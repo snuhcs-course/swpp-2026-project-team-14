@@ -9,16 +9,33 @@ Configured through environment variables so the same code runs locally and in th
 
 import os
 import secrets
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(BASE_DIR / ".env", override=False)
 
 DEBUG = os.environ.get("DJANGO_DEBUG", "0") == "1"
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY") or secrets.token_urlsafe(64)
 ALLOWED_HOSTS = os.environ.get("DJANGO_ALLOWED_HOSTS", "*").split(",")
 
-INSTALLED_APPS = ["apps.body_profiles"]
+INSTALLED_APPS = ["apps.body_profiles", "apps.wardrobe"]
 MIDDLEWARE = ["django.middleware.common.CommonMiddleware"]
 ROOT_URLCONF = "config.urls"
 WSGI_APPLICATION = "config.wsgi.application"
-DATABASES = {}  # the analyze endpoint is stateless; profile storage comes with the database setup
+DATABASES = {}  # Body analysis and landmarks can run before MySQL is configured.
+if os.environ.get("MYSQL_DATABASE"):
+    DATABASES = {"default": {
+        "ENGINE": "django.db.backends.mysql",
+        "NAME": os.environ["MYSQL_DATABASE"],
+        "USER": os.environ.get("MYSQL_USER", ""),
+        "PASSWORD": os.environ.get("MYSQL_PASSWORD", ""),
+        "HOST": os.environ.get("MYSQL_HOST", "127.0.0.1"),
+        "PORT": os.environ.get("MYSQL_PORT", "3306"),
+        "OPTIONS": {"charset": "utf8mb4", "init_command": "SET sql_mode='STRICT_TRANS_TABLES'"},
+    }}
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 USE_TZ = True
 
 # Log unhandled errors (500s) with tracebacks to stderr, so they show up in `kubectl logs`.
@@ -33,3 +50,8 @@ LOGGING = {
 FILE_UPLOAD_HANDLERS = ["django.core.files.uploadhandler.MemoryFileUploadHandler"]
 FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024
 DATA_UPLOAD_MAX_MEMORY_SIZE = 25 * 1024 * 1024
+
+
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "").strip()
+WARDROBE_MODEL_DIR = Path(os.environ.get("WARDROBE_MODEL_DIR", str(BASE_DIR / "wardrobe/garment-landmarks")))
+MEDIA_ROOT = Path(os.environ.get("WARDROBE_MEDIA_ROOT", str(BASE_DIR / "private/wardrobe-media")))

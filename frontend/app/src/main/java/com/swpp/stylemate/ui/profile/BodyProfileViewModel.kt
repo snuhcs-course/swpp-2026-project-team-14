@@ -63,7 +63,7 @@ data class AppState(
 )
 
 class BodyProfileViewModel(
-    private val analyzer: BodyAnalyzer = RemoteBodyAnalyzer(BuildConfig.BODY_API_BASE_URL),
+    private val analyzer: BodyAnalyzer = RemoteBodyAnalyzer(BuildConfig.API_BASE_URL),
 ) : ViewModel() {
 
     private val _app = MutableStateFlow(AppState())

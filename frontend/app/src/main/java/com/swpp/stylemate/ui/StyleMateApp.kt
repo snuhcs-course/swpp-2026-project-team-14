@@ -4,6 +4,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -37,6 +38,7 @@ import com.swpp.stylemate.ui.profile.MyProfileScreen
 import com.swpp.stylemate.ui.profile.PhotoInputScreen
 import com.swpp.stylemate.ui.profile.ReviewScreen
 import com.swpp.stylemate.ui.profile.SetupStep
+import com.swpp.stylemate.ui.wardrobe.WardrobeRoute
 
 private enum class Tab(val label: String, val icon: ImageVector) {
     HOME("홈", Icons.Filled.Home),
@@ -96,7 +98,7 @@ private fun ProfileSetupFlow(viewModel: BodyProfileViewModel, canCancel: Boolean
 @Composable
 private fun MainTabs(viewModel: BodyProfileViewModel) {
     val app by viewModel.app.collectAsStateWithLifecycle()
-    var tab by rememberSaveable { mutableStateOf(Tab.PROFILE) }
+    var tab by rememberSaveable { mutableStateOf(Tab.WARDROBE) }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -120,7 +122,7 @@ private fun MainTabs(viewModel: BodyProfileViewModel) {
     ) { padding ->
         when (tab) {
             Tab.HOME -> Placeholder("오늘의 코디", "홈 대시보드는 P8 담당 화면이에요.", Modifier.padding(padding))
-            Tab.WARDROBE -> Placeholder("내 옷장", "옷장 화면은 P11·P12 담당 화면이에요.", Modifier.padding(padding))
+            Tab.WARDROBE -> Box(Modifier.padding(padding).consumeWindowInsets(padding)) { WardrobeRoute() }
             Tab.PROFILE -> MyProfileScreen(
                 profile = app.profile,
                 onReanalyze = viewModel::startReanalysis,

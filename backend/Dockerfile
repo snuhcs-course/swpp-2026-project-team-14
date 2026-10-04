@@ -1,3 +1,14 @@
+FROM python:3.12-slim AS wardrobe-model
+
+WORKDIR /build
+RUN pip install --no-cache-dir torch==2.6.0 --index-url https://download.pytorch.org/whl/cpu \
+    && pip install --no-cache-dir onnx==1.19.0
+COPY scripts/prepare_landmarks.py ./scripts/prepare_landmarks.py
+# Download pinned source weights and export ONNX only while building the image.
+RUN python scripts/prepare_landmarks.py \
+    && chmod 755 wardrobe wardrobe/garment-landmarks \
+    && chmod 644 wardrobe/garment-landmarks/*
+
 FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -10,7 +21,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 # OpenCV and MediaPipe's native library need these even without a display
 # (without libEGL, loading the pose model fails with "libEGL.so.1: cannot open shared object file").
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends libgl1 libglib2.0-0 libegl1 libgles2 \
+    && apt-get install -y --no-install-recommends libgl1 libglib2.0-0 libegl1 libgles2 default-libmysqlclient-dev build-essential pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -28,6 +39,7 @@ COPY manage.py .
 COPY config ./config
 COPY apps ./apps
 COPY body_analysis ./body_analysis
+COPY --from=wardrobe-model /build/wardrobe/garment-landmarks /app/wardrobe/garment-landmarks
 
 USER 10001:10001
 
