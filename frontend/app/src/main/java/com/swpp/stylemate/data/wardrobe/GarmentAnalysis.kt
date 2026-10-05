@@ -57,7 +57,7 @@ internal suspend fun requestAnalysis(context: Context, photo: String): JSONObjec
             "IMAGE_TOO_LARGE" -> "사진 용량이 너무 큽니다."
             else -> "분석하지 못했습니다. 다시 시도해 주세요."
         })
-        check(result.has("id") && result.has("attributes") && result.has("display")) { "분석 응답을 읽지 못했습니다." }
+        check(result.has("id") && result.has("attributes")) { "분석 응답을 읽지 못했습니다." }
         result
     } catch (_: SocketTimeoutException) {
         error("응답 시간이 초과됐습니다. 잠시 후 다시 시도해 주세요.")

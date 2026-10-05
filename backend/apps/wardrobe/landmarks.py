@@ -1,45 +1,117 @@
-"""GarmentIQ HRNet inference. Predict image points; ARCore remains the cm reference."""
 import hashlib
 import json
 from io import BytesIO
 from pathlib import Path
 from threading import Lock
 from time import perf_counter
+from typing import NamedTuple
 
 from django.conf import settings
 from PIL import Image, ImageOps, UnidentifiedImageError
 
 from .analysis import AnalysisError
 
+
+class GarmentDefinition(NamedTuple):
+    channel_start: int
+    channel_stop: int
+    measurement_paths: dict[str, tuple[int, ...]]
+
+
 MODEL_ID = 'lygitdata/garmentiq'
 MODEL_REVISION = '5f02016e9ad3a4aa171fa9199423a437170f5afe'
 INPUT_WIDTH, INPUT_HEIGHT = 288, 384
 MAX_FRAME_BYTES = 1024 * 1024
-MIN_SCORE = 0.4  # Heatmap score, not a calibrated probability.
-# DeepFashion2 class slices (zero-based) and landmark paths (one-based).
-# Endpoints: shoulder / underarm / back neck / hem / outer cuff / inner cuff.
-# Reference diagram: github.com/switchablenorms/DeepFashion2/blob/master/images/cls.jpg
+MIN_SCORE = 0.4
+MIN_PATH_DISTANCE_SQUARED = 0.0004
+MIN_THIGH_WIDTH = 0.02
+PARALLEL_TOLERANCE = 1e-6
 GARMENTS = {
-    'short_sleeve_top': (0, 25, {'shoulder_width': (7, 25), 'chest_width_half': (12, 20),
-                              'armhole_straight': (7, 12), 'sleeve_length': (25, 24, 23),
-                              'total_length': (1, 16), 'hem_width_half': (15, 17), 'cuff_width_half': (23, 22)}),
-    'long_sleeve_top': (25, 58, {'shoulder_width': (7, 33), 'chest_width_half': (16, 24),
-                               'armhole_straight': (7, 16), 'sleeve_length': (33, 32, 31, 30, 29),
-                               'total_length': (1, 20), 'hem_width_half': (19, 21), 'cuff_width_half': (29, 28)}),
-    'short_sleeve_outerwear': (58, 89, {'shoulder_width': (7, 25), 'chest_width_half': (12, 20),
-                                      'armhole_straight': (7, 12), 'sleeve_length': (25, 24, 23),
-                                      'total_length': (1, 16), 'hem_width_half': (15, 17), 'cuff_width_half': (23, 22)}),
-    'long_sleeve_outerwear': (89, 128, {'shoulder_width': (7, 33), 'chest_width_half': (16, 24),
-                                      'armhole_straight': (7, 16), 'sleeve_length': (33, 32, 31, 30, 29),
-                                      'total_length': (1, 20), 'hem_width_half': (19, 21), 'cuff_width_half': (29, 28)}),
-    'trousers': (168, 182, {'waist_width_half': (1, 3), 'hip_width_half': (4, 14),
-                           'total_length': (1, 4, 5, 6), 'rise_front': (2, 9),
-                           'inseam': (9, 8, 7), 'hem_opening': (6, 7)}),
-    'shorts': (158, 168, {'waist_width_half': (1, 3), 'hip_width_half': (4, 10),
-                        'total_length': (1, 4, 5), 'rise_front': (2, 7),
-                        'inseam': (7, 6), 'hem_opening': (5, 6)}),
-    'skirt': (182, 190, {'waist_width_half': (1, 3), 'hip_width_half': (4, 8),
-                       'total_length': (1, 4, 5)}),
+    'short_sleeve_top': GarmentDefinition(
+        channel_start=0,
+        channel_stop=25,
+        measurement_paths={
+            'shoulder_width': (7, 25),
+            'chest_width_half': (12, 20),
+            'armhole_straight': (7, 12),
+            'sleeve_length': (25, 24, 23),
+            'total_length': (1, 16),
+            'hem_width_half': (15, 17),
+            'cuff_width_half': (23, 22),
+        },
+    ),
+    'long_sleeve_top': GarmentDefinition(
+        channel_start=25,
+        channel_stop=58,
+        measurement_paths={
+            'shoulder_width': (7, 33),
+            'chest_width_half': (16, 24),
+            'armhole_straight': (7, 16),
+            'sleeve_length': (33, 32, 31, 30, 29),
+            'total_length': (1, 20),
+            'hem_width_half': (19, 21),
+            'cuff_width_half': (29, 28),
+        },
+    ),
+    'short_sleeve_outerwear': GarmentDefinition(
+        channel_start=58,
+        channel_stop=89,
+        measurement_paths={
+            'shoulder_width': (7, 25),
+            'chest_width_half': (12, 20),
+            'armhole_straight': (7, 12),
+            'sleeve_length': (25, 24, 23),
+            'total_length': (1, 16),
+            'hem_width_half': (15, 17),
+            'cuff_width_half': (23, 22),
+        },
+    ),
+    'long_sleeve_outerwear': GarmentDefinition(
+        channel_start=89,
+        channel_stop=128,
+        measurement_paths={
+            'shoulder_width': (7, 33),
+            'chest_width_half': (16, 24),
+            'armhole_straight': (7, 16),
+            'sleeve_length': (33, 32, 31, 30, 29),
+            'total_length': (1, 20),
+            'hem_width_half': (19, 21),
+            'cuff_width_half': (29, 28),
+        },
+    ),
+    'trousers': GarmentDefinition(
+        channel_start=168,
+        channel_stop=182,
+        measurement_paths={
+            'waist_width_half': (1, 3),
+            'hip_width_half': (4, 14),
+            'total_length': (1, 4, 5, 6),
+            'rise_front': (2, 9),
+            'inseam': (9, 8, 7),
+            'hem_opening': (6, 7),
+        },
+    ),
+    'shorts': GarmentDefinition(
+        channel_start=158,
+        channel_stop=168,
+        measurement_paths={
+            'waist_width_half': (1, 3),
+            'hip_width_half': (4, 10),
+            'total_length': (1, 4, 5),
+            'rise_front': (2, 7),
+            'inseam': (7, 6),
+            'hem_opening': (5, 6),
+        },
+    ),
+    'skirt': GarmentDefinition(
+        channel_start=182,
+        channel_stop=190,
+        measurement_paths={
+            'waist_width_half': (1, 3),
+            'hip_width_half': (4, 8),
+            'total_length': (1, 4, 5),
+        },
+    ),
 }
 _session = None
 _lock = Lock()
@@ -95,7 +167,6 @@ def prepare_frame(raw):
 
 def image_tensor(image):
     import numpy as np
-    # Fit the complete viewport, retaining aspect ratio and the inverse coordinate transform.
     width, height = image.size
     factor = min(INPUT_WIDTH / width, INPUT_HEIGHT / height)
     scaled_w, scaled_h = max(1, round(width * factor)), max(1, round(height * factor))
@@ -108,56 +179,101 @@ def image_tensor(image):
 
 
 def decode(heatmaps, garment, transform):
+    definition = GARMENTS[garment]
+    garment_heatmaps = heatmaps[0, definition.channel_start:definition.channel_stop]
+    points = _decode_points(garment_heatmaps, transform)
+    points_by_id = {point['id']: point for point in points}
+    suggestions = _measurement_paths(points_by_id, definition.measurement_paths)
+
+    thigh_path = _thigh_width_path(points_by_id, garment)
+    if thigh_path is not None:
+        suggestions['thigh_width_half'] = thigh_path
+
+    return points, suggestions
+
+
+def _decode_points(heatmaps, transform):
     import numpy as np
-    begin, end, definitions = GARMENTS[garment]
-    maps = heatmaps[0, begin:end]
-    height, width = maps.shape[1:]
-    scaled_w, scaled_h, left, top = transform
+
+    height, width = heatmaps.shape[1:]
+    scaled_width, scaled_height, left, top = transform
     points = []
-    for index, heatmap in enumerate(maps, start=1):
-        flat = int(np.argmax(heatmap))
-        y, x = divmod(flat, width)
+    for point_id, heatmap in enumerate(heatmaps, start=1):
+        peak_index = int(np.argmax(heatmap))
+        y, x = divmod(peak_index, width)
         score = float(heatmap[y, x])
         if not np.isfinite(score) or score < MIN_SCORE:
             continue
-        dx = np.sign(heatmap[y, x + 1] - heatmap[y, x - 1]) * .25 if 1 < x < width - 1 else 0
-        dy = np.sign(heatmap[y + 1, x] - heatmap[y - 1, x]) * .25 if 1 < y < height - 1 else 0
-        u = ((x + dx) * INPUT_WIDTH / width - left) / scaled_w
-        v = ((y + dy) * INPUT_HEIGHT / height - top) / scaled_h
-        if 0 <= u <= 1 and 0 <= v <= 1:
-            points.append({'id': index, 'x': round(float(u), 6), 'y': round(float(v), 6), 'score': round(score, 4)})
-    by_id = {point['id']: point for point in points}
+
+        offset_x = np.sign(heatmap[y, x + 1] - heatmap[y, x - 1]) * .25 if 1 < x < width - 1 else 0
+        offset_y = np.sign(heatmap[y + 1, x] - heatmap[y - 1, x]) * .25 if 1 < y < height - 1 else 0
+        image_x = ((x + offset_x) * INPUT_WIDTH / width - left) / scaled_width
+        image_y = ((y + offset_y) * INPUT_HEIGHT / height - top) / scaled_height
+        if 0 <= image_x <= 1 and 0 <= image_y <= 1:
+            points.append({
+                'id': point_id,
+                'x': round(float(image_x), 6),
+                'y': round(float(image_y), 6),
+                'score': round(score, 4),
+            })
+    return points
+
+
+def _measurement_paths(points_by_id, definitions):
     suggestions = {}
-    for field, path in definitions.items():
-        if all(index in by_id for index in path):
-            a, b = by_id[path[0]], by_id[path[-1]]
-            if (a['x'] - b['x']) ** 2 + (a['y'] - b['y']) ** 2 >= .0004:
-                suggestions[field] = [[by_id[index]['x'], by_id[index]['y']] for index in path]
-    # Thigh: intersect the outer leg contour at crotch level, parallel to the waistband.
-    # This is a derived image point, not an extra keypoint predicted by HRNet.
-    if garment in ('trousers', 'shorts'):
-        crotch, contour = (9, (1, 4, 5, 6)) if garment == 'trousers' else (7, (1, 4, 5))
-        if all(index in by_id for index in (1, 3, crotch)):
-            a = np.array([by_id[1]['x'], by_id[1]['y']])
-            b = np.array([by_id[3]['x'], by_id[3]['y']])
-            c = np.array([by_id[crotch]['x'], by_id[crotch]['y']])
-            direction = b - a
-            cross = lambda u, v: u[0] * v[1] - u[1] * v[0]
-            for first, second in zip(contour, contour[1:]):
-                if first not in by_id or second not in by_id:
-                    continue
-                p = np.array([by_id[first]['x'], by_id[first]['y']])
-                q = np.array([by_id[second]['x'], by_id[second]['y']])
-                denominator = cross(q - p, direction)
-                if abs(denominator) < 1e-6:
-                    continue
-                t = cross(c - p, direction) / denominator
-                if 0 <= t <= 1:
-                    outer = p + t * (q - p)
-                    if np.linalg.norm(outer - c) >= .02:
-                        suggestions['thigh_width_half'] = [outer.round(6).tolist(), c.tolist()]
-                    break
-    return points, suggestions
+    for field, point_ids in definitions.items():
+        if not all(point_id in points_by_id for point_id in point_ids):
+            continue
+
+        first = points_by_id[point_ids[0]]
+        last = points_by_id[point_ids[-1]]
+        distance_squared = (first['x'] - last['x']) ** 2 + (first['y'] - last['y']) ** 2
+        if distance_squared >= MIN_PATH_DISTANCE_SQUARED:
+            suggestions[field] = [
+                [points_by_id[point_id]['x'], points_by_id[point_id]['y']]
+                for point_id in point_ids
+            ]
+    return suggestions
+
+
+def _thigh_width_path(points_by_id, garment):
+    import numpy as np
+
+    if garment == 'trousers':
+        crotch_id, contour_ids = 9, (1, 4, 5, 6)
+    elif garment == 'shorts':
+        crotch_id, contour_ids = 7, (1, 4, 5)
+    else:
+        return None
+    if not all(point_id in points_by_id for point_id in (1, 3, crotch_id)):
+        return None
+
+    waist_start = np.array([points_by_id[1]['x'], points_by_id[1]['y']])
+    waist_end = np.array([points_by_id[3]['x'], points_by_id[3]['y']])
+    crotch = np.array([points_by_id[crotch_id]['x'], points_by_id[crotch_id]['y']])
+    waist_direction = waist_end - waist_start
+
+    for first_id, second_id in zip(contour_ids, contour_ids[1:]):
+        if first_id not in points_by_id or second_id not in points_by_id:
+            continue
+
+        segment_start = np.array([points_by_id[first_id]['x'], points_by_id[first_id]['y']])
+        segment_end = np.array([points_by_id[second_id]['x'], points_by_id[second_id]['y']])
+        denominator = _cross_2d(segment_end - segment_start, waist_direction)
+        if abs(denominator) < PARALLEL_TOLERANCE:
+            continue
+
+        fraction = _cross_2d(crotch - segment_start, waist_direction) / denominator
+        if 0 <= fraction <= 1:
+            outer_point = segment_start + fraction * (segment_end - segment_start)
+            if np.linalg.norm(outer_point - crotch) >= MIN_THIGH_WIDTH:
+                return [outer_point.round(6).tolist(), crotch.tolist()]
+            break
+    return None
+
+
+def _cross_2d(first, second):
+    return first[0] * second[1] - first[1] * second[0]
 
 
 def detect(raw, garment):
@@ -171,5 +287,10 @@ def detect(raw, garment):
     except Exception as error:
         raise AnalysisError('LANDMARK_FAILED', 503) from error
     points, suggestions = decode(heatmaps, garment, transform)
-    return {'model': MODEL_ID, 'garment': garment, 'points': points, 'suggestions': suggestions,
-            'elapsed_ms': round((perf_counter() - started) * 1000)}
+    return {
+        'model': MODEL_ID,
+        'garment': garment,
+        'points': points,
+        'suggestions': suggestions,
+        'elapsed_ms': round((perf_counter() - started) * 1000),
+    }
