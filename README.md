@@ -110,7 +110,7 @@ To run the Docker image instead, see [backend/README.md](backend/README.md#docke
 
 1. Copy `backend/.env.example` to `backend/.env` if it does not already exist. Fill in an existing MySQL database/account and `GEMINI_API_KEY`; keep this file out of Git.
 2. Start MySQL, then run `.venv\Scripts\python manage.py migrate` from `backend/`.
-3. For a local Python server, prepare HRNet with the [model setup instructions](docs/wardrobe/local-development.md#모델-준비). Docker builds do this automatically.
+3. For a local Python server, prepare HRNet with the [model setup instructions](docs/wardrobe/local-development.md#4-모델-준비). Docker builds do this automatically.
 4. Restart Django after changing environment variables. Body analysis and garment landmark detection can run without MySQL; wardrobe analysis, listing and saving require it.
 
 In the cluster, MySQL settings, the Gemini key and a writable persistent photo directory must be supplied separately. Do not mount an empty volume over the bundled model directory. Merging this demo branch alone does not deploy it: automatic releases track `main`.
