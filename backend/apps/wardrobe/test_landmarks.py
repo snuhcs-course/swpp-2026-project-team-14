@@ -87,29 +87,49 @@ class LandmarkTests(SimpleTestCase):
 
     def test_assisted_measurements_preserve_provenance(self):
         measurement = {'value': 45.123, 'source': 'arcore_assisted',
-                       'method': TOP_DIMENSIONS['shoulder_width'][1], 'reference': 'HRNet'}
+                       'method': TOP_DIMENSIONS['shoulder_width'].method, 'reference': 'HRNet'}
         result = validate_record({'attributes': attributes(), 'dimensions': {'unit': 'cm', 'shoulder_width': measurement},
                                   'notes': ''})
         self.assertEqual(result['dimensions']['shoulder_width'], dict(measurement, value=45.12))
 
     def test_top_landmarks_supply_all_seven_measurements_and_preserve_sleeve_path(self):
         heatmaps = np.zeros((1, 294, 96, 72), dtype=np.float32)
-        # DeepFashion2 short-top fixture: back neck, shoulders, underarms, hem and right sleeve.
-        locations = {1: (36, 10), 7: (20, 18), 25: (52, 18), 12: (22, 35), 20: (50, 35),
-                     15: (22, 80), 16: (36, 80), 17: (50, 80), 24: (58, 23), 23: (64, 28), 22: (60, 34)}
+        locations = {
+            1: (36, 10),
+            7: (20, 18),
+            25: (52, 18),
+            12: (22, 35),
+            20: (50, 35),
+            15: (22, 80),
+            16: (36, 80),
+            17: (50, 80),
+            24: (58, 23),
+            23: (64, 28),
+            22: (60, 34),
+        }
         for point, (x, y) in locations.items():
             heatmaps[0, point - 1, y, x] = .9
         _, values = decode(heatmaps, 'short_sleeve_top', (288, 384, 0, 0))
         self.assertEqual(set(values), set(TOP_DIMENSIONS))
         self.assertEqual(len(values['sleeve_length']), 3)
         np.testing.assert_allclose(values['sleeve_length'][1], [58 / 72, 23 / 96], atol=1e-6)
-        heatmaps[0, 23] = 0  # Do not invent a missing intermediate seam point.
+        heatmaps[0, 23] = 0
         self.assertNotIn('sleeve_length', decode(heatmaps, 'short_sleeve_top', (288, 384, 0, 0))[1])
 
     def test_trouser_thigh_point_is_intersection_at_crotch_and_inseam_uses_inner_leg(self):
         heatmaps = np.zeros((1, 294, 96, 72), dtype=np.float32)
-        locations = {1: (18, 10), 2: (36, 10), 3: (54, 10), 4: (16, 30), 14: (56, 30),
-                     5: (14, 55), 6: (12, 85), 7: (30, 85), 8: (32, 55), 9: (36, 36)}
+        locations = {
+            1: (18, 10),
+            2: (36, 10),
+            3: (54, 10),
+            4: (16, 30),
+            14: (56, 30),
+            5: (14, 55),
+            6: (12, 85),
+            7: (30, 85),
+            8: (32, 55),
+            9: (36, 36),
+        }
         for point, (x, y) in locations.items():
             heatmaps[0, 168 + point - 1, y, x] = .9
         _, values = decode(heatmaps, 'trousers', (288, 384, 0, 0))

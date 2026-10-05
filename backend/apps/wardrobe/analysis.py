@@ -1,4 +1,3 @@
-"""Gemini REST adapter. No secrets, input images or provider error bodies are logged."""
 import base64
 from io import BytesIO
 import json
@@ -37,7 +36,8 @@ Color palette (HEX: Korean label):\n''' + json.dumps(COLOR_PALETTE, ensure_ascii
 class AnalysisError(Exception):
     def __init__(self, code, status=502):
         super().__init__(code)
-        self.code, self.status = code, status
+        self.code = code
+        self.status = status
 
 
 class NoRedirect(HTTPRedirectHandler):
@@ -46,8 +46,10 @@ class NoRedirect(HTTPRedirectHandler):
 
 
 def prepare_image(raw):
-    if not raw or len(raw) > MAX_IMAGE_BYTES:
-        raise AnalysisError('IMAGE_TOO_LARGE' if raw else 'INVALID_IMAGE', 413 if raw else 400)
+    if not raw:
+        raise AnalysisError('INVALID_IMAGE', 400)
+    if len(raw) > MAX_IMAGE_BYTES:
+        raise AnalysisError('IMAGE_TOO_LARGE', 413)
     try:
         with Image.open(BytesIO(raw)) as image:
             if image.format not in ('JPEG', 'PNG', 'WEBP') or getattr(image, 'n_frames', 1) != 1:
@@ -70,21 +72,46 @@ def analyze_image(raw, api_key):
     image = prepare_image(raw)
     if not api_key:
         raise AnalysisError('AI_NOT_CONFIGURED', 503)
+    request = _build_request(image, api_key)
+    body = _send_request(request)
+    return _parse_response(body)
+
+
+def _build_request(image, api_key):
     payload = {
         'systemInstruction': {'parts': [{'text': PROMPT}]},
-        'contents': [{'role': 'user', 'parts': [
-            {'inlineData': {'mimeType': 'image/jpeg', 'data': base64.b64encode(image).decode('ascii')}},
-            {'text': 'Classify this garment.'},
-        ]}],
-        'generationConfig': {'responseMimeType': 'application/json', 'responseJsonSchema': SCHEMA,
-                             'maxOutputTokens': 4096},
+        'contents': [
+            {
+                'role': 'user',
+                'parts': [
+                    {
+                        'inlineData': {
+                            'mimeType': 'image/jpeg',
+                            'data': base64.b64encode(image).decode('ascii'),
+                        },
+                    },
+                    {'text': 'Classify this garment.'},
+                ],
+            },
+        ],
+        'generationConfig': {
+            'responseMimeType': 'application/json',
+            'responseJsonSchema': SCHEMA,
+            'maxOutputTokens': 4096,
+        },
     }
-    request = Request(f'https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent',
-                      data=json.dumps(payload).encode('utf-8'), method='POST',
-                      headers={'Content-Type': 'application/json', 'x-goog-api-key': api_key})
+    return Request(
+        f'https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent',
+        data=json.dumps(payload).encode('utf-8'),
+        method='POST',
+        headers={'Content-Type': 'application/json', 'x-goog-api-key': api_key},
+    )
+
+
+def _send_request(request):
     try:
         with build_opener(NoRedirect()).open(request, timeout=TIMEOUT_SECONDS) as response:
-            body = response.read(MAX_RESPONSE_BYTES + 1)
+            return response.read(MAX_RESPONSE_BYTES + 1)
     except HTTPError as error:
         error.close()
         if error.code == 429:
@@ -99,6 +126,9 @@ def analyze_image(raw, api_key):
         raise AnalysisError(code, 504 if code == 'AI_TIMEOUT' else 502) from None
     except OSError:
         raise AnalysisError('AI_UNAVAILABLE') from None
+
+
+def _parse_response(body):
     try:
         if len(body) > MAX_RESPONSE_BYTES:
             raise ValueError('Response too large')

@@ -14,7 +14,6 @@ from .analysis import AnalysisError, MAX_IMAGE_BYTES, MODEL, analyze_image, prep
 from .editor import catalog, validate_record
 from .models import Garment
 from .landmarks import MAX_FRAME_BYTES, detect
-from .schema import display_attributes
 
 # Bound concurrent paid requests and image decode memory.
 ANALYSIS_SLOTS = BoundedSemaphore(1)
@@ -58,15 +57,14 @@ def analyze(request):
         # Bound image reads independently of the JSON edit limit.
         image = request.read(MAX_IMAGE_BYTES + 1)
         attributes = analyze_image(image, settings.GEMINI_API_KEY)
-        garment = Garment(attributes=attributes, original_attributes=attributes)
+        garment = Garment(attributes=attributes)
         garment.image.save(f'{uuid.uuid4()}.jpg', ContentFile(prepare_image(image)), save=False)
         try:
             garment.save()
         except Exception:
             garment.image.delete(save=False)
             raise
-        response = JsonResponse({'id': str(garment.id), 'model': MODEL, 'attributes': attributes,
-                                 'display': display_attributes(attributes)})
+        response = JsonResponse({'id': str(garment.id), 'model': MODEL, 'attributes': attributes})
         response['Cache-Control'] = 'no-store'
         return response
     except AnalysisError as error:
