@@ -19,7 +19,7 @@ Iteration 1 prototypes **body measurements from two phone photos** and **adding 
 
 ## Demo video
 
-▶ **[TODO: link to the demo video]**
+https://github.com/user-attachments/assets/2dec2d1a-e0b9-4220-a3ce-6b830debf52c
 
 ---
 
