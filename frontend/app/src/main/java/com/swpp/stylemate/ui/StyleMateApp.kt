@@ -31,7 +31,11 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
+import com.swpp.stylemate.data.SharedPrefsBodyProfileStore
 import com.swpp.stylemate.ui.profile.AnalyzingScreen
 import com.swpp.stylemate.ui.profile.BodyProfileViewModel
 import com.swpp.stylemate.ui.profile.CaptureGuideScreen
@@ -47,8 +51,15 @@ private enum class Tab(val label: String, val icon: ImageVector) {
     PROFILE("마이프로필", Icons.Filled.Person),
 }
 
+/** The app's view model, with the body profile kept on the device. */
 @Composable
-fun StyleMateApp(viewModel: BodyProfileViewModel = viewModel()) {
+private fun defaultBodyProfileViewModel(): BodyProfileViewModel {
+    val context = LocalContext.current.applicationContext
+    return viewModel(factory = viewModelFactory { initializer { BodyProfileViewModel(store = SharedPrefsBodyProfileStore(context)) } })
+}
+
+@Composable
+fun StyleMateApp(viewModel: BodyProfileViewModel = defaultBodyProfileViewModel()) {
     val app by viewModel.app.collectAsStateWithLifecycle()
     if (app.setupVisible) {
         ProfileSetupFlow(viewModel, canCancel = app.profile != null)

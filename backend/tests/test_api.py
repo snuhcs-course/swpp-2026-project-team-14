@@ -3,7 +3,7 @@ import cv2
 import numpy as np
 import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import Client
+from django.test import Client, override_settings
 
 from body_analysis import BodyAnalysisPipeline
 from apps.body_profiles import services
@@ -80,3 +80,22 @@ def test_empty_gender_means_unspecified(client):
     response = post(client, gender="")
     assert response.status_code == 200
     assert response.json()["inputs"]["gender"] == "unspecified"
+
+
+def test_two_large_photos_are_not_silently_dropped(client):
+    """Two 6 MB photos (each under the 8 MB limit) used to exceed the 10 MB in-memory upload limit,
+    so Django dropped both files and the API answered front_photo_required."""
+    big = b"\xff\xd8" + b"0" * (6 * 1024 * 1024)
+    response = post(
+        client,
+        front_photo=SimpleUploadedFile("front.jpg", big, content_type="image/jpeg"),
+        side_photo=SimpleUploadedFile("side.jpg", big, content_type="image/jpeg"),
+    )
+    assert response.json()["error"] not in ("front_photo_required", "side_photo_required")
+
+
+def test_request_too_large_for_memory_is_413(client):
+    with override_settings(FILE_UPLOAD_MAX_MEMORY_SIZE=1024):
+        response = post(client, front_photo=SimpleUploadedFile("front.jpg", b"0" * 4096, content_type="image/jpeg"))
+    assert response.status_code == 413
+    assert response.json()["error"] == "photo_too_large"

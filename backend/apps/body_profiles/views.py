@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import uuid
 
+from django.conf import settings
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
@@ -39,6 +40,9 @@ def _number(value: str | None, low: float, high: float) -> float | None:
 @csrf_exempt  # token auth for the mobile client comes with P7; no cookies are used here
 @require_POST
 def analyze(request):
+    # Above this size Django's memory upload handler drops the files without an error.
+    if int(request.META.get("CONTENT_LENGTH") or 0) > settings.FILE_UPLOAD_MAX_MEMORY_SIZE:
+        return _json({"error": "photo_too_large", "hint": "사진 용량이 너무 커요 (최대 8MB)."}, status=413)
     front = request.FILES.get("front_photo")
     side = request.FILES.get("side_photo")
     if front is None:
