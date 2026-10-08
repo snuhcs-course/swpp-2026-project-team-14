@@ -1,3 +1,4 @@
+# AI-generated with Codex, 2026-09-24, reviewed by Kihwan Kim
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

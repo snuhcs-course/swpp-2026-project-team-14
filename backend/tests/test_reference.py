@@ -1,3 +1,4 @@
+# AI-generated with Claude Code (Claude Opus 5.5), 2026-10-02, reviewed by Dongkun Moon
 """Benchmark photo recognition: accuracy is shown only for our benchmark bodies (body_analysis/reference.py)."""
 
 import cv2

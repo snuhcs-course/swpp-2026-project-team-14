@@ -1,3 +1,4 @@
+// AI-generated with Claude Code (Dongkun Moon) and Codex (Hyeon U Jeong), 2026-09-24, reviewed by Dongkun Moon and Hyeon U Jeong
 package com.swpp.stylemate.ui.profile
 
 import com.swpp.stylemate.ui.components.SectionTitle

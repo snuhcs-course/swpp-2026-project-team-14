@@ -1,3 +1,4 @@
+// AI-generated with Codex, 2026-10-04, reviewed by Hyeon U Jeong
 package com.swpp.stylemate.ui.components
 
 import androidx.compose.foundation.layout.*

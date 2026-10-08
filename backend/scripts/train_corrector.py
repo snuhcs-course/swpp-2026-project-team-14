@@ -1,3 +1,4 @@
+# AI-generated with Claude Code (Claude Opus 5.5), 2026-09-24, reviewed by Dongkun Moon
 """Train and evaluate the learned measurement correction on the synthetic dataset.
 
     python scripts/train_corrector.py [--data private/dataset/samples.csv] [--export]

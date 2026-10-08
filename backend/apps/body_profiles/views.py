@@ -1,3 +1,4 @@
+# AI-generated with Claude Code (Claude Opus 5.5), 2026-09-24, reviewed by Dongkun Moon
 """POST /api/body-profile/analyze/ — docs/body-analysis/02-design.md §7."""
 
 from __future__ import annotations

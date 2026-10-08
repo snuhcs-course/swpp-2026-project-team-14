@@ -1,3 +1,4 @@
+// AI-generated with Claude Code (Claude Opus 5.5), 2026-09-24, reviewed by Dongkun Moon
 package com.swpp.stylemate.data
 
 import org.junit.Assert.assertEquals

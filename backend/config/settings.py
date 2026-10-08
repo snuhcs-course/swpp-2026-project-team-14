@@ -1,3 +1,4 @@
+# AI-generated with Claude Code (Dongkun Moon) and Codex (Hyeon U Jeong), 2026-09-24, reviewed by Dongkun Moon and Hyeon U Jeong
 """Django settings for the StyleMate backend.
 
 Configured through environment variables so the same code runs locally and in the cluster:

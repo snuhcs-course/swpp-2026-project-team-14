@@ -1,3 +1,4 @@
+// AI-generated with Claude Code (Claude Opus 5.5), 2026-09-28, reviewed by Dongkun Moon
 package com.swpp.stylemate.ui.profile
 
 import androidx.compose.animation.core.RepeatMode

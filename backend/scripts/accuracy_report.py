@@ -1,3 +1,4 @@
+# AI-generated with Claude Code (Claude Opus 5.5), 2026-10-03, reviewed by Dongkun Moon
 """Accuracy of the shipped pipeline on every benchmark photo with known measurements.
 
     python scripts/accuracy_report.py [--out ../docs/body-analysis/07-accuracy-report.md]

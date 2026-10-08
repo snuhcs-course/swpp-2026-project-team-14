@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# AI-generated with Claude Code (Claude Opus 5.5), 2026-09-24, reviewed by Dongkun Moon
 """Django entry point for the body-analysis dev server (see README)."""
 import os
 import sys

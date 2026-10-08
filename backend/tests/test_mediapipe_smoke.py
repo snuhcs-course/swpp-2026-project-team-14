@@ -1,3 +1,4 @@
+# AI-generated with Claude Code (Claude Opus 5.5), 2026-09-24, reviewed by Dongkun Moon
 """MediaPipe estimator: loads the real model (skipped if not downloaded) and handles image sizes."""
 
 import numpy as np

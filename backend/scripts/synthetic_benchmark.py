@@ -1,3 +1,4 @@
+# AI-generated with Claude Code (Claude Opus 5.5), 2026-09-24, reviewed by Dongkun Moon
 """Synthetic benchmark: render Anny 3D bodies, measure them with the pipeline, compare with the mesh.
 
     python scripts/synthetic_benchmark.py [--out private/synthetic_benchmark] [--bodies 8]

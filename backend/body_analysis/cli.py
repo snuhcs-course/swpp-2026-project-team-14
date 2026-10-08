@@ -1,3 +1,4 @@
+# AI-generated with Claude Code (Claude Opus 5.5), 2026-09-24, reviewed by Dongkun Moon
 """Run the pipeline on local photos.
 
     python -m body_analysis.cli --front front.jpg --side side.jpg --height 172 --weight 65 \

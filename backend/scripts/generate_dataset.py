@@ -1,3 +1,4 @@
+# AI-generated with Claude Code (Claude Opus 5.5), 2026-09-24, reviewed by Dongkun Moon
 """Generate a synthetic training set for the learned measurement correction.
 
     python scripts/generate_dataset.py --bodies 200 [--seed 7] [--out private/dataset]

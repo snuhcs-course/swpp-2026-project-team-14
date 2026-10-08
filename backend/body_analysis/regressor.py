@@ -1,3 +1,4 @@
+# AI-generated with Claude Code (Claude Opus 5.5), 2026-09-24, reviewed by Dongkun Moon
 """Learned correction of the geometric measurements (Option 2 in docs/body-analysis/01-model-research.md).
 
 A per-measurement ridge regression maps the scale-free geometric features (RawMeasurements.features)

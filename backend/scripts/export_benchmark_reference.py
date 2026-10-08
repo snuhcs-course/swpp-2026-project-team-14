@@ -1,3 +1,4 @@
+# AI-generated with Claude Code (Claude Opus 5.5), 2026-10-02, reviewed by Dongkun Moon
 """Renders the benchmark bodies as demo photos and exports their true measurements.
 
     python scripts/export_benchmark_reference.py [--out private/benchmark_photos]

@@ -1,3 +1,4 @@
+# AI-generated with Codex, 2026-09-29, reviewed by Hyeon U Jeong
 import re
 from typing import TypedDict, cast
 

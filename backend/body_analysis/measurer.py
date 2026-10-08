@@ -1,3 +1,4 @@
+# AI-generated with Claude Code (Claude Opus 5.5), 2026-09-24, reviewed by Dongkun Moon
 """Turns front/side pose results into garment measurements (baseline v1, geometric).
 
 Method (docs/body-analysis/02-design.md §6, Option 1):

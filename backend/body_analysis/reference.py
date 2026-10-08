@@ -1,3 +1,4 @@
+# AI-generated with Claude Code (Claude Opus 5.5), 2026-10-02, reviewed by Dongkun Moon
 """Recognises our benchmark photos so the app can show real accuracy against known measurements.
 
 The 8 synthetic benchmark bodies (`scripts/synthetic_benchmark.py`) have exact measurements taken

@@ -1,3 +1,4 @@
+# AI-generated with Codex, 2026-10-03, reviewed by Hyeon U Jeong
 """Download pinned GarmentIQ weights and export in Docker's build stage or a separate torch environment."""
 import hashlib
 import importlib.util

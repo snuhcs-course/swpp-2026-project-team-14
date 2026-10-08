@@ -1,3 +1,4 @@
+# AI-generated with Claude Code (Claude Opus 5.5), 2026-09-24, reviewed by Dongkun Moon
 """A procedurally drawn mannequin with known dimensions, used instead of real body photos in tests.
 
 Units are cm; the body is 170 cm tall and rasterised at PX_PER_CM. Front and side masks are
