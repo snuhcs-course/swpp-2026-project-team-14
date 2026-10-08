@@ -1,3 +1,4 @@
+# AI-generated with Codex, 2026-10-03, reviewed by Hyeon U Jeong
 from django.urls import path
 
 from . import views

@@ -1,3 +1,4 @@
+# AI-generated with Claude Code (Dongkun Moon) and Codex (Hyeon U Jeong), 2026-09-25, reviewed by Dongkun Moon and Hyeon U Jeong
 name: Backend CI
 
 # Runs on every PR and push that touches backend/, so broken code is caught before it reaches

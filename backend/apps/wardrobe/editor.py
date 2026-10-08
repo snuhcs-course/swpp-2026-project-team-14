@@ -1,3 +1,4 @@
+# AI-generated with Codex, 2026-09-29, reviewed by Hyeon U Jeong
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from typing import NamedTuple
 

@@ -1,3 +1,4 @@
+# AI-generated with Claude Code (Claude Opus 5.5), 2026-09-25, reviewed by Dongkun Moon
 """Service endpoints kept from the team's original deployment app (backend/app.py)."""
 
 from django.http import JsonResponse

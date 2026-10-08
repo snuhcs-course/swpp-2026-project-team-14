@@ -1,3 +1,4 @@
+# AI-generated with Claude Code (Dongkun Moon) and Codex (Hyeon U Jeong, Kihwan Kim), 2026-09-24, reviewed by Dongkun Moon, Hyeon U Jeong and Kihwan Kim
 FROM python:3.12-slim AS wardrobe-model
 
 WORKDIR /build

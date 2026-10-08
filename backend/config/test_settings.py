@@ -1,3 +1,4 @@
+# AI-generated with Codex, 2026-10-03, reviewed by Hyeon U Jeong
 """Isolated wardrobe API tests; no production database, photos, or AI credentials."""
 from .settings import *
 

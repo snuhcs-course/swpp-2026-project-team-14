@@ -1,3 +1,4 @@
+# AI-generated with Claude Code (Claude Opus 5.5), 2026-09-28, reviewed by Dongkun Moon
 """Detects loose clothing from the silhouette, so users no longer have to say what they wore.
 
 Two logistic-regression models (loose top, loose bottom) on the same scale-free features as the

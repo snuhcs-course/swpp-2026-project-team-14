@@ -1,3 +1,4 @@
+# AI-generated with Claude Code (Claude Opus 5.5), 2026-09-24, reviewed by Dongkun Moon
 """End-to-end analysis: image bytes in, measurements out. Photos stay in memory only."""
 
 from __future__ import annotations

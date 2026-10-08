@@ -1,3 +1,4 @@
+# AI-generated with Claude Code (Claude Opus 5.5), 2026-09-24, reviewed by Dongkun Moon
 """Pure geometry helpers on person masks. No ML dependencies, fully unit-testable."""
 
 from __future__ import annotations

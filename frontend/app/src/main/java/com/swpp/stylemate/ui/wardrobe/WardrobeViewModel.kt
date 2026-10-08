@@ -1,3 +1,4 @@
+// AI-generated with Codex, 2026-10-03, reviewed by Hyeon U Jeong
 package com.swpp.stylemate.ui.wardrobe
 
 import com.swpp.stylemate.data.wardrobe.WardrobeRepository

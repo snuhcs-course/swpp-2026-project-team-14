@@ -1,3 +1,4 @@
+# AI-generated with Claude Code (Claude Opus 5.5), 2026-09-28, reviewed by Dongkun Moon
 """Train and evaluate the loose-clothing detector on the synthetic dataset.
 
     python scripts/train_clothing_detector.py [--data private/dataset/samples.csv] [--export]

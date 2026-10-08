@@ -1,3 +1,4 @@
+# AI-generated with Codex, 2026-09-29, reviewed by Hyeon U Jeong
 """Initial wardrobe schema for a fresh database."""
 
 import uuid
