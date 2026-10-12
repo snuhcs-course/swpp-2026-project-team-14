@@ -12,3 +12,4 @@ scripts/*
 *.md
 requirements-dev.txt
 requirements-benchmark.txt
+recommendation/demo/

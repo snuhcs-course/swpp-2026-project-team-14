@@ -40,6 +40,8 @@ COPY manage.py .
 COPY config ./config
 COPY apps ./apps
 COPY body_analysis ./body_analysis
+# Outfit recommendation: rules + models trained on K-Fashion (statistics and weights only, no data)
+COPY recommendation ./recommendation
 COPY --from=wardrobe-model /build/wardrobe/garment-landmarks /app/wardrobe/garment-landmarks
 
 USER 10001:10001
