@@ -120,12 +120,18 @@ class OutfitRepositoryTest {
     fun labels_postsTheGarmentBeingEdited() = runBlocking {
         server.enqueue(MockResponse().setBody("""{"labels": {"fit": "루즈", "fit_basis": "가슴 여유 16 cm"}}"""))
         val attributes = JSONObject().put("name", "니트").put("category", "top")
-        val labels = repository().labels(attributes, null, body, JSONObject().put("print", "무지"))
+        val labels = repository().labels(attributes, null, body, JSONObject().put("print", "무지"), "short_sleeve_top")
         assertEquals("루즈", labels?.getString("fit"))
         val request = server.takeRequest()
         assertEquals("/api/wardrobe/labels/", request.path)
         val sent = JSONObject(request.body.readUtf8())
         assertTrue(sent.isNull("dimensions"))
         assertEquals("무지", sent.getJSONObject("details").getString("print"))
+        assertEquals("short_sleeve_top", sent.getString("garment_type"))
+        // without a body profile the labels are still requested (the user then picks the fit)
+        server.enqueue(MockResponse().setBody("""{"labels": {"fit": null}}"""))
+        repository().labels(attributes, null, null, null)
+        val noBody = JSONObject(server.takeRequest().body.readUtf8())
+        assertTrue(noBody.isNull("body") && noBody.isNull("garment_type"))
     }
 }

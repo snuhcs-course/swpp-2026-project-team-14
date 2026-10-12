@@ -1,4 +1,4 @@
-// AI-generated with Codex, 2026-09-29, reviewed by Hyeon U Jeong
+// AI-generated with Codex, 2026-09-29, reviewed by Hyeon U Jeong; recommendation labels added with Claude Code (Claude Opus 5.5), 2026-10-12, reviewed by Dongkun Moon
 package com.swpp.stylemate.data.wardrobe
 
 import android.content.Context
@@ -10,8 +10,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
-internal suspend fun requestAnalysis(context: Context, photo: String): JSONObject = withContext(Dispatchers.IO) {
-    val connection = URI("${BuildConfig.API_BASE_URL.trimEnd('/')}/api/wardrobe/analyze/").toURL().openConnection() as HttpURLConnection
+/** [garmentType]: the kind picked for AR measurement (a landmark type), sent as a hint for the AI. */
+internal suspend fun requestAnalysis(context: Context, photo: String, garmentType: String? = null): JSONObject = withContext(Dispatchers.IO) {
+    val hint = garmentType?.takeIf { it in landmarkTypes }?.let { "?garment=$it" }.orEmpty()
+    val connection = URI("${BuildConfig.API_BASE_URL.trimEnd('/')}/api/wardrobe/analyze/$hint").toURL().openConnection() as HttpURLConnection
     try {
         val bytes = context.contentResolver.openInputStream(CaptureFiles(context).uri(photo))!!.use { input ->
             val buffer = ByteArray(5 * 1024 * 1024 + 1)

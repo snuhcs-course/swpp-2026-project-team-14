@@ -132,7 +132,11 @@ fun HomeScreen(
 }
 
 private fun weatherLine(state: HomeState): String {
-    val w = state.weather ?: return if (state.outfits.isEmpty()) "오늘 날씨를 확인하고 있어요" else "날씨 정보 없이 18°C 기준으로 골랐어요"
+    val w = state.weather ?: return when {
+        state.outfits.isNotEmpty() -> "날씨 정보 없이 18°C 기준으로 골랐어요"
+        state.loading -> "오늘 날씨를 확인하고 있어요"
+        else -> "" // no profile or an error: the card below explains
+    }
     val parts = listOf("서울 ${String.format(Locale.KOREA, "%.0f", w.temp)}°C", w.label,
         if (kotlin.math.abs(w.apparent - w.temp) >= 2) "체감 ${String.format(Locale.KOREA, "%.0f", w.apparent)}°C" else null, w.band)
     return parts.filterNotNull().filter { it.isNotBlank() }.joinToString(" · ")

@@ -46,6 +46,17 @@ class GarmentLabelsTest {
     }
 
     @Test
+    fun designDetails_areCheckedAndLimitedToThree() {
+        val withDetails = JSONObject(options.toString())
+        withDetails.getJSONObject("top").put("design_details", JSONArray(listOf("프릴", "리본", "포켓", "지퍼")))
+        withDetails.getJSONObject("limits").put("design_details", 3)
+        val merged = GarmentLabels.merge(suggested, mapOf("design_details" to JSONArray(listOf("프릴", "반짝이", "리본", "포켓", "지퍼"))),
+            "top", withDetails)!!
+        val details = merged.getJSONArray("design_details")
+        assertEquals(listOf("프릴", "리본", "포켓"), (0 until details.length()).map { details.getString(it) })
+    }
+
+    @Test
     fun noSuggestionOrShoes_meansNoLabels() {
         assertNull(GarmentLabels.merge(null, mapOf("fit" to "루즈"), "top", options))
         assertNull(GarmentLabels.merge(suggested, emptyMap(), "shoes", options))

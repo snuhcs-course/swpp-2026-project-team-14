@@ -7,6 +7,10 @@ import com.swpp.stylemate.data.BodyProfileJson
 import com.swpp.stylemate.data.SharedPrefsBodyProfileStore
 import com.swpp.stylemate.data.recommendation.OutfitRepository
 import com.swpp.stylemate.ui.wardrobe.capture.MeasurementActivity
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.compose.runtime.rememberCoroutineScope
+import com.swpp.stylemate.ui.profile.decodeDownscaled
+import kotlinx.coroutines.launch
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import android.Manifest
@@ -71,6 +75,16 @@ fun WardrobeRoute() {
     var previewLoading by remember { mutableStateOf(false) }
     var measurementBusy by rememberSaveable { mutableStateOf(false) }
     var selectedMeasurements by rememberSaveable { mutableStateOf<String?>(null) }
+    // Tops and outerwear are measured from the back; their design is analysed from a separate front photo.
+    var frontPhoto by rememberSaveable { mutableStateOf<String?>(null) }
+    var pendingFront by rememberSaveable { mutableStateOf<String?>(null) }
+    var frontPreview by remember { mutableStateOf<ImageBitmap?>(null) }
+    var frontLoading by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    val measured = remember(selectedMeasurements) { selectedMeasurements?.let { runCatching { JSONObject(it) }.getOrNull() } }
+    val needsFront = needsFrontPhoto(measured?.optString("category"))
+    val garmentType = measured?.let { if (it.isNull("garment_type")) null else it.optString("garment_type") }
+    val analysisPhoto = if (needsFront) frontPhoto else selected
     val analysisModel: GarmentAnalysisViewModel = viewModel()
     val analysis by analysisModel.state.collectAsStateWithLifecycle()
     val wardrobeModel: WardrobeViewModel = viewModel()
@@ -82,11 +96,13 @@ fun WardrobeRoute() {
     val body = remember { SharedPrefsBodyProfileStore(context).load()?.let { JSONObject(BodyProfileJson.encode(it)) } }
     var editingId by rememberSaveable { mutableStateOf<String?>(null) }
     var savedPhoto by remember(editingId) { mutableStateOf<ImageBitmap?>(null) }
-    LaunchedEffect(selected) { analysisModel.select(selected) }
+    LaunchedEffect(analysisPhoto) { analysisModel.select(analysisPhoto) }
     LaunchedEffect(wardrobe.savedId) {
         if (wardrobe.savedId != null) {
             files.delete(selected)
+            files.delete(frontPhoto)
             selected = null
+            frontPhoto = null
             selectedMeasurements = null
             editingId = null
             message = null
@@ -103,12 +119,22 @@ fun WardrobeRoute() {
         previewLoading = false
         if (preview == null) message = "사진을 읽을 수 없습니다. 다시 촬영해 주세요."
     }
+    LaunchedEffect(frontPhoto) {
+        frontPreview = null
+        val name = frontPhoto ?: return@LaunchedEffect
+        frontLoading = true
+        frontPreview = withContext(Dispatchers.IO) { runCatching { files.preview(name)?.asImageBitmap() }.getOrNull() }
+        frontLoading = false
+        if (frontPreview == null) message = "앞면 사진을 읽을 수 없습니다. 다시 찍어 주세요."
+    }
 
     val measurementCamera = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         measurementBusy = false
         val name = result.data?.getStringExtra("capture_name")
         if (result.resultCode == Activity.RESULT_OK && name != null && files.exists(name)) {
             files.delete(selected)
+            files.delete(frontPhoto)
+            frontPhoto = null
             selected = name
             selectedMeasurements = result.data?.getStringExtra("measurements")
             message = null
@@ -147,7 +173,38 @@ fun WardrobeRoute() {
             else -> requestPermission()
         }
     }
-    fun discard() { files.delete(selected); selected = null; selectedMeasurements = null; message = null }
+    val frontCamera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { saved ->
+        val name = pendingFront
+        pendingFront = null
+        if (saved && name != null && files.exists(name)) { files.delete(frontPhoto); frontPhoto = name; message = null }
+        else files.delete(name)
+    }
+    fun captureFront() {
+        val name = files.create()
+        pendingFront = name
+        try { frontCamera.launch(files.uri(name)) }
+        catch (_: Exception) { files.delete(name); pendingFront = null; message = "카메라를 열지 못했습니다." }
+    }
+    val frontPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) captureFront() else message = "카메라 권한을 허용하거나 갤러리에서 앞면 사진을 골라 주세요."
+    }
+    fun takeFront() {
+        message = null
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) captureFront()
+        else frontPermission.launch(Manifest.permission.CAMERA)
+    }
+    val frontGallery = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) scope.launch {
+            val bitmap = decodeDownscaled(context, uri, maxSide = 1536)
+            val name = bitmap?.let { withContext(Dispatchers.IO) { runCatching { files.create().also { n -> files.write(n, it) } }.getOrNull() } }
+            if (name == null) message = "사진을 읽을 수 없습니다. 다른 사진을 골라 주세요."
+            else { files.delete(frontPhoto); frontPhoto = name; message = null }
+        }
+    }
+    fun discard() {
+        files.delete(selected); files.delete(frontPhoto)
+        selected = null; frontPhoto = null; selectedMeasurements = null; message = null
+    }
     BackHandler(selected != null || editingId != null) {
         if (!wardrobe.saving) { discard(); editingId = null; wardrobeModel.clearSaveState() }
     }
@@ -190,30 +247,40 @@ fun WardrobeRoute() {
         val result = if (editingId == null) analysis.result else null
         val record = editing ?: result
         val catalog = wardrobe.catalog
-        val measurements = selectedMeasurements?.let { JSONObject(it) }
+        val measurements = measured
         val measuredCategory = measurements?.optString("category")
         val attrs = record?.getJSONObject("attributes")
         val sameCategory = measuredCategory == attrs?.optString("category") || measuredCategory == "top" && attrs?.optString("category") == "outerwear"
         val back = { discard(); editingId = null; wardrobeModel.clearSaveState() }
-        if (record != null && catalog != null) {
+        // a new garment's bottom kind comes from what the user picked when measuring (shorts, skirt, trousers)
+        val initialAttributes = remember(record, garmentType) {
+            record?.getJSONObject("attributes")?.let { if (editing == null) applyCaptureType(it, garmentType) else it }
+        }
+        if (record != null && catalog != null && initialAttributes != null) {
             GarmentEditor(
-                record.getString("id"), record.getJSONObject("attributes"),
+                record.getString("id"), initialAttributes,
                 if (editing != null) editing.optJSONObject("dimensions") else if (sameCategory) measurements?.optJSONObject("dimensions") else null,
                 if (editing != null) editing.getString("notes") else "", catalog,
                 wardrobe.saving || wardrobe.loading, editing != null, wardrobe.saveError,
                 onSave = { payload ->
                     labelsModel.merged(payload.getJSONObject("attributes").optString("category"), catalog.optJSONObject("label_options"))
-                        ?.let { payload.put("labels", it) }
+                        ?.let { labels ->
+                            payload.put("labels", labels)
+                            // the fit is kept only in the labels, so the old attribute fields do not disagree with it
+                            payload.getJSONObject("attributes").put("fit_type", JSONObject.NULL).put("leg_shape", JSONObject.NULL)
+                        }
                     wardrobeModel.save(record.getString("id"), payload)
                 }, onBack = back,
-                image = if (editing != null) savedPhoto else preview,
+                image = if (editing != null) savedPhoto else if (needsFront) frontPreview else preview,
                 photo = {
                     if (editing != null) GarmentPhoto(editing.getString("image_url"), editing.getJSONObject("attributes").getString("name"),
                         onLoaded = { savedPhoto = it })
                     else {
                         PhotoFrame {
-                            preview?.let { Image(it, "촬영한 옷 사진", Modifier.fillMaxSize(), contentScale = ContentScale.Fit) }
-                            if (previewLoading) CircularProgressIndicator()
+                            (if (needsFront) frontPreview else preview)?.let {
+                                Image(it, "촬영한 옷 사진", Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
+                            }
+                            if (if (needsFront) frontLoading else previewLoading) CircularProgressIndicator()
                         }
                         if (measurements != null && !sameCategory) Text("옷 종류가 달라 치수를 다시 입력해 주세요.",
                             Modifier.padding(top = 12.dp), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
@@ -223,15 +290,15 @@ fun WardrobeRoute() {
                     val stored = editing?.optJSONObject("labels")
                     GarmentLabelSection(labelsModel, record.getString("id"), attributes, dimensions, body,
                         GarmentLabels.details(result, stored), stored, catalog.optJSONObject("label_options"),
-                        enabled = !(wardrobe.saving || wardrobe.loading))
+                        enabled = !(wardrobe.saving || wardrobe.loading), garmentType = if (editing == null) garmentType else null)
                 },
             )
         } else {
             ScreenScaffold(
                 title = if (editingId != null) "옷 정보" else "촬영한 옷",
                 primaryLabel = if (editingId != null || result != null) null else if (analysis.busy) "분석 중" else "분석하기",
-                primaryEnabled = !analysis.busy && !measurementBusy && preview != null,
-                onPrimary = { selected?.let { analysisModel.analyze(context, it) } },
+                primaryEnabled = !analysis.busy && !measurementBusy && preview != null && (!needsFront || frontPreview != null),
+                onPrimary = { analysisPhoto?.let { analysisModel.analyze(context, it, garmentType) } },
                 onBack = back,
                 actionLabel = if (editingId == null && result == null) "다시 촬영" else null,
                 onAction = { takePhoto() },
@@ -252,6 +319,10 @@ fun WardrobeRoute() {
                                 }
                             })
                         }
+                        if (needsFront) FrontPhotoCard(frontPreview, frontLoading, enabled = !analysis.busy && !measurementBusy,
+                            onCamera = ::takeFront, onGallery = {
+                                frontGallery.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                            })
                         if (analysis.busy) LinearProgressIndicator(Modifier.fillMaxWidth().padding(top = 16.dp))
                         analysis.error?.let { Text(it, Modifier.padding(top = 12.dp), color = MaterialTheme.colorScheme.error) }
                     } else if (wardrobe.loading) {

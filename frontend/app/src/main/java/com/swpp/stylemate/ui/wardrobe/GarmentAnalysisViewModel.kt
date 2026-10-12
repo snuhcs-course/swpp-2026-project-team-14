@@ -1,4 +1,4 @@
-// AI-generated with Codex, 2026-10-03, reviewed by Hyeon U Jeong
+// AI-generated with Codex, 2026-10-03, reviewed by Hyeon U Jeong; recommendation labels added with Claude Code (Claude Opus 5.5), 2026-10-12, reviewed by Dongkun Moon
 package com.swpp.stylemate.ui.wardrobe
 
 import com.swpp.stylemate.data.wardrobe.requestAnalysis
@@ -35,14 +35,14 @@ class GarmentAnalysisViewModel : ViewModel() {
         mutableState.value = AnalysisState(photo)
     }
 
-    fun analyze(context: Context, photo: String) {
+    fun analyze(context: Context, photo: String, garmentType: String? = null) {
         if (mutableState.value.busy) return
         select(photo)
         mutableState.value = AnalysisState(photo, busy = true)
         val application = context.applicationContext
         job = viewModelScope.launch {
             try {
-                val result = requestAnalysis(application, photo)
+                val result = requestAnalysis(application, photo, garmentType)
                 mutableState.value = AnalysisState(photo, result = result)
             } catch (error: CancellationException) {
                 throw error

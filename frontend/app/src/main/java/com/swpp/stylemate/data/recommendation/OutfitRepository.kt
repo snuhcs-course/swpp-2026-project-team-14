@@ -74,13 +74,16 @@ class OutfitRepository(
         return parseOutfit(result.getJSONObject("outfit")) to result.getJSONObject("preference")
     }
 
-    /** Suggested labels for the garment being registered, on this body (nothing is saved). */
-    suspend fun labels(attributes: JSONObject, dimensions: JSONObject?, body: JSONObject, details: JSONObject?): JSONObject? =
+    /** Suggested labels for the garment being registered (nothing is saved). Without [body] the fit,
+     * length and "too small" stay open for the user to pick. */
+    suspend fun labels(attributes: JSONObject, dimensions: JSONObject?, body: JSONObject?, details: JSONObject?,
+                       garmentType: String? = null): JSONObject? =
         call("POST", "/api/wardrobe/labels/", JSONObject()
             .put("attributes", attributes)
             .put("dimensions", dimensions ?: JSONObject.NULL)
-            .put("body", body)
-            .put("details", details ?: JSONObject.NULL)).optJSONObject("labels")
+            .put("body", body ?: JSONObject.NULL)
+            .put("details", details ?: JSONObject.NULL)
+            .put("garment_type", garmentType ?: JSONObject.NULL)).optJSONObject("labels")
 
     private suspend fun call(method: String, path: String, body: JSONObject? = null): JSONObject = withContext(Dispatchers.IO) {
         val payload = body?.toString()?.toRequestBody("application/json".toMediaType())

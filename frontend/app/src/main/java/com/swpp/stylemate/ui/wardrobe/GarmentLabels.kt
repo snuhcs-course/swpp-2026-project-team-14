@@ -14,9 +14,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
@@ -35,6 +35,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
@@ -64,7 +65,7 @@ data class LabelState(
 
 object GarmentLabels {
     private val SINGLE = listOf("fit", "length", "sleeve", "season", "neckline", "collar")
-    private val MULTIPLE = listOf("prints", "materials")
+    private val MULTIPLE = listOf("prints", "materials", "design_details")
 
     /**
      * Suggestion + edits, with every value checked against the category's options (the server
@@ -84,7 +85,7 @@ object GarmentLabels {
         MULTIPLE.forEach { key ->
             val values = allowed.optJSONArray(key)?.strings().orEmpty()
             val chosen = result.optJSONArray(key)?.strings().orEmpty().filter { it in values }.distinct()
-            result.put(key, JSONArray(chosen.take(limits.optInt(key, 2))))
+            result.put(key, JSONArray(chosen.take(limits.optInt(key, if (key == "design_details") 3 else 2))))
         }
         return result.put("confirmed", true)
     }
@@ -92,13 +93,16 @@ object GarmentLabels {
     fun inputKey(attributes: JSONObject, dimensions: JSONObject?): String =
         listOf(attributes.optString("category"), attributes.opt("subcategory"), attributes.opt("colors"), dimensions).joinToString("|")
 
-    /** AI design details (print, neckline, collar) to send back with a recomputation. */
+    /** AI design details (print, neckline, collar, design details, visible materials) to send back with a
+     * recomputation: from the analysis of a new garment, or from the saved labels. */
     fun details(analysis: JSONObject?, stored: JSONObject?): JSONObject? = analysis?.optJSONObject("details")
         ?: stored?.let { labels ->
             JSONObject()
                 .put("print", labels.optJSONArray("prints")?.strings()?.firstOrNull() ?: JSONObject.NULL)
                 .put("neckline", if (labels.isNull("neckline")) JSONObject.NULL else labels.optString("neckline"))
                 .put("collar", if (labels.isNull("collar")) JSONObject.NULL else labels.optString("collar"))
+                .put("design_details", labels.optJSONArray("design_details") ?: JSONArray())
+                .put("materials", labels.optJSONArray("materials") ?: JSONArray())
         }
 
     internal fun JSONArray.strings(): List<String> = (0 until length()).map { getString(it) }
@@ -116,15 +120,15 @@ class GarmentLabelsViewModel(private val repository: OutfitRepository) : ViewMod
         mutableState.value = LabelState(garmentId, stored, inputKey = if (stored != null) inputKey else null)
     }
 
-    fun compute(garmentId: String, attributes: JSONObject, dimensions: JSONObject?, body: JSONObject,
-                details: JSONObject?, inputKey: String, force: Boolean = false) {
+    fun compute(garmentId: String, attributes: JSONObject, dimensions: JSONObject?, body: JSONObject?,
+                details: JSONObject?, garmentType: String?, inputKey: String, force: Boolean = false) {
         val current = mutableState.value
         if (current.garmentId != garmentId || (!force && current.inputKey == inputKey && current.suggested != null)) return
         job?.cancel()
         mutableState.value = current.copy(loading = true, error = null)
         job = viewModelScope.launch {
             try {
-                val labels = repository.labels(attributes, dimensions, body, details)
+                val labels = repository.labels(attributes, dimensions, body, details, garmentType)
                 mutableState.value = mutableState.value.copy(suggested = labels, inputKey = inputKey, loading = false)
             } catch (error: CancellationException) {
                 throw error
@@ -145,29 +149,28 @@ class GarmentLabelsViewModel(private val repository: OutfitRepository) : ViewMod
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun GarmentLabelSection(model: GarmentLabelsViewModel, garmentId: String, attributes: JSONObject, dimensions: JSONObject?,
-                        body: JSONObject?, details: JSONObject?, stored: JSONObject?, options: JSONObject?, enabled: Boolean) {
+                        body: JSONObject?, details: JSONObject?, stored: JSONObject?, options: JSONObject?, enabled: Boolean,
+                        garmentType: String? = null) {
     val category = attributes.optString("category")
     val allowed = options?.optJSONObject(category) ?: return  // shoes: not used by the recommender
     val state by model.state.collectAsStateWithLifecycle()
-    val key = GarmentLabels.inputKey(attributes, dimensions)
+    val key = GarmentLabels.inputKey(attributes, dimensions) + if (body != null) "|body" else ""
     LaunchedEffect(garmentId) { model.start(garmentId, stored, key) }
     LaunchedEffect(garmentId, key, body?.toString()) {
-        if (body == null) return@LaunchedEffect
         delay(500) // wait until the user stops typing a dimension
-        model.compute(garmentId, attributes, dimensions, body, details, key)
+        model.compute(garmentId, attributes, dimensions, body, details, garmentType, key)
     }
     SectionTitle("내 몸 기준 라벨", "추천에 쓰여요")
     Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             if (body == null) {
-                Text("마이프로필에서 체형 분석을 하면 이 옷이 내 몸에 어떻게 맞는지 계산해 드려요.",
+                Text("마이프로필에서 체형 분석을 하면 핏과 기장을 치수로 계산해 드려요. 지금은 직접 골라 주세요.",
                     style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                return@Column
             }
             if (state.loading) LinearProgressIndicator(Modifier.fillMaxWidth())
             state.error?.let { message ->
                 Text(message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
-                TextButton(onClick = { model.compute(garmentId, attributes, dimensions, body, details, key, force = true) },
+                TextButton(onClick = { model.compute(garmentId, attributes, dimensions, body, details, garmentType, key, force = true) },
                     enabled = enabled) { Text("다시 계산") }
             }
             val labels = GarmentLabels.merge(state.suggested, state.edits, category, options) ?: return@Column
@@ -190,6 +193,7 @@ fun GarmentLabelSection(model: GarmentLabelsViewModel, garmentId: String, attrib
                 LabelMenu("넥라인", choices("neckline"), listOfNotNull(value("neckline")), 0, enabled) { model.edit("neckline", it.firstOrNull()) }
                 LabelMenu("옷깃", choices("collar"), listOfNotNull(value("collar")), 0, enabled) { model.edit("collar", it.firstOrNull()) }
             }
+            LabelMenu("디테일", choices("design_details"), values("design_details"), 3, enabled) { model.edit("design_details", JSONArray(it)) }
             LabelMenu("소재", choices("materials"), values("materials"), 2, enabled) { model.edit("materials", JSONArray(it)) }
             Text("치수와 사진으로 계산한 값이에요. 실제와 다르면 눌러서 고쳐 주세요.",
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -235,7 +239,11 @@ private fun LabelMenu(label: String, choices: List<String>, selected: List<Strin
             DropdownMenuItem(text = { Text("없음") }, onClick = { onChange(emptyList()); expanded = false })
             choices.forEach { choice ->
                 DropdownMenuItem(text = { Text(choice) },
-                    leadingIcon = if (multiple > 0) ({ Checkbox(checked = choice in selected, onCheckedChange = null) }) else null,
+                    // a plain icon rather than a Checkbox: these menus have up to 40 rows (K-Fashion details)
+                    leadingIcon = if (multiple > 0) ({
+                        Icon(Icons.Filled.Check, contentDescription = if (choice in selected) "선택됨" else null,
+                            tint = if (choice in selected) MaterialTheme.colorScheme.primary else Color.Transparent)
+                    }) else null,
                     enabled = multiple == 0 || choice in selected || selected.size < multiple,
                     onClick = {
                         if (multiple == 0) { onChange(listOf(choice)); expanded = false }

@@ -27,6 +27,9 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 private fun JSONObject.keysList(): List<String> = keys().asSequence().toList()
+
+/** Attributes replaced by the fit in the recommendation labels (GarmentLabels.kt). */
+internal val LABEL_OWNED_FIELDS = setOf("fit_type", "leg_shape")
 private fun JSONObject.code(key: String): String? = if (isNull(key)) null else optString(key).takeIf { it.isNotEmpty() }
 
 private fun attributeChoices(attributes: JSONObject, catalog: JSONObject, field: String): JSONObject {
@@ -120,7 +123,11 @@ fun GarmentEditor(id: String, initialAttributes: JSONObject, initialDimensions: 
             .put("notes", notes))
     }
 
-    val primary = setOf("category")
+    // The AI suggests the kind and styles, so they are shown up front for review. The fit lives only in
+    // the recommendation labels ("내 몸 기준 라벨"), computed from the measurements and the body.
+    val primary = setOf("category", "subcategory", "styles")
+    val detailFields = catalog.getJSONObject("enums").keysList()
+        .filter { it !in primary && it !in LABEL_OWNED_FIELDS && attributeChoices(attributes, catalog, it).length() > 0 }
     @Composable fun attribute(field: String) {
         val choices = attributeChoices(attributes, catalog, field)
         if (choices.length() > 0) ChoiceField(catalog.getJSONObject("labels").getString(field), choices,
@@ -154,9 +161,9 @@ fun GarmentEditor(id: String, initialAttributes: JSONObject, initialDimensions: 
                     catalog.getJSONObject("array_limits").getInt("colors"), image, !busy,
                     onChange = { updateAttribute("colors", JSONArray(it)) })
             }
-            ExpandSection("상세 정보", extra) { extra = !extra }
-            if (extra) EditorSection {
-                catalog.getJSONObject("enums").keysList().filter { it !in primary }.forEach { attribute(it) }
+            if (detailFields.isNotEmpty()) ExpandSection("상세 정보", extra) { extra = !extra }
+            if (extra && detailFields.isNotEmpty()) EditorSection {
+                detailFields.forEach { attribute(it) }
             }
             if (dimensions.length() > 0) {
                 SectionTitle("치수", "cm")
