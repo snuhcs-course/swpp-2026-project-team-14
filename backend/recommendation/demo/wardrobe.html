@@ -1,0 +1,175 @@
+<!doctype html>
+<!-- AI-generated with Claude Code (Claude Opus 5.5), 2026-10-12, reviewed by Dongkun Moon -->
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>내 옷장 코디 테스트</title>
+<style>
+  :root { --tc:#C4552B; --tc-soft:#F6DDD2; --tc-ink:#8A3312; --cream:#F8F6F2; --sand:#F1ECE6; --ink:#1F1B18;
+          --muted:#8A8580; --line:#E4DED7; --good:#3F8F5A; }
+  * { box-sizing:border-box; margin:0; }
+  body { font-family:"Pretendard","Malgun Gothic","Apple SD Gothic Neo",system-ui,sans-serif; background:var(--cream); color:var(--ink); }
+  header { display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; padding:14px 20px; border-bottom:1px solid var(--line); background:#fff; position:sticky; top:0; z-index:5; }
+  header h1 { font-size:17px; } header span, header a { color:var(--muted); font-size:12px; }
+  .wrap { display:grid; grid-template-columns:340px 1fr; gap:16px; padding:16px 20px; max-width:1280px; margin:0 auto; }
+  @media (max-width:860px) { .wrap { grid-template-columns:1fr; padding:16px; } }
+  .panel { background:#fff; border-radius:16px; padding:14px; border:1px solid var(--line); margin-bottom:12px; }
+  h2 { font-size:14px; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center; gap:8px; }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:6px 10px; }
+  label.row { display:flex; flex-direction:column; gap:3px; font-size:11.5px; color:var(--muted); }
+  input, select { width:100%; border:1px solid var(--line); border-radius:8px; padding:6px 8px; font:inherit; font-size:13px; background:#fff; color:var(--ink); }
+  .chips { display:flex; flex-wrap:wrap; gap:5px; }
+  .chip { border:1px solid var(--line); border-radius:999px; padding:4px 10px; font-size:12px; cursor:pointer; background:#fff; user-select:none; }
+  .chip.on { background:var(--tc); border-color:var(--tc); color:#fff; }
+  .btn { border:0; border-radius:12px; padding:10px 14px; font:inherit; font-weight:700; cursor:pointer; }
+  .btn.primary { background:var(--tc); color:#fff; } .btn.ghost { background:var(--sand); color:var(--ink); }
+  .btn.small { padding:5px 10px; font-size:12px; border-radius:999px; }
+  .actions { display:flex; gap:8px; margin-top:10px; }
+  .garments { display:grid; gap:8px; }
+  .g { display:grid; grid-template-columns:34px 1fr auto; gap:8px; align-items:start; padding:8px; border:1px solid var(--line); border-radius:12px; }
+  .g.off { opacity:.45; } .g.small { border-color:var(--tc); background:#FDF3EE; }
+  .sw { width:34px; height:34px; border-radius:8px; border:1px solid var(--line); }
+  .g b { font-size:13px; } .g .dims { font-size:11px; color:var(--muted); }
+  .labels { display:flex; flex-wrap:wrap; gap:4px; margin-top:4px; }
+  .lb { font-size:11px; background:var(--sand); border-radius:6px; padding:2px 6px; }
+  .lb.warn { background:#FBE6E0; color:var(--tc-ink); font-weight:700; }
+  .basis { font-size:10.5px; color:var(--muted); margin-top:2px; }
+  .outfits { display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:12px; }
+  .card { background:#fff; border:1px solid var(--line); border-radius:20px; padding:14px; display:grid; gap:10px; }
+  .stack { display:grid; gap:6px; justify-items:center; padding:8px 0; }
+  .block { border-radius:12px; height:64px; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; border:1px solid var(--line); }
+  .pill { justify-self:center; background:var(--tc-soft); color:var(--tc-ink); border-radius:999px; padding:5px 12px; font-size:12px; font-weight:700; }
+  .bars { display:grid; grid-template-columns:auto 1fr auto; gap:3px 8px; font-size:11px; color:var(--muted); align-items:center; }
+  .bar { height:6px; background:var(--sand); border-radius:6px; overflow:hidden; } .bar i { display:block; height:100%; background:var(--tc); }
+  .reasons { font-size:12.5px; display:grid; gap:6px; } .reasons small { display:block; color:var(--muted); font-size:10.5px; }
+  .note { font-size:12.5px; background:#fff; border:1px solid var(--line); border-radius:12px; padding:8px 12px; margin-bottom:8px; }
+  .muted { color:var(--muted); font-size:12px; }
+  .temp { display:flex; align-items:center; gap:8px; } .temp input { flex:1; }
+</style>
+</head>
+<body>
+<header><h1>내 옷장 코디 테스트</h1>
+  <span>앱과 같은 경로: 옷 치수 + 체형 → 라벨 → 내 옷만으로 코디 (PMI + 마스킹 모델)</span>
+  <a href="/">← K-Fashion 엔진 테스트</a></header>
+<div class="wrap">
+  <aside>
+    <div class="panel">
+      <h2>체형 (cm) <span class="chips"><span class="chip on" data-preset="female">여성 예시</span><span class="chip" data-preset="male">남성 예시</span></span></h2>
+      <div class="grid2" id="body"></div>
+    </div>
+    <div class="panel">
+      <h2>선호</h2>
+      <div class="chips" id="fit"></div>
+      <div class="chips" id="styles" style="margin-top:8px"></div>
+    </div>
+    <div class="panel">
+      <h2>날씨 <span class="chip" id="wet">비 오는 날</span></h2>
+      <div class="temp"><input id="temp" type="range" min="-8" max="34" value="16"><b id="tempv">16°</b></div>
+    </div>
+  </aside>
+  <main>
+    <div class="panel">
+      <h2>샘플 옷장 <span class="muted">눌러서 빼거나 넣어 보세요 · 라벨은 이 체형으로 계산돼요</span></h2>
+      <div class="garments" id="garments"></div>
+    </div>
+    <div class="actions"><button class="btn primary" id="go">코디 추천</button><button class="btn ghost" id="more">다른 코디</button></div>
+    <div id="notes" style="margin-top:12px"></div>
+    <div class="outfits" id="outfits"></div>
+  </main>
+</div>
+<script>
+const $ = s => document.querySelector(s);
+const PRESETS = {
+  female: {gender:"female", height:163, chest:84, waist:67, hip:93, shoulder:38, inseam:73, torso_length:44, sleeve_length:56, outseam:99},
+  male:   {gender:"male", height:175, chest:96, waist:82, hip:96, shoulder:46, inseam:80, torso_length:50, sleeve_length:60, outseam:106},
+};
+const FIELDS = [["height","키"],["chest","가슴둘레"],["waist","허리둘레"],["hip","엉덩이둘레"],["shoulder","어깨너비"],
+                ["inseam","다리 안쪽"],["torso_length","상체 길이"],["sleeve_length","팔 길이"],["outseam","다리 바깥"]];
+const m = v => ({value:v, source:"user_measured", method:"unspecified", reference:null});
+const dims = o => Object.fromEntries([["unit","cm"], ...Object.entries(o).map(([k,v]) => [k, m(v)])]);
+// a wardrobe as the app stores it (apps/wardrobe): attributes + measured dimensions (half widths)
+const WARDROBE = [
+  ["베이지 니트","top","knitwear","#D6BE9A",["minimal"],{chest_width_half:52,total_length:63,sleeve_length:58,shoulder_width:46}],
+  ["화이트 셔츠","top","shirt","#FFFFFF",["classic"],{chest_width_half:50,total_length:70,sleeve_length:59,shoulder_width:41}],
+  ["네이비 반팔 티","top","tshirt","#24344B",["casual"],{chest_width_half:48,total_length:62,sleeve_length:20,shoulder_width:42}],
+  ["작은 스트라이프 셔츠","top","shirt","#3975C6",["classic"],{chest_width_half:40,total_length:60,sleeve_length:57}],
+  ["블랙 슬랙스","bottom","slacks","#202020",["minimal"],{waist_width_half:35,hip_width_half:51,thigh_width_half:32,hem_opening:27,inseam:71}],
+  ["데님 팬츠","bottom","jeans","#3975C6",["casual"],{waist_width_half:34,hip_width_half:48,thigh_width_half:29,hem_opening:19,inseam:72}],
+  ["베이지 스커트","bottom","skirt","#D6BE9A",["classic"],{waist_width_half:34,hip_width_half:50,total_length:72}],
+  ["반바지","bottom","shorts","#7B8052",["casual"],{waist_width_half:36,hip_width_half:52,thigh_width_half:33,hem_opening:30,inseam:13}],
+  ["브라운 코트","outerwear","coat","#795548",["classic"],{chest_width_half:55,total_length:98,sleeve_length:60,shoulder_width:42}],
+  ["그레이 가디건","outerwear","cardigan","#808080",["minimal"],{chest_width_half:53,total_length:62,sleeve_length:58}],
+].map(([name,category,subcategory,color,styles,d],i) => ({id:"s"+i, attributes:{name,category,subcategory,colors:[color],styles,
+  fit_type:null,leg_shape:null,rise_type:null,skirt_shape:null}, dimensions:dims(d)}));
+const S = {preset:"female", fit:"regular", styles:new Set(["미니멀"]), off:new Set(), wet:false, seen:[], pref:{weights:{},excluded:[],liked:[]}, labels:{}};
+const DIM_LABEL = {chest_width_half:"가슴단면",total_length:"총장",sleeve_length:"소매",shoulder_width:"어깨",waist_width_half:"허리단면",
+  hip_width_half:"엉덩이단면",thigh_width_half:"허벅지단면",hem_opening:"밑단",inseam:"인심"};
+
+function body() { return Object.fromEntries(FIELDS.map(([k]) => [k, +$("#b_"+k).value]).concat([["gender", PRESETS[S.preset].gender], ["pref_fit", S.fit], ["styles", [...S.styles]]])); }
+function setPreset(p) {
+  S.preset = p;
+  document.querySelectorAll("[data-preset]").forEach(c => c.classList.toggle("on", c.dataset.preset === p));
+  $("#body").innerHTML = FIELDS.map(([k,l]) => `<label class="row">${l}<input id="b_${k}" type="number" value="${PRESETS[p][k]}"></label>`).join("");
+}
+function renderGarments() {
+  $("#garments").innerHTML = WARDROBE.map(g => {
+    const a = g.attributes, L = S.labels["w:"+g.id];
+    const d = Object.entries(g.dimensions).filter(([k]) => k !== "unit").map(([k,v]) => `${DIM_LABEL[k]||k} ${v.value}`).join(" · ");
+    const lbs = !L ? "" : [L.too_small ? `<span class="lb warn">${L.too_small_reason}</span>` : "",
+      L.fit && `<span class="lb">핏 ${L.fit}</span>`, L.length && `<span class="lb">기장 ${L.length}</span>`,
+      L.sleeve && `<span class="lb">소매 ${L.sleeve}</span>`, L.season && `<span class="lb">${L.season}</span>`,
+      L.drop_shoulder && `<span class="lb">드롭숄더</span>`, `<span class="lb">${L.kf_category}·${(L.kf_colors||[]).join("/")}</span>`].filter(Boolean).join("");
+    const basis = L ? [L.fit_basis, L.length_basis, L.sleeve_basis].filter(Boolean).join(" / ") : "";
+    return `<div class="g ${S.off.has(g.id)?"off":""} ${L&&L.too_small?"small":""}" data-id="${g.id}"><span class="sw" style="background:${a.colors[0]}"></span>
+      <div><b>${a.name}</b><div class="dims">${d}</div><div class="labels">${lbs}</div>${basis ? `<div class="basis">${basis}</div>` : ""}</div>
+      <span class="chip">${S.off.has(g.id) ? "넣기" : "빼기"}</span></div>`;
+  }).join("");
+  document.querySelectorAll(".g .chip").forEach(c => c.onclick = () => { const id = c.closest(".g").dataset.id;
+    S.off.has(id) ? S.off.delete(id) : S.off.add(id); renderGarments(); });
+}
+async function api(path, data) {
+  const r = await fetch(path, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(data)});
+  const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status); return j;
+}
+const COMP = {compat:"궁합", body:"체형·핏", color:"배색", season:"날씨", taste:"취향"};
+async function run(more) {
+  if (!more) S.seen = [];
+  const garments = WARDROBE.filter(g => !S.off.has(g.id)).map(g => JSON.parse(JSON.stringify(g)));
+  const res = await api("/api/wardrobe-recommend", {profile: body(), garments, temp: +$("#temp").value, wet: S.wet ? "비" : null,
+    preference: S.pref, seen_outfits: S.seen, count: 3});
+  S.labels = res.labels || {}; renderGarments();
+  S.seen.push(...res.outfits.map(o => o.key));
+  $("#notes").innerHTML = (res.band ? `<div class="note">${$("#temp").value}°C · ${res.band.label} · 아우터 ${{none:"필요 없음",optional:"선택",recommended:"권장",required:"필수"}[res.band.outer]}${res.debug && res.debug.masked ? " · 마스킹 모델 사용" : ""}</div>` : "")
+    + res.notes.map(n => `<div class="note">${n}</div>`).join("");
+  const byId = Object.fromEntries(WARDROBE.map(g => ["w:"+g.id, g]));
+  $("#outfits").innerHTML = res.outfits.map((o,k) => `<div class="card">
+    <div class="stack">${o.items.map(i => { const c = byId[i.id].attributes.colors[0];
+      const w = {아우터:"92%",상의:"80%",하의:"68%"}[i.slot]; const dark = ["#202020","#24344B","#795548","#3975C6","#7B8052","#808080"].includes(c);
+      return `<div class="block" style="width:${w};background:${c};color:${dark?"#fff":"#1F1B18"}">${i.name}</div>`; }).join("")}</div>
+    <span class="pill">✓ 내 옷장에서 100% 구성 · ${o.total}점</span>
+    <div class="bars">${Object.entries(o.components).map(([k,v]) => `<span>${COMP[k]}</span><span class="bar"><i style="width:${v}%"></i></span><span>${v}</span>`).join("")}</div>
+    <div class="reasons">${o.reasons.slice(0,3).map(r => `<div>${r.text}<small>${r.sub}</small></div>`).join("")}</div>
+    <div class="muted">${o.items.map(i => `${i.name}: ${i.size.replace("내 옷 · ","")}`).join("<br>")}</div>
+    <div class="chips"><span class="chip" data-k="${k}" data-p="1">좋아요</span><span class="chip" data-k="${k}" data-p="-1">별로예요</span></div>
+  </div>`).join("") || `<div class="note">${res.error || "코디를 만들지 못했어요"}</div>`;
+  document.querySelectorAll(".card .chip").forEach(c => c.onclick = async () => {
+    const o = res.outfits[+c.dataset.k];
+    const r = await api("/api/feedback", {events: o.items.map(i => ({item_id:i.id, polarity:+c.dataset.p})), preference:S.pref,
+      wardrobe: garments.map(g => ({...g, labels: S.labels["w:"+g.id]}))});
+    S.pref = r.preference; c.classList.add("on");
+  });
+}
+document.querySelectorAll("[data-preset]").forEach(c => c.onclick = () => setPreset(c.dataset.preset));
+$("#fit").innerHTML = [["slim","슬림핏"],["regular","레귤러핏"],["loose","루즈핏"]].map(([v,l]) => `<span class="chip ${v===S.fit?"on":""}" data-v="${v}">${l}</span>`).join("");
+document.querySelectorAll("#fit .chip").forEach(c => c.onclick = () => { S.fit = c.dataset.v; document.querySelectorAll("#fit .chip").forEach(x => x.classList.toggle("on", x === c)); });
+$("#styles").innerHTML = ["미니멀","캐주얼","스트릿","러블리","클래식","스포티"].map(s => `<span class="chip ${S.styles.has(s)?"on":""}" data-s="${s}">${s}</span>`).join("");
+document.querySelectorAll("#styles .chip").forEach(c => c.onclick = () => { S.styles.has(c.dataset.s) ? S.styles.delete(c.dataset.s) : S.styles.add(c.dataset.s); c.classList.toggle("on"); });
+$("#wet").onclick = () => { S.wet = !S.wet; $("#wet").classList.toggle("on", S.wet); };
+$("#temp").oninput = () => $("#tempv").textContent = $("#temp").value + "°";
+$("#go").onclick = () => run(false);
+$("#more").onclick = () => run(true);
+setPreset("female"); renderGarments(); run(false);
+</script>
+</body>
+</html>
