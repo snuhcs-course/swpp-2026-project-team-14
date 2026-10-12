@@ -1,4 +1,4 @@
-# AI-generated with Codex, 2026-09-29, reviewed by Hyeon U Jeong
+# AI-generated with Codex, 2026-09-29, reviewed by Hyeon U Jeong; recommendation labels added with Claude Code (Claude Opus 5.5), 2026-10-12, reviewed by Dongkun Moon
 import base64
 from io import BytesIO
 import json
@@ -8,7 +8,7 @@ from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 from PIL import Image, ImageOps, UnidentifiedImageError
 
-from .schema import COLOR_PALETTE, SCHEMA, validate_ai_attributes
+from .schema import COLOR_PALETTE, DETAIL_CHOICES, SCHEMA, validate_ai_attributes, validate_ai_details
 
 MODEL = 'gemini-3.1-flash-lite'
 MAX_IMAGE_BYTES = 5 * 1024 * 1024
@@ -31,7 +31,12 @@ transparency, thickness, season, dimensions, size labels, body data or actual fi
 Names must not assert unverified materials either. A back photo does not reveal front details.
 Category: top=상의, bottom=하의, outerwear=아우터, shoes=신발.
 Cardigans, zip-up hooded jackets and shirt jackets belong to outerwear.
-Color palette (HEX: Korean label):\n''' + json.dumps(COLOR_PALETTE, ensure_ascii=False)
+Color palette (HEX: Korean label):\n''' + json.dumps(COLOR_PALETTE, ensure_ascii=False) + '''
+Also return details with exact values from the lists below, or null when a detail is not
+clearly visible. print is the main surface pattern (무지 for a solid garment). neckline and
+collar apply to tops and outerwear only; use null for bottoms. details=null for shoes or when
+attributes=null. Details describe visible design only, like the attributes.
+Details (field: allowed values):\n''' + json.dumps({k: list(v) for k, v in DETAIL_CHOICES.items()}, ensure_ascii=False)
 
 
 class AnalysisError(Exception):
@@ -70,6 +75,7 @@ def prepare_image(raw):
 
 
 def analyze_image(raw, api_key):
+    """(attributes, details): details are optional K-Fashion hints for the recommendation labels."""
     image = prepare_image(raw)
     if not api_key:
         raise AnalysisError('AI_NOT_CONFIGURED', 503)
@@ -140,7 +146,7 @@ def _parse_response(body):
         parts = candidates[0]['content']['parts']
         text = ''.join(part.get('text', '') for part in parts if not part.get('thought', False))
         result = json.loads(text)
-        if not isinstance(result, dict) or set(result) != {'image_status', 'attributes'}:
+        if not isinstance(result, dict) or set(result) - {'details'} != {'image_status', 'attributes'}:
             raise ValueError('Invalid response fields')
         if result['image_status'] not in SCHEMA['properties']['image_status']['enum']:
             raise ValueError('Invalid image status')
@@ -148,6 +154,7 @@ def _parse_response(body):
             if result['attributes'] is not None:
                 raise ValueError('Unexpected attributes')
             raise AnalysisError('IMAGE_' + result['image_status'].upper(), 422)
-        return validate_ai_attributes(result['attributes'])
+        attributes = validate_ai_attributes(result['attributes'])
+        return attributes, validate_ai_details(result.get('details'), attributes['category'])
     except (ValueError, KeyError, TypeError, IndexError, AttributeError):
         raise AnalysisError('AI_INVALID_RESPONSE') from None

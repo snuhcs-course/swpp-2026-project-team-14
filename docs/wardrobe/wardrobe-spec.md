@@ -12,7 +12,7 @@
 
 ## 2. 저장 구조
 
-MySQL `wardrobe_garment` 테이블 하나에 옷 한 벌당 한 행을 저장한다. `0001_initial`이 최종 구조를 생성한다.
+MySQL `wardrobe_garment` 테이블 하나에 옷 한 벌당 한 행을 저장한다. `0001_initial`이 테이블을 만들고 `0002_garment_labels`가 추천 라벨 컬럼을 더한다.
 
 | 컬럼 | Django 타입 | 의미 |
 | --- | --- | --- |
@@ -21,6 +21,7 @@ MySQL `wardrobe_garment` 테이블 하나에 옷 한 벌당 한 행을 저장한
 | `attributes` | JSONField | 현재 속성. 분석 시 제안값, 저장·수정 시 사용자 편집값으로 교체 |
 | `dimensions` | JSONField, NULL 허용 | 실측값·측정 출처, 기본 NULL |
 | `notes` | TextField | 메모, 기본 빈 문자열, API에서 2,000자 제한 |
+| `labels` | JSONField, NULL 허용 | 내 몸 기준 추천 라벨(핏·기장·소매·계절·무늬·소재 등). 사용자가 확인한 값. 신발은 NULL |
 | `saved` | BooleanField, 인덱스 | 기본 false. 확정 저장 시 true |
 | `created_at` | DateTimeField | 생성 시 자동 기록 |
 | `updated_at` | DateTimeField | 저장·수정 시 자동 기록 |
@@ -193,7 +194,8 @@ Gemini는 아래 색상표에서 대표색 1~2개를 반환해야 한다. 사용
 | --- | --- |
 | POST analyze/ | 사진 분석 후 초안 생성, 200 |
 | POST landmarks/?garment=종류 | HRNet 측정점 탐지, 200 |
-| GET options/ | 필드 표시명·허용 코드·색상표·치수 기준, 200 |
+| GET options/ | 필드 표시명·허용 코드·색상표·치수 기준·추천 라벨 선택지(`label_options`), 200 |
+| POST labels/ | 치수·체형으로 추천 라벨 계산(저장 안 함, DB 불필요), 200 |
 | GET items/ | saved=true인 옷 목록, 200 |
 | GET items/{id}/ | 초안 또는 저장된 옷 조회, 200 |
 | PUT items/{id}/ | 동일 행의 편집값 전체 교체·확정 저장, 200 |
@@ -203,7 +205,7 @@ Gemini는 아래 색상표에서 대표색 1~2개를 반환해야 한다. 사용
 
 본문은 JPEG·PNG·WebP 이미지 바이트이며 해당 Content-Type을 지정한다. 최대 5 MiB·1,200만 픽셀·단일 프레임만 허용한다. EXIF 방향 적용 후 긴 변 최대 1536px의 JPEG로 정규화하고 메타데이터를 제외한다.
 
-서버는 Gemini gemini-3.1-flash-lite를 호출한다. 성공 시 사진을 파일 저장소에 기록하고 Garment를 saved=false로 생성한다. AR 치수는 이 요청으로 전송하지 않는다. 응답은 id·model·attributes 세 필드다. 한국어 표시명은 options 응답을 사용한다.
+서버는 Gemini gemini-3.1-flash-lite를 호출한다. 성공 시 사진을 파일 저장소에 기록하고 Garment를 saved=false로 생성한다. AR 치수는 이 요청으로 전송하지 않는다. 응답은 id·model·attributes·details 네 필드다. details는 추천 라벨용 무늬(print)·넥라인·옷깃 제안(K-Fashion 값, 하의는 무늬만, 신발·불명확하면 null)이며 attributes와 DB에는 넣지 않는다. 한국어 표시명은 options 응답을 사용한다.
 
 ```json
 {
@@ -227,7 +229,7 @@ Gemini는 아래 색상표에서 대표색 1~2개를 반환해야 한다. 사용
 
 ### 편집·확정 저장
 
-PUT은 attributes·dimensions·notes 세 필드를 모두 요구하며, 다른 최상위 키는 거부한다. 최대 요청 크기는 16 KiB다. 부분 수정 PATCH는 제공하지 않는다. 새 행을 만들지 않고 요청 ID의 행에 값을 반영하며 saved=true로 바꾼다. 같은 ID로 반복 저장하면 한 벌을 유지하고 마지막 요청값이 반영된다.
+PUT은 attributes·dimensions·notes 세 필드를 모두 요구하고 labels는 선택이다(없으면 기존 라벨 유지, 신발로 바꾸면 비움). 그 밖의 최상위 키는 거부한다. labels 값은 `recommendation/labeling.py`의 `validate_labels`로 검증한다. 최대 요청 크기는 16 KiB다. 부분 수정 PATCH는 제공하지 않는다. 새 행을 만들지 않고 요청 ID의 행에 값을 반영하며 saved=true로 바꾼다. 같은 ID로 반복 저장하면 한 벌을 유지하고 마지막 요청값이 반영된다.
 
 PUT 요청 예시:
 

@@ -1,6 +1,8 @@
-# AI-generated with Codex, 2026-09-29, reviewed by Hyeon U Jeong
+# AI-generated with Codex, 2026-09-29, reviewed by Hyeon U Jeong; recommendation labels added with Claude Code (Claude Opus 5.5), 2026-10-12, reviewed by Dongkun Moon
 import re
 from typing import TypedDict, cast
+
+from recommendation.vocab import COLLARS, NECKLINES, PRINTS
 
 
 class WardrobeAttributes(TypedDict):
@@ -19,6 +21,13 @@ class AiAttributes(TypedDict):
     name: str
     category: str
     colors: list[str]
+
+
+class AiDetails(TypedDict):
+    """Visible design details in the K-Fashion vocabulary, used only for the recommendation labels."""
+    print: str | None
+    neckline: str | None
+    collar: str | None
 
 
 SUBCATEGORIES = {
@@ -151,6 +160,7 @@ NAME_MAX_LENGTH = 80
 AI_COLOR_MIN_COUNT = 1
 AI_COLOR_MAX_COUNT = 2
 AI_FIELDS = tuple(AiAttributes.__annotations__)
+DETAIL_CHOICES = {'print': PRINTS, 'neckline': NECKLINES, 'collar': COLLARS}
 ATTRIBUTE_FIELDS = frozenset(WardrobeAttributes.__annotations__)
 BOTTOM_FIELDS = ('leg_shape', 'rise_type', 'skirt_shape')
 PANTS_SUBCATEGORIES = ('jeans', 'slacks', 'pants', 'active_pants', 'shorts')
@@ -185,9 +195,29 @@ SCHEMA = {
             },
             'required': list(AI_FIELDS),
         },
+        'details': {
+            'type': ['object', 'null'],
+            'additionalProperties': False,
+            'properties': {
+                field: {'anyOf': [{'type': 'string', 'enum': list(choices)}, {'type': 'null'}]}
+                for field, choices in DETAIL_CHOICES.items()
+            },
+            'required': list(DETAIL_CHOICES),
+        },
     },
-    'required': ['image_status', 'attributes'],
+    'required': ['image_status', 'attributes', 'details'],
 }
+
+
+def validate_ai_details(data: object, category: str) -> AiDetails | None:
+    """Details are optional hints: anything malformed is dropped instead of failing the paid analysis."""
+    if category == 'shoes' or not isinstance(data, dict):
+        return None
+    details = {field: data.get(field) if data.get(field) in choices else None
+               for field, choices in DETAIL_CHOICES.items()}
+    if category == 'bottom':
+        details.update(neckline=None, collar=None)
+    return cast(AiDetails, details) if any(details.values()) else None
 
 
 def validate_ai_attributes(data: object) -> WardrobeAttributes:

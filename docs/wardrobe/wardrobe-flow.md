@@ -37,10 +37,12 @@ sequenceDiagram
     BE->>BE: 검증·선택 속성 기본값 추가
     BE->>Files: JPEG 저장
     BE->>DB: Garment 생성 (saved=false)
-    BE-->>App: id·model·attributes
+    BE-->>App: id·model·attributes·details
     App->>User: 속성·AR 치수·메모 편집
     User->>App: 옷장에 추가
-    App->>BE: PUT items/id (attributes·dimensions·notes)
+    App->>BE: POST labels (attributes·dimensions·체형·details)
+    BE-->>App: 내 몸 기준 추천 라벨 (사용자 확인·수정)
+    App->>BE: PUT items/id (attributes·dimensions·notes·labels)
     BE->>DB: 같은 행 갱신 (saved=true)
     BE-->>App: 저장된 옷 응답
     App->>App: 응답으로 목록 갱신·임시 촬영 파일 정리
@@ -62,7 +64,7 @@ HRNet은 원본 사진의 2D 측정점 경로를 반환한다. Android는 사진
 
 분석 요청은 동기 처리다. 서버는 DB 설정을 먼저 확인한 뒤 이미지 검증·Gemini 호출·사진 및 초안 저장을 수행한다. 실패한 분석을 저장하는 별도 상태 모델은 없다. 서버 프로세스당 분석·점 탐지 한 건만 처리하며 추가 요청에는 429를 반환한다.
 
-AI는 name·category·colors만 생성한다. 나머지 선택 속성은 null 또는 []로 초기화하고 사용자가 입력한다. 최초 AI 결과의 별도 복사본이나 표시용 display 응답은 저장·전달하지 않는다. 화면 표시는 options의 한국어 라벨·색상표를 사용한다.
+AI는 name·category·colors만 속성으로 생성한다. 무늬·넥라인·옷깃은 추천 라벨 계산에만 쓰는 details로 따로 돌려준다. 나머지 선택 속성은 null 또는 []로 초기화하고 사용자가 입력한다. 최초 AI 결과의 별도 복사본이나 표시용 display 응답은 저장·전달하지 않는다. 화면 표시는 options의 한국어 라벨·색상표를 사용한다.
 
 사진 색상 선택은 Android가 화면 좌표를 사진 픽셀에 매핑하여 HEX를 얻는다. 추가 AI 호출 없이 편집값으로 저장한다. 메모는 맨 아래 입력하며 AI에 전송하지 않는다.
 
