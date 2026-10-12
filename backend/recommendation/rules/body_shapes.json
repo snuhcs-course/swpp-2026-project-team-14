@@ -1,0 +1,87 @@
+{
+  "version": 1,
+  "note": "Styling rules per body shape, mapped to K-Fashion attributes. weight: added to a 0.5 neutral score. Each rule cites where the advice comes from. Wording is styling-only (no body judgements).",
+  "sources": {
+    "khan": {"title": "레이디경향 · 체형별 스타일링 (Triangle/Inverted Triangle/Capital S/Rectangle)", "url": "https://lady.khan.co.kr/fashion/article/201109071748031"},
+    "beautyai": {"title": "BeautyAI · 역삼각형 체형 코디", "url": "https://beautyai.app/ko/blog/yeok-samgakhyeong-chehyeong-kodi"},
+    "nydj": {"title": "NYDJ · How to style a straight (rectangle) body shape", "url": "https://nydj.uk/blogs/news/what-to-do-with-an-rectangle-shaped-body"},
+    "bone": {"title": "LaLaport · 골격 진단별 아우터 코디 (스트레이트/웨이브/내추럴)", "url": "https://mitsui-shopping-park.com/ko/lalaport/tokyo-bay/special/styles/contents/019"},
+    "wkorea": {"title": "W Korea · 스트레이트·부츠컷 팬츠 실루엣", "url": "https://www.wkorea.com/?p=426592"},
+    "stylemate": {"title": "StyleMate 체형 인사이트 (앱 결과 화면 문구)", "url": ""},
+    "team": {"title": "팀 스타일 가이드 (스트레이트: 부츠컷·V넥, 상체를 부하게 입지 않기)", "url": ""}
+  },
+  "shapes": {
+    "하체 볼륨형": [
+      {"id": "lv-bright-top", "slot": "상의", "when": {"색상": "@bright"}, "weight": 0.15, "reason": "상의는 밝게 입어 시선을 위로 올려요", "source": "khan"},
+      {"id": "lv-dark-bottom", "slot": "하의", "when": {"색상": "@dark"}, "weight": 0.1, "reason": "하의는 어둡고 심플하게 입어 균형을 맞춰요", "source": "khan"},
+      {"id": "lv-top-detail", "slot": "상의", "when": {"디테일": ["퍼프", "셔링", "프릴", "러플", "리본"]}, "weight": 0.15, "reason": "상의 디테일로 상체에 볼륨을 더해요", "source": "khan"},
+      {"id": "lv-cover-jacket", "slot": "아우터", "when": {"카테고리": ["재킷", "코트"], "기장": ["하프", "롱"]}, "weight": 0.1, "reason": "엉덩이를 덮는 기장의 재킷·코트가 하체 라인을 정돈해요", "source": "khan"},
+      {"id": "lv-straight-bottom", "slot": "하의", "when": {"핏": ["노멀", "와이드"]}, "weight": 0.12, "reason": "일자로 떨어지는 하의로 하체 라인을 정돈해요", "source": "stylemate"},
+      {"id": "lv-a-line", "slot": "하의", "when": {"카테고리": ["스커트"], "디테일": ["플레어", "셔링", "비대칭"]}, "weight": 0.12, "reason": "A라인·셔링 스커트가 엉덩이 라인을 자연스럽게 감싸요", "source": "khan"},
+      {"id": "lv-avoid-skinny", "slot": "하의", "when": {"핏": ["스키니"]}, "weight": -0.2, "reason": "하체 라인을 그대로 드러내는 스키니 핏은 피해요", "source": "khan"}
+    ],
+    "상체 볼륨형": [
+      {"id": "uv-v-neck", "slot": "상의|원피스", "when": {"넥라인": ["브이넥", "유넥"]}, "weight": 0.2, "reason": "V넥·U넥이 세로 흐름을 만들어 상체를 정리해요", "source": "beautyai"},
+      {"id": "uv-asym", "slot": "상의|원피스", "when": {"디테일": ["비대칭"]}, "weight": 0.05, "reason": "비대칭 디테일이 어깨 라인을 분산해요", "source": "beautyai"},
+      {"id": "uv-avoid-shoulder", "slot": "상의|원피스|아우터", "when": {"디테일": ["퍼프", "드롭숄더"]}, "weight": -0.2, "reason": "퍼프·과한 드롭숄더처럼 어깨를 키우는 디테일은 피해요", "source": "beautyai"},
+      {"id": "uv-avoid-boatneck", "slot": "상의|원피스", "when": {"넥라인": ["보트넥", "오프숄더"]}, "weight": -0.15, "reason": "보트넥은 어깨를 넓어 보이게 해요", "source": "beautyai"},
+      {"id": "uv-avoid-wide-collar", "slot": "상의|아우터", "when": {"옷깃": ["세일러칼라", "피터팬칼라"]}, "weight": -0.1, "reason": "넓은 칼라는 상체를 키워 보여요", "source": "khan"},
+      {"id": "uv-volume-bottom", "slot": "하의", "when": {"핏": ["와이드", "벨보텀", "루즈"]}, "weight": 0.2, "reason": "와이드·부츠컷 하의로 하체에 볼륨을 더해 균형을 맞춰요", "source": "beautyai"},
+      {"id": "uv-flare-skirt", "slot": "하의", "when": {"디테일": ["플레어", "플리츠"]}, "weight": 0.15, "reason": "플레어·플리츠가 허리 아래에 움직임을 만들어요", "source": "beautyai"},
+      {"id": "uv-print-bottom", "slot": "하의", "when": {"프린트": "@pattern"}, "weight": 0.05, "reason": "하의에 무늬를 두면 시선이 아래로 내려가요", "source": "khan"},
+      {"id": "uv-avoid-slim-bottom", "slot": "하의", "when": {"핏": ["스키니"]}, "weight": -0.15, "reason": "슬림한 하의는 상체를 더 커 보이게 해요", "source": "beautyai"}
+    ],
+    "허리 라인형": [
+      {"id": "hg-belt", "slot": "*", "when": {"디테일": ["띠", "버클", "페플럼"]}, "weight": 0.2, "reason": "허리 라인을 잡아주는 벨트·끈 디테일이 잘 어울려요", "source": "khan"},
+      {"id": "hg-trench", "slot": "아우터", "when": {"카테고리": ["코트"], "디테일": ["띠"]}, "weight": 0.1, "reason": "벨티드 트렌치코트로 허리선을 살려요", "source": "khan"},
+      {"id": "hg-v-neck", "slot": "상의|원피스", "when": {"넥라인": ["브이넥"]}, "weight": 0.1, "reason": "V넥이 상체 라인을 살려요", "source": "khan"},
+      {"id": "hg-avoid-shapeless", "slot": "상의|원피스", "when": {"핏": ["오버사이즈", "루즈"]}, "weight": -0.15, "reason": "라인 없는 루즈한 셔츠·원피스는 허리선을 가려요", "source": "khan"}
+    ],
+    "일자형": [
+      {"id": "st-waist", "slot": "*", "when": {"디테일": ["띠", "페플럼", "셔링"]}, "weight": 0.15, "reason": "허리 디테일로 곡선을 만들어 입체감을 더해요", "source": "nydj"},
+      {"id": "st-wide-bottom", "slot": "하의", "when": {"핏": ["와이드", "벨보텀"]}, "weight": 0.15, "reason": "와이드·부츠컷·플레어 하의가 허리를 상대적으로 가늘어 보이게 해요", "source": "nydj"},
+      {"id": "st-pleats", "slot": "하의", "when": {"디테일": ["플리츠"]}, "weight": 0.1, "reason": "플리츠 스커트가 하체에 볼륨을 더해요", "source": "khan"},
+      {"id": "st-soft", "slot": "상의|원피스", "when": {"소재": ["시폰", "실크"]}, "weight": 0.1, "reason": "시폰·실크처럼 부드러운 소재가 곡선을 만들어요", "source": "khan"},
+      {"id": "st-avoid-jumpsuit", "slot": "원피스", "when": {"카테고리": ["점프수트"]}, "weight": -0.2, "reason": "몸을 하나로 묶는 롱 점프수트는 피해요", "source": "khan"}
+    ]
+  },
+  "bone_types": {
+    "스트레이트": [
+      {"id": "bs-v-neck", "slot": "상의|원피스", "when": {"넥라인": ["브이넥", "유넥"]}, "weight": 0.15, "reason": "V넥이 두께감 있는 상체를 깔끔하게 정리해요", "source": "team"},
+      {"id": "bs-avoid-oversize", "slot": "상의|아우터", "when": {"핏": ["오버사이즈"]}, "weight": -0.2, "reason": "과한 오버사이즈는 상체를 부해 보이게 해요", "source": "bone"},
+      {"id": "bs-avoid-bulky", "slot": "상의", "when": {"소재": ["헤어 니트", "퍼", "플리스"]}, "weight": -0.1, "reason": "부피감 있는 소재의 상의는 피해요", "source": "team"},
+      {"id": "bs-avoid-frills", "slot": "상의|원피스", "when": {"디테일": ["프릴", "러플", "리본", "퍼프"]}, "weight": -0.15, "reason": "과한 장식보다 심플한 디자인이 잘 어울려요", "source": "bone"},
+      {"id": "bs-tailored", "slot": "아우터", "when": {"옷깃": ["테일러드칼라"]}, "weight": 0.15, "reason": "테일러드 재킷·체스터 코트가 잘 어울려요", "source": "bone"},
+      {"id": "bs-mid-long", "slot": "아우터", "when": {"기장": ["하프", "롱"]}, "weight": 0.1, "reason": "미들~롱 기장으로 I라인을 만들어요", "source": "bone"},
+      {"id": "bs-bootcut", "slot": "하의", "when": {"핏": ["벨보텀", "노멀"]}, "weight": 0.15, "reason": "부츠컷·스트레이트 팬츠로 균형을 맞춰요", "source": "team"}
+    ],
+    "웨이브": [
+      {"id": "bw-short-outer", "slot": "아우터", "when": {"기장": ["크롭", "하프"]}, "weight": 0.15, "reason": "짧은 아우터가 시선을 위로 올려요", "source": "bone"},
+      {"id": "bw-shawl", "slot": "아우터", "when": {"옷깃": ["숄칼라"]}, "weight": 0.1, "reason": "숄칼라가 얼굴 주변을 화사하게 해요", "source": "bone"},
+      {"id": "bw-avoid-collarless", "slot": "아우터", "when": {"넥라인": ["노카라"]}, "weight": -0.1, "reason": "칼라 없는 코트보다 목 주변 장식이 있는 쪽이 잘 어울려요", "source": "bone"},
+      {"id": "bw-soft", "slot": "*", "when": {"소재": ["퍼", "플리스", "헤어 니트", "앙고라"]}, "weight": 0.1, "reason": "부드럽고 볼륨 있는 소재가 잘 어울려요", "source": "bone"},
+      {"id": "bw-ribbon", "slot": "상의|원피스", "when": {"디테일": ["리본", "프릴"]}, "weight": 0.1, "reason": "리본·프릴 디테일로 화사함을 더해요", "source": "bone"},
+      {"id": "bw-fit-flare", "slot": "하의|원피스", "when": {"디테일": ["플레어"]}, "weight": 0.1, "reason": "핏&플레어 실루엣이 곡선을 살려요", "source": "bone"},
+      {"id": "bw-avoid-oversize", "slot": "상의|아우터", "when": {"핏": ["오버사이즈"]}, "weight": -0.1, "reason": "너무 큰 옷은 몸이 묻혀 보여요", "source": "bone"}
+    ],
+    "내추럴": [
+      {"id": "bn-oversize", "slot": "상의|아우터", "when": {"핏": ["오버사이즈", "루즈"]}, "weight": 0.15, "reason": "오버사이즈가 골격감을 자연스럽게 살려요", "source": "bone"},
+      {"id": "bn-asym", "slot": "*", "when": {"디테일": ["비대칭", "프린지"]}, "weight": 0.1, "reason": "비대칭·프린지 같은 개성 있는 디테일이 잘 어울려요", "source": "bone"},
+      {"id": "bn-casual-texture", "slot": "아우터", "when": {"소재": ["무스탕", "퍼", "코듀로이", "데님"]}, "weight": 0.1, "reason": "무스탕·보아처럼 캐주얼한 텍스처가 잘 어울려요", "source": "bone"},
+      {"id": "bn-long", "slot": "하의|원피스", "when": {"기장": ["미디", "맥시", "발목"]}, "weight": 0.1, "reason": "무릎이 가려지는 긴 기장이 잘 어울려요", "source": "bone"},
+      {"id": "bn-avoid-frills", "slot": "상의|원피스", "when": {"디테일": ["프릴", "러플", "리본"]}, "weight": -0.15, "reason": "과도하게 여성스러운 장식은 피해요", "source": "bone"},
+      {"id": "bn-avoid-tight", "slot": "상의|원피스", "when": {"핏": ["타이트"]}, "weight": -0.1, "reason": "몸에 딱 붙는 핏은 골격을 강조해요", "source": "bone"}
+    ]
+  },
+  "proportions": {
+    "short_legs": [
+      {"id": "pl-short-top", "slot": "상의", "when": {"기장": ["크롭", "노멀"]}, "weight": 0.1, "reason": "짧은 상의로 허리선을 올려 다리가 길어 보여요", "source": "stylemate"},
+      {"id": "pl-avoid-long-top", "slot": "상의", "when": {"기장": ["롱"]}, "weight": -0.1, "reason": "긴 상의는 다리를 짧아 보이게 해요", "source": "stylemate"},
+      {"id": "pl-long-bottom", "slot": "하의|원피스", "when": {"기장": ["발목", "맥시"]}, "weight": 0.1, "reason": "발목까지 오는 길이로 다리가 길어 보여요", "source": "stylemate"}
+    ],
+    "broad_shoulders": [
+      {"id": "pb-v-neck", "slot": "상의|원피스", "when": {"넥라인": ["브이넥", "유넥"]}, "weight": 0.1, "reason": "V넥이 어깨선을 좁아 보이게 해요", "source": "beautyai"},
+      {"id": "pb-avoid", "slot": "상의|원피스", "when": {"넥라인": ["보트넥", "오프숄더"]}, "weight": -0.15, "reason": "보트넥·오프숄더는 어깨를 넓어 보이게 해요", "source": "beautyai"}
+    ]
+  }
+}

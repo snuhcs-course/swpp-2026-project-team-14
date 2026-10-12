@@ -15,3 +15,5 @@ local.properties
 *.iml
 *.jks
 *.keystore
+# K-Fashion (AI Hub) data, cut-outs and preprocessed files: redistribution is not allowed
+kfashion_dataset/
