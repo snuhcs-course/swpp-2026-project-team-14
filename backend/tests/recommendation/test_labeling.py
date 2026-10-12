@@ -89,6 +89,10 @@ def test_ai_details_are_kept_only_inside_the_vocabulary():
 
 
 def test_nearest_color():
+    from recommendation.labeling import kf_color
+
+    assert kf_color("#4F7952") == "그린" and nearest_color("#4F7952") == "카키"  # the palette's own mapping wins
+    assert kf_color("#4f7952") == "그린" and kf_color("#2E8B57") == nearest_color("#2E8B57")
     assert nearest_color("#F5F5F0") == "화이트"
     assert nearest_color("#1A2340") == "네이비"
     assert nearest_color("#C0392B") == "레드"
@@ -101,8 +105,35 @@ def test_validate_labels():
     assert validate_labels(edited, "top")["fit"] == "오버사이즈"
     assert validate_labels(None, "top") is None
     for bad in ({**good, "fit": "스키니"}, {**good, "materials": ["린넨", "린넨"]}, {**good, "extra": 1},
-                {**good, "confirmed": "yes"}, {**good, "length": "맥시"}, "labels"):
+                {**good, "confirmed": "yes"}, {**good, "length": "맥시"}, "labels",
+                {**good, "design_details": ["프릴", "리본", "포켓", "지퍼"]}, {**good, "design_details": ["반짝이"]}):
         with pytest.raises(ValueError):
             validate_labels(bad, "top")
     with pytest.raises(ValueError):
         validate_labels(good, "shoes")
+
+
+def test_ai_design_details_and_visible_materials_win_over_defaults():
+    knit = label({"category": "top", "subcategory": "knitwear", "colors": []}, {}, BODY,
+                 {"design_details": ["드롭숄더", "포켓", "없는디테일"], "materials": ["울/캐시미어"]})
+    assert knit["design_details"] == ["드롭숄더", "포켓"]
+    assert knit["materials"] == ["울/캐시미어"]  # the AI saw wool; the subcategory default would be 니트
+    plain = label({"category": "top", "subcategory": "knitwear", "colors": []}, {}, BODY, {"materials": []})
+    assert plain["materials"] == ["니트"]
+
+
+def test_without_body_or_measurements_the_capture_type_and_old_fit_fill_in():
+    top = label({"category": "top", "subcategory": None, "colors": [], "fit_type": "oversized"}, {}, None,
+                garment_type="short_sleeve_top")
+    assert (top["fit"], top["fit_basis"]) == ("오버사이즈", "기존에 고른 핏")
+    assert (top["sleeve"], top["season"], top["body_basis"]) == ("반팔", "여름", {})
+    assert top["length"] is None and not top["too_small"]
+    shorts = label({"category": "bottom", "subcategory": None, "colors": [], "leg_shape": "wide"}, {}, None,
+                   garment_type="shorts")
+    assert (shorts["fit"], shorts["length"], shorts["kf_category"]) == ("와이드", "미니", "팬츠")
+    skirt = label({"category": "bottom", "subcategory": None, "colors": []}, {}, None, garment_type="skirt")
+    assert skirt["kf_category"] == "스커트" and skirt["fit"] is None
+    # measured on the body, the computed fit wins over the old choice
+    measured = label({"category": "top", "subcategory": "tshirt", "colors": [], "fit_type": "slim"},
+                     dims(chest_width_half=50), BODY)
+    assert measured["fit"] == "루즈"

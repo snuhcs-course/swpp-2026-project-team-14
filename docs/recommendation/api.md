@@ -6,25 +6,26 @@
 
 ### 분석 응답의 details
 
-`POST /api/wardrobe/analyze/` 응답에 `details`가 추가됐다. 기존 `attributes` 계약은 그대로다.
+`POST /api/wardrobe/analyze/?garment=<측정 종류>` 응답에 `details`가 추가됐다. `garment`(선택)는 측정 화면에서 고른 종류이며 AI 힌트로만 쓴다. `attributes`의 `subcategory`·`styles`는 이제 AI 제안이다(분류와 맞지 않으면 null). 상의·아우터는 앞면 사진을 보낸다.
 
 ```json
 {"id": "…", "model": "gemini-3.1-flash-lite", "attributes": {"name": "스트라이프 니트 조끼", "category": "top", "…": "…"},
- "details": {"print": "스트라이프", "neckline": "브이넥", "collar": null}}
+ "details": {"print": "스트라이프", "neckline": "브이넥", "collar": null, "design_details": ["드롭숄더"], "materials": ["니트"]}}
 ```
 
-값은 K-Fashion 목록(`recommendation/vocab.py`의 PRINTS·NECKLINES·COLLARS)에서만 나온다. 하의는 무늬만, 신발이나 알 수 없으면 `null`이다. DB에는 저장하지 않는다.
+값은 K-Fashion 목록(`recommendation/vocab.py`의 PRINTS·NECKLINES·COLLARS·DETAILS·MATERIALS)에서만 나온다. 디테일은 최대 3개, 소재는 겉으로 분명할 때만 최대 2개다. 하의는 넥라인·옷깃이 없고, 신발이나 알 수 없으면 `null`이다. DB에는 저장하지 않는다.
 
 ### POST /api/wardrobe/labels/
 
-저장하지 않고 라벨만 계산한다. DB가 없어도 동작한다.
+저장하지 않고 라벨만 계산한다. DB가 없어도 동작한다. `body`가 null이면 체형과 무관한 라벨(계절·색·카테고리·details)만 채우고 핏·기장·작음은 비운다. `garment_type`(선택)은 측정 종류다.
 
 ```json
 {"attributes": {"name": "베이지 니트", "category": "top", "subcategory": "knitwear", "colors": ["#D6BE9A"], "styles": [],
                 "fit_type": null, "leg_shape": null, "rise_type": null, "skirt_shape": null},
  "dimensions": {"unit": "cm", "chest_width_half": {"value": 52, "source": "arcore_manual", "method": "flat_underarm_to_underarm", "reference": null}},
  "body": {"height_cm": 163, "gender": "female", "measurements": [{"type": "chest", "value_cm": 84}]},
- "details": {"print": "무지", "neckline": "라운드넥", "collar": null}}
+ "details": {"print": "무지", "neckline": "라운드넥", "collar": null, "design_details": [], "materials": ["니트"]},
+ "garment_type": "long_sleeve_top"}
 ```
 
 응답 `{"labels": {…}}` (신발은 `null`):
@@ -32,15 +33,15 @@
 ```json
 {"fit": "루즈", "fit_basis": "가슴 여유 20 cm · 가슴둘레 84 cm 기준", "length": "노멀", "length_basis": "총장 63 cm · 상체 길이의 1.4배",
  "sleeve": "긴팔", "sleeve_basis": "소매 58 cm · 팔 길이의 104%", "season": "간절기", "drop_shoulder": true,
- "prints": ["무지"], "neckline": "라운드넥", "collar": null, "materials": ["니트"], "kf_category": "니트웨어", "kf_colors": ["베이지"],
+ "prints": ["무지"], "neckline": "라운드넥", "collar": null, "design_details": [], "materials": ["니트"], "kf_category": "니트웨어", "kf_colors": ["베이지"],
  "too_small": false, "too_small_reason": null, "body_basis": {"height": 163, "chest": 84}, "confirmed": false}
 ```
 
-허용값은 `GET /api/wardrobe/options/`의 `label_options`(분류별 fit·length·sleeve·season·prints·neckline·collar·materials, `limits`)에 있다. 오류: 체형·속성·치수가 잘못되면 400 `INVALID_LABEL_REQUEST`.
+허용값은 `GET /api/wardrobe/options/`의 `label_options`(분류별 fit·length·sleeve·season·prints·neckline·collar·design_details·materials, `limits`)에 있다. 오류: 체형·속성·치수·측정 종류가 잘못되면 400 `INVALID_LABEL_REQUEST`.
 
 ### PUT /api/wardrobe/items/{id}/
 
-`labels`를 선택 키로 받는다. 사용자가 확인한 라벨을 `confirmed: true`로 보낸다. 키가 없으면 기존 라벨을 유지하고, 분류를 신발로 바꾸면 비운다. 허용값 밖이면 400 `INVALID_GARMENT`. 조회 응답에도 `labels`가 들어 있다.
+`labels`를 선택 키로 받는다. 사용자가 확인한 라벨을 `confirmed: true`로 보낸다. 앱은 라벨과 함께 저장할 때 `attributes.fit_type`·`leg_shape`를 null로 보낸다(핏은 라벨에만). 키가 없으면 기존 라벨을 유지하고, 분류를 신발로 바꾸면 비운다. 허용값 밖이면 400 `INVALID_GARMENT`. 조회 응답에도 `labels`가 들어 있다.
 
 ## 코디
 

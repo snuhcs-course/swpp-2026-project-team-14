@@ -41,7 +41,9 @@ def to_item(g: dict) -> Item | None:
 
 
 def _labeled_attrs(slot: str, labels: dict, plain: dict) -> dict:
-    details = ["드롭숄더"] if labels.get("drop_shoulder") else []
+    details = list(labels.get("design_details") or [])
+    if labels.get("drop_shoulder") and "드롭숄더" not in details:
+        details.append("드롭숄더")
     return {
         "카테고리": labels.get("kf_category") or plain["카테고리"],
         "색상": (labels.get("kf_colors") or [plain["색상"]])[0],

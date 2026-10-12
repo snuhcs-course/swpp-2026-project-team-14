@@ -6,7 +6,7 @@
 
 ## 1. 구현 범위
 
-촬영 → HRNet 측정점 → Android ARCore 치수 계산 → Gemini 분석 → 사용자 수정 → MySQL 저장·조회로 구성한다. Gemini는 이름·분류·대표색만 생성한다. 소재·착용 정보·상품 사이즈·실측을 AI가 생성하지 않는다.
+촬영 → HRNet 측정점 → Android ARCore 치수 계산 → Gemini 분석 → 사용자 수정 → MySQL 저장·조회로 구성한다. Gemini는 이름·분류·대표색을 생성하고 세부 종류·스타일을 제안한다. 추천용 details에는 겉으로 분명한 소재만 제안할 수 있다. 혼용률·착용 정보·상품 사이즈·실측·핏을 AI가 생성하지 않는다.
 
 사용자 구분·인증, S3, 별도 초안 테이블, 옷 삭제, 초안 만료·자동 청소, 검색·페이지네이션, 추천 기능은 구현하지 않았다. 이 문서에는 미구현 API를 현재 계약으로 포함하지 않는다.
 
@@ -195,7 +195,7 @@ Gemini는 아래 색상표에서 대표색 1~2개를 반환해야 한다. 사용
 | POST analyze/ | 사진 분석 후 초안 생성, 200 |
 | POST landmarks/?garment=종류 | HRNet 측정점 탐지, 200 |
 | GET options/ | 필드 표시명·허용 코드·색상표·치수 기준·추천 라벨 선택지(`label_options`), 200 |
-| POST labels/ | 치수·체형으로 추천 라벨 계산(저장 안 함, DB 불필요), 200 |
+| POST labels/ | 치수·체형(선택)·촬영 종류로 추천 라벨 계산(저장 안 함, DB 불필요), 200 |
 | GET items/ | saved=true인 옷 목록, 200 |
 | GET items/{id}/ | 초안 또는 저장된 옷 조회, 200 |
 | PUT items/{id}/ | 동일 행의 편집값 전체 교체·확정 저장, 200 |
@@ -205,7 +205,7 @@ Gemini는 아래 색상표에서 대표색 1~2개를 반환해야 한다. 사용
 
 본문은 JPEG·PNG·WebP 이미지 바이트이며 해당 Content-Type을 지정한다. 최대 5 MiB·1,200만 픽셀·단일 프레임만 허용한다. EXIF 방향 적용 후 긴 변 최대 1536px의 JPEG로 정규화하고 메타데이터를 제외한다.
 
-서버는 Gemini gemini-3.1-flash-lite를 호출한다. 성공 시 사진을 파일 저장소에 기록하고 Garment를 saved=false로 생성한다. AR 치수는 이 요청으로 전송하지 않는다. 응답은 id·model·attributes·details 네 필드다. details는 추천 라벨용 무늬(print)·넥라인·옷깃 제안(K-Fashion 값, 하의는 무늬만, 신발·불명확하면 null)이며 attributes와 DB에는 넣지 않는다. 한국어 표시명은 options 응답을 사용한다.
+서버는 Gemini gemini-3.1-flash-lite를 호출한다. 성공 시 사진을 파일 저장소에 기록하고 Garment를 saved=false로 생성한다. AR 치수는 이 요청으로 전송하지 않는다. 선택 쿼리 `garment`(측정 화면의 종류: short_sleeve_top·long_sleeve_top·short_sleeve_outerwear·long_sleeve_outerwear·trousers·shorts·skirt)는 AI에 힌트로만 전달한다. 상의·아우터는 앞면 사진을 보낸다. 응답은 id·model·attributes·details 네 필드다. attributes의 subcategory·styles는 AI 제안이다. details는 추천 라벨용 무늬(print)·넥라인·옷깃·디테일(design_details, 최대 3)·소재(materials, 겉으로 분명할 때만 최대 2) 제안(K-Fashion 값, 하의는 넥라인·옷깃 없음, 신발·불명확하면 null)이며 attributes와 DB에는 넣지 않는다. 한국어 표시명은 options 응답을 사용한다.
 
 ```json
 {

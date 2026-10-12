@@ -15,7 +15,8 @@ swpp-2026-project-team-14/
 |   |   |       |-- GarmentAnalysis.kt            # Gemini 분석 API 호출
 |   |   |       |-- GarmentLandmarks.kt           # 자동 측정점 요청·응답 검증
 |   |   |       |-- MeasurementGeometry.kt       # AR 광선·평면 교점과 실측 경로 계산
-|   |   |       `-- CaptureFiles.kt               # 옷 사진 임시 캐시 관리
+|   |   |       |-- CaptureFiles.kt               # 옷 사진 임시 캐시 관리
+|   |   |       `-- CaptureType.kt                # 측정 종류 → 하의 세부 종류 기본값
 |   |   `-- ui/
 |   |       |-- StyleMateApp.kt                   # 온보딩·홈·옷장·코디북·마이프로필 탭
 |   |       |-- components/ScreenComponents.kt   # 체형·옷장 공통 상단바·하단 버튼·섹션 제목
@@ -27,7 +28,8 @@ swpp-2026-project-team-14/
 |   |           |-- GarmentAnalysisViewModel.kt  # 분석 진행·실패 상태
 |   |           |-- WardrobeColorField.kt       # 색상표·사진 좌표 변환·픽셀 색상 선택
 |   |           |-- GarmentEditor.kt             # 특징·실측·메모 편집과 하단 고정 저장
-|   |           |-- GarmentLabels.kt             # 내 몸 기준 추천 라벨 확인·수정 (docs/recommendation)
+|   |           |-- GarmentLabels.kt             # 내 몸 기준 추천 라벨(유일한 핏 선택) 확인·수정 (docs/recommendation)
+|   |           |-- FrontPhoto.kt                # 상의·아우터 앞면 사진 카드
 |   |           `-- capture/
 |   |               |-- MeasurementActivity.kt  # 실측 촬영·측정점 확인·수정
 |   |               `-- MeasurementCamera.kt    # AR 카메라·촬영 프레임 고정
@@ -65,7 +67,7 @@ swpp-2026-project-team-14/
 
 - Android: 체형·옷장은 같은 서버 주소와 공통 `StyleMateTheme`·화면 컴포넌트를 사용한다.
 - 측정: HRNet은 원본 사진의 2D 점을 제안하고, Android ARCore가 바닥 평면을 기준으로 cm를 계산한다.
-- 분석: Gemini는 이름·분류·색상을 생성한다. 응답은 `id`·`model`·`attributes`와 추천용 `details`(무늬·넥라인·옷깃, 저장하지 않음)다.
+- 분석: 상의·아우터는 앞면 사진, 하의는 측정 사진을 보낸다. Gemini는 이름·분류·색상을 생성하고 세부 종류·스타일을 제안한다. 응답은 `id`·`model`·`attributes`와 추천용 `details`(무늬·넥라인·옷깃·디테일·겉으로 분명한 소재, 저장하지 않음)다.
 - 추천 라벨: 저장 전 `POST labels/`가 치수와 체형으로 핏·기장·소매·계절 등을 계산하고, 사용자가 확인·수정한 값을 `labels`로 함께 저장한다. 설계는 [추천 문서](../recommendation/README.md)를 따른다.
 - 저장: 옷 속성·치수·메모·사진 경로는 MySQL, 옷 사진은 서버 파일 저장소에 보관한다. 최초 AI 결과는 별도 복제하지 않는다.
 - DB 의존성: 체형 분석·측정점 API는 DB 없이 실행된다. 옷장 분석·조회·저장은 MySQL 설정이 필요하다.

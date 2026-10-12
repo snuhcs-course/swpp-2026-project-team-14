@@ -177,7 +177,8 @@ class GeminiTests(SimpleTestCase):
         self.assertEqual(body['contents'][0]['parts'][0]['inlineData']['mimeType'], 'image/jpeg')
         self.assertIn('responseJsonSchema', body['generationConfig'])
         schema = body['generationConfig']['responseJsonSchema']['properties']['attributes']
-        self.assertEqual(set(schema['properties']), {'name', 'category', 'colors'})
+        self.assertEqual(set(schema['properties']), {'name', 'category', 'colors', 'subcategory', 'styles'})
+        self.assertEqual(schema['properties']['styles']['maxItems'], 2)
         self.assertEqual(schema['properties']['colors']['maxItems'], 2)
         self.assertEqual(schema['properties']['colors']['minItems'], 1)
         self.assertEqual(schema['properties']['colors']['items']['enum'], list(COLOR_PALETTE))
@@ -220,7 +221,7 @@ class GeminiTests(SimpleTestCase):
             self.assertEqual(error.exception.status, 422)
 
     @patch('apps.wardrobe.analysis.build_opener')
-    def test_optional_visual_fields_are_not_generated_and_bottom_dimensions_remain_editable(self, opener):
+    def test_missing_suggestions_are_allowed_and_bottom_dimensions_remain_editable(self, opener):
         from .editor import dimension_fields
         response = {
             'image_status': 'single',
@@ -247,14 +248,19 @@ class GeminiTests(SimpleTestCase):
         body = json.loads(opener.return_value.open.call_args.args[0].data)
         schema = body['generationConfig']['responseJsonSchema']
         self.assertIn('details', schema['required'])
-        self.assertEqual(set(schema['properties']['details']['properties']), {'print', 'neckline', 'collar'})
+        self.assertEqual(set(schema['properties']['details']['properties']),
+                         {'print', 'neckline', 'collar', 'design_details', 'materials'})
         top = {'image_status': 'single', 'attributes': {key: attributes()[key] for key in AI_FIELDS}}
+        empty = {'design_details': [], 'materials': []}
         cases = (
-            ({'print': '스트라이프', 'neckline': '브이넥', 'collar': None}, 'top',
-             {'print': '스트라이프', 'neckline': '브이넥', 'collar': None}),
-            ({'print': '체크', 'neckline': '라운드넥', 'collar': '셔츠칼라'}, 'bottom',
-             {'print': '체크', 'neckline': None, 'collar': None}),
-            ({'print': 'polka', 'neckline': None, 'collar': None}, 'top', None),
+            ({'print': '스트라이프', 'neckline': '브이넥', 'collar': None, **empty}, 'top',
+             {'print': '스트라이프', 'neckline': '브이넥', 'collar': None, **empty}),
+            ({'print': '체크', 'neckline': '라운드넥', 'collar': '셔츠칼라', **empty}, 'bottom',
+             {'print': '체크', 'neckline': None, 'collar': None, **empty}),
+            ({'print': None, 'neckline': None, 'collar': None,
+              'design_details': ['프릴', '리본', 'sparkles', '프릴', '포켓', '지퍼'], 'materials': ['데님', '면', '니트', '가죽']}, 'top',
+             {'print': None, 'neckline': None, 'collar': None, 'design_details': ['프릴', '리본', '포켓'], 'materials': ['데님', '니트']}),
+            ({'print': 'polka', 'neckline': None, 'collar': None, **empty}, 'top', None),
             ('striped', 'top', None),
             ({'print': '무지', 'neckline': None, 'collar': None}, 'shoes', None),
         )
@@ -266,6 +272,28 @@ class GeminiTests(SimpleTestCase):
         self.mock_response(opener, envelope(dict(top, extra=1)))
         with self.assertRaises(AnalysisError):
             analyze_image(photo(), 'test-key')
+
+    @patch('apps.wardrobe.analysis.build_opener')
+    def test_subcategory_and_style_suggestions_are_checked(self, opener):
+        def analyze(category, subcategory, styles):
+            data = {'name': '니트', 'category': category, 'colors': ['#FFFFFF'], 'subcategory': subcategory, 'styles': styles}
+            self.mock_response(opener, envelope({'image_status': 'single', 'attributes': data}))
+            return analyze_image(photo(), 'test-key')[0]
+        result = analyze('top', 'knitwear', ['minimal', 'lovely', 'casual', 'minimal', 'street'])
+        self.assertEqual((result['subcategory'], result['styles']), ('knitwear', ['minimal', 'casual']))
+        self.assertIsNone(analyze('top', 'jeans', [])['subcategory'])  # not a top
+        self.assertIsNone(analyze('bottom', ['skirt'], 'casual')['subcategory'])
+        self.assertIsNone(result['fit_type'])  # the fit comes from the measurements, never from the photo
+
+    @patch('apps.wardrobe.analysis.build_opener')
+    def test_measured_garment_type_is_a_prompt_hint(self, opener):
+        self.mock_response(opener, envelope())
+        analyze_image(photo(), 'test-key', 'shorts')
+        text = json.loads(opener.return_value.open.call_args.args[0].data)['contents'][0]['parts'][1]['text']
+        self.assertIn('measured it as shorts', text)
+        analyze_image(photo(), 'test-key', 'gown')
+        text = json.loads(opener.return_value.open.call_args.args[0].data)['contents'][0]['parts'][1]['text']
+        self.assertEqual(text, 'Classify this garment.')
 
     @patch('apps.wardrobe.analysis.build_opener')
     def test_provider_failures_are_sanitized_and_not_retried(self, opener):
@@ -303,6 +331,14 @@ class AnalysisEndpointTests(TestCase):
         self.assertEqual(response.json()['attributes'], attributes())
         self.assertNotIn('dimensions', response.json()['attributes'])
         self.assertEqual(response['Cache-Control'], 'no-store')
+        self.assertIsNone(analyze.call_args.args[2])
+
+    @patch('apps.wardrobe.views.analyze_image', return_value=(attributes(), None))
+    def test_measured_garment_type_is_passed_only_when_known(self, analyze):
+        self.client.post('/api/wardrobe/analyze/?garment=skirt', photo(), content_type='image/jpeg')
+        self.assertEqual(analyze.call_args.args[2], 'skirt')
+        self.client.post('/api/wardrobe/analyze/?garment=gown', photo(), content_type='image/jpeg')
+        self.assertIsNone(analyze.call_args.args[2])
 
     @patch('apps.wardrobe.views.analyze_image')
     def test_wrong_content_type_and_method_do_not_call_provider(self, analyze):
@@ -459,9 +495,20 @@ class RecommendationLabelTests(TestCase):
         shoes = dict(attributes(), category='shoes', subcategory='sneakers')
         self.assertIsNone(self.preview(attributes=shoes, body=BODY, dimensions=None).json()['labels'])
 
+    def test_without_a_body_profile_the_user_picks_the_fit(self):
+        response = self.preview(attributes=dict(attributes(), fit_type='loose'), dimensions=measured(chest_width_half=50),
+                                details={'print': '무지', 'design_details': ['포켓'], 'materials': ['니트']},
+                                garment_type='long_sleeve_top')
+        self.assertEqual(response.status_code, 200)
+        labels = response.json()['labels']
+        self.assertEqual((labels['fit'], labels['fit_basis']), ('루즈', '기존에 고른 핏'))
+        self.assertEqual((labels['sleeve'], labels['length'], labels['too_small']), ('긴팔', None, False))
+        self.assertEqual((labels['design_details'], labels['materials'], labels['body_basis']), (['포켓'], ['니트'], {}))
+        self.assertIsNone(self.preview(attributes=attributes(), dimensions=None).json()['labels']['fit'])
+
     def test_invalid_label_requests(self):
         cases = {
-            'no_body': {'attributes': attributes(), 'dimensions': None},
+            'bad_garment_type': {'attributes': attributes(), 'dimensions': None, 'body': BODY, 'garment_type': 'gown'},
             'body_out_of_range': {'attributes': attributes(), 'dimensions': None,
                                   'body': {'height_cm': 162, 'measurements': [{'type': 'chest', 'value_cm': 900}]}},
             'no_height': {'attributes': attributes(), 'dimensions': None, 'body': {'chest': 84}},

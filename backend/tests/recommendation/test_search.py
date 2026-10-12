@@ -106,6 +106,8 @@ def test_labels_become_kfashion_attributes():
     assert knit.labeled and knit.attrs["핏"] == "루즈" and knit.attrs["소재"] == ["니트"]
     assert knit.fit_note == "루즈 (가슴 여유 16 cm)" and knit.styles == ("모던", "소피스트케이티드")
     assert WARDROBE[2].too_small == "가슴둘레보다 4 cm 작아요"
+    frilly = owned(9, "top", "blouse", "화이트", "프릴 블라우스", design_details=["프릴", "리본"], drop_shoulder=True)
+    assert frilly.attrs["디테일"] == ["프릴", "리본", "드롭숄더"]
 
 
 def test_wardrobe_mode_uses_only_my_garments(catalog, female):

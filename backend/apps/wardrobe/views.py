@@ -18,7 +18,7 @@ from .analysis import AnalysisError, MAX_IMAGE_BYTES, MODEL, analyze_image, prep
 from .editor import catalog, validate_record
 from .schema import validate_ai_details, validate_attributes
 from .models import Garment
-from .landmarks import MAX_FRAME_BYTES, detect
+from .landmarks import GARMENTS, MAX_FRAME_BYTES, detect
 
 # Bound concurrent paid requests and image decode memory.
 ANALYSIS_SLOTS = BoundedSemaphore(1)
@@ -61,7 +61,9 @@ def analyze(request):
     try:
         # Bound image reads independently of the JSON edit limit.
         image = request.read(MAX_IMAGE_BYTES + 1)
-        attributes, details = analyze_image(image, settings.GEMINI_API_KEY)
+        garment_type = request.GET.get('garment')
+        attributes, details = analyze_image(image, settings.GEMINI_API_KEY,
+                                            garment_type if garment_type in GARMENTS else None)
         garment = Garment(attributes=attributes)
         garment.image.save(f'{uuid.uuid4()}.jpg', ContentFile(prepare_image(image)), save=False)
         try:
@@ -91,7 +93,8 @@ def editor_options(request):
 
 @require_POST
 def labels(request):
-    """Suggested recommendation labels for the garment being edited; nothing is saved."""
+    """Suggested recommendation labels for the garment being edited; nothing is saved. Without a body
+    profile only the body-independent labels are filled (the user picks the fit)."""
     if request.content_type != 'application/json':
         return JsonResponse({'error': 'JSON_REQUIRED'}, status=415)
     try:
@@ -104,13 +107,16 @@ def labels(request):
         attributes = validate_attributes(data.get('attributes'))
         dimensions = validate_record({'attributes': attributes, 'dimensions': data.get('dimensions'),
                                       'notes': ''})['dimensions']
-        body = body_from_request(request, data)
+        body = body_from_request(request, data) if data.get('body') is not None else None
+        garment_type = data.get('garment_type')
+        if garment_type is not None and garment_type not in GARMENTS:
+            raise ValueError('Invalid garment type')
     except RequestDataTooBig:
         return JsonResponse({'error': 'BODY_TOO_LARGE'}, status=413)
     except (ValueError, TypeError, UnicodeDecodeError, OverflowError):
         return JsonResponse({'error': 'INVALID_LABEL_REQUEST'}, status=400)
     details = validate_ai_details(data.get('details'), attributes['category'])
-    response = JsonResponse({'labels': label(attributes, dimensions, body, details)},
+    response = JsonResponse({'labels': label(attributes, dimensions, body, details, garment_type)},
                             json_dumps_params={'ensure_ascii': False})
     response['Cache-Control'] = 'no-store'
     return response

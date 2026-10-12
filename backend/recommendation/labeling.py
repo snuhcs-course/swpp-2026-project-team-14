@@ -21,6 +21,7 @@ from recommendation.vocab import (
     BOTTOM_FITS,
     COLLARS,
     COLORS,
+    DETAILS,
     LENGTHS,
     MATERIALS,
     NECKLINES,
@@ -29,14 +30,23 @@ from recommendation.vocab import (
     SLEEVES,
     UPPER_FITS,
     WARDROBE_CATEGORY,
+    WARDROBE_COLOR,
     WARDROBE_DEFAULT_CATEGORY,
+    WARDROBE_LEG_SHAPE,
     WARDROBE_SUBCATEGORY,
+    WARDROBE_UPPER_FIT,
 )
 
 # default material suggestions by wardrobe subcategory (the user can change them)
 MATERIAL_HINTS = {"jeans": ["데님"], "knitwear": ["니트"], "fleece": ["플리스"], "puffer": ["패딩"],
                   "hoodie": ["저지"], "sweatshirt": ["저지"], "tshirt": ["저지"], "active_pants": ["저지"]}
 DROP_SHOULDER_CM = 4.0
+# what the user picked when measuring (apps/wardrobe/landmarks.py GARMENTS)
+CAPTURE_SLEEVE = {"short_sleeve_top": "반팔", "short_sleeve_outerwear": "반팔",
+                  "long_sleeve_top": "긴팔", "long_sleeve_outerwear": "긴팔"}
+CAPTURE_SUBCATEGORY = {"shorts": "shorts", "skirt": "skirt"}
+# the fit chosen in the wardrobe editor before labels existed (fit_type also exists for bottoms)
+BOTTOM_FIT_TYPE = {"skinny": "스키니", "slim": "스키니", "regular": "노멀", "loose": "루즈", "oversized": "루즈"}
 
 
 def _value(dimensions: dict | None, key: str) -> float | None:
@@ -66,6 +76,12 @@ def nearest_color(hex_: str) -> str:
     """The K-Fashion colour name closest to a garment colour (CIELab distance)."""
     target = _lab(hex_)
     return min(COLORS, key=lambda name: math.dist(target, _lab(COLORS[name])))
+
+
+def kf_color(hex_: str) -> str:
+    """K-Fashion colour of a wardrobe colour: the palette's own mapping (its 초록 is K-Fashion 그린,
+    though nearer to 카키 in Lab), otherwise the nearest colour for a pixel picked from the photo."""
+    return WARDROBE_COLOR.get(hex_.upper()) or nearest_color(hex_)
 
 
 # ------------------------------------------------------------------ pieces
@@ -150,27 +166,43 @@ def _sleeve(dims: dict, body: Body) -> tuple[str | None, str | None]:
 
 
 # ------------------------------------------------------------------ main
-def label(attributes: dict, dimensions: dict | None, body: Body, details: dict | None = None) -> dict | None:
-    """Suggested labels for a wardrobe garment, or None for shoes (not used by the recommender yet)."""
+def label(attributes: dict, dimensions: dict | None, body: Body | None = None, details: dict | None = None,
+          garment_type: str | None = None) -> dict | None:
+    """Suggested labels for a wardrobe garment, or None for shoes (not used by the recommender yet).
+
+    Without a body profile the fit, length and "too small" stay open (the user picks the fit);
+    colour, category, season and the AI design details are filled either way."""
     slot = WARDROBE_CATEGORY.get(attributes.get("category"))
     if slot is None:
         return None
-    sub = attributes.get("subcategory")
+    sub = attributes.get("subcategory") or (CAPTURE_SUBCATEGORY.get(garment_type) if slot == "하의" else None)
     dims = dimensions or {}
     details = details or {}
-    if slot == "하의":
-        fit_label, fit_basis, small = _bottom_fit(sub, dims, body)
-    else:
-        fit_label, fit_basis, small = _upper_fit(slot, dims, body)
-    length, length_basis = _length(slot, sub, dims, body)
-    sleeve, sleeve_basis = _sleeve(dims, body) if slot != "하의" else (None, None)
-    shoulder = _value(dims, "shoulder_width")
-    drop = bool(shoulder and body.shoulder and shoulder > body.shoulder + DROP_SHOULDER_CM)
-    materials = list(MATERIAL_HINTS.get(sub or "", []))
-    kf_category = WARDROBE_SUBCATEGORY.get(sub or "", WARDROBE_DEFAULT_CATEGORY[slot])
+    fit_label = fit_basis = small = length = length_basis = sleeve = sleeve_basis = None
+    drop = False
+    if body is not None:
+        if slot == "하의":
+            fit_label, fit_basis, small = _bottom_fit(sub, dims, body)
+        else:
+            fit_label, fit_basis, small = _upper_fit(slot, dims, body)
+        length, length_basis = _length(slot, sub, dims, body)
+        if slot != "하의":
+            sleeve, sleeve_basis = _sleeve(dims, body)
+        shoulder = _value(dims, "shoulder_width")
+        drop = bool(shoulder and body.shoulder and shoulder > body.shoulder + DROP_SHOULDER_CM)
+    if fit_label is None:
+        old = (WARDROBE_LEG_SHAPE.get(attributes.get("leg_shape") or "")
+               or BOTTOM_FIT_TYPE.get(attributes.get("fit_type") or "")) if slot == "하의"             else WARDROBE_UPPER_FIT.get(attributes.get("fit_type") or "")
+        if old:
+            fit_label, fit_basis = old, "기존에 고른 핏"
+    if sleeve is None and slot != "하의" and garment_type in CAPTURE_SLEEVE:
+        sleeve, sleeve_basis = CAPTURE_SLEEVE[garment_type], "촬영할 때 고른 종류 기준"
     if sub == "shorts" and not length:
         length = "미니"
-    kf_colors = list(dict.fromkeys(nearest_color(c) for c in attributes.get("colors") or []))[:2]
+    ai_materials = [m for m in details.get("materials") or [] if m in MATERIALS][:2]
+    materials = ai_materials or list(MATERIAL_HINTS.get(sub or "", []))
+    kf_category = WARDROBE_SUBCATEGORY.get(sub or "", WARDROBE_DEFAULT_CATEGORY[slot])
+    kf_colors = list(dict.fromkeys(kf_color(c) for c in attributes.get("colors") or []))[:2]
     season_attrs = {"카테고리": kf_category, "소재": materials, "소매기장": sleeve, "기장": length}
     labels = {
         "fit": fit_label,
@@ -182,14 +214,15 @@ def label(attributes: dict, dimensions: dict | None, body: Body, details: dict |
         "season": season_token(slot, {k: v for k, v in season_attrs.items() if v}),
         "drop_shoulder": drop,
         "prints": [p for p in [details.get("print")] if p in PRINTS],
-        "neckline": details.get("neckline") if details.get("neckline") in NECKLINES else None,
-        "collar": details.get("collar") if details.get("collar") in COLLARS else None,
+        "neckline": details.get("neckline") if details.get("neckline") in NECKLINES and slot != "하의" else None,
+        "collar": details.get("collar") if details.get("collar") in COLLARS and slot != "하의" else None,
+        "design_details": list(dict.fromkeys(d for d in details.get("design_details") or [] if d in DETAILS))[:3],
         "materials": materials,
         "kf_category": kf_category,
         "kf_colors": kf_colors,
         "too_small": small is not None,
         "too_small_reason": small,
-        "body_basis": body.public(),
+        "body_basis": body.public() if body is not None else {},
         "confirmed": False,
     }
     return labels
@@ -197,21 +230,21 @@ def label(attributes: dict, dimensions: dict | None, body: Body, details: dict |
 
 def options() -> dict:
     """Allowed values per wardrobe category, for the app's label editor (GET /api/wardrobe/options/)."""
-    common = {"season": list(SEASONS), "prints": list(PRINTS), "materials": list(MATERIALS)}
+    common = {"season": list(SEASONS), "prints": list(PRINTS), "materials": list(MATERIALS), "design_details": list(DETAILS)}
     upper = {"sleeve": list(SLEEVES), "neckline": list(NECKLINES), "collar": list(COLLARS)}
     return {
         "top": {"fit": list(UPPER_FITS), "length": list(LENGTHS["상의"]), **upper, **common},
         "outerwear": {"fit": list(UPPER_FITS), "length": list(LENGTHS["아우터"]), **upper, **common},
         "bottom": {"fit": list(BOTTOM_FITS), "length": list(LENGTHS["하의"]), **common},
-        "limits": {"prints": 2, "materials": 2},
+        "limits": {"prints": 2, "materials": 2, "design_details": 3},
     }
 
 
 # ------------------------------------------------------------------ validation (PUT items/{id})
 LABEL_KEYS = frozenset({
     "fit", "fit_basis", "length", "length_basis", "sleeve", "sleeve_basis", "season", "drop_shoulder", "prints",
-    "neckline", "collar", "materials", "kf_category", "kf_colors", "too_small", "too_small_reason", "body_basis",
-    "confirmed",
+    "neckline", "collar", "design_details", "materials", "kf_category", "kf_colors", "too_small", "too_small_reason",
+    "body_basis", "confirmed",
 })
 TEXT_MAX = 200
 
@@ -245,6 +278,7 @@ def validate_labels(data: object, category: str) -> dict | None:
     one_of("collar", COLLARS)
     list_of("prints", PRINTS, 2)
     list_of("materials", MATERIALS, 2)
+    list_of("design_details", DETAILS, 3)
     list_of("kf_colors", tuple(COLORS), 2)
     for key in ("fit_basis", "length_basis", "sleeve_basis", "too_small_reason", "kf_category"):
         v = data.get(key)
