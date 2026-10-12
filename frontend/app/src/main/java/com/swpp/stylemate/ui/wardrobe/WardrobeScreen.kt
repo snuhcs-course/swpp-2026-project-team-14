@@ -1,8 +1,14 @@
-// AI-generated with Codex, 2026-09-29, reviewed by Hyeon U Jeong
+// AI-generated with Codex, 2026-09-29, reviewed by Hyeon U Jeong; recommendation labels added with Claude Code (Claude Opus 5.5), 2026-10-12, reviewed by Dongkun Moon
 package com.swpp.stylemate.ui.wardrobe
 
 import com.swpp.stylemate.data.wardrobe.*
+import com.swpp.stylemate.BuildConfig
+import com.swpp.stylemate.data.BodyProfileJson
+import com.swpp.stylemate.data.SharedPrefsBodyProfileStore
+import com.swpp.stylemate.data.recommendation.OutfitRepository
 import com.swpp.stylemate.ui.wardrobe.capture.MeasurementActivity
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
 import android.Manifest
 import android.app.Activity
 import android.content.ActivityNotFoundException
@@ -69,6 +75,11 @@ fun WardrobeRoute() {
     val analysis by analysisModel.state.collectAsStateWithLifecycle()
     val wardrobeModel: WardrobeViewModel = viewModel()
     val wardrobe by wardrobeModel.state.collectAsStateWithLifecycle()
+    val labelsModel: GarmentLabelsViewModel = viewModel(factory = viewModelFactory {
+        initializer { GarmentLabelsViewModel(OutfitRepository(BuildConfig.API_BASE_URL)) }
+    })
+    // The body profile kept on the device (recommendation labels are computed on this body).
+    val body = remember { SharedPrefsBodyProfileStore(context).load()?.let { JSONObject(BodyProfileJson.encode(it)) } }
     var editingId by rememberSaveable { mutableStateOf<String?>(null) }
     var savedPhoto by remember(editingId) { mutableStateOf<ImageBitmap?>(null) }
     LaunchedEffect(selected) { analysisModel.select(selected) }
@@ -190,7 +201,11 @@ fun WardrobeRoute() {
                 if (editing != null) editing.optJSONObject("dimensions") else if (sameCategory) measurements?.optJSONObject("dimensions") else null,
                 if (editing != null) editing.getString("notes") else "", catalog,
                 wardrobe.saving || wardrobe.loading, editing != null, wardrobe.saveError,
-                onSave = { wardrobeModel.save(record.getString("id"), it) }, onBack = back,
+                onSave = { payload ->
+                    labelsModel.merged(payload.getJSONObject("attributes").optString("category"), catalog.optJSONObject("label_options"))
+                        ?.let { payload.put("labels", it) }
+                    wardrobeModel.save(record.getString("id"), payload)
+                }, onBack = back,
                 image = if (editing != null) savedPhoto else preview,
                 photo = {
                     if (editing != null) GarmentPhoto(editing.getString("image_url"), editing.getJSONObject("attributes").getString("name"),
@@ -203,6 +218,12 @@ fun WardrobeRoute() {
                         if (measurements != null && !sameCategory) Text("옷 종류가 달라 치수를 다시 입력해 주세요.",
                             Modifier.padding(top = 12.dp), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
                     }
+                },
+                labels = { attributes, dimensions ->
+                    val stored = editing?.optJSONObject("labels")
+                    GarmentLabelSection(labelsModel, record.getString("id"), attributes, dimensions, body,
+                        GarmentLabels.details(result, stored), stored, catalog.optJSONObject("label_options"),
+                        enabled = !(wardrobe.saving || wardrobe.loading))
                 },
             )
         } else {

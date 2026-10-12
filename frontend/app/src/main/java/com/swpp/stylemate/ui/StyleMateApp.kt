@@ -13,6 +13,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -36,6 +37,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.swpp.stylemate.data.SharedPrefsBodyProfileStore
+import com.swpp.stylemate.ui.home.CodiBookRoute
+import com.swpp.stylemate.ui.home.HomeRoute
 import com.swpp.stylemate.ui.profile.AnalyzingScreen
 import com.swpp.stylemate.ui.profile.BodyProfileViewModel
 import com.swpp.stylemate.ui.profile.CaptureGuideScreen
@@ -48,6 +51,7 @@ import com.swpp.stylemate.ui.wardrobe.WardrobeRoute
 private enum class Tab(val label: String, val icon: ImageVector) {
     HOME("홈", Icons.Filled.Home),
     WARDROBE("옷장", Icons.AutoMirrored.Filled.List),
+    CODIBOOK("코디북", Icons.Filled.Star),
     PROFILE("마이프로필", Icons.Filled.Person),
 }
 
@@ -133,25 +137,16 @@ private fun MainTabs(viewModel: BodyProfileViewModel) {
         },
     ) { padding ->
         when (tab) {
-            Tab.HOME -> Placeholder("오늘의 코디", "홈 대시보드는 P8 담당 화면이에요.", Modifier.padding(padding))
+            Tab.HOME -> HomeRoute(app.profile, onSetupProfile = viewModel::startReanalysis,
+                onOpenWardrobe = { tab = Tab.WARDROBE }, modifier = Modifier.padding(padding).consumeWindowInsets(padding))
             Tab.WARDROBE -> Box(Modifier.padding(padding).consumeWindowInsets(padding)) { WardrobeRoute() }
+            Tab.CODIBOOK -> CodiBookRoute(Modifier.padding(padding).consumeWindowInsets(padding))
             Tab.PROFILE -> MyProfileScreen(
                 profile = app.profile,
                 onReanalyze = viewModel::startReanalysis,
                 onDelete = viewModel::deleteProfile,
                 modifier = Modifier.padding(padding),
             )
-        }
-    }
-}
-
-@Composable
-private fun Placeholder(title: String, note: String, modifier: Modifier) {
-    Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(8.dp))
-            Text(note, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

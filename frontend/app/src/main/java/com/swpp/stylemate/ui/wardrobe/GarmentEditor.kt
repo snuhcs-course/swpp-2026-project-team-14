@@ -1,4 +1,4 @@
-// AI-generated with Codex, 2026-09-29, reviewed by Hyeon U Jeong
+// AI-generated with Codex, 2026-09-29, reviewed by Hyeon U Jeong; recommendation labels added with Claude Code (Claude Opus 5.5), 2026-10-12, reviewed by Dongkun Moon
 package com.swpp.stylemate.ui.wardrobe
 
 import com.swpp.stylemate.data.wardrobe.*
@@ -57,7 +57,8 @@ private fun dimensionChoices(attributes: JSONObject, catalog: JSONObject): JSONO
 fun GarmentEditor(id: String, initialAttributes: JSONObject, initialDimensions: JSONObject?,
                   initialNotes: String, catalog: JSONObject,
                   busy: Boolean, saved: Boolean, error: String?, onSave: (JSONObject) -> Unit,
-                  onBack: (() -> Unit)? = null, image: ImageBitmap? = null, photo: @Composable () -> Unit = {}) {
+                  onBack: (() -> Unit)? = null, image: ImageBitmap? = null, photo: @Composable () -> Unit = {},
+                  labels: @Composable (attributes: JSONObject, dimensions: JSONObject?) -> Unit = { _, _ -> }) {
     var attributesText by rememberSaveable(id) { mutableStateOf(initialAttributes.toString()) }
     var notes by rememberSaveable(id) { mutableStateOf(initialNotes) }
     var dimensionText by rememberSaveable(id) {
@@ -97,11 +98,12 @@ fun GarmentEditor(id: String, initialAttributes: JSONObject, initialDimensions: 
         attributesText = next.toString()
     }
 
-    fun save() {
+    // Valid entries only, so the recommendation labels can follow the fields while the user types.
+    fun currentDimensions(): JSONObject? {
         val result = JSONObject().put("unit", "cm")
         dimensions.keysList().forEach { key ->
             val text = inputs.optString(key)
-            if (text.isNotBlank()) {
+            if (text.isNotBlank() && validNumber(text)) {
                 val value = text.toBigDecimal().setScale(2, RoundingMode.HALF_UP)
                 val original = initialDimensions?.optJSONObject(key)
                 val same = original != null && value.toDouble() == original.optDouble("value") &&
@@ -110,7 +112,11 @@ fun GarmentEditor(id: String, initialAttributes: JSONObject, initialDimensions: 
                     JSONObject().put("value", value).put("source", "user_measured").put("method", "unspecified").put("reference", JSONObject.NULL))
             }
         }
-        onSave(JSONObject().put("attributes", attributes).put("dimensions", if (result.length() == 1) JSONObject.NULL else result)
+        return if (result.length() == 1) null else result
+    }
+
+    fun save() {
+        onSave(JSONObject().put("attributes", attributes).put("dimensions", currentDimensions() ?: JSONObject.NULL)
             .put("notes", notes))
     }
 
@@ -168,6 +174,7 @@ fun GarmentEditor(id: String, initialAttributes: JSONObject, initialDimensions: 
                     }
                 }
             }
+            labels(attributes, currentDimensions())
             Spacer(Modifier.height(20.dp))
             OutlinedTextField(value = notes, onValueChange = { if (it.length <= 2000) notes = it },
                 label = { Text("메모") }, minLines = 4, enabled = !busy,

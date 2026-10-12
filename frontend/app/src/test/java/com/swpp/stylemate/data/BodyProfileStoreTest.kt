@@ -1,3 +1,4 @@
+// AI-generated with Claude Code (Claude Opus 5.5), 2026-10-07, reviewed by Dongkun Moon
 package com.swpp.stylemate.data
 
 import com.swpp.stylemate.ui.profile.BodyProfileViewModel
