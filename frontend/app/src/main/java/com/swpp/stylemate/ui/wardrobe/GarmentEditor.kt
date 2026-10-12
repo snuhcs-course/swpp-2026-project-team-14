@@ -61,6 +61,7 @@ fun GarmentEditor(id: String, initialAttributes: JSONObject, initialDimensions: 
                   initialNotes: String, catalog: JSONObject,
                   busy: Boolean, saved: Boolean, error: String?, onSave: (JSONObject) -> Unit,
                   onBack: (() -> Unit)? = null, image: ImageBitmap? = null, photo: @Composable () -> Unit = {},
+                  canSaveLabels: (JSONObject, JSONObject?) -> Boolean = { _, _ -> true },
                   labels: @Composable (attributes: JSONObject, dimensions: JSONObject?) -> Unit = { _, _ -> }) {
     var attributesText by rememberSaveable(id) { mutableStateOf(initialAttributes.toString()) }
     var notes by rememberSaveable(id) { mutableStateOf(initialNotes) }
@@ -119,6 +120,7 @@ fun GarmentEditor(id: String, initialAttributes: JSONObject, initialDimensions: 
     }
 
     fun save() {
+        if (!valid || busy || !canSaveLabels(attributes, currentDimensions())) return
         onSave(JSONObject().put("attributes", attributes).put("dimensions", currentDimensions() ?: JSONObject.NULL)
             .put("notes", notes))
     }
@@ -138,7 +140,7 @@ fun GarmentEditor(id: String, initialAttributes: JSONObject, initialDimensions: 
     ScreenScaffold(
         title = if (saved) "옷 정보" else "분석 결과",
         primaryLabel = if (busy) "저장 중" else if (saved) "저장하기" else "옷장에 추가",
-        primaryEnabled = valid && !busy,
+        primaryEnabled = valid && !busy && canSaveLabels(attributes, currentDimensions()),
         onPrimary = ::save,
         onBack = onBack,
         navigationEnabled = !busy,

@@ -137,3 +137,38 @@ def test_without_body_or_measurements_the_capture_type_and_old_fit_fill_in():
     measured = label({"category": "top", "subcategory": "tshirt", "colors": [], "fit_type": "slim"},
                      dims(chest_width_half=50), BODY)
     assert measured["fit"] == "루즈"
+
+
+def test_category_must_belong_to_the_garment_slot():
+    for category in ("없는카테고리", "팬츠", [], {}):
+        with pytest.raises(ValueError):
+            validate_labels({"kf_category": category}, "top")
+    assert validate_labels({"kf_category": "티셔츠"}, "top")["kf_category"] == "티셔츠"
+    assert validate_labels({"kf_category": None}, "top")["kf_category"] is None
+
+
+def test_primary_and_secondary_colors_keep_the_first_two_positions():
+    from recommendation.wardrobe import to_item
+
+    # The first two HEX values can map to the same K-Fashion name. Do not promote color 3.
+    attrs = {"category": "top", "subcategory": "tshirt", "colors": ["#FFFFFF", "#FFFFF0", "#202020"]}
+    labels = label(attrs, None)
+    assert labels["kf_colors"] == ["화이트", "화이트"]
+    validate_labels(labels, "top")
+    for saved in (None, labels):
+        item = to_item({"id": "colors", "attributes": attrs, "labels": saved})
+        assert (item.attrs["색상"], item.attrs["서브색상"]) == ("화이트", "화이트")
+    attrs["colors"] = ["#FFFFFF", "#24344B", "#202020"]
+    item = to_item({"id": "colors", "attributes": attrs, "labels": label(attrs, None)})
+    assert (item.attrs["색상"], item.attrs["서브색상"]) == ("화이트", "네이비")
+
+
+def test_confirmed_season_is_the_model_token_not_a_new_estimate():
+    from recommendation.wardrobe import to_item
+    from recommendation.masked import garment_tokens, season_token
+
+    attrs = {"category": "top", "subcategory": "tshirt", "colors": []}
+    labels = {**label(attrs, None, garment_type="short_sleeve_top"), "season": "겨울", "confirmed": True}
+    item = to_item({"id": "season", "attributes": attrs, "labels": validate_labels(labels, "top")})
+    assert season_token(item.slot, item.attrs) == "여름"  # the previous automatic estimate
+    assert ("상의", "계절", "겨울") in garment_tokens(item.slot, item.attrs)

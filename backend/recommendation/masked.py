@@ -10,12 +10,13 @@ are the context, and each candidate is scored by the mean log-probability of its
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 
 import numpy as np
 
 from recommendation import season
-from recommendation.vocab import SLOTS, as_list
+from recommendation.vocab import SLOTS, as_list, normalize_value
 
 STYLE_SLOT = "스타일"
 SLOT_TOKENS = (STYLE_SLOT, *SLOTS)
@@ -41,7 +42,7 @@ def garment_tokens(slot: str, attrs: dict) -> list[tuple[str, str, str]]:
     toks = [(slot, k, str(attrs[k])) for k in SCALAR_KEYS if attrs.get(k)]
     for k, limit in LIST_KEYS.items():
         toks += [(slot, k, str(v)) for v in as_list(attrs.get(k))[:limit]]
-    toks.append((slot, "계절", season_token(slot, attrs)))
+    toks.append((slot, "계절", attrs.get("계절") or season_token(slot, attrs)))
     return toks
 
 
@@ -52,7 +53,7 @@ class MaskedModel:
         vocab = json.loads((directory / "masked_vocab.json").read_text(encoding="utf-8"))
         self.slots = vocab["slots"]
         self.keys = vocab["keys"]
-        self.values = [tuple(v) for v in vocab["values"]]
+        self.values = [(k, normalize_value(v)) for k, v in vocab["values"]]
         self.index = {v: i for i, v in enumerate(self.values)}
         self.fitb = vocab.get("fitb", {})
         # "상의|하의" -> 5/25/50/75/95 % quantiles of pair_score on real K-Fashion outfits
@@ -77,10 +78,13 @@ class MaskedModel:
                 toks += garment_tokens(s, context[s])
         s_ids, k_ids, v_ids = [], [], []
         for sl, k, v in toks:
+            v = normalize_value(v)
             if (k, v) in self.index:
                 s_ids.append(self.slots.index(sl))
                 k_ids.append(self.keys.index(k))
                 v_ids.append(self.index[(k, v)])
+            else:
+                logging.getLogger(__name__).warning("Unknown model token: %s=%s", k, v)
         queries = [q for q in QUERY_KEYS if q in self.keys]
         keep = SEQ_LEN - len(queries)
         s_ids, k_ids, v_ids = s_ids[:keep], k_ids[:keep], v_ids[:keep]
@@ -103,7 +107,7 @@ class MaskedModel:
         for key, lp in logprobs.items():
             raw = attrs.get(key)
             value = raw[0] if isinstance(raw, list) and raw else raw
-            i = self.index.get((key, str(value))) if value else None
+            i = self.index.get((key, normalize_value(str(value)))) if value else None
             if i is not None:
                 vals.append(float(lp[i]))
         return float(np.mean(vals)) if vals else -20.0

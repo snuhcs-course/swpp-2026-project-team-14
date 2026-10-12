@@ -37,6 +37,8 @@
  "too_small": false, "too_small_reason": null, "body_basis": {"height": 163, "chest": 84}, "confirmed": false}
 ```
 
+`kf_colors`는 등록 색상의 앞 두 개를 변환한 순서이며 같은 색상명이 두 번 나올 수 있다. 추천 입력의 `색상`·`서브색상`에 대응하고 3번 이후의 색상은 사용하지 않는다. 저장 요청의 `kf_category`는 옷 분류와 일치하는 허용 카테고리만 받는다.
+
 허용값은 `GET /api/wardrobe/options/`의 `label_options`(분류별 fit·length·sleeve·season·prints·neckline·collar·design_details·materials, `limits`)에 있다. 오류: 체형·속성·치수·측정 종류가 잘못되면 400 `INVALID_LABEL_REQUEST`.
 
 ### PUT /api/wardrobe/items/{id}/

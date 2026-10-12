@@ -28,13 +28,13 @@ swpp-2026-project-team-14/
 |   |           |-- GarmentAnalysisViewModel.kt  # 분석 진행·실패 상태
 |   |           |-- WardrobeColorField.kt       # 색상표·사진 좌표 변환·픽셀 색상 선택
 |   |           |-- GarmentEditor.kt             # 특징·실측·메모 편집과 하단 고정 저장
-|   |           |-- GarmentLabels.kt             # 내 몸 기준 추천 라벨(유일한 핏 선택) 확인·수정 (docs/recommendation)
+|   |           |-- GarmentLabels.kt             # 추천 라벨 확인·수정·실패 후 수동 확인·저장 가능 상태
 |   |           |-- FrontPhoto.kt                # 상의·아우터 앞면 사진 카드
 |   |           `-- capture/
 |   |               |-- MeasurementActivity.kt  # 실측 촬영·측정점 확인·수정
 |   |               `-- MeasurementCamera.kt    # AR 카메라·촬영 프레임 고정
 |   |-- test/java/com/swpp/stylemate/             # 체형 계약·실측 기하 단위 검사
-|   `-- androidTest/java/com/swpp/stylemate/      # 옷장 UI·사진 색상 선택·탭 연결·측정점 검사
+|   `-- androidTest/java/com/swpp/stylemate/      # 옷장 UI·라벨 실패/재시도·사진 색상 선택·탭 연결·측정점 검사
 |-- backend/
 |   |-- config/
 |   |   |-- settings.py                          # 공통 API·MySQL·사진·모델 설정
@@ -54,10 +54,11 @@ swpp-2026-project-team-14/
 |   |       |-- migrations/0002_garment_labels.py # 추천 라벨 컬럼 추가
 |   |       |-- tests.py                         # AI 계약·DB 저장·재조회 검사
 |   |       `-- test_landmarks.py                # 원본 사진의 자동 측정점·좌표 변환 검사
+|   |-- recommendation/                          # 저장 라벨 → K-Fashion 입력, 계절·주색/서브색·모델 어휘 정규화
 |   |-- body_analysis/                           # MediaPipe 체형 분석
 |   |-- wardrobe/garment-landmarks/              # HRNet 가중치·메타데이터·라이선스
 |   |-- scripts/prepare_landmarks.py             # 빌드 시 HRNet 다운로드·검증·ONNX 변환
-|   `-- tests/                                   # 체형 분석·공통 API 회귀 검사
+|   `-- tests/                                   # 체형 분석·추천 모델 입력 계약·공통 API 회귀 검사
 `-- docs/wardrobe/                               # 옷장 설계·실행 안내
 ```
 

@@ -41,12 +41,15 @@ def to_item(g: dict) -> Item | None:
 
 
 def _labeled_attrs(slot: str, labels: dict, plain: dict) -> dict:
+    colors = labels.get("kf_colors") or [plain.get("색상"), plain.get("서브색상")]
     details = list(labels.get("design_details") or [])
     if labels.get("drop_shoulder") and "드롭숄더" not in details:
         details.append("드롭숄더")
     return {
         "카테고리": labels.get("kf_category") or plain["카테고리"],
-        "색상": (labels.get("kf_colors") or [plain["색상"]])[0],
+        "색상": colors[0],
+        "서브색상": colors[1] if len(colors) > 1 else None,
+        "계절": labels.get("season"),
         "핏": labels.get("fit") or "노멀",
         "기장": labels.get("length"),
         "소매기장": labels.get("sleeve") if slot != "하의" else None,
@@ -62,9 +65,8 @@ def _plain_attrs(slot: str, a: dict) -> dict:
     """Garments saved before labels existed: a rough mapping of the wardrobe attributes."""
     sub = a.get("subcategory") or ""
     colors = a.get("colors") or []
-    color = colors[0] if colors else None
-    if color and color not in COLORS:
-        color = WARDROBE_COLOR.get(str(color).upper()) or nearest_color(str(color))
+    mapped = [c if c in COLORS else WARDROBE_COLOR.get(str(c).upper()) or nearest_color(str(c))
+              for c in colors[:2]]
     if slot == "하의":
         fit_label = "노멀" if sub == "skirt" else WARDROBE_LEG_SHAPE.get(a.get("leg_shape") or "", "노멀")
     else:
@@ -72,7 +74,8 @@ def _plain_attrs(slot: str, a: dict) -> dict:
     material = {"fleece": "플리스", "puffer": "패딩", "knitwear": "니트", "jeans": "데님"}.get(sub)
     return {
         "카테고리": WARDROBE_SUBCATEGORY.get(sub, WARDROBE_DEFAULT_CATEGORY[slot]),
-        "색상": color,
+        "색상": mapped[0] if mapped else None,
+        "서브색상": mapped[1] if len(mapped) > 1 else None,
         "핏": fit_label,
         "기장": "미니" if sub == "shorts" else "발목" if slot == "하의" else None,
         "소재": [material] if material else [],

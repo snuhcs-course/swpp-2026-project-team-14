@@ -544,3 +544,27 @@ class RecommendationLabelTests(TestCase):
         shoes = dict(attributes(), category='shoes', subcategory='sneakers')
         payload = {'attributes': shoes, 'dimensions': None, 'notes': ''}
         self.assertIsNone(self.client.put(url, json.dumps(payload), content_type='application/json').json()['labels'])
+
+    def test_saved_labels_reach_model_inputs_and_invalid_category_is_rejected(self):
+        from .models import Garment
+        from recommendation.wardrobe import to_item
+        from recommendation.masked import garment_tokens
+
+        attrs = dict(attributes(), colors=['#FFFFFF', '#24344B', '#C83C3C'])
+        with patch('apps.wardrobe.views.analyze_image', return_value=(attrs, None)):
+            item_id = self.client.post('/api/wardrobe/analyze/', photo(), content_type='image/jpeg').json()['id']
+        url = f'/api/wardrobe/items/{item_id}/'
+        labels = self.preview(attributes=attrs, dimensions=None).json()['labels']
+        labels.update(season='겨울', prints=['하운즈 투스'], confirmed=True)
+        payload = {'attributes': attrs, 'dimensions': None, 'notes': '', 'labels': labels}
+        self.assertEqual(self.client.put(url, json.dumps(payload), content_type='application/json').status_code, 200)
+        stored = self.client.get(url).json()
+        self.assertEqual(Garment.objects.get(pk=item_id).labels, labels)
+        self.assertEqual(stored['attributes']['colors'], attrs['colors'])
+        item = to_item(stored)
+        self.assertEqual((item.attrs['색상'], item.attrs['서브색상']), ('화이트', '네이비'))
+        self.assertIn(('상의', '계절', '겨울'), garment_tokens(item.slot, item.attrs))
+        for wrong in ('팬츠', '없는카테고리'):
+            payload['labels'] = dict(labels, kf_category=wrong)
+            self.assertEqual(self.client.put(url, json.dumps(payload), content_type='application/json').status_code, 400)
+        self.assertEqual(self.client.get(url).json()['labels'], labels)

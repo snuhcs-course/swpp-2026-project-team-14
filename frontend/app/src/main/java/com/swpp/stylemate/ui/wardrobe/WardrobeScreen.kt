@@ -92,6 +92,7 @@ fun WardrobeRoute() {
     val labelsModel: GarmentLabelsViewModel = viewModel(factory = viewModelFactory {
         initializer { GarmentLabelsViewModel(OutfitRepository(BuildConfig.API_BASE_URL)) }
     })
+    val labelState by labelsModel.state.collectAsStateWithLifecycle()
     // The body profile kept on the device (recommendation labels are computed on this body).
     val body = remember { SharedPrefsBodyProfileStore(context).load()?.let { JSONObject(BodyProfileJson.encode(it)) } }
     var editingId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -262,7 +263,12 @@ fun WardrobeRoute() {
                 if (editing != null) editing.optJSONObject("dimensions") else if (sameCategory) measurements?.optJSONObject("dimensions") else null,
                 if (editing != null) editing.getString("notes") else "", catalog,
                 wardrobe.saving || wardrobe.loading, editing != null, wardrobe.saveError,
-                onSave = { payload ->
+                canSaveLabels = { attributes, dimensions ->
+                    GarmentLabels.canSave(labelState, record.getString("id"), attributes, dimensions, body)
+                },
+                onSave = save@{ payload ->
+                    if (!GarmentLabels.canSave(labelsModel.state.value, record.getString("id"),
+                            payload.getJSONObject("attributes"), payload.optJSONObject("dimensions"), body)) return@save
                     labelsModel.merged(payload.getJSONObject("attributes").optString("category"), catalog.optJSONObject("label_options"))
                         ?.let { labels ->
                             payload.put("labels", labels)

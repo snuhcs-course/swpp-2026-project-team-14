@@ -2,8 +2,10 @@
 package com.swpp.stylemate.wardrobe
 
 import com.swpp.stylemate.ui.wardrobe.GarmentLabels
+import com.swpp.stylemate.ui.wardrobe.LabelState
 import org.json.JSONArray
 import org.json.JSONObject
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -72,5 +74,23 @@ class GarmentLabelsTest {
         assertEquals("라운드넥", fromSaved.getString("neckline"))
         assertTrue(fromSaved.isNull("collar"))
         assertNull(GarmentLabels.details(null, null))
+    }
+    @Test
+    fun onlyCurrentSuccessfulOrManuallyConfirmedLabelsAllowSave() {
+        val attrs = JSONObject("""{"category":"top","colors":["#FFFFFF"]}""")
+        val key = GarmentLabels.inputKey(attrs, null)
+        val ready = LabelState("item", suggested, inputKey = key)
+        fun canSave(state: LabelState) = GarmentLabels.canSave(state, "item", attrs, null, null)
+        assertTrue(canSave(ready))
+        assertFalse(canSave(LabelState()))
+        assertFalse(canSave(ready.copy(loading = true)))
+        assertFalse(canSave(ready.copy(error = "failed")))
+        assertFalse(canSave(ready.copy(garmentId = "previous")))
+        // Before the 500 ms debounce starts a new request, old labels must not enable saving.
+        val changed = JSONObject(attrs.toString()).put("colors", JSONArray(listOf("#202020")))
+        assertFalse(GarmentLabels.canSave(ready, "item", changed, null, null))
+        assertFalse(GarmentLabels.canSave(ready, "item", attrs, JSONObject("""{"chest_width_half":{"value":40}}"""), null))
+        assertFalse(GarmentLabels.canSave(ready, "item", attrs, null, JSONObject("""{"height":180}""")))
+        assertTrue(GarmentLabels.canSave(LabelState(), "shoe", JSONObject("""{"category":"shoes"}"""), null, null))
     }
 }

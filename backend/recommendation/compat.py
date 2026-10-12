@@ -16,7 +16,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from recommendation.vocab import SLOTS, as_list
+from recommendation.vocab import SLOTS, as_list, normalize_value
 
 KEYS = ("카테고리", "색상", "핏", "소재", "기장", "프린트", "소매기장")
 FEATURE_TYPES: tuple[tuple[str, str], ...] = tuple(
@@ -101,7 +101,7 @@ class Reason:
 
 class CompatModel:
     def __init__(self, pmi: dict[str, list | tuple], weights: list[float], bias: float) -> None:
-        self.pmi = {k: (float(v[0]), int(v[1])) for k, v in pmi.items()}
+        self.pmi = {normalize_value(k): (float(v[0]), int(v[1])) for k, v in pmi.items()}
         self.weights = np.asarray(weights, dtype=float)
         self.bias = float(bias)
 
@@ -110,7 +110,7 @@ class CompatModel:
         return cls(data["pmi"], data["weights"], data["bias"])
 
     def lookup(self, sa: str, sb: str, ka: str, kb: str, x: str, y: str) -> tuple[float, int]:
-        return self.pmi.get("|".join((sa, sb, ka, kb, x, y)), (0.0, 0))
+        return self.pmi.get(normalize_value("|".join((sa, sb, ka, kb, x, y))), (0.0, 0))
 
     def pair_features(self, slot_a: str, vals_a: dict, slot_b: str, vals_b: dict) -> np.ndarray:
         if not ordered(slot_a, slot_b):

@@ -128,6 +128,11 @@ WARDROBE_LEG_SHAPE = {
 }
 
 
+def normalize_value(value: str) -> str:
+    """Keep dataset NBSP and UI spaces identical without changing trained token IDs."""
+    return " ".join(value.split())
+
+
 def as_list(value) -> list:
     if value is None:
         return []

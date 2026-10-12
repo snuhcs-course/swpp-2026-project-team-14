@@ -90,8 +90,13 @@ object GarmentLabels {
         return result.put("confirmed", true)
     }
 
-    fun inputKey(attributes: JSONObject, dimensions: JSONObject?): String =
-        listOf(attributes.optString("category"), attributes.opt("subcategory"), attributes.opt("colors"), dimensions).joinToString("|")
+    fun inputKey(attributes: JSONObject, dimensions: JSONObject?, body: JSONObject? = null): String =
+        listOf(attributes.optString("category"), attributes.opt("subcategory"), attributes.opt("colors"), dimensions, body).joinToString("|")
+
+    fun canSave(state: LabelState, garmentId: String, attributes: JSONObject, dimensions: JSONObject?, body: JSONObject?): Boolean =
+        attributes.optString("category") == "shoes" ||
+            (state.garmentId == garmentId && state.inputKey == inputKey(attributes, dimensions, body) &&
+                state.suggested != null && !state.loading && state.error == null)
 
     /** AI design details (print, neckline, collar, design details, visible materials) to send back with a
      * recomputation: from the analysis of a new garment, or from the saved labels. */
@@ -123,18 +128,26 @@ class GarmentLabelsViewModel(private val repository: OutfitRepository) : ViewMod
     fun compute(garmentId: String, attributes: JSONObject, dimensions: JSONObject?, body: JSONObject?,
                 details: JSONObject?, garmentType: String?, inputKey: String, force: Boolean = false) {
         val current = mutableState.value
-        if (current.garmentId != garmentId || (!force && current.inputKey == inputKey && current.suggested != null)) return
+        if (current.garmentId != garmentId || (!force && current.inputKey == inputKey && current.suggested != null && !current.loading && current.error == null)) return
         job?.cancel()
-        mutableState.value = current.copy(loading = true, error = null)
+        mutableState.value = current.copy(inputKey = inputKey, loading = true, error = null)
         job = viewModelScope.launch {
             try {
                 val labels = repository.labels(attributes, dimensions, body, details, garmentType)
+                    ?: throw OutfitApiException("EMPTY_LABELS", "Empty labels")
                 mutableState.value = mutableState.value.copy(suggested = labels, inputKey = inputKey, loading = false)
             } catch (error: CancellationException) {
                 throw error
             } catch (error: OutfitApiException) {
-                mutableState.value = mutableState.value.copy(loading = false, error = "라벨을 계산하지 못했어요.")
+                mutableState.value = mutableState.value.copy(suggested = JSONObject(), loading = false, error = "라벨을 계산하지 못했어요.")
             }
+        }
+    }
+
+    fun confirmManual(inputKey: String) {
+        val current = mutableState.value
+        if (current.inputKey == inputKey && current.error != null && !current.loading) {
+            mutableState.value = current.copy(error = null)
         }
     }
 
@@ -154,7 +167,7 @@ fun GarmentLabelSection(model: GarmentLabelsViewModel, garmentId: String, attrib
     val category = attributes.optString("category")
     val allowed = options?.optJSONObject(category) ?: return  // shoes: not used by the recommender
     val state by model.state.collectAsStateWithLifecycle()
-    val key = GarmentLabels.inputKey(attributes, dimensions) + if (body != null) "|body" else ""
+    val key = GarmentLabels.inputKey(attributes, dimensions, body)
     LaunchedEffect(garmentId) { model.start(garmentId, stored, key) }
     LaunchedEffect(garmentId, key, body?.toString()) {
         delay(500) // wait until the user stops typing a dimension
@@ -173,7 +186,8 @@ fun GarmentLabelSection(model: GarmentLabelsViewModel, garmentId: String, attrib
                 TextButton(onClick = { model.compute(garmentId, attributes, dimensions, body, details, garmentType, key, force = true) },
                     enabled = enabled) { Text("다시 계산") }
             }
-            val labels = GarmentLabels.merge(state.suggested, state.edits, category, options) ?: return@Column
+            val labels = GarmentLabels.merge(state.suggested ?: JSONObject(), state.edits, category, options) ?: return@Column
+            val editable = enabled && !state.loading && state.inputKey == key
             if (labels.optBoolean("too_small")) {
                 Text("${labels.optString("too_small_reason")}. 이 옷은 코디 추천에서 빠져요.",
                     style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.SemiBold)
@@ -182,19 +196,23 @@ fun GarmentLabelSection(model: GarmentLabelsViewModel, garmentId: String, attrib
             fun values(key: String) = labels.optJSONArray(key)?.let { a -> (0 until a.length()).map { a.getString(it) } }.orEmpty()
             fun choices(key: String) = allowed.optJSONArray(key)?.let { a -> (0 until a.length()).map { a.getString(it) } }.orEmpty()
 
-            LabelChips("핏", choices("fit"), value("fit"), value("fit_basis"), enabled) { model.edit("fit", it) }
-            LabelChips("기장", choices("length"), value("length"), value("length_basis"), enabled) { model.edit("length", it) }
+            LabelChips("핏", choices("fit"), value("fit"), value("fit_basis"), editable) { model.edit("fit", it) }
+            LabelChips("기장", choices("length"), value("length"), value("length_basis"), editable) { model.edit("length", it) }
             if (allowed.has("sleeve")) {
-                LabelChips("소매", choices("sleeve"), value("sleeve"), value("sleeve_basis"), enabled) { model.edit("sleeve", it) }
+                LabelChips("소매", choices("sleeve"), value("sleeve"), value("sleeve_basis"), editable) { model.edit("sleeve", it) }
             }
-            LabelChips("계절", choices("season"), value("season"), null, enabled) { model.edit("season", it) }
-            LabelMenu("무늬", choices("prints"), values("prints"), 2, enabled) { model.edit("prints", JSONArray(it)) }
+            LabelChips("계절", choices("season"), value("season"), null, editable) { model.edit("season", it) }
+            LabelMenu("무늬", choices("prints"), values("prints"), 2, editable) { model.edit("prints", JSONArray(it)) }
             if (allowed.has("neckline")) {
-                LabelMenu("넥라인", choices("neckline"), listOfNotNull(value("neckline")), 0, enabled) { model.edit("neckline", it.firstOrNull()) }
-                LabelMenu("옷깃", choices("collar"), listOfNotNull(value("collar")), 0, enabled) { model.edit("collar", it.firstOrNull()) }
+                LabelMenu("넥라인", choices("neckline"), listOfNotNull(value("neckline")), 0, editable) { model.edit("neckline", it.firstOrNull()) }
+                LabelMenu("옷깃", choices("collar"), listOfNotNull(value("collar")), 0, editable) { model.edit("collar", it.firstOrNull()) }
             }
-            LabelMenu("디테일", choices("design_details"), values("design_details"), 3, enabled) { model.edit("design_details", JSONArray(it)) }
-            LabelMenu("소재", choices("materials"), values("materials"), 2, enabled) { model.edit("materials", JSONArray(it)) }
+            LabelMenu("디테일", choices("design_details"), values("design_details"), 3, editable) { model.edit("design_details", JSONArray(it)) }
+            LabelMenu("소재", choices("materials"), values("materials"), 2, editable) { model.edit("materials", JSONArray(it)) }
+            if (state.error != null) {
+                Text("직접 입력한 라벨을 확인한 뒤 완료를 눌러 주세요.", style = MaterialTheme.typography.bodySmall)
+                TextButton(onClick = { model.confirmManual(key) }, enabled = editable) { Text("수동 입력 완료") }
+            }
             Text("치수와 사진으로 계산한 값이에요. 실제와 다르면 눌러서 고쳐 주세요.",
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }

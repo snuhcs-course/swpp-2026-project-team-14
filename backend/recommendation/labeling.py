@@ -19,6 +19,7 @@ from recommendation.body import Body
 from recommendation.masked import season_token
 from recommendation.vocab import (
     BOTTOM_FITS,
+    CATEGORIES,
     COLLARS,
     COLORS,
     DETAILS,
@@ -202,7 +203,7 @@ def label(attributes: dict, dimensions: dict | None, body: Body | None = None, d
     ai_materials = [m for m in details.get("materials") or [] if m in MATERIALS][:2]
     materials = ai_materials or list(MATERIAL_HINTS.get(sub or "", []))
     kf_category = WARDROBE_SUBCATEGORY.get(sub or "", WARDROBE_DEFAULT_CATEGORY[slot])
-    kf_colors = list(dict.fromkeys(kf_color(c) for c in attributes.get("colors") or []))[:2]
+    kf_colors = [kf_color(c) for c in (attributes.get("colors") or [])[:2]]
     season_attrs = {"카테고리": kf_category, "소재": materials, "소매기장": sleeve, "기장": length}
     labels = {
         "fit": fit_label,
@@ -265,9 +266,9 @@ def validate_labels(data: object, category: str) -> dict | None:
         if v is not None and v not in allowed:
             raise ValueError(f"Invalid {key}")
 
-    def list_of(key: str, allowed, limit: int) -> None:
+    def list_of(key: str, allowed, limit: int, duplicates: bool = False) -> None:
         v = data.get(key, [])
-        if not isinstance(v, list) or len(v) > limit or any(x not in allowed for x in v) or len(set(v)) != len(v):
+        if not isinstance(v, list) or len(v) > limit or any(x not in allowed for x in v) or (not duplicates and len(set(v)) != len(v)):
             raise ValueError(f"Invalid {key}")
 
     one_of("fit", fits)
@@ -279,7 +280,8 @@ def validate_labels(data: object, category: str) -> dict | None:
     list_of("prints", PRINTS, 2)
     list_of("materials", MATERIALS, 2)
     list_of("design_details", DETAILS, 3)
-    list_of("kf_colors", tuple(COLORS), 2)
+    list_of("kf_colors", tuple(COLORS), 2, duplicates=True)
+    one_of("kf_category", CATEGORIES[slot])
     for key in ("fit_basis", "length_basis", "sleeve_basis", "too_small_reason", "kf_category"):
         v = data.get(key)
         if v is not None and (not isinstance(v, str) or len(v) > TEXT_MAX):
