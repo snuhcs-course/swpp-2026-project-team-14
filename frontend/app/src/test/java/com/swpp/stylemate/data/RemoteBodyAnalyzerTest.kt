@@ -126,4 +126,16 @@ class RemoteBodyAnalyzerTest {
         server.shutdown()
         assertEquals(RemoteBodyAnalyzer.NETWORK_ERROR, analyzeExpectingError().message)
     }
+    @Test
+    fun malformedSuccessResponse_isAServerErrorNotACrash() {
+        // a 200 without "measurements", and one with an unknown confidence level
+        for (body in listOf("""{"warnings": []}""", """{"measurements": [{"type": "waist", "value_cm": 66, "confidence": "certain"}]}""")) {
+            try {
+                RemoteBodyAnalyzer.parseResponse(200, body)
+                fail("expected BodyAnalysisException for $body")
+            } catch (e: BodyAnalysisException) {
+                assertEquals(RemoteBodyAnalyzer.SERVER_ERROR, e.message)
+            }
+        }
+    }
 }

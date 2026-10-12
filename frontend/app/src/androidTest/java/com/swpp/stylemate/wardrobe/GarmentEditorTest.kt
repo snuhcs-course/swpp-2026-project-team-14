@@ -26,7 +26,8 @@ class GarmentEditorTest {
             GarmentEditor("minimal", attributes, null, "", fixture.getJSONObject("catalog"),
                 false, false, null, { submitted = it })
         } }
-        compose.onNodeWithText("종류: 미입력").assertDoesNotExist()
+        compose.onNodeWithText("종류: 미입력").performScrollTo().assertIsDisplayed() // the AI suggestion is reviewed up front
+        compose.onNodeWithText("바지형태:", substring = true).assertDoesNotExist() // the fit lives in the labels
         compose.onNodeWithText("허리 단면").performScrollTo().performTextInput("37.25")
         compose.onNodeWithText("옷장에 추가").assertIsDisplayed().performClick()
         compose.runOnIdle {
@@ -44,12 +45,13 @@ class GarmentEditorTest {
         } }
         compose.onNodeWithText("AR 추정").assertDoesNotExist()
         compose.onNodeWithText("착용 정보").assertDoesNotExist()
-        compose.onNodeWithText("상세 정보").performScrollTo().performClick()
-        listOf("격식:", "여밈:", "디테일:", "어깨:", "넥라인:", "소매:").forEach {
+        // a top has no detail fields left: the kind and styles are basic info, the fit is in the labels
+        compose.onNodeWithText("상세 정보").assertDoesNotExist()
+        listOf("격식:", "여밈:", "디테일:", "어깨:", "넥라인:", "소매:", "핏:").forEach {
             compose.onNodeWithText(it, substring = true).assertDoesNotExist()
         }
-        compose.onNodeWithText("핏: 미입력").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText("상세 정보").performScrollTo().performClick()
+        compose.onNodeWithText("종류:", substring = true).performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("스타일:", substring = true).performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("이름").performScrollTo().performTextReplacement("내 흰 티셔츠")
         compose.onNodeWithText("가슴 단면").performScrollTo().performTextReplacement("56.78")
         compose.onNodeWithText("메모").performScrollTo().performTextInput("찬물 세탁\n여행용")

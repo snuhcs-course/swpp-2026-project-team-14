@@ -21,7 +21,7 @@ DEBUG = os.environ.get("DJANGO_DEBUG", "0") == "1"
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY") or secrets.token_urlsafe(64)
 ALLOWED_HOSTS = os.environ.get("DJANGO_ALLOWED_HOSTS", "*").split(",")
 
-INSTALLED_APPS = ["apps.body_profiles", "apps.wardrobe"]
+INSTALLED_APPS = ["apps.body_profiles", "apps.wardrobe", "apps.outfits"]
 MIDDLEWARE = ["django.middleware.common.CommonMiddleware"]
 ROOT_URLCONF = "config.urls"
 WSGI_APPLICATION = "config.wsgi.application"
@@ -49,7 +49,9 @@ LOGGING = {
 
 # Body photos must never touch the disk: keep uploads in memory only (no temp files) and cap them.
 FILE_UPLOAD_HANDLERS = ["django.core.files.uploadhandler.MemoryFileUploadHandler"]
-FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024
+# The memory handler takes a request only if the whole body fits; a larger body would silently lose
+# its files. Two 8 MB body photos plus form fields must fit (larger requests get a 413 in the view).
+FILE_UPLOAD_MAX_MEMORY_SIZE = 20 * 1024 * 1024
 DATA_UPLOAD_MAX_MEMORY_SIZE = 25 * 1024 * 1024
 
 

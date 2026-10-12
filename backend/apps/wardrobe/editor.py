@@ -1,6 +1,8 @@
-# AI-generated with Codex, 2026-09-29, reviewed by Hyeon U Jeong
+# AI-generated with Codex, 2026-09-29, reviewed by Hyeon U Jeong; recommendation labels added with Claude Code (Claude Opus 5.5), 2026-10-12, reviewed by Dongkun Moon
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from typing import NamedTuple
+
+from recommendation.labeling import options as label_options, validate_labels
 
 from .schema import (
     ARRAY_LIMITS,
@@ -73,11 +75,13 @@ def catalog():
         'array_limits': ARRAY_LIMITS,
         'color_palette': COLOR_PALETTE,
         'dimensions': dimensions,
+        'label_options': label_options(),
     }
 
 
 def validate_record(data):
-    if not isinstance(data, dict) or set(data) != {'attributes', 'dimensions', 'notes'}:
+    # labels (recommendation labels the user reviewed) are optional; without the key they are kept.
+    if not isinstance(data, dict) or set(data) - {'labels'} != {'attributes', 'dimensions', 'notes'}:
         raise ValueError('Invalid fields')
 
     attributes = validate_attributes(data['attributes'])
@@ -86,7 +90,10 @@ def validate_record(data):
         raise ValueError('Invalid notes')
     dimensions = _validate_dimensions(data['dimensions'], attributes)
 
-    return {'attributes': attributes, 'dimensions': dimensions, 'notes': notes}
+    record = {'attributes': attributes, 'dimensions': dimensions, 'notes': notes}
+    if 'labels' in data or attributes['category'] == 'shoes':  # shoes have no labels
+        record['labels'] = validate_labels(data.get('labels'), attributes['category'])
+    return record
 
 
 def _validate_dimensions(raw, attributes):

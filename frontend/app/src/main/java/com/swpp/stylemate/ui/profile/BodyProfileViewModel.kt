@@ -11,6 +11,8 @@ import com.swpp.stylemate.data.BodyAnalyzer
 import com.swpp.stylemate.data.BodyMeasurement
 import com.swpp.stylemate.data.BodyPhotos
 import com.swpp.stylemate.data.BodyProfile
+import com.swpp.stylemate.data.BodyProfileStore
+import com.swpp.stylemate.data.InMemoryBodyProfileStore
 import com.swpp.stylemate.data.DetectedClothing
 import com.swpp.stylemate.data.Gender
 import com.swpp.stylemate.data.RemoteBodyAnalyzer
@@ -65,9 +67,11 @@ data class AppState(
 
 class BodyProfileViewModel(
     private val analyzer: BodyAnalyzer = RemoteBodyAnalyzer(BuildConfig.API_BASE_URL),
+    private val store: BodyProfileStore = InMemoryBodyProfileStore(),
 ) : ViewModel() {
 
-    private val _app = MutableStateFlow(AppState())
+    // A saved profile skips onboarding; without one the setup flow opens first.
+    private val _app = MutableStateFlow(store.load().let { AppState(profile = it, setupVisible = it == null) })
     val app: StateFlow<AppState> = _app.asStateFlow()
 
     private val _setup = MutableStateFlow(SetupState())
@@ -153,6 +157,7 @@ class BodyProfileViewModel(
             clothing = state.detectedClothing,
             reference = state.reference,
         )
+        store.save(profile)
         _app.update { it.copy(profile = profile, setupVisible = false) }
     }
 
@@ -178,7 +183,10 @@ class BodyProfileViewModel(
     /** Leaves the flow without changing the saved profile. */
     fun cancelSetup() = _app.update { it.copy(setupVisible = false) }
 
-    fun deleteProfile() = _app.update { it.copy(profile = null) }
+    fun deleteProfile() {
+        store.save(null)
+        _app.update { it.copy(profile = null) }
+    }
 }
 
 /** Re-encoding also strips EXIF metadata (location, device) from the original photo. */

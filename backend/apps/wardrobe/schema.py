@@ -1,6 +1,8 @@
-# AI-generated with Codex, 2026-09-29, reviewed by Hyeon U Jeong
+# AI-generated with Codex, 2026-09-29, reviewed by Hyeon U Jeong; recommendation labels added with Claude Code (Claude Opus 5.5), 2026-10-12, reviewed by Dongkun Moon
 import re
 from typing import TypedDict, cast
+
+from recommendation.vocab import COLLARS, DETAILS, MATERIALS, NECKLINES, PRINTS
 
 
 class WardrobeAttributes(TypedDict):
@@ -19,6 +21,17 @@ class AiAttributes(TypedDict):
     name: str
     category: str
     colors: list[str]
+    subcategory: str | None  # suggestion the user confirms
+    styles: list[str]  # suggestion the user confirms
+
+
+class AiDetails(TypedDict):
+    """Visible design details in the K-Fashion vocabulary, used only for the recommendation labels."""
+    print: str | None
+    neckline: str | None
+    collar: str | None
+    design_details: list[str]
+    materials: list[str]  # only when clearly visible (denim, knit, leather, padding, ...)
 
 
 SUBCATEGORIES = {
@@ -151,6 +164,10 @@ NAME_MAX_LENGTH = 80
 AI_COLOR_MIN_COUNT = 1
 AI_COLOR_MAX_COUNT = 2
 AI_FIELDS = tuple(AiAttributes.__annotations__)
+AI_REQUIRED_FIELDS = frozenset({'name', 'category', 'colors'})
+AI_STYLE_MAX_COUNT = 2
+DETAIL_CHOICES = {'print': PRINTS, 'neckline': NECKLINES, 'collar': COLLARS}
+DETAIL_LISTS = {'design_details': (DETAILS, 3), 'materials': (MATERIALS, 2)}
 ATTRIBUTE_FIELDS = frozenset(WardrobeAttributes.__annotations__)
 BOTTOM_FIELDS = ('leg_shape', 'rise_type', 'skirt_shape')
 PANTS_SUBCATEGORIES = ('jeans', 'slacks', 'pants', 'active_pants', 'shorts')
@@ -182,16 +199,51 @@ SCHEMA = {
                     'minItems': AI_COLOR_MIN_COUNT,
                     'maxItems': AI_COLOR_MAX_COUNT,
                 },
+                'subcategory': {'anyOf': [
+                    {'type': 'string', 'enum': list(dict.fromkeys(code for group in SUBCATEGORIES.values() for code in group))},
+                    {'type': 'null'},
+                ]},
+                'styles': {
+                    'type': 'array',
+                    'items': {'type': 'string', 'enum': list(ENUMS['styles'])},
+                    'maxItems': AI_STYLE_MAX_COUNT,
+                },
             },
             'required': list(AI_FIELDS),
         },
+        'details': {
+            'type': ['object', 'null'],
+            'additionalProperties': False,
+            'properties': {
+                **{field: {'anyOf': [{'type': 'string', 'enum': list(choices)}, {'type': 'null'}]}
+                   for field, choices in DETAIL_CHOICES.items()},
+                **{field: {'type': 'array', 'items': {'type': 'string', 'enum': list(choices)}, 'maxItems': limit}
+                   for field, (choices, limit) in DETAIL_LISTS.items()},
+            },
+            'required': [*DETAIL_CHOICES, *DETAIL_LISTS],
+        },
     },
-    'required': ['image_status', 'attributes'],
+    'required': ['image_status', 'attributes', 'details'],
 }
 
 
+def validate_ai_details(data: object, category: str) -> AiDetails | None:
+    """Details are optional hints: anything malformed is dropped instead of failing the paid analysis."""
+    if category == 'shoes' or not isinstance(data, dict):
+        return None
+    details = {field: data.get(field) if data.get(field) in choices else None
+               for field, choices in DETAIL_CHOICES.items()}
+    for field, (choices, limit) in DETAIL_LISTS.items():
+        values = data.get(field) if isinstance(data.get(field), list) else []
+        details[field] = list(dict.fromkeys(v for v in values if v in choices))[:limit]
+    if category == 'bottom':
+        details.update(neckline=None, collar=None)
+    return cast(AiDetails, details) if any(details.values()) else None
+
+
 def validate_ai_attributes(data: object) -> WardrobeAttributes:
-    if not isinstance(data, dict) or set(data) != set(AI_FIELDS):
+    # name, category and colors are required; the subcategory and style suggestions are dropped when invalid
+    if not isinstance(data, dict) or not AI_REQUIRED_FIELDS <= set(data) or set(data) - set(AI_FIELDS):
         raise ValueError('Unexpected AI fields')
 
     colors = data['colors']
@@ -200,10 +252,13 @@ def validate_ai_attributes(data: object) -> WardrobeAttributes:
     if any(not isinstance(color, str) or color not in COLOR_PALETTE for color in colors):
         raise ValueError('Invalid AI colors')
 
+    category = data['category'] if isinstance(data['category'], str) else ''
+    subcategory = data.get('subcategory')
+    styles = data.get('styles') if isinstance(data.get('styles'), list) else []
     attributes = {
         **data,
-        'subcategory': None,
-        'styles': [],
+        'subcategory': subcategory if isinstance(subcategory, str) and subcategory in SUBCATEGORIES.get(category, {}) else None,
+        'styles': list(dict.fromkeys(s for s in styles if isinstance(s, str) and s in ENUMS['styles']))[:AI_STYLE_MAX_COUNT],
         'fit_type': None,
         'leg_shape': None,
         'rise_type': None,

@@ -1,4 +1,4 @@
-// AI-generated with Codex, 2026-09-29, reviewed by Hyeon U Jeong
+// AI-generated with Codex, 2026-09-29, reviewed by Hyeon U Jeong; recommendation labels added with Claude Code (Claude Opus 5.5), 2026-10-12, reviewed by Dongkun Moon
 package com.swpp.stylemate.ui.wardrobe.capture
 
 import com.swpp.stylemate.data.wardrobe.*
@@ -386,6 +386,7 @@ class MeasurementActivity : ComponentActivity() {
             points.put(it.field.key, JSONArray(it.points.map { point -> JSONArray(listOf(point.x, point.y)) }))
         }
         val payload = JSONObject().put("category", category).put("dimensions", dimensions)
+            .put("garment_type", landmarkType ?: JSONObject.NULL) // kept for the analysis hint and the subcategory
             .put("measurement_capture", JSONObject().put("frame_timestamp_ns", captured.timestamp)
                 .put("tilt_degrees", captured.tiltDegrees)
                 .put("width", captured.bitmap.width).put("height", captured.bitmap.height)

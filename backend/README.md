@@ -8,6 +8,8 @@ The team backend: a Django project (`config/` + `apps/`) deployed to the team14 
 | `GET /healthz/` | Kubernetes readiness/liveness probe |
 | `GET /api/hello/` | smoke test (kept from the original `app.py`) |
 | `POST /api/body-profile/analyze/` | body measurements from front + side photos (`apps/body_profiles/`) |
+| `/api/wardrobe/...` | garment photos, attributes, measurements and recommendation labels (`apps/wardrobe/`, [docs](../docs/wardrobe/wardrobe-spec.md)) |
+| `/api/outfits/...`, `GET /api/weather/` | outfits from the user's own wardrobe, the 코디 table, weather (`apps/outfits/`, [docs](../docs/recommendation/api.md)) |
 
 `body_analysis/` turns a front photo, a side photo and the user's height into garment measurements.
 It is a plain Python package with no Django dependency.
@@ -169,7 +171,7 @@ See [common app setup](../docs/wardrobe/local-development.md) for model preparat
 Wardrobe tests use an isolated in-memory SQLite database, without real MySQL or Gemini calls:
 
 ```powershell
-.\.venv\Scripts\python.exe manage.py test apps.wardrobe --settings=config.test_settings --noinput
+.\.venv\Scripts\python.exe manage.py test apps.wardrobe apps.outfits --settings=config.test_settings --noinput
 ```
 
 The Docker build downloads checksum-verified GarmentIQ source/weights and exports HRNet in a separate build

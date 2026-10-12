@@ -1,4 +1,4 @@
-// AI-generated with Codex, 2026-09-29, reviewed by Hyeon U Jeong
+// AI-generated with Codex, 2026-09-29, reviewed by Hyeon U Jeong; recommendation labels added with Claude Code (Claude Opus 5.5), 2026-10-12, reviewed by Dongkun Moon
 package com.swpp.stylemate.ui.wardrobe
 
 import com.swpp.stylemate.data.wardrobe.*
@@ -27,6 +27,9 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 private fun JSONObject.keysList(): List<String> = keys().asSequence().toList()
+
+/** Attributes replaced by the fit in the recommendation labels (GarmentLabels.kt). */
+internal val LABEL_OWNED_FIELDS = setOf("fit_type", "leg_shape")
 private fun JSONObject.code(key: String): String? = if (isNull(key)) null else optString(key).takeIf { it.isNotEmpty() }
 
 private fun attributeChoices(attributes: JSONObject, catalog: JSONObject, field: String): JSONObject {
@@ -57,7 +60,9 @@ private fun dimensionChoices(attributes: JSONObject, catalog: JSONObject): JSONO
 fun GarmentEditor(id: String, initialAttributes: JSONObject, initialDimensions: JSONObject?,
                   initialNotes: String, catalog: JSONObject,
                   busy: Boolean, saved: Boolean, error: String?, onSave: (JSONObject) -> Unit,
-                  onBack: (() -> Unit)? = null, image: ImageBitmap? = null, photo: @Composable () -> Unit = {}) {
+                  onBack: (() -> Unit)? = null, image: ImageBitmap? = null, photo: @Composable () -> Unit = {},
+                  canSaveLabels: (JSONObject, JSONObject?) -> Boolean = { _, _ -> true },
+                  labels: @Composable (attributes: JSONObject, dimensions: JSONObject?) -> Unit = { _, _ -> }) {
     var attributesText by rememberSaveable(id) { mutableStateOf(initialAttributes.toString()) }
     var notes by rememberSaveable(id) { mutableStateOf(initialNotes) }
     var dimensionText by rememberSaveable(id) {
@@ -97,11 +102,12 @@ fun GarmentEditor(id: String, initialAttributes: JSONObject, initialDimensions: 
         attributesText = next.toString()
     }
 
-    fun save() {
+    // Valid entries only, so the recommendation labels can follow the fields while the user types.
+    fun currentDimensions(): JSONObject? {
         val result = JSONObject().put("unit", "cm")
         dimensions.keysList().forEach { key ->
             val text = inputs.optString(key)
-            if (text.isNotBlank()) {
+            if (text.isNotBlank() && validNumber(text)) {
                 val value = text.toBigDecimal().setScale(2, RoundingMode.HALF_UP)
                 val original = initialDimensions?.optJSONObject(key)
                 val same = original != null && value.toDouble() == original.optDouble("value") &&
@@ -110,11 +116,20 @@ fun GarmentEditor(id: String, initialAttributes: JSONObject, initialDimensions: 
                     JSONObject().put("value", value).put("source", "user_measured").put("method", "unspecified").put("reference", JSONObject.NULL))
             }
         }
-        onSave(JSONObject().put("attributes", attributes).put("dimensions", if (result.length() == 1) JSONObject.NULL else result)
+        return if (result.length() == 1) null else result
+    }
+
+    fun save() {
+        if (!valid || busy || !canSaveLabels(attributes, currentDimensions())) return
+        onSave(JSONObject().put("attributes", attributes).put("dimensions", currentDimensions() ?: JSONObject.NULL)
             .put("notes", notes))
     }
 
-    val primary = setOf("category")
+    // The AI suggests the kind and styles, so they are shown up front for review. The fit lives only in
+    // the recommendation labels ("내 몸 기준 라벨"), computed from the measurements and the body.
+    val primary = setOf("category", "subcategory", "styles")
+    val detailFields = catalog.getJSONObject("enums").keysList()
+        .filter { it !in primary && it !in LABEL_OWNED_FIELDS && attributeChoices(attributes, catalog, it).length() > 0 }
     @Composable fun attribute(field: String) {
         val choices = attributeChoices(attributes, catalog, field)
         if (choices.length() > 0) ChoiceField(catalog.getJSONObject("labels").getString(field), choices,
@@ -125,7 +140,7 @@ fun GarmentEditor(id: String, initialAttributes: JSONObject, initialDimensions: 
     ScreenScaffold(
         title = if (saved) "옷 정보" else "분석 결과",
         primaryLabel = if (busy) "저장 중" else if (saved) "저장하기" else "옷장에 추가",
-        primaryEnabled = valid && !busy,
+        primaryEnabled = valid && !busy && canSaveLabels(attributes, currentDimensions()),
         onPrimary = ::save,
         onBack = onBack,
         navigationEnabled = !busy,
@@ -148,9 +163,9 @@ fun GarmentEditor(id: String, initialAttributes: JSONObject, initialDimensions: 
                     catalog.getJSONObject("array_limits").getInt("colors"), image, !busy,
                     onChange = { updateAttribute("colors", JSONArray(it)) })
             }
-            ExpandSection("상세 정보", extra) { extra = !extra }
-            if (extra) EditorSection {
-                catalog.getJSONObject("enums").keysList().filter { it !in primary }.forEach { attribute(it) }
+            if (detailFields.isNotEmpty()) ExpandSection("상세 정보", extra) { extra = !extra }
+            if (extra && detailFields.isNotEmpty()) EditorSection {
+                detailFields.forEach { attribute(it) }
             }
             if (dimensions.length() > 0) {
                 SectionTitle("치수", "cm")
@@ -168,6 +183,7 @@ fun GarmentEditor(id: String, initialAttributes: JSONObject, initialDimensions: 
                     }
                 }
             }
+            labels(attributes, currentDimensions())
             Spacer(Modifier.height(20.dp))
             OutlinedTextField(value = notes, onValueChange = { if (it.length <= 2000) notes = it },
                 label = { Text("메모") }, minLines = 4, enabled = !busy,

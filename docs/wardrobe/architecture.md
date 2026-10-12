@@ -15,9 +15,10 @@ swpp-2026-project-team-14/
 |   |   |       |-- GarmentAnalysis.kt            # Gemini 분석 API 호출
 |   |   |       |-- GarmentLandmarks.kt           # 자동 측정점 요청·응답 검증
 |   |   |       |-- MeasurementGeometry.kt       # AR 광선·평면 교점과 실측 경로 계산
-|   |   |       `-- CaptureFiles.kt               # 옷 사진 임시 캐시 관리
+|   |   |       |-- CaptureFiles.kt               # 옷 사진 임시 캐시 관리
+|   |   |       `-- CaptureType.kt                # 측정 종류 → 하의 세부 종류 기본값
 |   |   `-- ui/
-|   |       |-- StyleMateApp.kt                   # 온보딩·홈·옷장·마이프로필 탭
+|   |       |-- StyleMateApp.kt                   # 온보딩·홈·옷장·코디북·마이프로필 탭
 |   |       |-- components/ScreenComponents.kt   # 체형·옷장 공통 상단바·하단 버튼·섹션 제목
 |   |       |-- theme/Theme.kt                    # 크림·테라코타 공통 테마
 |   |       |-- profile/                         # 체형 촬영·수정·프로필 화면
@@ -27,11 +28,13 @@ swpp-2026-project-team-14/
 |   |           |-- GarmentAnalysisViewModel.kt  # 분석 진행·실패 상태
 |   |           |-- WardrobeColorField.kt       # 색상표·사진 좌표 변환·픽셀 색상 선택
 |   |           |-- GarmentEditor.kt             # 특징·실측·메모 편집과 하단 고정 저장
+|   |           |-- GarmentLabels.kt             # 추천 라벨 확인·수정·실패 후 수동 확인·저장 가능 상태
+|   |           |-- FrontPhoto.kt                # 상의·아우터 앞면 사진 카드
 |   |           `-- capture/
 |   |               |-- MeasurementActivity.kt  # 실측 촬영·측정점 확인·수정
 |   |               `-- MeasurementCamera.kt    # AR 카메라·촬영 프레임 고정
 |   |-- test/java/com/swpp/stylemate/             # 체형 계약·실측 기하 단위 검사
-|   `-- androidTest/java/com/swpp/stylemate/      # 옷장 UI·사진 색상 선택·탭 연결·측정점 검사
+|   `-- androidTest/java/com/swpp/stylemate/      # 옷장 UI·라벨 실패/재시도·사진 색상 선택·탭 연결·측정점 검사
 |-- backend/
 |   |-- config/
 |   |   |-- settings.py                          # 공통 API·MySQL·사진·모델 설정
@@ -41,19 +44,21 @@ swpp-2026-project-team-14/
 |   |   |-- body_profiles/                      # 체형 분석 요청 처리
 |   |   `-- wardrobe/
 |   |       |-- urls.py                          # 옷장 API 경로
-|   |       |-- views.py                         # 분석 초안·저장·수정·조회
+|   |       |-- views.py                         # 분석 초안·저장·수정·조회·추천 라벨 미리보기
 |   |       |-- analysis.py                      # 이미지 검증·Gemini 요청·응답 처리
 |   |       |-- landmarks.py                     # HRNet 추론·좌표 복원·치수별 경로 계산
-|   |       |-- schema.py                        # 속성 타입·한국어 선택지·Gemini 계약·입력 검증
-|   |       |-- editor.py                        # 치수 정의·측정값·저장 요청 검증
-|   |       |-- models.py                        # 사진 경로·현재 옷 속성·치수·메모 저장
-|   |       |-- migrations/0001_initial.py        # 최종 옷장 테이블 최초 생성
+|   |       |-- schema.py                        # 속성 타입·한국어 선택지·Gemini 계약(추천용 details 포함)·입력 검증
+|   |       |-- editor.py                        # 치수 정의·측정값·저장 요청(추천 라벨 포함) 검증
+|   |       |-- models.py                        # 사진 경로·현재 옷 속성·치수·메모·추천 라벨 저장
+|   |       |-- migrations/0001_initial.py        # 옷장 테이블 최초 생성
+|   |       |-- migrations/0002_garment_labels.py # 추천 라벨 컬럼 추가
 |   |       |-- tests.py                         # AI 계약·DB 저장·재조회 검사
 |   |       `-- test_landmarks.py                # 원본 사진의 자동 측정점·좌표 변환 검사
+|   |-- recommendation/                          # 저장 라벨 → K-Fashion 입력, 계절·주색/서브색·모델 어휘 정규화
 |   |-- body_analysis/                           # MediaPipe 체형 분석
 |   |-- wardrobe/garment-landmarks/              # HRNet 가중치·메타데이터·라이선스
 |   |-- scripts/prepare_landmarks.py             # 빌드 시 HRNet 다운로드·검증·ONNX 변환
-|   `-- tests/                                   # 체형 분석·공통 API 회귀 검사
+|   `-- tests/                                   # 체형 분석·추천 모델 입력 계약·공통 API 회귀 검사
 `-- docs/wardrobe/                               # 옷장 설계·실행 안내
 ```
 
@@ -63,7 +68,8 @@ swpp-2026-project-team-14/
 
 - Android: 체형·옷장은 같은 서버 주소와 공통 `StyleMateTheme`·화면 컴포넌트를 사용한다.
 - 측정: HRNet은 원본 사진의 2D 점을 제안하고, Android ARCore가 바닥 평면을 기준으로 cm를 계산한다.
-- 분석: Gemini는 이름·분류·색상을 생성한다. 응답은 `id`·`model`·`attributes`다.
+- 분석: 상의·아우터는 앞면 사진, 하의는 측정 사진을 보낸다. Gemini는 이름·분류·색상을 생성하고 세부 종류·스타일을 제안한다. 응답은 `id`·`model`·`attributes`와 추천용 `details`(무늬·넥라인·옷깃·디테일·겉으로 분명한 소재, 저장하지 않음)다.
+- 추천 라벨: 저장 전 `POST labels/`가 치수와 체형으로 핏·기장·소매·계절 등을 계산하고, 사용자가 확인·수정한 값을 `labels`로 함께 저장한다. 설계는 [추천 문서](../recommendation/README.md)를 따른다.
 - 저장: 옷 속성·치수·메모·사진 경로는 MySQL, 옷 사진은 서버 파일 저장소에 보관한다. 최초 AI 결과는 별도 복제하지 않는다.
 - DB 의존성: 체형 분석·측정점 API는 DB 없이 실행된다. 옷장 분석·조회·저장은 MySQL 설정이 필요하다.
 

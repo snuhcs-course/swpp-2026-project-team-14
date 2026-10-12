@@ -314,7 +314,8 @@ private const val PHOTO_LOAD_ERROR = "사진을 불러오지 못했어요. 다�
  * Returns null instead of throwing when the photo cannot be read (unsupported or broken file, a cloud
  * photo that is not downloaded, revoked access): an exception here would crash the app.
  */
-private suspend fun decodeDownscaled(context: Context, uri: Uri, maxSide: Int = 1280): Bitmap? =
+/** Gallery or camera image, upright and downscaled; null if it cannot be read. Shared with the wardrobe front photo. */
+internal suspend fun decodeDownscaled(context: Context, uri: Uri, maxSide: Int = 1280): Bitmap? =
     withContext(Dispatchers.IO) {
         try {
             decodeUpright(context, uri, maxSide)

@@ -66,6 +66,17 @@ class RemoteBodyAnalyzer(
                 val hint = json.optString("hint").ifBlank { SERVER_ERROR }
                 throw BodyAnalysisException(hint, json.optString("error").ifBlank { null })
             }
+            return try {
+                parseSuccess(json)
+            } catch (e: JSONException) {
+                throw BodyAnalysisException(SERVER_ERROR, "invalid_response", e)
+            } catch (e: IllegalArgumentException) { // unknown enum value, e.g. a new confidence level
+                throw BodyAnalysisException(SERVER_ERROR, "invalid_response", e)
+            }
+        }
+
+        /** A 200 body. Throws JSONException / IllegalArgumentException on a malformed one. */
+        private fun parseSuccess(json: JSONObject): AnalysisResult {
             val byKey = MeasurementType.entries.associateBy { it.apiKey }
             val items = json.getJSONArray("measurements")
             val measurements = (0 until items.length()).mapNotNull { i ->
