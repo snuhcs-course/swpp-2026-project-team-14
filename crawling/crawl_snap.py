@@ -5,9 +5,8 @@ import argparse
 from html.parser import HTMLParser
 import json
 from pathlib import Path
+import subprocess
 import sys
-from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
 from urllib.parse import urljoin, urlsplit
 
 
@@ -67,8 +66,17 @@ class ProductImageParser(HTMLParser):
 
 
 def fetch_html(url):
-    with urlopen(Request(url, headers=HEADERS), timeout=20) as response:
-        return response.read().decode("utf-8")
+    command = ["curl", "-L", "--fail", "-sS", "--max-time", "20", "-A", HEADERS["User-Agent"]]
+    for key in ("Accept", "Accept-Language"):
+        command.extend(["-H", f"{key}: {HEADERS[key]}"])
+    command.extend(["--", url])
+    try:
+        response = subprocess.run(command, capture_output=True, timeout=25)
+    except (OSError, subprocess.TimeoutExpired) as error:
+        raise ValueError(str(error)) from error
+    if response.returncode:
+        raise ValueError(response.stderr.decode("utf-8", errors="replace").strip())
+    return response.stdout.decode("utf-8")
 
 
 def extract_product_image(html, product_id):
@@ -126,7 +134,7 @@ def main():
     else:
         try:
             html = fetch_html(f"https://www.musinsa.com/snap/{snap_id}")
-        except (HTTPError, URLError) as error:
+        except ValueError as error:
             cli.exit(1, f"요청 실패: {error}\n")
 
     try:
@@ -147,7 +155,7 @@ def main():
             else:
                 product_html = fetch_html(product["productUrl"])
             product["imageUrl"] = extract_product_image(product_html, product["productId"])
-        except (HTTPError, URLError, OSError, ValueError) as error:
+        except (OSError, ValueError) as error:
             cli.exit(1, f"상품 {product['productId']} 이미지 수집 실패: {error}\n")
 
     output = json.dumps(result, ensure_ascii=False, indent=2) + "\n"
