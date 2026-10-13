@@ -1,0 +1,50 @@
+{
+  "snapId": "1557579246966677943",
+  "images": [
+    "https://image.msscdn.net/thumbnails/snap/images/2026/10/08/54610cf871474998bec8f1316b806036.jpg"
+  ],
+  "products": [
+    {
+      "order": 1,
+      "productId": "5409377",
+      "platform": "MUSINSA",
+      "productUrl": "https://www.musinsa.com/products/5409377",
+      "imageUrl": "https://image.msscdn.net/images/goods_img/20250905/5409377/5409377_17574824687468_500.jpg"
+    },
+    {
+      "order": 2,
+      "productId": "7177917",
+      "platform": "MUSINSA",
+      "productUrl": "https://www.musinsa.com/products/7177917",
+      "imageUrl": "https://image.msscdn.net/images/goods_img/20260827/7177917/7177917_17890113605448_500.jpg"
+    },
+    {
+      "order": 3,
+      "productId": "5119643",
+      "platform": "MUSINSA",
+      "productUrl": "https://www.musinsa.com/products/5119643",
+      "imageUrl": "https://image.msscdn.net/images/goods_img/20250516/5119643/5119643_17480824675769_500.jpg"
+    },
+    {
+      "order": 4,
+      "productId": "7173809",
+      "platform": "MUSINSA",
+      "productUrl": "https://www.musinsa.com/products/7173809",
+      "imageUrl": "https://image.msscdn.net/images/goods_img/20260826/7173809/7173809_17900452908793_500.jpg"
+    },
+    {
+      "order": 5,
+      "productId": "7020394",
+      "platform": "MUSINSA",
+      "productUrl": "https://www.musinsa.com/products/7020394",
+      "imageUrl": "https://image.msscdn.net/images/goods_img/20260807/7020394/7020394_17883339513961_500.jpg"
+    },
+    {
+      "order": 6,
+      "productId": "6113215",
+      "platform": "MUSINSA",
+      "productUrl": "https://www.musinsa.com/products/6113215",
+      "imageUrl": "https://image.msscdn.net/images/goods_img/20260311/6113215/6113215_17797822047757_500.jpg"
+    }
+  ]
+}
