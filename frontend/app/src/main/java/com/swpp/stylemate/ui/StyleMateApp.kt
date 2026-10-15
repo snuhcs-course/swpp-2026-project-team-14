@@ -21,6 +21,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -36,7 +37,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
-import com.swpp.stylemate.data.SharedPrefsBodyProfileStore
+import com.swpp.stylemate.data.LocalBodyProfileStore
 import com.swpp.stylemate.ui.home.CodiBookRoute
 import com.swpp.stylemate.ui.home.HomeRoute
 import com.swpp.stylemate.ui.profile.AnalyzingScreen
@@ -59,12 +60,21 @@ private enum class Tab(val label: String, val icon: ImageVector) {
 @Composable
 private fun defaultBodyProfileViewModel(): BodyProfileViewModel {
     val context = LocalContext.current.applicationContext
-    return viewModel(factory = viewModelFactory { initializer { BodyProfileViewModel(store = SharedPrefsBodyProfileStore(context)) } })
+    return viewModel(factory = viewModelFactory { initializer { BodyProfileViewModel(store = LocalBodyProfileStore(context)) } })
 }
 
 @Composable
 fun StyleMateApp(viewModel: BodyProfileViewModel = defaultBodyProfileViewModel()) {
     val app by viewModel.app.collectAsStateWithLifecycle()
+    if (app.storageError != null) {
+        Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(app.storageError!!)
+                TextButton(onClick = viewModel::reloadLocalData) { Text("다시 불러오기") }
+            }
+        }
+        return
+    }
     if (app.setupVisible) {
         ProfileSetupFlow(viewModel, canCancel = app.profile != null)
     } else {
@@ -142,7 +152,7 @@ private fun MainTabs(viewModel: BodyProfileViewModel) {
             Tab.WARDROBE -> Box(Modifier.padding(padding).consumeWindowInsets(padding)) { WardrobeRoute() }
             Tab.CODIBOOK -> CodiBookRoute(Modifier.padding(padding).consumeWindowInsets(padding))
             Tab.PROFILE -> MyProfileScreen(
-                profile = app.profile,
+                profile = app.profile?.copy(preferredFit = app.style.legacyFit(), preferredStyles = app.style.styleLabels()),
                 onReanalyze = viewModel::startReanalysis,
                 onDelete = viewModel::deleteProfile,
                 modifier = Modifier.padding(padding),

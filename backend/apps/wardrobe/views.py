@@ -25,6 +25,26 @@ ANALYSIS_SLOTS = BoundedSemaphore(1)
 
 
 @require_POST
+def analyze_preview(request):
+    """Guest analysis returns attributes only; the app owns the image and draft."""
+    if request.content_type not in ('image/jpeg', 'image/png', 'image/webp'):
+        return JsonResponse({'error': 'IMAGE_REQUIRED'}, status=415)
+    if not ANALYSIS_SLOTS.acquire(blocking=False):
+        return JsonResponse({'error': 'AI_BUSY'}, status=429)
+    try:
+        garment_type = request.GET.get('garment')
+        attributes, details = analyze_image(request.read(MAX_IMAGE_BYTES + 1), settings.GEMINI_API_KEY,
+                                            garment_type if garment_type in GARMENTS else None)
+        response = JsonResponse({'model': MODEL, 'attributes': attributes, 'details': details})
+        response['Cache-Control'] = 'no-store'
+        return response
+    except AnalysisError as error:
+        return JsonResponse({'error': error.code}, status=error.status)
+    finally:
+        ANALYSIS_SLOTS.release()
+
+
+@require_POST
 def landmarks(request):
     if request.content_type not in ('image/jpeg', 'image/png', 'image/webp'):
         return JsonResponse({'error': 'IMAGE_REQUIRED'}, status=415)

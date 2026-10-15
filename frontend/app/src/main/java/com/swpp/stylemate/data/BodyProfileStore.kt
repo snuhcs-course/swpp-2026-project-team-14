@@ -13,29 +13,41 @@ import org.json.JSONObject
 interface BodyProfileStore {
     fun load(): BodyProfile?
     fun save(profile: BodyProfile?)
+    fun loadStyle(): StyleProfile
+    fun saveStyle(style: StyleProfile)
+    fun loadOnboarding(): OnboardingProgress
+    fun saveOnboarding(progress: OnboardingProgress)
 }
 
 class InMemoryBodyProfileStore(private var profile: BodyProfile? = null) : BodyProfileStore {
+    private var style = profile?.let { StyleProfile.fromLegacy(it.preferredFit, it.preferredStyles) } ?: StyleProfile()
+    private var progress = OnboardingProgress(completed = profile != null)
     override fun load(): BodyProfile? = profile
     override fun save(profile: BodyProfile?) {
         this.profile = profile
     }
+    override fun loadStyle() = style
+    override fun saveStyle(style: StyleProfile) { this.style = style }
+    override fun loadOnboarding() = progress
+    override fun saveOnboarding(progress: OnboardingProgress) { this.progress = progress }
 }
 
-class SharedPrefsBodyProfileStore(context: Context) : BodyProfileStore {
-    private val prefs = context.applicationContext.getSharedPreferences("body_profile", Context.MODE_PRIVATE)
-
-    override fun load(): BodyProfile? = prefs.getString(KEY, null)?.let(BodyProfileJson::decode)
-
+class LocalBodyProfileStore(private val store: LocalUserStore) : BodyProfileStore {
+    constructor(context: Context, accountId: String? = null) : this(LocalUserStore.forContext(context, accountId))
+    override fun load(): BodyProfile? = store.get("body")?.toString()?.let(BodyProfileJson::decode)?.let {
+        // New profile styles remain intact; the old recommendation contract only knows these labels.
+        it.copy(preferredFit = loadStyle().legacyFit(), preferredStyles = loadStyle().styleLabels().filter { label -> label in STYLE_OPTIONS })
+    }
     override fun save(profile: BodyProfile?) {
-        prefs.edit().apply {
-            if (profile == null) remove(KEY) else putString(KEY, BodyProfileJson.encode(profile))
-        }.apply()
+        val body = profile?.let { JSONObject(BodyProfileJson.encode(it)).apply {
+            remove("preferred_fit"); remove("preferred_styles")
+        } }
+        store.put("body", body)
     }
-
-    private companion object {
-        const val KEY = "profile_v1"
-    }
+    override fun loadStyle() = store.style()
+    override fun saveStyle(style: StyleProfile) = store.saveStyle(style)
+    override fun loadOnboarding() = store.onboarding()
+    override fun saveOnboarding(progress: OnboardingProgress) = store.saveOnboarding(progress)
 }
 
 /** JSON form of [BodyProfile]. Measurement keys match the API (`MeasurementType.apiKey`). */

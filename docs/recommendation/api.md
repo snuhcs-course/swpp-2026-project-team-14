@@ -1,6 +1,8 @@
 # 추천 API
 
-모든 요청·응답은 JSON(UTF-8)이다. 코디 API와 옷장 분석·저장·조회에는 [로그인 API](../login/README.md)의 Bearer 토큰이 필요하며 본인 데이터만 사용한다. 날씨와 라벨 미리보기는 비로그인에서도 제공한다. 체형은 기존대로 요청의 `body`로 받는다(앱의 `BodyProfileJson` 형식 그대로, 또는 `{height, chest, waist, hip, shoulder, inseam, …}` cm 값). 서버 쪽에서 체형을 읽는 곳은 `apps/body_profiles/profile.py`의 `body_from_request()` 하나다. 사용자 DB의 선호 정보를 추천 계산에 새로 연결하지 않는다.
+모든 요청·응답은 JSON(UTF-8)이다. 계정 코디 API와 옷장 DB 분석·저장·조회에는 [로그인 API](../login/README.md)의 Bearer 토큰이 필요하며 본인 데이터만 사용한다. 날씨·라벨·비저장 분석·코디 미리보기는 비로그인에서도 제공한다. 체형은 기존대로 요청의 `body`로 받는다(앱의 `BodyProfileJson` 형식 그대로, 또는 `{height, chest, waist, hip, shoulder, inseam, …}` cm 값). 서버 쪽에서 체형을 읽는 곳은 `apps/body_profiles/profile.py`의 `body_from_request()` 하나다. 사용자 DB의 선호 정보를 추천 계산에 새로 연결하지 않는다.
+
+현재 비로그인 앱은 `POST /api/outfits/preview/`에 기존 추천 요청과 `wardrobe` 배열(로컬 옷의 UUID·속성·치수·라벨 등)을 전달한다. 최대 100벌·256KiB이며 옷 ID 중복·잘못된 필드를 검증한다. 기존 추천 계산 결과를 반환하고 DB에 저장하지 않는다. 결과 ID는 같은 조합에 대해 유지되며 앱이 코디 저장 여부를 로컬에 관리한다. `POST /api/outfits/preview/feedback/`은 해당 코디·구성 옷·기존 취향으로 피드백을 계산한다(최대 64KiB). 계산은 온라인이며 서버 DB에 기록하지 않는다. 새 추천 알고리즘이나 사용자 DB 취향 연동은 추가하지 않는다.
 
 ## 옷 등록: 추천 라벨
 

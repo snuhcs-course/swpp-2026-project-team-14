@@ -2,6 +2,7 @@
 package com.swpp.stylemate.ui.wardrobe
 
 import com.swpp.stylemate.data.wardrobe.WardrobeRepository
+import com.swpp.stylemate.data.LocalUserStore
 
 import android.graphics.BitmapFactory
 import android.os.Build
@@ -23,7 +24,7 @@ data class WardrobeState(val records: List<JSONObject> = emptyList(), val catalo
                          val loading: Boolean = false, val saving: Boolean = false,
                          val error: String? = null, val saveError: String? = null, val savedId: String? = null)
 
-class WardrobeViewModel : ViewModel() {
+class WardrobeViewModel(private val store: LocalUserStore) : ViewModel() {
     private val mutableState = MutableStateFlow(WardrobeState())
     val state = mutableState.asStateFlow()
     init { refresh() }
@@ -33,10 +34,12 @@ class WardrobeViewModel : ViewModel() {
         mutableState.value = mutableState.value.copy(loading = true, error = null)
         viewModelScope.launch {
             try {
-                val catalog = WardrobeRepository.json("/api/wardrobe/options/")
-                val rows = WardrobeRepository.json("/api/wardrobe/items/").getJSONArray("items")
-                mutableState.value = mutableState.value.copy(catalog = catalog,
+                val rows = WardrobeRepository.json("/api/wardrobe/items/", store = store).getJSONArray("items")
+                val cached = withContext(Dispatchers.IO) { store.get("catalog") }
+                mutableState.value = mutableState.value.copy(catalog = cached,
                     records = (0 until rows.length()).map { rows.getJSONObject(it) }, loading = false)
+                val catalog = WardrobeRepository.json("/api/wardrobe/options/", store = store)
+                mutableState.value = mutableState.value.copy(catalog = catalog, loading = false)
             } catch (error: CancellationException) { throw error }
             catch (error: Exception) { mutableState.value = mutableState.value.copy(loading = false, error = error.message ?: "옷장을 불러오지 못했습니다.") }
         }
@@ -47,7 +50,7 @@ class WardrobeViewModel : ViewModel() {
         mutableState.value = mutableState.value.copy(saving = true, saveError = null)
         viewModelScope.launch {
             try {
-                val record = WardrobeRepository.json("/api/wardrobe/items/$id/", payload)
+                val record = WardrobeRepository.json("/api/wardrobe/items/$id/", payload, store)
                 val records = mutableState.value.records
                 mutableState.value = mutableState.value.copy(saving = false, savedId = id,
                     records = if (records.any { it.getString("id") == id }) records.map { if (it.getString("id") == id) record else it }

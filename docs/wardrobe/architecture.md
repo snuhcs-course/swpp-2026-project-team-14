@@ -9,10 +9,13 @@ swpp-2026-project-team-14/
 |   |   |-- MainActivity.kt                       # 공통 앱 진입
 |   |   |-- data/
 |   |   |   |-- BodyMeasurements.kt              # 체형 치수·선호 정보 모델
+|   |   |   |-- LocalUserStore.kt                # 비로그인·계정별 메타데이터와 옷 사진 로컬 저장
+|   |   |   |-- BodyProfileStore.kt              # 체형·독립 스타일·온보딩 상태 저장 연결
+|   |   |   |-- recommendation/                 # 코디 로컬 저장·취향 저장·서버 계산 요청
 |   |   |   |-- RemoteBodyAnalyzer.kt            # 체형 분석 API 호출
 |   |   |   `-- wardrobe/
-|   |   |       |-- WardrobeRepository.kt         # 옷 목록·사진 조회와 저장 요청
-|   |   |       |-- GarmentAnalysis.kt            # Gemini 분석 API 호출
+|   |   |       |-- WardrobeRepository.kt         # 로컬 옷·사진 조회·저장과 선택지 캐시
+|   |   |       |-- GarmentAnalysis.kt            # 비저장 분석 API 호출·로컬 초안 생성
 |   |   |       |-- GarmentLandmarks.kt           # 자동 측정점 요청·응답 검증
 |   |   |       |-- MeasurementGeometry.kt       # AR 광선·평면 교점과 실측 경로 계산
 |   |   |       |-- CaptureFiles.kt               # 옷 사진 임시 캐시 관리
@@ -57,6 +60,7 @@ swpp-2026-project-team-14/
 |   |   |-- body_profiles/                      # 체형 분석 요청 처리
 |   |   |-- outfits/
 |   |   |   |-- models.py                        # 코디·소유 사용자·옷 연결 저장
+|   |   |   |-- views.py                         # 계정 코디 API·비로그인 비저장 계산 API
 |   |   |   |-- migrations/0002_outfit_user.py    # 코디 소유 사용자 외래 키 추가
 |   |   |   `-- migrations/0003_alter_outfit_user.py # 무소유 코디 정리·소유자 필수 전환
 |   |   `-- wardrobe/
@@ -83,15 +87,15 @@ swpp-2026-project-team-14/
 
 촬영·저장 흐름은 다음과 같다.
 
-`옷장 → AR 촬영 → 자동 점 확인·수정 → cm 계산 → Gemini 분석 → 사용자 편집 → MySQL 저장`
+`옷장 → AR 촬영 → 자동 점 확인·수정 → cm 계산 → Gemini 분석 → 사용자 편집 → 기기 로컬 저장`
 
 - Android: 체형·옷장은 같은 서버 주소와 공통 `StyleMateTheme`·화면 컴포넌트를 사용한다.
 - 측정: HRNet은 원본 사진의 2D 점을 제안하고, Android ARCore가 바닥 평면을 기준으로 cm를 계산한다.
 - 분석: 상의·아우터는 앞면 사진, 하의는 측정 사진을 보낸다. Gemini는 이름·분류·색상을 생성하고 세부 종류·스타일을 제안한다. 응답은 `id`·`model`·`attributes`와 추천용 `details`(무늬·넥라인·옷깃·디테일·겉으로 분명한 소재, 저장하지 않음)다.
 - 추천 라벨: 저장 전 `POST labels/`가 치수와 체형으로 핏·기장·소매·계절 등을 계산하고, 사용자가 확인·수정한 값을 `labels`로 함께 저장한다. 설계는 [추천 문서](../recommendation/README.md)를 따른다.
-- 저장: 옷 속성·치수·메모·사진 경로는 MySQL, 옷 사진은 서버 파일 저장소에 보관한다. 최초 AI 결과는 별도 복제하지 않는다.
-- DB 의존성: 체형 분석·측정점 API는 DB 없이 실행된다. 옷장 분석·조회·저장은 MySQL 설정이 필요하다.
+- 저장: 현재 Android 비로그인 경로는 앱 전용 JSON과 사진 파일을 사용한다. 인증된 서버 저장 API는 MySQL·서버 사진 저장소를 사용한다.
+- DB 의존성: 체형·측정점·비저장 옷 분석·로컬 옷 기반 코디 계산은 DB 없이 실행된다. 계정 옷·코디 조회·저장은 MySQL 설정과 인증이 필요하다.
 
-가입·로그인·로그아웃·프로필 API와 계정별 옷·코디 접근 제한이 구현되었다. 소유자 외래 키는 필수이며 전환 마이그레이션은 소유자 없는 기존 행만 정리한다. 앱의 인증·비로그인 로컬 저장·계정 가져오기 연동과 S3·추천 치수 비교는 미구현이다. 인증 계약은 [로그인 문서](../login/README.md)를 따른다.
+가입·로그인·로그아웃·프로필 API와 계정별 옷·코디 접근 제한, 앱의 비로그인 로컬 저장이 구현되었다. 소유자 외래 키는 필수이며 전환 마이그레이션은 소유자 없는 기존 행만 정리한다. 앱의 인증 화면·계정 전환·가져오기, 새 8페이지 온보딩과 S3·추천 치수 비교는 미구현이다. 저장 범위와 인증 계약은 [로그인 문서](../login/README.md)를 따른다.
 
 화면 기준은 [디자인](design.md), 데이터·API 규칙은 [명세](wardrobe-spec.md), 등록 과정은 [데이터 흐름](wardrobe-flow.md), 실행·배포는 [실행 안내](local-development.md)를 따른다.

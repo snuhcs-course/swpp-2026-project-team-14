@@ -13,15 +13,18 @@ from __future__ import annotations
 
 import json
 import math
+import uuid
 from functools import lru_cache
 
 from django.db import transaction
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
+from django.utils import timezone
 
 from apps.body_profiles.profile import body_from_request
 from apps.wardrobe.models import Garment
+from apps.wardrobe.editor import validate_record
 from apps.users.auth import require_auth
 from recommendation import preference, season, weather
 from recommendation.catalog import Catalog
@@ -66,11 +69,11 @@ def _error(code: str, status: int, hint: str = "") -> JsonResponse:
     return _json({"error": code, **({"hint": hint} if hint else {})}, status)
 
 
-def _read(request) -> dict:
+def _read(request, limit=MAX_REQUEST_BYTES) -> dict:
     if request.content_type != "application/json":
         raise NotJson()
-    raw = request.read(MAX_REQUEST_BYTES + 1)
-    if len(raw) > MAX_REQUEST_BYTES:
+    raw = request.read(limit + 1)
+    if len(raw) > limit:
         raise TooLarge()
     data = json.loads(raw)
     if not isinstance(data, dict):
@@ -153,46 +156,48 @@ def _create(source: str, garments: list[tuple[str, Garment, str]], **fields) -> 
     return outfit
 
 
+def _calculate(data, garments):
+    body = body_from_request(None, data)
+    profile = data["body"]
+    pref_fit = data.get("pref_fit", profile.get("preferred_fit", "regular"))
+    if pref_fit not in PREF_FITS:
+        raise ValueError("Invalid pref_fit")
+    styles = _strings(data.get("styles", profile.get("preferred_styles")), 6, 20, PROFILE_STYLES)
+    temp, wet, weather_context = _weather(data)
+    count = int(_number(data.get("count", 3), 1, MAX_COUNT))
+    seen_keys = _strings(data.get("seen_keys"), MAX_SEEN, 400)
+    occasion = data.get("occasion")
+    if occasion is not None and (not isinstance(occasion, str) or len(occasion) > 40):
+        raise ValueError("Invalid occasion")
+    anchor = data.get("anchor_id")
+    if anchor is not None and not isinstance(anchor, str):
+        raise ValueError("Invalid anchor")
+    taste = _preference(data.get("preference"))
+    items = [i for i in (_garment_item(g, body) for g in garments.values()) if i]
+    req = Request(body=body, pref_fit=pref_fit, styles=styles, temp=temp, wet=wet, mode="wardrobe",
+                  anchor=f"w:{anchor}" if anchor else None, wardrobe=items, preference=taste,
+                  seen_outfits=seen_keys, count=count)
+    result = recommend(models(), req)
+    context = {**weather_context, "band": result["band"]["label"], "pref_fit": pref_fit, "styles": styles,
+               **({"occasion": occasion} if occasion else {})}
+    return result, context
+
+
 @require_POST
 @require_auth
 def recommend_view(request):
     try:
         data = _read(request)
-        body = body_from_request(request, data)
-        profile = data["body"]
-        pref_fit = data.get("pref_fit", profile.get("preferred_fit", "regular"))
-        if pref_fit not in PREF_FITS:
-            raise ValueError("Invalid pref_fit")
-        styles = _strings(data.get("styles", profile.get("preferred_styles")), 6, 20, PROFILE_STYLES)
-        temp, wet, weather_context = _weather(data)
-        count = int(_number(data.get("count", 3), 1, MAX_COUNT))
-        seen_keys = _strings(data.get("seen_keys"), MAX_SEEN, 400)
-        occasion = data.get("occasion")
-        if occasion is not None and (not isinstance(occasion, str) or len(occasion) > 40):
-            raise ValueError("Invalid occasion")
-        anchor = data.get("anchor_id")
-        if anchor is not None and not isinstance(anchor, str):
-            raise ValueError("Invalid anchor")
-        taste = _preference(data.get("preference"))
+        garments = {str(g.id): g for g in Garment.objects.filter(user=request.user, saved=True)}
+        result, context = _calculate(data, garments)
     except TooLarge:
         return _error("BODY_TOO_LARGE", 413)
     except NotJson:
         return _error("JSON_REQUIRED", 415)
+    except RecommendError as error:
+        return _error(error.code, 422, str(error))
     except (ValueError, TypeError, KeyError, UnicodeDecodeError, OverflowError) as error:
         return _error("INVALID_REQUEST", 400, str(error))
-
-    garments = {str(g.id): g for g in Garment.objects.filter(user=request.user, saved=True)}
-    items = [i for i in (_garment_item(g, body) for g in garments.values()) if i]
-    req = Request(body=body, pref_fit=pref_fit, styles=styles, temp=temp, wet=wet, mode="wardrobe",
-                  anchor=f"w:{anchor}" if anchor else None, wardrobe=items, preference=taste,
-                  seen_outfits=seen_keys, count=count)
-    try:
-        result = recommend(models(), req)
-    except RecommendError as error:
-        return _json({"error": error.code, "hint": str(error)}, 422)
-
-    context = {**weather_context, "band": result["band"]["label"], "pref_fit": pref_fit, "styles": styles,
-               **({"occasion": occasion} if occasion else {})}
     outfits = []
     with transaction.atomic():
         for o in result["outfits"]:
@@ -201,6 +206,78 @@ def recommend_view(request):
                                    reasons=o["reasons"], context=context))
     return _json({"outfits": [serialize(o) for o in outfits], "notes": result["notes"], "band": result["band"],
                   "context": context})
+
+
+def _local_garments(data):
+    rows = data.get('wardrobe')
+    if not isinstance(rows, list) or len(rows) > 100:
+        raise ValueError('Invalid local wardrobe')
+    garments = {}
+    for row in rows:
+        if not isinstance(row, dict):
+            raise ValueError('Invalid garment')
+        garment_id = str(uuid.UUID(row['id']))
+        if garment_id in garments:
+            raise ValueError('Duplicate garment')
+        values = validate_record({key: row[key] for key in ('attributes', 'dimensions', 'notes', 'labels') if key in row})
+        garments[garment_id] = Garment(id=garment_id, image='', saved=True, **values)
+    return garments
+
+
+@require_POST
+def preview_view(request):
+    """Use the same calculation for a device's wardrobe without reading or writing the DB."""
+    try:
+        data = _read(request, 256 * 1024)
+        garments = _local_garments(data)
+        result, context = _calculate(data, garments)
+        outfits = []
+        for outfit in result['outfits']:
+            items = []
+            for item in outfit['items']:
+                garment_id = item['id'][2:]
+                garment = garments[garment_id]
+                items.append({'garment_id': garment_id, 'slot': SLOT_CODE[item['slot']],
+                              'name': garment.attributes.get('name', ''), 'colors': garment.attributes.get('colors', []),
+                              'image_url': f'local:{garment_id}', 'note': item.get('size', '')})
+            outfits.append({'id': str(uuid.uuid5(uuid.NAMESPACE_URL, outfit['key'])), 'key': outfit['key'],
+                            'items': items, 'score': outfit['total'], 'components': outfit['components'],
+                            'reasons': outfit['reasons'], 'saved': False, 'name': '', 'feedback': None,
+                            'created_at': timezone.now().isoformat()})
+        return _json({'outfits': outfits, 'notes': result['notes'], 'band': result['band'], 'context': context})
+    except TooLarge:
+        return _error('BODY_TOO_LARGE', 413)
+    except NotJson:
+        return _error('JSON_REQUIRED', 415)
+    except RecommendError as error:
+        return _error(error.code, 422, str(error))
+    except (ValueError, TypeError, KeyError, AttributeError, UnicodeDecodeError, OverflowError, RecursionError):
+        return _error('INVALID_REQUEST', 400)
+
+
+@require_POST
+def preview_feedback(request):
+    try:
+        data = _read(request)
+        garments = _local_garments(data)
+        outfit = data['outfit']
+        value = data.get('feedback')
+        if not isinstance(outfit, dict) or value not in ('liked', 'disliked', None):
+            raise ValueError('Invalid feedback')
+        taste = _preference(data.get('preference'))
+        if value != outfit.get('feedback') and value is not None:
+            items = [to_item({'id': str(g.id), 'attributes': g.attributes, 'labels': g.labels}) for g in garments.values()]
+            by_id = {i.id: {'slot': i.slot, 'attrs': i.attrs, 'style': i.style} for i in items if i}
+            sign = 1 if value == 'liked' else -1
+            taste = preference.apply_feedback(taste, [{'item_id': gid, 'polarity': sign} for gid in by_id], by_id)
+        outfit['feedback'] = value
+        return _json({'outfit': outfit, 'preference': taste})
+    except TooLarge:
+        return _error('BODY_TOO_LARGE', 413)
+    except NotJson:
+        return _error('JSON_REQUIRED', 415)
+    except (ValueError, TypeError, KeyError, AttributeError, UnicodeDecodeError, OverflowError, RecursionError):
+        return _error('INVALID_REQUEST', 400)
 
 
 @require_http_methods(["GET", "POST"])

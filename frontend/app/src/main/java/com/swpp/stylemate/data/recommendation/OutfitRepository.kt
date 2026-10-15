@@ -12,6 +12,7 @@ import org.json.JSONException
 import org.json.JSONObject
 import java.io.IOException
 import java.util.concurrent.TimeUnit
+import com.swpp.stylemate.data.LocalUserStore
 
 data class Weather(val temp: Double, val apparent: Double, val label: String, val band: String,
                    val rain: Boolean, val snow: Boolean, val json: JSONObject)
@@ -43,6 +44,7 @@ class OutfitApiException(val code: String, message: String) : Exception(message)
 class OutfitRepository(
     baseUrl: String,
     private val client: OkHttpClient = defaultClient(),
+    private val local: LocalUserStore? = null,
 ) {
     private val base = baseUrl.trimEnd('/')
 
@@ -57,18 +59,37 @@ class OutfitRepository(
             .put("preference", preference ?: JSONObject.NULL)
         if (weather != null) request.put("weather", weather.json) else request.put("temp", DEFAULT_TEMP)
         anchorId?.let { request.put("anchor_id", it) }
-        return parseRecommendation(call("POST", "/api/outfits/recommend/", request))
+        local?.let { request.put("wardrobe", JSONArray(withContext(Dispatchers.IO) { it.garments() })) }
+        val result = call("POST", if (local == null) "/api/outfits/recommend/" else "/api/outfits/preview/", request)
+        local?.let { withContext(Dispatchers.IO) { it.rememberOutfits(result.getJSONArray("outfits")) } }
+        return parseRecommendation(result)
     }
 
-    suspend fun saved(): List<Outfit> = call("GET", "/api/outfits/").getJSONArray("outfits").let { list ->
+    suspend fun saved(): List<Outfit> {
+        local?.let { return withContext(Dispatchers.IO) { it.outfits().map(::parseOutfit) } }
+        return call("GET", "/api/outfits/").getJSONArray("outfits").let { list ->
         (0 until list.length()).map { parseOutfit(list.getJSONObject(it)) }
+        }
     }
 
-    suspend fun setSaved(id: String, saved: Boolean): Outfit =
-        parseOutfit(call("PUT", "/api/outfits/$id/", JSONObject().put("saved", saved)))
+    suspend fun setSaved(id: String, saved: Boolean): Outfit {
+        local?.let { return withContext(Dispatchers.IO) { parseOutfit(it.saveOutfit(id, saved)) } }
+        return parseOutfit(call("PUT", "/api/outfits/$id/", JSONObject().put("saved", saved)))
+    }
 
     /** Returns the outfit and the updated taste profile to keep on the device. */
     suspend fun feedback(id: String, value: String?, preference: JSONObject?): Pair<Outfit, JSONObject> {
+        if (local != null) {
+            val outfit = withContext(Dispatchers.IO) { checkNotNull(local.outfit(id)) }
+            val items = outfit.getJSONArray("items")
+            val ids = (0 until items.length()).map { items.getJSONObject(it).getString("garment_id") }.toSet()
+            val garments = withContext(Dispatchers.IO) { local.garments().filter { it.getString("id") in ids } }
+            val result = call("POST", "/api/outfits/preview/feedback/", JSONObject().put("outfit", outfit)
+                .put("wardrobe", JSONArray(garments)).put("feedback", value ?: JSONObject.NULL)
+                .put("preference", preference ?: JSONObject.NULL))
+            val updated = withContext(Dispatchers.IO) { local.setFeedback(id, value) }
+            return parseOutfit(updated) to result.getJSONObject("preference")
+        }
         val result = call("POST", "/api/outfits/$id/feedback/",
             JSONObject().put("feedback", value ?: JSONObject.NULL).put("preference", preference ?: JSONObject.NULL))
         return parseOutfit(result.getJSONObject("outfit")) to result.getJSONObject("preference")

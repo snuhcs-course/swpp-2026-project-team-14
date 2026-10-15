@@ -3,6 +3,9 @@ package com.swpp.stylemate.data.wardrobe
 
 import android.content.Context
 import com.swpp.stylemate.BuildConfig
+import com.swpp.stylemate.data.LocalUserStore
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import java.net.HttpURLConnection
 import java.net.URI
 import java.net.SocketTimeoutException
@@ -13,7 +16,7 @@ import org.json.JSONObject
 /** [garmentType]: the kind picked for AR measurement (a landmark type), sent as a hint for the AI. */
 internal suspend fun requestAnalysis(context: Context, photo: String, garmentType: String? = null): JSONObject = withContext(Dispatchers.IO) {
     val hint = garmentType?.takeIf { it in landmarkTypes }?.let { "?garment=$it" }.orEmpty()
-    val connection = URI("${BuildConfig.API_BASE_URL.trimEnd('/')}/api/wardrobe/analyze/$hint").toURL().openConnection() as HttpURLConnection
+    val connection = URI("${BuildConfig.API_BASE_URL.trimEnd('/')}/api/wardrobe/analyze-preview/$hint").toURL().openConnection() as HttpURLConnection
     try {
         val bytes = context.contentResolver.openInputStream(CaptureFiles(context).uri(photo))!!.use { input ->
             val buffer = ByteArray(5 * 1024 * 1024 + 1)
@@ -60,8 +63,9 @@ internal suspend fun requestAnalysis(context: Context, photo: String, garmentTyp
             "IMAGE_TOO_LARGE" -> "사진 용량이 너무 큽니다."
             else -> "분석하지 못했습니다. 다시 시도해 주세요."
         })
-        check(result.has("id") && result.has("attributes")) { "분석 응답을 읽지 못했습니다." }
-        result
+        check(result.has("attributes")) { "분석 응답을 읽지 못했습니다." }
+        currentCoroutineContext().ensureActive()
+        LocalUserStore.forContext(context).createGarment(result, bytes)
     } catch (_: SocketTimeoutException) {
         error("응답 시간이 초과됐습니다. 잠시 후 다시 시도해 주세요.")
     } catch (_: java.io.IOException) {

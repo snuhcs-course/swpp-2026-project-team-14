@@ -2,6 +2,9 @@
 package com.swpp.stylemate.data.wardrobe
 
 import android.graphics.BitmapFactory
+import android.content.Context
+import com.swpp.stylemate.data.LocalUserStore
+import org.json.JSONArray
 import com.swpp.stylemate.BuildConfig
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
@@ -53,9 +56,24 @@ object WardrobeRepository {
         } finally { connection.disconnect() }
     }
 
-    suspend fun json(path: String, body: JSONObject? = null): JSONObject = JSONObject(request(path, body).toString(Charsets.UTF_8))
-    suspend fun thumbnail(path: String): ImageBitmap? = withContext(Dispatchers.IO) {
-        val bytes = request(path)
+    suspend fun json(path: String, body: JSONObject? = null, store: LocalUserStore): JSONObject = withContext(Dispatchers.IO) {
+        when {
+            path == "/api/wardrobe/options/" -> try {
+                JSONObject(request(path).toString(Charsets.UTF_8)).also { store.put("catalog", it) }
+            } catch (error: Exception) {
+                if (error is kotlinx.coroutines.CancellationException) throw error
+                store.get("catalog") ?: throw error
+            }
+            path == "/api/wardrobe/items/" -> JSONObject().put("items", JSONArray(store.garments()))
+            else -> {
+                val id = Regex("/api/wardrobe/items/([0-9a-f-]+)/").matchEntire(path)?.groupValues?.get(1)
+                checkNotNull(id) { "잘못된 옷 정보 경로입니다." }
+                if (body == null) checkNotNull(store.garment(id)) else store.saveGarment(id, body)
+            }
+        }
+    }
+    suspend fun thumbnail(context: Context, path: String): ImageBitmap? = withContext(Dispatchers.IO) {
+        val bytes = if (path.startsWith("local:")) LocalUserStore.forContext(context).image(path) else request(path)
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
         val options = BitmapFactory.Options().apply {

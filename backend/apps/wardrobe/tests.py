@@ -148,6 +148,16 @@ class InitialMigrationTests(TransactionTestCase):
         self.assertFalse(garment.saved)
 
 
+class GuestAnalysisTests(SimpleTestCase):
+    @patch('apps.wardrobe.views.analyze_image', return_value=(attributes(), None))
+    def test_guest_preview_does_not_need_database_or_create_draft(self, analyze):
+        response = self.client.post('/api/wardrobe/analyze-preview/', photo(), content_type='image/jpeg')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(set(response.json()), {'model', 'attributes', 'details'})
+        self.assertEqual(response['Cache-Control'], 'no-store')
+        analyze.assert_called_once()
+
+
 class ImageTests(SimpleTestCase):
     def test_valid_image_is_jpeg_and_bounded(self):
         with Image.open(BytesIO(prepare_image(photo()))) as image:

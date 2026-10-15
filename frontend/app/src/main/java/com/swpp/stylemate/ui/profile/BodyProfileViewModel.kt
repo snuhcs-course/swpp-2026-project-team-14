@@ -20,6 +20,9 @@ import com.swpp.stylemate.data.MeasurementType
 import com.swpp.stylemate.data.PreferredFit
 import com.swpp.stylemate.data.ReferenceMeasurements
 import com.swpp.stylemate.data.toggleStyle
+import com.swpp.stylemate.data.OnboardingProgress
+import com.swpp.stylemate.data.StyleProfile
+import org.json.JSONObject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -61,6 +64,8 @@ data class SetupState(
 
 data class AppState(
     val profile: BodyProfile? = null,
+    val style: StyleProfile = StyleProfile(),
+    val storageError: String? = null,
     /** True while the onboarding / re-analysis flow is on screen. */
     val setupVisible: Boolean = true,
 )
@@ -70,16 +75,53 @@ class BodyProfileViewModel(
     private val store: BodyProfileStore = InMemoryBodyProfileStore(),
 ) : ViewModel() {
 
-    // A saved profile skips onboarding; without one the setup flow opens first.
-    private val _app = MutableStateFlow(store.load().let { AppState(profile = it, setupVisible = it == null) })
+    private fun loadAppState(): AppState = try {
+        AppState(profile = store.load(), style = store.loadStyle(), setupVisible = !store.loadOnboarding().completed)
+    } catch (_: Exception) {
+        AppState(setupVisible = false, storageError = "저장된 정보를 불러오지 못했어요. 기존 데이터는 유지됩니다.")
+    }
+    private val _app = MutableStateFlow(loadAppState())
     val app: StateFlow<AppState> = _app.asStateFlow()
 
-    private val _setup = MutableStateFlow(SetupState())
+    private val _setup = MutableStateFlow(runCatching { restoreSetup() }.getOrDefault(SetupState()))
     val setup: StateFlow<SetupState> = _setup.asStateFlow()
 
-    fun startCapture() = _setup.update { it.copy(step = SetupStep.INPUT) }
+    fun reloadLocalData() {
+        _app.value = loadAppState()
+        if (_app.value.storageError == null) _setup.value = restoreSetup()
+    }
 
-    fun backToGuide() = _setup.update { it.copy(step = SetupStep.GUIDE) }
+    private fun restoreSetup(): SetupState {
+        val progress = store.loadOnboarding()
+        val draft = JSONObject(progress.draft)
+        val result = draft.optJSONObject("result")?.toString()?.let(com.swpp.stylemate.data.BodyProfileJson::decode)
+        return SetupState(
+            step = if (!progress.completed && progress.step == 5 && result != null) SetupStep.REVIEW
+                   else if (!progress.completed && progress.step >= 4) SetupStep.INPUT else SetupStep.GUIDE,
+            heightText = draft.optString("height"), weightText = draft.optString("weight"),
+            gender = Gender.entries.firstOrNull { it.name == draft.optString("gender") } ?: Gender.UNSPECIFIED,
+            lastInput = result?.input, measurements = result?.measurements.orEmpty(),
+            detectedClothing = result?.clothing ?: DetectedClothing(), reference = result?.reference,
+            preferredFit = store.loadStyle().legacyFit(), preferredStyles = store.loadStyle().styleLabels(),
+        )
+    }
+
+    private fun persistSetup() {
+        val state = _setup.value
+        val draft = JSONObject().put("height", state.heightText).put("weight", state.weightText).put("gender", state.gender.name)
+        if (state.step == SetupStep.REVIEW && state.lastInput != null) {
+            draft.put("result", JSONObject(com.swpp.stylemate.data.BodyProfileJson.encode(BodyProfile(
+                state.lastInput, state.measurements, state.preferredFit, state.preferredStyles,
+                state.detectedClothing, state.reference,
+            ))))
+        }
+        val step = when (state.step) { SetupStep.GUIDE -> 1; SetupStep.REVIEW -> 5; else -> 4 }
+        store.saveOnboarding(OnboardingProgress(step, store.loadOnboarding().completed, draft.toString()))
+    }
+
+    fun startCapture() { _setup.update { it.copy(step = SetupStep.INPUT) }; persistSetup() }
+
+    fun backToGuide() { _setup.update { it.copy(step = SetupStep.GUIDE) }; persistSetup() }
 
     fun setPhoto(slot: PhotoSlot, bitmap: Bitmap?) = _setup.update {
         when (slot) {
@@ -90,11 +132,11 @@ class BodyProfileViewModel(
 
     fun showError(message: String) = _setup.update { it.copy(errorMessage = message) }
 
-    fun setHeight(text: String) = _setup.update { it.copy(heightText = text.filter(Char::isDigit).take(3)) }
+    fun setHeight(text: String) { _setup.update { it.copy(heightText = text.filter(Char::isDigit).take(3)) }; persistSetup() }
 
-    fun setWeight(text: String) = _setup.update { it.copy(weightText = text.filter(Char::isDigit).take(3)) }
+    fun setWeight(text: String) { _setup.update { it.copy(weightText = text.filter(Char::isDigit).take(3)) }; persistSetup() }
 
-    fun setGender(gender: Gender) = _setup.update { it.copy(gender = gender) }
+    fun setGender(gender: Gender) { _setup.update { it.copy(gender = gender) }; persistSetup() }
 
     fun analyze() {
         val state = _setup.value
@@ -125,6 +167,7 @@ class BodyProfileViewModel(
                         reference = result.reference,
                     )
                 }
+                persistSetup()
             } catch (e: BodyAnalysisException) {
                 // Keep the photos so the user can replace just the one that failed.
                 _setup.update { it.copy(step = SetupStep.INPUT, errorMessage = e.message) }
@@ -132,18 +175,27 @@ class BodyProfileViewModel(
         }
     }
 
-    fun editMeasurement(type: MeasurementType, valueCm: Double) = _setup.update { state ->
+    fun editMeasurement(type: MeasurementType, valueCm: Double) { _setup.update { state ->
         state.copy(
             measurements = state.measurements.map {
                 if (it.type == type) it.copy(valueCm = valueCm, editedByUser = true) else it
             },
         )
+    }; persistSetup() }
+
+    fun setPreferredFit(fit: PreferredFit) {
+        _setup.update { it.copy(preferredFit = fit) }
+        store.saveStyle(store.loadStyle().copy(preferredFits = StyleProfile.fromLegacy(fit, emptyList()).preferredFits))
+        _app.update { it.copy(style = store.loadStyle()) }
+        persistSetup()
     }
 
-    fun setPreferredFit(fit: PreferredFit) = _setup.update { it.copy(preferredFit = fit) }
-
-    fun toggleStyle(style: String) = _setup.update {
+    fun toggleStyle(style: String) { _setup.update {
         it.copy(preferredStyles = toggleStyle(it.preferredStyles, style))
+    }
+        store.saveStyle(store.loadStyle().copy(preferredStyles = StyleProfile.fromLegacy(_setup.value.preferredFit, _setup.value.preferredStyles).preferredStyles))
+        _app.update { it.copy(style = store.loadStyle()) }
+        persistSetup()
     }
 
     fun confirmProfile() {
@@ -158,10 +210,14 @@ class BodyProfileViewModel(
             reference = state.reference,
         )
         store.save(profile)
-        _app.update { it.copy(profile = profile, setupVisible = false) }
+        store.saveOnboarding(OnboardingProgress(step = 8, completed = true))
+        _app.update { it.copy(profile = store.load(), setupVisible = false) }
     }
 
-    fun skipSetup() = _app.update { it.copy(setupVisible = false) }
+    fun skipSetup() {
+        store.saveOnboarding(OnboardingProgress(step = 8, completed = true))
+        _app.update { it.copy(setupVisible = false) }
+    }
 
     /** Opens the flow again, pre-filled with the current profile (US-B4). */
     fun startReanalysis() {

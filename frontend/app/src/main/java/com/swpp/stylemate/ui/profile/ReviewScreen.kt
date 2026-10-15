@@ -247,7 +247,7 @@ private fun FitSelector(selected: PreferredFit, onSelect: (PreferredFit) -> Unit
 private fun StyleChips(selected: List<String>, onToggle: (String) -> Unit) {
     val full = selected.size >= MAX_STYLES
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        STYLE_OPTIONS.forEach { style ->
+        STYLE_OPTIONS.map { if (it == "러블리") "시티보이" else it }.forEach { style ->
             val isSelected = style in selected
             FilterChip(
                 selected = isSelected,

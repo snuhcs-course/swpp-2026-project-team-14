@@ -4,7 +4,8 @@ import json
 import tempfile
 from unittest.mock import patch
 
-from django.test import TestCase, override_settings
+from django.test import SimpleTestCase, TestCase, override_settings
+import uuid
 
 from apps.wardrobe.models import Garment
 from apps.users.auth import issue_token
@@ -164,3 +165,37 @@ class WeatherTests(TestCase):
         current.side_effect = weather.WeatherError("down")
         self.assertEqual(self.client.get("/api/weather/").status_code, 502)
         self.assertEqual(self.client.get("/api/weather/?lat=abc").status_code, 400)
+
+
+class LocalWardrobePreviewTests(SimpleTestCase):
+    def setUp(self):
+        self.rows = []
+        for category, subtype in [('top', 'tshirt'), ('bottom', 'jeans')]:
+            self.rows.append({'id': str(uuid.uuid4()), 'attributes': {
+                'name': '기기에 저장한 옷', 'category': category, 'subcategory': subtype,
+                'colors': ['#FFFFFF'], 'styles': ['minimal'], 'fit_type': None, 'leg_shape': None,
+                'rise_type': None, 'skirt_shape': None,
+            }, 'dimensions': None, 'notes': '', 'labels': None})
+
+    def post(self, path, data):
+        return self.client.post(path, json.dumps(data), content_type='application/json')
+
+    def test_recommendation_uses_local_records_without_any_database_queries(self):
+        data = {'body': BODY, 'temp': 18, 'wardrobe': self.rows, 'count': 1}
+        response = self.post('/api/outfits/preview/', data)
+        self.assertEqual(response.status_code, 200, response.content)
+        outfit = response.json()['outfits'][0]
+        self.assertEqual({item['garment_id'] for item in outfit['items']}, {row['id'] for row in self.rows})
+        self.assertTrue(all(item['image_url'].startswith('local:') for item in outfit['items']))
+        repeated = self.post('/api/outfits/preview/', data).json()['outfits'][0]
+        self.assertEqual(outfit['id'], repeated['id'])
+        feedback = {'outfit': outfit, 'wardrobe': self.rows, 'feedback': 'liked'}
+        first = self.post('/api/outfits/preview/feedback/', feedback)
+        self.assertEqual(first.status_code, 200)
+        feedback.update(outfit=first.json()['outfit'], preference=first.json()['preference'])
+        self.assertEqual(self.post('/api/outfits/preview/feedback/', feedback).json()['preference'], first.json()['preference'])
+
+    def test_rejects_bad_local_records(self):
+        for rows in (self.rows * 2, [{'id': 'invalid'}], self.rows * 51):
+            with self.subTest(count=len(rows)):
+                self.assertEqual(self.post('/api/outfits/preview/', {'body': BODY, 'wardrobe': rows}).status_code, 400)
