@@ -108,6 +108,21 @@ class LocalUserStore(private val directory: File) {
         write(snapshot, data.toString().toByteArray(Charsets.UTF_8))
     }
 
+    fun importState(accountId: String): JSONObject = get("imports")?.optJSONObject(accountId) ?: JSONObject()
+
+    fun recordImport(accountId: String, key: String, fingerprint: String, status: String) = synchronized(lock) {
+        require(status in setOf("imported", "unchanged", "kept"))
+        val data = read()
+        val imports = data.optJSONObject("imports") ?: JSONObject()
+        val account = imports.optJSONObject(accountId) ?: JSONObject()
+        val records = account.optJSONObject("records") ?: JSONObject()
+        records.put(key, JSONObject().put("fingerprint", fingerprint).put("status", status))
+        account.put("records", records)
+        imports.put(accountId, account)
+        data.put("imports", imports)
+        write(snapshot, data.toString().toByteArray(Charsets.UTF_8))
+    }
+
     private fun records(data: JSONObject, key: String) = data.optJSONArray(key) ?: JSONArray()
     private fun list(key: String): List<JSONObject> = synchronized(lock) {
         val array = records(read(), key)

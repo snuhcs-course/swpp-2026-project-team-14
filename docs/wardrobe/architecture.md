@@ -9,9 +9,10 @@ swpp-2026-project-team-14/
 |   |   |-- MainActivity.kt                       # 공통 앱 진입
 |   |   |-- data/
 |   |   |   |-- BodyMeasurements.kt              # 체형 치수·선호 정보 모델
-|   |   |   |-- LocalUserStore.kt                # 비로그인·계정별 메타데이터와 옷 사진 로컬 저장
+|   |   |   |-- LocalUserStore.kt                # 로컬 메타데이터·사진·계정별 가져오기 결과 보관
 |   |   |   |-- BodyProfileStore.kt              # 체형·독립 스타일·온보딩 상태 저장 연결
-|   |   |   |-- AuthRepository.kt                # 인증·프로필 API·세션 복원·만료·세션별 요청 검증
+|   |   |   |-- AuthRepository.kt                # 인증·프로필·사진 업로드·세션 복원·만료·요청 검증
+|   |   |   |-- GuestImportRepository.kt         # 가져오기 후보·충돌 조회·지문·계정별 재시도 처리
 |   |   |   |-- AuthSessionStore.kt              # Keystore AES-GCM 암호화 세션 보관·백업 제외
 |   |   |   |-- recommendation/                 # 코디 로컬 저장·취향 저장·서버 계산 요청
 |   |   |   |-- RemoteBodyAnalyzer.kt            # 체형 분석 API 호출
@@ -23,14 +24,16 @@ swpp-2026-project-team-14/
 |   |   |       |-- CaptureFiles.kt               # 옷 사진 임시 캐시 관리
 |   |   |       `-- CaptureType.kt                # 측정 종류 → 하의 세부 종류 기본값
 |   |   `-- ui/
-|   |       |-- StyleMateApp.kt                   # 공통 탭·인증 진입·계정/게스트 저장소 및 ViewModel 전환
+|   |       |-- StyleMateApp.kt                   # 공통 탭·인증·가져오기 진입·계정별 ViewModel 전환
 |   |       |-- components/ScreenComponents.kt   # 체형·옷장 공통 상단바·하단 버튼·섹션 제목
 |   |       |-- theme/Theme.kt                    # 크림·테라코타 공통 테마
 |   |       |-- profile/
 |   |       |   |-- AuthScreens.kt               # 로그인 팝업·회원가입·비밀번호 표시·오류 안내
 |   |       |   |-- AuthViewModel.kt             # 중복 제출 방지·시도 제한 대기·포그라운드 검증·만료 안내
+|   |       |   |-- GuestImportViewModel.kt      # 수동 가져오기·읽기 취소·충돌 선택·저장/새로고침 재시도
+|   |       |   |-- GuestImportDialog.kt         # 가져오기 확인·항목별 교체 선택·결과 팝업
 |   |       |   |-- BodyProfileViewModel.kt      # 체형 분석·계정 체형 저장 및 삭제·로컬 상태 연결
-|   |       |   `-- MyProfileScreen.kt           # 스타일 편집·계정 표시·체형 상세·프로필 촬영 화면과 연결
+|   |       |   `-- MyProfileScreen.kt           # 핏·무드 즉시 저장·컬러 편집·간결한 계정 카드·가져오기·체형 상세
 |   |       `-- wardrobe/
 |   |           |-- WardrobeScreen.kt            # 옷장 목록·오류 재시도·카드 정렬·사진 확인·편집 연결
 |   |           |-- WardrobeViewModel.kt         # 목록·저장 상태
@@ -42,8 +45,8 @@ swpp-2026-project-team-14/
 |   |           `-- capture/
 |   |               |-- MeasurementActivity.kt  # 실측 촬영·측정점 확인·수정
 |   |               `-- MeasurementCamera.kt    # AR 카메라·촬영 프레임 고정
-|   |-- test/java/com/swpp/stylemate/             # 인증 API·만료·오래된 응답 차단·로컬 저장·체형 계약 검사
-|   `-- androidTest/java/com/swpp/stylemate/      # 인증 입력·Keystore 암호화·옷장 UI·탭 연결·측정점 검사
+|   |-- test/java/com/swpp/stylemate/             # 인증·만료·로컬 저장·가져오기 계약·지문·재시도 검사
+|   `-- androidTest/java/com/swpp/stylemate/      # 인증·옷장 UI·가져오기 선택·실제 서버 연결·측정점 검사
 |-- backend/
 |   |-- config/
 |   |   |-- settings.py                          # 공통 API·사용자 모델·MySQL·사진·모델 설정
@@ -55,13 +58,15 @@ swpp-2026-project-team-14/
 |   |   |   |-- auth.py                          # 토큰 발급·만료 확인·DB 및 인증 접근 제한
 |   |   |   |-- limits.py                        # DB 공유 카운터·5회 실패 잠금·IP 요청 제한
 |   |   |   |-- profile.py                       # 체형 허용 필드·16종 치수·중첩 메타데이터 검증
-|   |   |   |-- urls.py                          # 가입·로그인·로그아웃·내 정보 경로
+|   |   |   |-- urls.py                          # 가입·로그인·로그아웃·내 정보·가져오기 경로
 |   |   |   |-- views.py                         # 인증·프로필 조회 및 부분 수정 API
+|   |   |   |-- imports.py                       # 인증 가져오기·버전 충돌·사진·코디 연결 저장
 |   |   |   |-- migrations/0001_initial.py        # 사용자 테이블 최초 생성
 |   |   |   |-- migrations/0002_authtoken.py      # 만료 가능한 토큰 해시 테이블 생성
 |   |   |   |-- migrations/0003_authratelimit.py  # 인증 요청·실패 횟수 공유 테이블 생성
 |   |   |   |-- tests.py                         # 계정·토큰·프로필·계정 간 접근 차단 검사
 |   |   |   |-- test_security.py                 # 시도 제한·만료 경계·잘못된 프로필 입력 검사
+|   |   |   |-- test_imports.py                  # 재전송·충돌·계정 격리·연결·사진 실패 정리 검사
 |   |   |   `-- test_migrations.py               # 기존 무소유 데이터 정리·소유 데이터 보존 검사
 |   |   |-- body_profiles/                      # 체형 분석 요청 처리
 |   |   |-- outfits/
@@ -102,6 +107,6 @@ swpp-2026-project-team-14/
 - 저장: 현재 Android 비로그인 경로는 앱 전용 JSON과 사진 파일을 사용한다. 인증된 서버 저장 API는 MySQL·서버 사진 저장소를 사용한다.
 - DB 의존성: 체형·측정점·비저장 옷 분석·로컬 옷 기반 코디 계산은 DB 없이 실행된다. 계정 옷·코디 조회·저장은 MySQL 설정과 인증이 필요하다.
 
-가입·로그인·로그아웃·프로필 API와 계정별 옷·코디 접근 제한, 앱 인증 화면·만료·계정 전환·비로그인 로컬 저장이 구현되었다. 소유자 외래 키는 필수이며 전환 마이그레이션은 소유자 없는 기존 행만 정리한다. 계정 가져오기, 새 8페이지 온보딩과 S3·추천 치수 비교는 미구현이다. 저장 범위와 인증 계약은 [로그인 문서](../login/README.md)를 따른다.
+가입·로그인·로그아웃·프로필 API와 계정별 옷·코디 접근 제한, 앱 인증 화면·만료·계정 전환·비로그인 로컬 저장·동의 후 계정 가져오기가 구현되었다. 소유자 외래 키는 필수이며 전환 마이그레이션은 소유자 없는 기존 행만 정리한다. 새 8페이지 온보딩과 S3·추천 치수 비교는 미구현이다. 저장 범위와 인증·가져오기 계약은 [로그인 문서](../login/README.md)를 따른다.
 
 화면 기준은 [디자인](design.md), 데이터·API 규칙은 [명세](wardrobe-spec.md), 등록 과정은 [데이터 흐름](wardrobe-flow.md), 실행·배포는 [실행 안내](local-development.md)를 따른다.

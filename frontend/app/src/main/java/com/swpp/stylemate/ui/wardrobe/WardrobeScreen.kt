@@ -94,6 +94,7 @@ fun WardrobeRoute() {
         initializer { WardrobeViewModel(LocalUserStore.forContext(context, account?.userId), account) }
     })
     val wardrobe by wardrobeModel.state.collectAsStateWithLifecycle()
+    LaunchedEffect(Unit) { wardrobeModel.refresh() }
     val labelsModel: GarmentLabelsViewModel = viewModel(factory = viewModelFactory {
         initializer { GarmentLabelsViewModel(OutfitRepository(BuildConfig.API_BASE_URL)) }
     })

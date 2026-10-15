@@ -48,11 +48,14 @@ import com.swpp.stylemate.data.AccountAccess
 import com.swpp.stylemate.data.AuthRepository
 import com.swpp.stylemate.data.KeystoreSessionStore
 import com.swpp.stylemate.data.LocalUserStore
+import com.swpp.stylemate.data.GuestImportRepository
 import com.swpp.stylemate.BuildConfig
 import com.swpp.stylemate.ui.profile.AuthViewModel
 import com.swpp.stylemate.ui.profile.AuthPage
 import com.swpp.stylemate.ui.profile.LoginDialog
 import com.swpp.stylemate.ui.profile.RegistrationScreen
+import com.swpp.stylemate.ui.profile.GuestImportViewModel
+import com.swpp.stylemate.ui.profile.GuestImportDialog
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.lifecycle.Lifecycle
@@ -99,6 +102,7 @@ private fun defaultAuthViewModel(): AuthViewModel {
 
 @Composable
 fun StyleMateApp(viewModel: BodyProfileViewModel? = null, authModel: AuthViewModel = defaultAuthViewModel()) {
+    val context = LocalContext.current.applicationContext
     val auth by authModel.state.collectAsStateWithLifecycle()
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     DisposableEffect(lifecycle, authModel) {
@@ -117,12 +121,19 @@ fun StyleMateApp(viewModel: BodyProfileViewModel? = null, authModel: AuthViewMod
     CompositionLocalProvider(LocalViewModelStoreOwner provides owner, LocalAccountAccess provides account) {
       key(scope) {
         val profileModel = viewModel ?: defaultBodyProfileViewModel(account)
+        val importModel: GuestImportViewModel? = if (account == null) null else viewModel(factory = viewModelFactory {
+            initializer { GuestImportViewModel(GuestImportRepository(LocalUserStore.forContext(context), account)) }
+        })
         LaunchedEffect(auth.session?.user?.json()?.toString()) { if (account != null) profileModel.refreshAccountProfile() }
         if (auth.page == AuthPage.REGISTER) RegistrationScreen(auth, { authModel.open(AuthPage.LOGIN) }, { id, password, confirmation -> authModel.submit(id, password, confirmation) })
         else {
-            AppContent(profileModel, authModel)
+            AppContent(profileModel, authModel, importModel)
             if (auth.page == AuthPage.LOGIN) LoginDialog(auth, { authModel.open(AuthPage.NONE) }, { authModel.open(AuthPage.REGISTER) },
                 { id, password -> authModel.submit(id, password) })
+            if (auth.page == AuthPage.NONE && importModel != null) {
+                val importing by importModel.state.collectAsStateWithLifecycle()
+                GuestImportDialog(importing, importModel::confirm, importModel::decide, importModel::retry, importModel::close)
+            }
         }
       }
     }
@@ -133,7 +144,7 @@ fun StyleMateApp(viewModel: BodyProfileViewModel? = null, authModel: AuthViewMod
 }
 
 @Composable
-private fun AppContent(viewModel: BodyProfileViewModel, authModel: AuthViewModel) {
+private fun AppContent(viewModel: BodyProfileViewModel, authModel: AuthViewModel, importModel: GuestImportViewModel?) {
     val app by viewModel.app.collectAsStateWithLifecycle()
     if (app.storageError != null) {
         Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
@@ -147,7 +158,7 @@ private fun AppContent(viewModel: BodyProfileViewModel, authModel: AuthViewModel
     if (app.setupVisible) {
         ProfileSetupFlow(viewModel, canCancel = app.profile != null)
     } else {
-        MainTabs(viewModel, authModel)
+        MainTabs(viewModel, authModel, importModel)
     }
 }
 
@@ -191,7 +202,7 @@ private fun ProfileSetupFlow(viewModel: BodyProfileViewModel, canCancel: Boolean
 }
 
 @Composable
-private fun MainTabs(viewModel: BodyProfileViewModel, authModel: AuthViewModel) {
+private fun MainTabs(viewModel: BodyProfileViewModel, authModel: AuthViewModel, importModel: GuestImportViewModel?) {
     val app by viewModel.app.collectAsStateWithLifecycle()
     val auth by authModel.state.collectAsStateWithLifecycle()
     val account = LocalAccountAccess.current
@@ -246,6 +257,7 @@ private fun MainTabs(viewModel: BodyProfileViewModel, authModel: AuthViewModel) 
                 onLogout = authModel::logout,
                 authBusy = auth.busy,
                 onDeleteRemote = viewModel::deleteAccountProfile,
+                onImport = importModel?.let { { it.open() } },
             )
         }
     }

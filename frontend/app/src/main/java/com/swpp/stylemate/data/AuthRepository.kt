@@ -10,6 +10,8 @@ import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody
+import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.io.IOException
@@ -117,9 +119,13 @@ class AuthRepository(
     fun dismissNotice() { mutableStatus.value = mutableStatus.value.copy(notice = null) }
 
     suspend fun verify() {
-        val access = account() ?: return
-        val result = access.json("GET", "/api/users/me/")
-        updateUser(access.session, result.getJSONObject("user"))
+        val session = mutableStatus.value.session ?: return
+        refresh(session)
+    }
+
+    internal suspend fun refresh(session: AuthSession) {
+        val result = request("GET", "/api/users/me/", session = session)
+        updateUser(session, result.getJSONObject("user"))
     }
 
     internal suspend fun patch(session: AuthSession, data: JSONObject) {
@@ -154,10 +160,20 @@ class AuthRepository(
         }
     }
 
-    internal suspend fun request(method: String, path: String, data: JSONObject? = null, session: AuthSession? = null): JSONObject = withContext(Dispatchers.IO) {
+    internal suspend fun request(method: String, path: String, data: JSONObject? = null, session: AuthSession? = null): JSONObject =
+        send(method, path, data?.toString()?.toRequestBody("application/json".toMediaType()), session)
+
+    internal suspend fun upload(path: String, metadata: JSONObject, image: ByteArray, session: AuthSession): JSONObject {
+        require(image.isNotEmpty() && image.size <= 5 * 1024 * 1024)
+        val payload = MultipartBody.Builder().setType(MultipartBody.FORM)
+            .addFormDataPart("metadata", metadata.toString())
+            .addFormDataPart("image", "garment.jpg", image.toRequestBody("image/jpeg".toMediaType())).build()
+        return send("POST", path, payload, session)
+    }
+
+    private suspend fun send(method: String, path: String, payload: RequestBody?, session: AuthSession?): JSONObject = withContext(Dispatchers.IO) {
         require(path.startsWith("/api/"))
         session?.let(::check)
-        val payload = data?.toString()?.toRequestBody("application/json".toMediaType())
         val builder = Request.Builder().url(base + path).method(method, payload)
         session?.let { builder.header("Authorization", "Bearer ${it.token}") }
         val response = try {
@@ -197,6 +213,10 @@ class AuthRepository(
             "LOGIN_LOCKED" -> "로그인 시도가 잠시 제한됐어요. 잠시 후 다시 시도해 주세요."
             "TOO_MANY_REQUESTS" -> "요청이 너무 많아요. 잠시 후 다시 시도해 주세요."
             "INVALID_PROFILE" -> "입력한 프로필 정보를 확인해 주세요."
+            "IMPORT_CHANGED" -> "계정 데이터가 변경됐어요. 다시 확인한 뒤 가져와 주세요."
+            "INVALID_IMPORT" -> "가져올 데이터와 옷·코디 연결을 확인해 주세요."
+            "IMPORT_STORAGE_FAILED" -> "사진을 보관하지 못했어요. 잠시 후 다시 시도해 주세요."
+            "INVALID_IMAGE", "IMAGE_TOO_LARGE" -> "옷 사진의 형식이나 용량을 확인해 주세요."
             else -> "요청을 처리하지 못했어요. 잠시 후 다시 시도해 주세요."
         }, retry)
     }
@@ -223,4 +243,6 @@ class AccountAccess internal constructor(private val repository: AuthRepository,
     }
     suspend fun json(method: String, path: String, data: JSONObject? = null) = repository.request(method, path, data, session)
     suspend fun patchProfile(data: JSONObject) = repository.patch(session, data)
+    suspend fun refreshProfile() = repository.refresh(session)
+    suspend fun upload(path: String, metadata: JSONObject, image: ByteArray) = repository.upload(path, metadata, image, session)
 }
