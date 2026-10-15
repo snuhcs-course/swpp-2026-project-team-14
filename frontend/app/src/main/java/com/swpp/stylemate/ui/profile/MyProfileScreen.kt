@@ -2,6 +2,23 @@
 package com.swpp.stylemate.ui.profile
 
 import com.swpp.stylemate.ui.components.SectionTitle
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material3.Icon
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Surface
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.graphics.Color
+import com.swpp.stylemate.data.StyleProfile
+import com.swpp.stylemate.ui.components.ScreenScaffold
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -45,10 +62,11 @@ import com.swpp.stylemate.data.buildInsights
 import com.swpp.stylemate.ui.theme.StyleMateTheme
 
 @Composable
-fun MyProfileScreen(
+private fun BodyDetailsScreen(
     profile: BodyProfile?,
     onReanalyze: () -> Unit,
     onDelete: () -> Unit,
+    onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var confirmDelete by remember { mutableStateOf(false) }
@@ -60,7 +78,8 @@ fun MyProfileScreen(
             .padding(horizontal = 20.dp),
     ) {
         Spacer(Modifier.height(16.dp))
-        Text("마이프로필", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        TextButton(onClick = onBack) { Text("뒤로") }
+        Text("내 체형 정보", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
 
         if (profile == null) {
             EmptyProfile(onReanalyze)
@@ -104,7 +123,7 @@ fun MyProfileScreen(
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
             title = { Text("체형 프로필을 삭제할까요?") },
-            text = { Text("저장된 치수와 선호 정보가 모두 지워져요.") },
+            text = { Text("저장된 체형과 치수가 지워져요. 선호 핏·무드·컬러는 유지돼요.") },
             confirmButton = {
                 TextButton(onClick = { confirmDelete = false; onDelete() }) { Text("삭제") }
             },
@@ -135,8 +154,6 @@ private fun InfoCard(profile: BodyProfile) {
         "키" to "${profile.input.heightCm} cm",
         "몸무게" to (profile.input.weightKg?.let { "$it kg" } ?: "입력 안 함"),
         "촬영 복장" to "자동 판단 · ${profile.clothing.label}",
-        "선호 핏" to profile.preferredFit.label,
-        "선호 스타일" to profile.preferredStyles.ifEmpty { listOf("선택 안 함") }.joinToString(", "),
     )
     Column(
         Modifier
@@ -169,5 +186,171 @@ private fun MyProfilePreview() {
         preferredStyles = listOf("미니멀", "캐주얼"),
         clothing = DetectedClothing(),
     )
-    StyleMateTheme { MyProfileScreen(profile, onReanalyze = {}, onDelete = {}) }
+    StyleMateTheme { MyProfileScreen(profile, StyleProfile(), onSaveStyle = { null }, onReanalyze = {}, onDelete = {}) }
+}
+
+private enum class ProfilePage { MAIN, FITS, MOODS, COLORS, BODY }
+private val FIT_LABELS = linkedMapOf("oversized" to "오버핏", "wide" to "와이드", "regular" to "레귤러", "tapered" to "테이퍼드", "slim" to "슬림")
+private val MOOD_LABELS = linkedMapOf("minimal" to "미니멀", "cityboy" to "시티보이", "casual" to "캐주얼", "street" to "스트릿", "classic" to "클래식 / 프레피", "sporty" to "스포티")
+private val PROFILE_COLORS = linkedMapOf("#202020" to "블랙", "#FFFFFF" to "화이트", "#888888" to "그레이", "#1F2A44" to "네이비",
+    "#C7B69A" to "베이지", "#F0E6D2" to "크림", "#795548" to "브라운", "#686B42" to "카키",
+    "#3975C6" to "블루", "#E9A2B3" to "핑크", "#B83232" to "레드", "#9464AA" to "퍼플")
+
+@Composable
+fun MyProfileScreen(
+    profile: BodyProfile?,
+    style: StyleProfile,
+    onSaveStyle: (StyleProfile) -> String?,
+    onReanalyze: () -> Unit,
+    onDelete: () -> Unit,
+    modifier: Modifier = Modifier,
+    onLogin: (() -> Unit)? = null,
+) {
+    var page by rememberSaveable { mutableStateOf(ProfilePage.MAIN) }
+    val back = { page = ProfilePage.MAIN }
+    BackHandler(enabled = page != ProfilePage.MAIN, onBack = back)
+    when (page) {
+        ProfilePage.BODY -> BodyDetailsScreen(profile, onReanalyze, onDelete, back, modifier)
+        ProfilePage.FITS -> PreferenceEditor("선호하는 핏", FIT_LABELS, style.preferredFits, 5, false, modifier, back) {
+            onSaveStyle(style.copy(preferredFits = it.ifEmpty { listOf("regular") }))
+        }
+        ProfilePage.MOODS -> PreferenceEditor("선호하는 무드", MOOD_LABELS, style.preferredStyles, 6, false, modifier, back) {
+            onSaveStyle(style.copy(preferredStyles = it))
+        }
+        ProfilePage.COLORS -> PreferenceEditor("자주 입는 컬러", PROFILE_COLORS + style.favoriteColors.associateWith { PROFILE_COLORS[it] ?: it },
+            style.favoriteColors, 8, true, modifier, back) { onSaveStyle(style.copy(favoriteColors = it)) }
+        ProfilePage.MAIN -> Column(modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Spacer(Modifier.height(4.dp))
+            Text("마이프로필", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            ProfileCard {
+                Text("내 정보를 계정에 보관하세요", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                if (onLogin != null) Button(onClick = onLogin, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp), shape = RoundedCornerShape(16.dp)) { Text("로그인") }
+                Text("비로그인 데이터는 이 기기에만 저장돼요. 앱 삭제 또는 데이터 초기화 시 사라질 수 있어요.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            ProfileCard {
+                ProfileSectionHeader("선호하는 핏", "수정") { page = ProfilePage.FITS }
+                PreferenceTags(style.preferredFits.map { FIT_LABELS[it] ?: it })
+                Text("내가 편하게 입는 실루엣을 기록해요.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            ProfileCard {
+                ProfileSectionHeader("선호하는 무드", "수정") { page = ProfilePage.MOODS }
+                if (style.preferredStyles.isEmpty()) Text("아직 선택한 무드가 없어요", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                else PreferenceTags(style.preferredStyles.map { MOOD_LABELS[it] ?: it })
+            }
+            ProfileCard {
+                ProfileSectionHeader("자주 입는 컬러", "팔레트 관리") { page = ProfilePage.COLORS }
+                if (style.favoriteColors.isEmpty()) {
+                    Text("아직 저장한 컬러가 없어요", fontWeight = FontWeight.SemiBold)
+                    Text("좋아하는 컬러를 직접 골라보세요.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                } else ColorTags(style.favoriteColors)
+            }
+            SectionTitle("체형 밸런스 참고")
+            Surface(onClick = { page = ProfilePage.BODY }, shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceVariant,
+                modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(if (profile == null) "내 체형 분석하기" else "내 체형 정보 보기", fontWeight = FontWeight.Bold)
+                    Text(if (profile == null) "체형을 분석하면 내 치수를 확인할 수 있어요." else "분석한 치수와 체형 정보를 확인해요.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+        }
+    }
+}
+
+@Composable
+private fun ProfileCard(content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
+    Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp), content = content)
+    }
+}
+
+@Composable
+private fun ProfileSectionHeader(title: String, action: String, onClick: () -> Unit) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+        TextButton(onClick = onClick) { Text(action, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun PreferenceTags(labels: List<String>) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        labels.forEach { label -> Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.secondaryContainer) {
+            Text(label, Modifier.padding(horizontal = 14.dp, vertical = 8.dp), color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge)
+        } }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ColorTags(colors: List<String>) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        colors.forEach { hex -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Surface(Modifier.size(24.dp), shape = CircleShape, color = Color(android.graphics.Color.parseColor(hex)), border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {}
+            Text(PROFILE_COLORS[hex] ?: hex, style = MaterialTheme.typography.bodyMedium)
+        } }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun PreferenceEditor(title: String, options: Map<String, String>, initial: List<String>, limit: Int, colors: Boolean,
+    modifier: Modifier, onBack: () -> Unit, onSave: (List<String>) -> String?) {
+    var selected by rememberSaveable(title) { mutableStateOf(initial) }
+    var error by remember { mutableStateOf<String?>(null) }
+    ScreenScaffold(title, "저장하기", true, {
+        error = onSave(selected)
+        if (error == null) onBack()
+    }, modifier = modifier, onBack = onBack, contentWindowInsets = WindowInsets(0, 0, 0, 0)) { padding ->
+        Column(Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+            Text(if (colors) "좋아하는 컬러를 골라 저장하세요. 최대 8개까지 선택할 수 있어요." else "여러 개 선택할 수 있어요.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (colors) ProfileCard {
+                Text("선택한 컬러", fontWeight = FontWeight.Bold)
+                if (selected.isEmpty()) Text("선택한 컬러가 없어요", color = MaterialTheme.colorScheme.onSurfaceVariant) else ColorTags(selected)
+            }
+            ProfileCard {
+                Text(if (colors) "컬러 선택" else title, fontWeight = FontWeight.Bold)
+                if (colors) ColorChoices(options, selected, limit) { selected = it; error = null }
+                else FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    options.forEach { (code, label) -> FilterChip(selected = code in selected,
+                        onClick = { selected = if (code in selected) selected - code else selected + code; error = null },
+                        enabled = code in selected || selected.size < limit,
+                        label = { Text(label) })
+                    }
+                }
+            }
+            if (title == "선호하는 핏") Text("선택하지 않으면 레귤러로 저장돼요.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            TextButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterHorizontally)) { Text("취소") }
+        }
+    }
+}
+
+@Composable
+private fun ColorChoices(options: Map<String, String>, selected: List<String>, limit: Int, onChange: (List<String>) -> Unit) {
+    options.entries.chunked(4).forEach { row ->
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            row.forEach { (hex, label) ->
+                val checked = hex in selected
+                Surface(onClick = { onChange(if (checked) selected - hex else selected + hex) },
+                    enabled = checked || selected.size < limit, selected = checked,
+                    shape = RoundedCornerShape(12.dp), color = Color.Transparent, modifier = Modifier.weight(1f)) {
+                    Column(Modifier.padding(vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Surface(Modifier.size(48.dp), shape = CircleShape, color = Color(android.graphics.Color.parseColor(hex)),
+                            border = BorderStroke(if (checked) 2.dp else 1.dp, if (checked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant)) {
+                            Box(contentAlignment = Alignment.Center) {
+                                if (checked) Icon(Icons.Filled.Check, contentDescription = null,
+                                    tint = if (hex in setOf("#202020", "#1F2A44", "#795548", "#686B42", "#3975C6", "#B83232", "#9464AA")) Color.White else Color.Black)
+                            }
+                        }
+                        Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface)
+                    }
+                }
+            }
+            repeat(4 - row.size) { Spacer(Modifier.weight(1f)) }
+        }
+    }
 }

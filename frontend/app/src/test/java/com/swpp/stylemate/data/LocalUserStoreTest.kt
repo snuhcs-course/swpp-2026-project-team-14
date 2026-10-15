@@ -34,6 +34,19 @@ class LocalUserStoreTest {
         assertEquals(emptyList<String>(), store().style().favoriteColors)
     }
 
+    @Test fun profileEditsPersistWithoutBodyAndNormalizeEmptyFit() {
+        val model = BodyProfileViewModel(FakeBodyAnalyzer(0), LocalBodyProfileStore(store()))
+        val style = StyleProfile(emptyList(), listOf("minimal", "cityboy"), listOf("#1f2a44"))
+        assertNull(model.saveStyleProfile(style))
+        assertEquals(listOf("regular"), model.app.value.style.preferredFits)
+        assertEquals(listOf("#1F2A44"), model.app.value.style.favoriteColors)
+        val reopened = BodyProfileViewModel(FakeBodyAnalyzer(0), LocalBodyProfileStore(store()))
+        assertEquals(model.app.value.style, reopened.app.value.style)
+        assertNull(reopened.app.value.profile)
+        reopened.startReanalysis()
+        assertEquals(listOf("미니멀", "시티보이"), reopened.setup.value.preferredStyles)
+    }
+
     @Test fun skippingSetupIsNotLostWhenAppReopens() {
         val first = BodyProfileViewModel(FakeBodyAnalyzer(0), LocalBodyProfileStore(store()))
         first.skipSetup()

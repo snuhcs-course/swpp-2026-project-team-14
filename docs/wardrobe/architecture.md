@@ -24,7 +24,7 @@ swpp-2026-project-team-14/
 |   |       |-- StyleMateApp.kt                   # 온보딩·홈·옷장·코디북·마이프로필 탭
 |   |       |-- components/ScreenComponents.kt   # 체형·옷장 공통 상단바·하단 버튼·섹션 제목
 |   |       |-- theme/Theme.kt                    # 크림·테라코타 공통 테마
-|   |       |-- profile/                         # 체형 촬영·수정·프로필 화면
+|   |       |-- profile/                         # 스타일 프로필·핏/무드/컬러 편집·별도 체형 정보·촬영 화면
 |   |       `-- wardrobe/
 |   |           |-- WardrobeScreen.kt            # 옷장 목록·오류 재시도·카드 정렬·사진 확인·편집 연결
 |   |           |-- WardrobeViewModel.kt         # 목록·저장 상태
@@ -36,7 +36,7 @@ swpp-2026-project-team-14/
 |   |           `-- capture/
 |   |               |-- MeasurementActivity.kt  # 실측 촬영·측정점 확인·수정
 |   |               `-- MeasurementCamera.kt    # AR 카메라·촬영 프레임 고정
-|   |-- test/java/com/swpp/stylemate/             # 체형 계약·실측 기하 단위 검사
+|   |-- test/java/com/swpp/stylemate/             # 로컬 저장·프로필 편집·체형 계약·실측 기하 단위 검사
 |   `-- androidTest/java/com/swpp/stylemate/      # 옷장 UI·라벨 실패/재시도·사진 색상 선택·탭 연결·측정점 검사
 |-- backend/
 |   |-- config/

@@ -219,18 +219,28 @@ class BodyProfileViewModel(
         _app.update { it.copy(setupVisible = false) }
     }
 
+    fun saveStyleProfile(style: StyleProfile): String? = try {
+        store.saveStyle(style.copy(preferredFits = style.preferredFits.ifEmpty { listOf("regular") }))
+        val saved = store.loadStyle()
+        _app.update { it.copy(style = saved, profile = store.load()) }
+        _setup.update { it.copy(preferredFit = saved.legacyFit(), preferredStyles = saved.styleLabels()) }
+        null
+    } catch (_: Exception) {
+        "저장하지 못했어요. 다시 시도해 주세요."
+    }
+
     /** Opens the flow again, pre-filled with the current profile (US-B4). */
     fun startReanalysis() {
         val profile = _app.value.profile
         _setup.value = if (profile == null) {
-            SetupState()
+            SetupState(preferredFit = _app.value.style.legacyFit(), preferredStyles = _app.value.style.styleLabels())
         } else {
             SetupState(
                 heightText = profile.input.heightCm.toString(),
                 weightText = profile.input.weightKg?.toString().orEmpty(),
                 gender = profile.input.gender,
-                preferredFit = profile.preferredFit,
-                preferredStyles = profile.preferredStyles,
+                preferredFit = _app.value.style.legacyFit(),
+                preferredStyles = _app.value.style.styleLabels(),
             )
         }
         _app.update { it.copy(setupVisible = true) }

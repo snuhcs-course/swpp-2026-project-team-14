@@ -152,7 +152,9 @@ private fun MainTabs(viewModel: BodyProfileViewModel) {
             Tab.WARDROBE -> Box(Modifier.padding(padding).consumeWindowInsets(padding)) { WardrobeRoute() }
             Tab.CODIBOOK -> CodiBookRoute(Modifier.padding(padding).consumeWindowInsets(padding))
             Tab.PROFILE -> MyProfileScreen(
-                profile = app.profile?.copy(preferredFit = app.style.legacyFit(), preferredStyles = app.style.styleLabels()),
+                profile = app.profile,
+                style = app.style,
+                onSaveStyle = viewModel::saveStyleProfile,
                 onReanalyze = viewModel::startReanalysis,
                 onDelete = viewModel::deleteProfile,
                 modifier = Modifier.padding(padding),
