@@ -3,6 +3,7 @@ package com.swpp.stylemate.ui.wardrobe
 
 import com.swpp.stylemate.data.wardrobe.requestAnalysis
 import com.swpp.stylemate.data.AccountAccess
+import com.swpp.stylemate.data.LocalUserStore
 
 import android.content.Context
 import android.os.Build
@@ -25,15 +26,15 @@ import org.json.JSONObject
 data class AnalysisState(val photo: String? = null, val busy: Boolean = false,
                          val result: JSONObject? = null, val error: String? = null)
 
-class GarmentAnalysisViewModel(private val account: AccountAccess? = null) : ViewModel() {
+class GarmentAnalysisViewModel(private val account: AccountAccess? = null, private val store: LocalUserStore? = null) : ViewModel() {
     private val mutableState = MutableStateFlow(AnalysisState())
     val state = mutableState.asStateFlow()
     private var job: Job? = null
 
-    fun select(photo: String?) {
+    fun select(photo: String?, restored: JSONObject? = null) {
         if (mutableState.value.photo == photo) return
         job?.cancel()
-        mutableState.value = AnalysisState(photo)
+        mutableState.value = AnalysisState(photo, result = restored)
     }
 
     fun analyze(context: Context, photo: String, garmentType: String? = null) {
@@ -43,7 +44,7 @@ class GarmentAnalysisViewModel(private val account: AccountAccess? = null) : Vie
         val application = context.applicationContext
         job = viewModelScope.launch {
             try {
-                val result = requestAnalysis(application, photo, garmentType, account)
+                val result = requestAnalysis(application, photo, garmentType, account, store)
                 mutableState.value = AnalysisState(photo, result = result)
             } catch (error: CancellationException) {
                 throw error

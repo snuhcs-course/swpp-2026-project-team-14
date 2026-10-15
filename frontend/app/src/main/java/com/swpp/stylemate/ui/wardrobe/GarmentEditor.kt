@@ -62,11 +62,14 @@ fun GarmentEditor(id: String, initialAttributes: JSONObject, initialDimensions: 
                   busy: Boolean, saved: Boolean, error: String?, onSave: (JSONObject) -> Unit,
                   onBack: (() -> Unit)? = null, image: ImageBitmap? = null, photo: @Composable () -> Unit = {},
                   canSaveLabels: (JSONObject, JSONObject?) -> Boolean = { _, _ -> true },
-                  labels: @Composable (attributes: JSONObject, dimensions: JSONObject?) -> Unit = { _, _ -> }) {
-    var attributesText by rememberSaveable(id) { mutableStateOf(initialAttributes.toString()) }
-    var notes by rememberSaveable(id) { mutableStateOf(initialNotes) }
+                  labels: @Composable (attributes: JSONObject, dimensions: JSONObject?) -> Unit = { _, _ -> },
+                  topBar: (@Composable () -> Unit)? = null,
+                  draft: JSONObject? = null,
+                  onDraftChange: ((JSONObject) -> Unit)? = null) {
+    var attributesText by rememberSaveable(id) { mutableStateOf((draft?.optJSONObject("attributes") ?: initialAttributes).toString()) }
+    var notes by rememberSaveable(id) { mutableStateOf(draft?.optString("notes") ?: initialNotes) }
     var dimensionText by rememberSaveable(id) {
-        mutableStateOf(JSONObject().apply {
+        mutableStateOf(draft?.optJSONObject("dimension_inputs")?.toString() ?: JSONObject().apply {
             initialDimensions?.keysList()?.filter { it != "unit" }?.forEach { key ->
                 initialDimensions.optJSONObject(key)?.let { put(key, String.format(Locale.US, "%.2f", it.getDouble("value"))) }
             }
@@ -75,6 +78,10 @@ fun GarmentEditor(id: String, initialAttributes: JSONObject, initialDimensions: 
     var extra by rememberSaveable(id) { mutableStateOf(false) }
     val attributes = remember(attributesText) { JSONObject(attributesText) }
     val inputs = remember(dimensionText) { JSONObject(dimensionText) }
+    androidx.compose.runtime.LaunchedEffect(attributesText, notes, dimensionText) {
+        onDraftChange?.invoke(JSONObject().put("attributes", JSONObject(attributesText)).put("notes", notes)
+            .put("dimension_inputs", JSONObject(dimensionText)))
+    }
     val dimensions = dimensionChoices(attributes, catalog)
     val numberPattern = Regex("[0-9]+(?:\\.[0-9]{0,2})?")
     fun validNumber(text: String): Boolean = text.isBlank() ||
@@ -146,6 +153,7 @@ fun GarmentEditor(id: String, initialAttributes: JSONObject, initialDimensions: 
         navigationEnabled = !busy,
         contentWindowInsets = WindowInsets(0),
         modifier = Modifier.imePadding(),
+        topBar = topBar,
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
             photo()

@@ -25,6 +25,7 @@ fun ScreenScaffold(
     onAction: () -> Unit = {},
     navigationEnabled: Boolean = true,
     contentWindowInsets: WindowInsets = ScaffoldDefaults.contentWindowInsets,
+    topBar: (@Composable () -> Unit)? = null,
     content: @Composable (PaddingValues) -> Unit,
 ) {
     Scaffold(
@@ -32,7 +33,7 @@ fun ScreenScaffold(
         contentWindowInsets = contentWindowInsets,
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            TopAppBar(
+            if (topBar != null) topBar() else TopAppBar(
                 title = { Text(title, fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     if (onBack != null) {

@@ -24,9 +24,9 @@ class CaptureFiles(private val context: Context) {
     fun uri(name: String): Uri = FileProvider.getUriForFile(context, "${context.packageName}.captures", file(name))
     fun delete(name: String?) { if (name != null) file(name).delete() }
     fun exists(name: String): Boolean = file(name).let { it.isFile && it.length() > 0 }
-    fun cleanExpired() {
+    fun cleanExpired(keep: Set<String> = emptySet()) {
         val cutoff = System.currentTimeMillis() - 24 * 60 * 60 * 1000L
-        directory.listFiles()?.filter { it.lastModified() < cutoff }?.forEach { it.delete() }
+        directory.listFiles()?.filter { it.name !in keep && it.lastModified() < cutoff }?.forEach { it.delete() }
     }
     fun preview(name: String): Bitmap? {
         val path = file(name).absolutePath

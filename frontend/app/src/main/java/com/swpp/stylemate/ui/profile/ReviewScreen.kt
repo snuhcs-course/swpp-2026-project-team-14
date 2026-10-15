@@ -96,6 +96,8 @@ fun ReviewScreen(
     onFit: (PreferredFit) -> Unit,
     onToggleStyle: (String) -> Unit,
     onConfirm: () -> Unit,
+    topBar: (@Composable () -> Unit)? = null,
+    onboarding: Boolean = false,
 ) {
     var editing by remember { mutableStateOf<BodyMeasurement?>(null) }
 
@@ -104,10 +106,11 @@ fun ReviewScreen(
         onBack = onRetake,
         actionLabel = "다시 찍기",
         onAction = onRetake,
-        primaryLabel = "옷장 등록하고 시작하기  →",
+        primaryLabel = if (onboarding) "확인하고 계속하기" else "저장하기",
         primaryEnabled = !state.saving,
         navigationEnabled = !state.saving,
         onPrimary = onConfirm,
+        topBar = topBar,
     ) { padding ->
         Column(
             modifier = Modifier
@@ -140,11 +143,12 @@ fun ReviewScreen(
 
             AllMeasurementsSection(state.measurements, onClick = { editing = it }, reference = state.reference)
 
-            SectionTitle("선호 핏")
-            FitSelector(selected = state.preferredFit, onSelect = onFit)
-
-            SectionTitle("선호 스타일", "최대 ${MAX_STYLES}개 선택")
-            StyleChips(selected = state.preferredStyles, onToggle = onToggleStyle)
+            if (!onboarding) {
+                SectionTitle("선호 핏")
+                FitSelector(selected = state.preferredFit, onSelect = onFit)
+                SectionTitle("선호 스타일", "최대 ${MAX_STYLES}개 선택")
+                StyleChips(selected = state.preferredStyles, onToggle = onToggleStyle)
+            }
             Spacer(Modifier.height(24.dp))
         }
     }

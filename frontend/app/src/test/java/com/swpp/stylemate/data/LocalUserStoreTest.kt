@@ -71,6 +71,93 @@ class LocalUserStoreTest {
         assertTrue(reopened.app.value.setupVisible)
     }
 
+    @Test fun onboardingStyleAndStepSurviveReopeningWithoutBody() {
+        val model = BodyProfileViewModel(FakeBodyAnalyzer(0), LocalBodyProfileStore(store()))
+        model.moveOnboarding(2)
+        model.updateOnboardingStyle(StyleProfile(listOf("oversized", "wide"), listOf("minimal", "classic")))
+        model.moveOnboarding(3)
+        val reopened = BodyProfileViewModel(FakeBodyAnalyzer(0), LocalBodyProfileStore(store()))
+        assertEquals(3, reopened.onboarding.value.step)
+        assertEquals(listOf("oversized", "wide"), reopened.app.value.style.preferredFits)
+        assertEquals(listOf("minimal", "classic"), reopened.app.value.style.preferredStyles)
+        assertTrue(reopened.app.value.style.favoriteColors.isEmpty())
+        assertNull(reopened.app.value.profile)
+    }
+
+    @Test fun bodyReviewStoresProfileButDoesNotFinishOnboarding() {
+        val profile = BodyProfile(AnalysisInput(175, 68, Gender.MALE), emptyList(), PreferredFit.REGULAR, emptyList())
+        val draft = JSONObject().put("result", JSONObject(BodyProfileJson.encode(profile)))
+        store().saveOnboarding(OnboardingProgress(5, false, draft.toString()))
+        val model = BodyProfileViewModel(FakeBodyAnalyzer(0), LocalBodyProfileStore(store()))
+        assertEquals(SetupStep.REVIEW, model.setup.value.step)
+        model.confirmProfile()
+        assertEquals(6, model.onboarding.value.step)
+        assertFalse(model.onboarding.value.completed)
+        assertEquals(175, store().get("body")!!.getInt("height_cm"))
+        val reopened = BodyProfileViewModel(FakeBodyAnalyzer(0), LocalBodyProfileStore(store()))
+        assertEquals(SetupStep.REVIEW, reopened.setup.value.step)
+        assertEquals(175, reopened.setup.value.lastInput!!.heightCm)
+        reopened.moveOnboarding(8)
+        reopened.skipSetup()
+        assertTrue(store().onboarding().completed)
+        assertFalse(reopened.app.value.setupVisible)
+    }
+
+    @Test fun emptyOnboardingFitDraftSurvivesRestartAndDefaultsOnlyOnConfirmation() {
+        val model = BodyProfileViewModel(FakeBodyAnalyzer(0), LocalBodyProfileStore(store()))
+        model.saveStyleProfile(StyleProfile(listOf("wide")))
+        model.moveOnboarding(2)
+        model.setOnboardingFits(emptyList())
+        val reopened = BodyProfileViewModel(FakeBodyAnalyzer(0), LocalBodyProfileStore(store()))
+        assertEquals(0, JSONObject(reopened.onboarding.value.draft).getJSONArray("preferred_fits").length())
+        assertEquals(listOf("wide"), reopened.app.value.style.preferredFits)
+        reopened.confirmOnboardingFits()
+        assertEquals(3, reopened.onboarding.value.step)
+        assertEquals(listOf("regular"), store().style().preferredFits)
+        reopened.setOnboardingFits(listOf("slim", "tapered"))
+        reopened.confirmOnboardingFits()
+        assertEquals(listOf("slim", "tapered"), store().style().preferredFits)
+    }
+
+    @Test fun confirmingBodyKeepsOnboardingFitDraftForBackNavigation() {
+        val profile = BodyProfile(AnalysisInput(175, null, Gender.UNSPECIFIED), emptyList(), PreferredFit.REGULAR, emptyList())
+        val draft = JSONObject().put("result", JSONObject(BodyProfileJson.encode(profile)))
+            .put("preferred_fits", JSONArray(listOf("wide")))
+        store().saveOnboarding(OnboardingProgress(5, false, draft.toString()))
+        val model = BodyProfileViewModel(FakeBodyAnalyzer(0), LocalBodyProfileStore(store()))
+        model.confirmProfile()
+        assertEquals("wide", JSONObject(store().onboarding().draft).getJSONArray("preferred_fits").getString(0))
+    }
+
+    @Test fun garmentRegistrationDraftResumesAndClearsAfterReturningToWardrobe() {
+        val model = BodyProfileViewModel(FakeBodyAnalyzer(0), LocalBodyProfileStore(store()))
+        model.startOnboardingGarment("shoes")
+        val draft = JSONObject().put("category", "shoes").put("capture", "capture-123.jpg")
+            .put("editor", JSONObject().put("notes", "메모").put("dimension_inputs", JSONObject().put("total_length", "12.")))
+        model.saveOnboardingGarment(draft)
+        val reopened = BodyProfileViewModel(FakeBodyAnalyzer(0), LocalBodyProfileStore(store()))
+        assertEquals(7, reopened.onboarding.value.step)
+        assertEquals("메모", JSONObject(reopened.onboarding.value.draft).getJSONObject("garment").getJSONObject("editor").getString("notes"))
+        reopened.finishOnboardingGarment()
+        assertEquals(6, reopened.onboarding.value.step)
+        assertFalse(JSONObject(store().onboarding().draft).has("garment"))
+    }
+
+    @Test fun skippingBodyDoesNotRequireMeasurementsOrChangePreferences() {
+        val model = BodyProfileViewModel(FakeBodyAnalyzer(0), LocalBodyProfileStore(store()))
+        model.updateOnboardingStyle(StyleProfile(listOf("wide"), listOf("cityboy")))
+        model.moveOnboarding(4)
+        model.setHeight("175")
+        model.skipOnboardingBody()
+        assertEquals(6, model.onboarding.value.step)
+        model.moveOnboarding(8)
+        model.skipSetup()
+        val reopened = BodyProfileViewModel(FakeBodyAnalyzer(0), LocalBodyProfileStore(store()))
+        assertTrue(reopened.onboarding.value.completed)
+        assertNull(reopened.app.value.profile)
+        assertEquals(listOf("wide"), reopened.app.value.style.preferredFits)
+    }
+
     @Test fun deletingBodyDoesNotDeletePreferencesOrOnboardingCompletion() {
         val adapter = LocalBodyProfileStore(store())
         val style = StyleProfile(listOf("wide"), listOf("minimal"))

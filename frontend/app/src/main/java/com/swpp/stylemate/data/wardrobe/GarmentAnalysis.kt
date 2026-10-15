@@ -15,7 +15,8 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
 /** [garmentType]: the kind picked for AR measurement (a landmark type), sent as a hint for the AI. */
-internal suspend fun requestAnalysis(context: Context, photo: String, garmentType: String? = null, account: AccountAccess? = null): JSONObject = withContext(Dispatchers.IO) {
+internal suspend fun requestAnalysis(context: Context, photo: String, garmentType: String? = null, account: AccountAccess? = null,
+                                     store: LocalUserStore? = null): JSONObject = withContext(Dispatchers.IO) {
     val hint = garmentType?.takeIf { it in landmarkTypes }?.let { "?garment=$it" }.orEmpty()
     val endpoint = if (account == null) "analyze-preview" else "analyze"
     val connection = URI("${BuildConfig.API_BASE_URL.trimEnd('/')}/api/wardrobe/$endpoint/$hint").toURL().openConnection() as HttpURLConnection
@@ -69,7 +70,7 @@ internal suspend fun requestAnalysis(context: Context, photo: String, garmentTyp
         })
         check(result.has("attributes")) { "분석 응답을 읽지 못했습니다." }
         currentCoroutineContext().ensureActive()
-        if (account == null) LocalUserStore.forContext(context).createGarment(result, bytes) else result
+        if (account == null) (store ?: LocalUserStore.forContext(context)).createGarment(result, bytes) else result
     } catch (_: SocketTimeoutException) {
         error("응답 시간이 초과됐습니다. 잠시 후 다시 시도해 주세요.")
     } catch (_: java.io.IOException) {

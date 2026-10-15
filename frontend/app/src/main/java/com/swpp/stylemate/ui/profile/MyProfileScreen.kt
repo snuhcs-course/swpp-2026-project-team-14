@@ -280,14 +280,14 @@ fun MyProfileScreen(
                 Row(Modifier.padding(horizontal = 16.dp, vertical = 18.dp).fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                     if (username == null) {
-                        Text("내 정보를 계정에 보관하세요", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                        Text("내 정보를 계정에 보관하세요", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
                         if (onLogin != null) Button(onClick = onLogin, enabled = !inlineSaving, shape = RoundedCornerShape(12.dp)) { Text("로그인") }
                     } else {
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                             Text(username, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             Text("로그인됨", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                        OutlinedButton(onClick = onLogout, enabled = !authBusy && !inlineSaving) { Text(if (authBusy) "처리 중…" else "로그아웃") }
+                        OutlinedButton(onClick = onLogout, enabled = !authBusy && !inlineSaving, shape = RoundedCornerShape(12.dp)) { Text(if (authBusy) "처리 중…" else "로그아웃") }
                     }
                 }
             }
@@ -344,8 +344,9 @@ private fun ProfileSectionHeader(title: String, action: String, enabled: Boolean
 private fun PreferenceChoices(options: Map<String, String>, selected: List<String>, enabled: Boolean, onChange: (List<String>) -> Unit) {
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         options.forEach { (code, label) ->
-            FilterChip(selected = code in selected, enabled = enabled,
-                onClick = { onChange(if (code in selected) selected - code else selected + code) }, label = { Text(label) })
+            FilterChip(selected = code in selected, enabled = enabled, shape = RoundedCornerShape(50),
+                onClick = { onChange(if (code in selected) selected - code else selected + code) },
+                label = { Text(label, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium) })
         }
     }
 }
@@ -383,11 +384,11 @@ private fun ColorPreferenceEditor(initial: List<String>,
     }, modifier = modifier, onBack = onBack, navigationEnabled = !saving, contentWindowInsets = WindowInsets(0, 0, 0, 0)) { padding ->
         Column(Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
             ProfileCard {
-                Text("선택한 컬러 ${selected.size}/8", fontWeight = FontWeight.Bold)
+                Text("선택한 컬러 ${selected.size}/8", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 if (selected.isEmpty()) Text("선택한 컬러가 없어요", color = MaterialTheme.colorScheme.onSurfaceVariant) else ColorTags(selected)
             }
             ProfileCard {
-                Text("컬러 선택", fontWeight = FontWeight.Bold)
+                Text("컬러 선택", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 ColorChoices(options, selected, 8, !saving) { selected = it; error = null }
             }
             error?.let { Text(it, color = MaterialTheme.colorScheme.error) }

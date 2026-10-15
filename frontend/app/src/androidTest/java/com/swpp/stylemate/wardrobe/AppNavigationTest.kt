@@ -28,12 +28,14 @@ import org.junit.Test
 class AppNavigationTest {
     @get:Rule val compose = createComposeRule()
 
-    @Test fun onboardingOpensWardrobeAndProfileRemainsReachable() {
+    @Test fun skippingOnboardingOpensBodyGuideAndWardrobeAndProfileRemainReachable() {
         val model = BodyProfileViewModel(FakeBodyAnalyzer(0))
         val auth = guestAuth()
         compose.setContent { StyleMateTheme { StyleMateApp(model, auth) } }
         compose.waitUntil(5_000) { compose.onAllNodesWithText("건너뛰기").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("건너뛰기").performClick()
+        compose.onNodeWithText("체형 정보가 필요해요").assertIsDisplayed()
+        compose.onNodeWithText("옷장").performClick()
         compose.onNodeWithText("내 옷장").assertIsDisplayed()
         compose.onNodeWithText("촬영하기").assertIsDisplayed()
         compose.onNodeWithText("개발용 DB 연결 확인").assertDoesNotExist()

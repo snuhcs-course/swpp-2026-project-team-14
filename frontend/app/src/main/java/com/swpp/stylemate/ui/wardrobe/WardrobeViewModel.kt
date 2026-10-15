@@ -66,4 +66,12 @@ class WardrobeViewModel(private val store: LocalUserStore, private val account: 
     }
 
     fun clearSaveState() { mutableState.value = mutableState.value.copy(savedId = null, saveError = null) }
+
+    fun discardDraft(id: String) {
+        if (account == null) viewModelScope.launch(Dispatchers.IO) {
+            try { store.discardDraft(id) }
+            catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { mutableState.value = mutableState.value.copy(error = "등록 중인 옷을 정리하지 못했어요.") }
+        }
+    }
 }

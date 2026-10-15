@@ -25,6 +25,7 @@ import com.swpp.stylemate.data.StyleProfile
 import com.swpp.stylemate.data.AccountAccess
 import com.swpp.stylemate.data.BodyProfileJson
 import kotlinx.coroutines.CancellationException
+import org.json.JSONArray
 import org.json.JSONObject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -87,6 +88,8 @@ class BodyProfileViewModel(
     }
     private val _app = MutableStateFlow(loadAppState())
     val app: StateFlow<AppState> = _app.asStateFlow()
+    private val _onboarding = MutableStateFlow(runCatching { store.loadOnboarding() }.getOrDefault(OnboardingProgress()))
+    val onboarding = _onboarding.asStateFlow()
 
     private val _setup = MutableStateFlow(runCatching { restoreSetup() }.getOrDefault(SetupState()))
     val setup: StateFlow<SetupState> = _setup.asStateFlow()
@@ -95,7 +98,7 @@ class BodyProfileViewModel(
 
     fun reloadLocalData() {
         _app.value = loadAppState()
-        if (_app.value.storageError == null) _setup.value = restoreSetup()
+        if (_app.value.storageError == null) { _onboarding.value = store.loadOnboarding(); _setup.value = restoreSetup() }
     }
 
     fun refreshAccountProfile() {
@@ -105,29 +108,94 @@ class BodyProfileViewModel(
     private fun restoreSetup(): SetupState {
         val progress = store.loadOnboarding()
         val draft = JSONObject(progress.draft)
-        val result = draft.optJSONObject("result")?.toString()?.let(com.swpp.stylemate.data.BodyProfileJson::decode)
+        val result = draft.optJSONObject("result")?.toString()?.let(BodyProfileJson::decode)
+            ?: if (!progress.completed && progress.step >= 5) store.load() else null
         return SetupState(
-            step = if (!progress.completed && progress.step == 5 && result != null) SetupStep.REVIEW
+            step = if (!progress.completed && progress.step >= 5 && result != null) SetupStep.REVIEW
                    else if (!progress.completed && progress.step >= 4) SetupStep.INPUT else SetupStep.GUIDE,
-            heightText = draft.optString("height"), weightText = draft.optString("weight"),
-            gender = Gender.entries.firstOrNull { it.name == draft.optString("gender") } ?: Gender.UNSPECIFIED,
+            heightText = draft.optString("height", result?.input?.heightCm?.toString().orEmpty()),
+            weightText = draft.optString("weight", result?.input?.weightKg?.toString().orEmpty()),
+            gender = Gender.entries.firstOrNull { it.name == draft.optString("gender") } ?: result?.input?.gender ?: Gender.UNSPECIFIED,
             lastInput = result?.input, measurements = result?.measurements.orEmpty(),
             detectedClothing = result?.clothing ?: DetectedClothing(), reference = result?.reference,
             preferredFit = store.loadStyle().legacyFit(), preferredStyles = store.loadStyle().styleLabels(),
         )
     }
 
-    private fun persistSetup() {
+    private fun persistSetup() = try {
         val state = _setup.value
-        val draft = JSONObject().put("height", state.heightText).put("weight", state.weightText).put("gender", state.gender.name)
+        val progress = store.loadOnboarding()
+        val draft = JSONObject(progress.draft).put("height", state.heightText).put("weight", state.weightText).put("gender", state.gender.name)
+        draft.remove("result")
         if (state.step == SetupStep.REVIEW && state.lastInput != null) {
             draft.put("result", JSONObject(com.swpp.stylemate.data.BodyProfileJson.encode(BodyProfile(
                 state.lastInput, state.measurements, state.preferredFit, state.preferredStyles,
                 state.detectedClothing, state.reference,
             ))))
         }
-        val step = when (state.step) { SetupStep.GUIDE -> 1; SetupStep.REVIEW -> 5; else -> 4 }
-        store.saveOnboarding(OnboardingProgress(step, store.loadOnboarding().completed, draft.toString()))
+        val step = if (progress.completed) progress.step else if (state.step == SetupStep.REVIEW) 5 else 4
+        saveProgress(OnboardingProgress(step, progress.completed, draft.toString()))
+    } catch (_: Exception) { _setup.update { it.copy(errorMessage = "입력 내용을 저장하지 못했어요. 다시 시도해 주세요.") } }
+
+    private fun saveProgress(progress: OnboardingProgress) {
+        store.saveOnboarding(progress)
+        _onboarding.value = progress
+    }
+
+    fun moveOnboarding(step: Int) {
+        try {
+            if (step == 4) _setup.update { it.copy(step = SetupStep.INPUT, errorMessage = null) }
+            saveProgress(_onboarding.value.copy(step = step))
+        } catch (_: Exception) { _app.update { it.copy(storageError = "진행 상황을 저장하지 못했어요. 다시 시도해 주세요.") } }
+    }
+
+    fun updateOnboardingStyle(style: StyleProfile) {
+        val error = saveStyleProfile(style)
+        if (error != null) _setup.update { it.copy(errorMessage = error) }
+        else _setup.update { it.copy(errorMessage = null) }
+    }
+
+    fun setOnboardingFits(fits: List<String>) {
+        try {
+            val draft = JSONObject(_onboarding.value.draft).put("preferred_fits", JSONArray(fits))
+            saveProgress(_onboarding.value.copy(draft = draft.toString()))
+            _setup.update { it.copy(errorMessage = null) }
+        } catch (_: Exception) { showError("선택 내용을 저장하지 못했어요. 다시 시도해 주세요.") }
+    }
+
+    fun confirmOnboardingFits() {
+        val values = JSONObject(_onboarding.value.draft).optJSONArray("preferred_fits")
+        val fits = (0 until (values?.length() ?: 0)).map { values!!.getString(it) }
+        val error = saveStyleProfile(_app.value.style.copy(preferredFits = fits))
+        if (error != null) showError(error) else moveOnboarding(3)
+    }
+
+    fun skipOnboardingBody() {
+        _setup.update { it.copy(frontPhoto = null, sidePhoto = null) }
+        moveOnboarding(6)
+    }
+
+    fun startOnboardingGarment(category: String, id: String? = null) {
+        try {
+            val garment = JSONObject().put("category", category)
+            id?.let { garment.put("editing_id", it) }
+            val draft = JSONObject(_onboarding.value.draft).put("garment", garment)
+            saveProgress(_onboarding.value.copy(step = 7, draft = draft.toString()))
+        } catch (_: Exception) { _app.update { it.copy(storageError = "진행 상황을 저장하지 못했어요. 다시 시도해 주세요.") } }
+    }
+
+    fun saveOnboardingGarment(draft: JSONObject) {
+        val progress = _onboarding.value
+        if (progress.completed || progress.step != 7) return
+        try { saveProgress(progress.copy(draft = JSONObject(progress.draft).put("garment", draft).toString())) }
+        catch (_: Exception) { _app.update { it.copy(storageError = "옷 등록 내용을 저장하지 못했어요. 다시 시도해 주세요.") } }
+    }
+
+    fun finishOnboardingGarment() {
+        try {
+            val draft = JSONObject(_onboarding.value.draft).apply { remove("garment") }
+            saveProgress(_onboarding.value.copy(step = 6, draft = draft.toString()))
+        } catch (_: Exception) { _app.update { it.copy(storageError = "진행 상황을 저장하지 못했어요. 다시 시도해 주세요.") } }
     }
 
     fun startCapture() { _setup.update { it.copy(step = SetupStep.INPUT) }; persistSetup() }
@@ -151,6 +219,7 @@ class BodyProfileViewModel(
 
     fun analyze() {
         val state = _setup.value
+        if (state.step == SetupStep.ANALYZING || state.saving) return
         val height = state.heightCm ?: return
         val front = state.frontPhoto ?: return
         val side = state.sidePhoto ?: return
@@ -179,9 +248,10 @@ class BodyProfileViewModel(
                     )
                 }
                 persistSetup()
-            } catch (e: BodyAnalysisException) {
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (e: Exception) {
                 // Keep the photos so the user can replace just the one that failed.
-                _setup.update { it.copy(step = SetupStep.INPUT, errorMessage = e.message) }
+                _setup.update { it.copy(step = SetupStep.INPUT, errorMessage = e.message ?: "분석하지 못했어요. 다시 시도해 주세요.") }
             }
         }
     }
@@ -232,10 +302,15 @@ class BodyProfileViewModel(
         )
         fun saved() {
             store.save(profile)
-            store.saveOnboarding(OnboardingProgress(step = 8, completed = true))
-            _app.update { it.copy(profile = store.load(), style = store.loadStyle(), setupVisible = false) }
+            val completed = _onboarding.value.completed
+            val draft = if (completed) "{}" else JSONObject(_onboarding.value.draft).apply { remove("result"); remove("garment") }.toString()
+            saveProgress(OnboardingProgress(step = if (completed) 8 else 6, completed = completed, draft = draft))
+            _app.update { it.copy(profile = store.load(), style = store.loadStyle(), setupVisible = !completed) }
         }
-        if (account == null) saved() else {
+        if (account == null) {
+            try { saved() }
+            catch (_: Exception) { _setup.update { it.copy(errorMessage = "저장하지 못했어요. 다시 시도해 주세요.") } }
+        } else {
             _setup.update { it.copy(saving = true, errorMessage = null) }
             viewModelScope.launch {
                 try {
@@ -254,8 +329,11 @@ class BodyProfileViewModel(
     }
 
     fun skipSetup() {
-        store.saveOnboarding(OnboardingProgress(step = 8, completed = true))
-        _app.update { it.copy(setupVisible = false) }
+        try {
+            saveProgress(OnboardingProgress(step = 8, completed = true))
+            _setup.update { it.copy(frontPhoto = null, sidePhoto = null) }
+            _app.update { it.copy(setupVisible = false) }
+        } catch (_: Exception) { _app.update { it.copy(storageError = "진행 상황을 저장하지 못했어요. 다시 시도해 주세요.") } }
     }
 
     fun saveStyleProfile(style: StyleProfile): String? = try {

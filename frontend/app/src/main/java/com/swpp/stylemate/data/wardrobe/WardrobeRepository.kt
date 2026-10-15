@@ -80,8 +80,8 @@ object WardrobeRepository {
             }
         }
     }
-    suspend fun thumbnail(context: Context, path: String, account: AccountAccess? = null): ImageBitmap? = withContext(Dispatchers.IO) {
-        val bytes = if (path.startsWith("local:")) LocalUserStore.forContext(context, account?.userId).image(path) else request(path, account = account)
+    suspend fun thumbnail(context: Context, path: String, account: AccountAccess? = null, localStore: LocalUserStore? = null): ImageBitmap? = withContext(Dispatchers.IO) {
+        val bytes = if (path.startsWith("local:")) (localStore ?: LocalUserStore.forContext(context, account?.userId)).image(path) else request(path, account = account)
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
         val options = BitmapFactory.Options().apply {

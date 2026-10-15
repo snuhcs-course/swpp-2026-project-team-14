@@ -2,6 +2,8 @@
 package com.swpp.stylemate
 
 import android.content.ContextWrapper
+import android.graphics.Bitmap
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -29,6 +31,13 @@ import java.util.UUID
 
 class AuthScreensTest {
     @get:Rule val compose = createComposeRule()
+
+    private fun capture(name: String) {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val node = if (name == "login") compose.onNodeWithText("StyleMate").onParent() else compose.onRoot()
+        val bitmap = node.captureToImage().asAndroidBitmap()
+        File(context.cacheDir, "auth-preview-$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+    }
 
     @Test fun djangoOffsetTimestampParsesOnAndroid() {
         val json = JSONObject("""{"token":"${"a".repeat(43)}","expires_at":"2026-11-15T20:24:21.123456+00:00","user":{"id":"b3c3a372-9c51-4e47-9506-52dc352ff003","username":"member_1","body_profile":null,"preferred_fits":["regular"],"preferred_styles":[],"favorite_colors":[]}}""")
@@ -64,6 +73,7 @@ class AuthScreensTest {
     @Test fun loginMasksPasswordAndPreservesExactInputForSubmission() {
         var submitted: Pair<String, String>? = null
         compose.setContent { StyleMateTheme { LoginDialog(AuthUiState(ready = true), {}, {}, { id, pw -> submitted = id to pw }) } }
+        capture("login")
         compose.onNodeWithText("아이디").performTextInput("member_1")
         compose.onNodeWithText("비밀번호").performTextInput(" password_123 ")
         compose.onNodeWithText("비밀번호").assert(SemanticsMatcher.expectValue(SemanticsProperties.Password, Unit))
@@ -91,6 +101,7 @@ class AuthScreensTest {
     @Test fun registrationHasOnlyRequiredCredentialsAndPasswordConfirmation() {
         var submitted: Triple<String, String, String>? = null
         compose.setContent { StyleMateTheme { RegistrationScreen(AuthUiState(ready = true), {}, { id, pw, confirm -> submitted = Triple(id, pw, confirm) }) } }
+        capture("register")
         compose.onNodeWithText("아이디").performTextInput("member_1")
         compose.onNodeWithText("비밀번호").performScrollTo().performTextInput("password_123")
         compose.onNodeWithText("비밀번호 확인").performScrollTo().performTextInput("password_123")

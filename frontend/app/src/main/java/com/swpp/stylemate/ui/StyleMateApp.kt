@@ -73,6 +73,7 @@ import com.swpp.stylemate.ui.profile.MyProfileScreen
 import com.swpp.stylemate.ui.profile.PhotoInputScreen
 import com.swpp.stylemate.ui.profile.ReviewScreen
 import com.swpp.stylemate.ui.profile.SetupStep
+import com.swpp.stylemate.ui.profile.OnboardingRoute
 import com.swpp.stylemate.ui.wardrobe.WardrobeRoute
 
 private enum class Tab(val label: String, val icon: ImageVector) {
@@ -146,6 +147,7 @@ fun StyleMateApp(viewModel: BodyProfileViewModel? = null, authModel: AuthViewMod
 @Composable
 private fun AppContent(viewModel: BodyProfileViewModel, authModel: AuthViewModel, importModel: GuestImportViewModel?) {
     val app by viewModel.app.collectAsStateWithLifecycle()
+    val onboarding by viewModel.onboarding.collectAsStateWithLifecycle()
     if (app.storageError != null) {
         Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -155,8 +157,10 @@ private fun AppContent(viewModel: BodyProfileViewModel, authModel: AuthViewModel
         }
         return
     }
-    if (app.setupVisible) {
-        ProfileSetupFlow(viewModel, canCancel = app.profile != null)
+    if (!onboarding.completed) {
+        OnboardingRoute(viewModel, onLogin = { authModel.open(AuthPage.LOGIN) })
+    } else if (app.setupVisible) {
+        ProfileSetupFlow(viewModel, canCancel = true)
     } else {
         MainTabs(viewModel, authModel, importModel)
     }
@@ -206,7 +210,7 @@ private fun MainTabs(viewModel: BodyProfileViewModel, authModel: AuthViewModel, 
     val app by viewModel.app.collectAsStateWithLifecycle()
     val auth by authModel.state.collectAsStateWithLifecycle()
     val account = LocalAccountAccess.current
-    var tab by rememberSaveable { mutableStateOf(if (auth.returnToProfile || auth.session != null) Tab.PROFILE else Tab.WARDROBE) }
+    var tab by rememberSaveable { mutableStateOf(if (auth.returnToProfile || auth.session != null) Tab.PROFILE else Tab.HOME) }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,

@@ -81,6 +81,7 @@ fun PhotoInputScreen(
     onWeight: (String) -> Unit,
     onGender: (Gender) -> Unit,
     onAnalyze: () -> Unit,
+    topBar: (@Composable () -> Unit)? = null,
 ) {
     ScreenScaffold(
         title = "체형 분석",
@@ -88,6 +89,7 @@ fun PhotoInputScreen(
         primaryLabel = "분석하기",
         primaryEnabled = state.canAnalyze,
         onPrimary = onAnalyze,
+        topBar = topBar,
     ) { padding ->
         Column(
             modifier = Modifier
