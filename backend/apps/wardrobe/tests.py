@@ -8,6 +8,9 @@ from urllib.error import HTTPError
 from django.test import SimpleTestCase, TestCase, TransactionTestCase, override_settings
 from PIL import Image
 
+from apps.users.auth import issue_token
+from apps.users.models import User
+
 from .analysis import AnalysisError, MAX_IMAGE_BYTES, MODEL, analyze_image, prepare_image
 from .schema import AI_FIELDS, ARRAY_LIMITS, COLOR_PALETTE, ENUMS, validate_ai_attributes, validate_attributes
 
@@ -42,7 +45,7 @@ def envelope(data=None, finish='STOP'):
 
 
 class DatabaseConfigurationTests(SimpleTestCase):
-    @patch('apps.wardrobe.views.settings')
+    @patch('apps.users.auth.settings')
     @patch('apps.wardrobe.views.analyze_image')
     def test_missing_database_blocks_persistence_before_paid_analysis(self, analyze, settings):
         settings.DATABASES = {'default': {'ENGINE': 'django.db.backends.dummy'}}
@@ -125,8 +128,8 @@ class InitialMigrationTests(TransactionTestCase):
         from .models import Garment
 
         executor = MigrationExecutor(connection)
+        latest = executor.loader.graph.leaf_nodes()
         executor.migrate([('wardrobe', None)])
-        latest = MigrationExecutor(connection).loader.graph.leaf_nodes('wardrobe')
         MigrationExecutor(connection).migrate(latest)
         with connection.cursor() as cursor:
             columns = {column.name for column in connection.introspection.get_table_description(cursor, Garment._meta.db_table)}
@@ -136,7 +139,8 @@ class InitialMigrationTests(TransactionTestCase):
         dimensions = {'unit': 'cm', 'shoulder_width': {
             'value': 45.32, 'source': 'arcore_assisted',
             'method': 'flat_shoulder_seam_to_seam', 'reference': None}}
-        garment = Garment.objects.create(image='garments/example.jpg', attributes=attributes(), dimensions=dimensions)
+        user = User.objects.create_user('migration_owner', 'test-password')
+        garment = Garment.objects.create(user=user, image='garments/example.jpg', attributes=attributes(), dimensions=dimensions)
         garment.refresh_from_db()
         self.assertEqual(garment.attributes, attributes())
         self.assertEqual(garment.dimensions, dimensions)
@@ -316,6 +320,9 @@ class GeminiTests(SimpleTestCase):
 @override_settings(GEMINI_API_KEY='test-key')
 class AnalysisEndpointTests(TestCase):
     def setUp(self):
+        self.user = User.objects.create_user('wardrobe_owner', 'test-password')
+        _, token = issue_token(self.user)
+        self.client.defaults['HTTP_AUTHORIZATION'] = f'Bearer {token}'
         directory = tempfile.TemporaryDirectory()
         self.addCleanup(directory.cleanup)
         setting = override_settings(MEDIA_ROOT=directory.name)
@@ -332,6 +339,8 @@ class AnalysisEndpointTests(TestCase):
         self.assertNotIn('dimensions', response.json()['attributes'])
         self.assertEqual(response['Cache-Control'], 'no-store')
         self.assertIsNone(analyze.call_args.args[2])
+        from .models import Garment
+        self.assertEqual(Garment.objects.get(pk=response.json()['id']).user, self.user)
 
     @patch('apps.wardrobe.views.analyze_image', return_value=(attributes(), None))
     def test_measured_garment_type_is_passed_only_when_known(self, analyze):
@@ -472,6 +481,9 @@ def measured(**values):
 
 class RecommendationLabelTests(TestCase):
     def setUp(self):
+        self.user = User.objects.create_user('label_owner', 'test-password')
+        _, token = issue_token(self.user)
+        self.client.defaults['HTTP_AUTHORIZATION'] = f'Bearer {token}'
         directory = tempfile.TemporaryDirectory()
         self.addCleanup(directory.cleanup)
         setting = override_settings(MEDIA_ROOT=directory.name)

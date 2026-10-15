@@ -21,7 +21,17 @@ DEBUG = os.environ.get("DJANGO_DEBUG", "0") == "1"
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY") or secrets.token_urlsafe(64)
 ALLOWED_HOSTS = os.environ.get("DJANGO_ALLOWED_HOSTS", "*").split(",")
 
-INSTALLED_APPS = ["apps.body_profiles", "apps.wardrobe", "apps.outfits"]
+INSTALLED_APPS = [
+    "django.contrib.contenttypes", "django.contrib.auth",
+    "apps.users", "apps.body_profiles", "apps.wardrobe", "apps.outfits",
+]
+AUTH_USER_MODEL = "users.User"
+AUTH_TOKEN_TTL_DAYS = 30
+AUTH_REQUEST_LIMIT = 20
+AUTH_REQUEST_WINDOW_SECONDS = 60
+LOGIN_FAILURE_LIMIT = 5
+LOGIN_FAILURE_WINDOW_SECONDS = 300
+LOGIN_LOCK_SECONDS = 300
 MIDDLEWARE = ["django.middleware.common.CommonMiddleware"]
 ROOT_URLCONF = "config.urls"
 WSGI_APPLICATION = "config.wsgi.application"

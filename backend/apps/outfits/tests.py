@@ -7,6 +7,8 @@ from unittest.mock import patch
 from django.test import TestCase, override_settings
 
 from apps.wardrobe.models import Garment
+from apps.users.auth import issue_token
+from apps.users.models import User
 from recommendation import weather
 
 from .models import Outfit
@@ -23,30 +25,33 @@ def dims(**values):
                              for k, v in values.items()}}
 
 
-def garment(name, category, sub, color, saved=True, labels=None, **measured):
+def garment(user, name, category, sub, color, saved=True, labels=None, **measured):
     attributes = {"name": name, "category": category, "subcategory": sub, "colors": [color], "styles": ["minimal"],
                   "fit_type": None, "leg_shape": None, "rise_type": None, "skirt_shape": None}
-    return Garment.objects.create(image="garments/x.jpg", attributes=attributes, dimensions=dims(**measured) if measured else None,
+    return Garment.objects.create(user=user, image="garments/x.jpg", attributes=attributes, dimensions=dims(**measured) if measured else None,
                                   labels=labels, saved=saved)
 
 
 class OutfitApiTests(TestCase):
     def setUp(self):
+        self.user = User.objects.create_user('outfit_owner', 'test-password')
+        _, token = issue_token(self.user)
+        self.client.defaults['HTTP_AUTHORIZATION'] = f'Bearer {token}'
         directory = tempfile.TemporaryDirectory()
         self.addCleanup(directory.cleanup)
         setting = override_settings(MEDIA_ROOT=directory.name)
         setting.enable()
         self.addCleanup(setting.disable)
-        self.knit = garment("베이지 니트", "top", "knitwear", "#D6BE9A", chest_width_half=50, total_length=64, sleeve_length=58)
-        self.tee = garment("흰 티", "top", "tshirt", "#FFFFFF", chest_width_half=47, total_length=62, sleeve_length=20)
-        self.small = garment("작은 셔츠", "top", "shirt", "#3975C6", chest_width_half=40)
-        self.slacks = garment("검정 슬랙스", "bottom", "slacks", "#202020", hip_width_half=53, thigh_width_half=32,
+        self.knit = garment(self.user, "베이지 니트", "top", "knitwear", "#D6BE9A", chest_width_half=50, total_length=64, sleeve_length=58)
+        self.tee = garment(self.user, "흰 티", "top", "tshirt", "#FFFFFF", chest_width_half=47, total_length=62, sleeve_length=20)
+        self.small = garment(self.user, "작은 셔츠", "top", "shirt", "#3975C6", chest_width_half=40)
+        self.slacks = garment(self.user, "검정 슬랙스", "bottom", "slacks", "#202020", hip_width_half=53, thigh_width_half=32,
                               hem_opening=29, inseam=70)
-        self.jeans = garment("청바지", "bottom", "jeans", "#3975C6", hip_width_half=48, thigh_width_half=29,
+        self.jeans = garment(self.user, "청바지", "bottom", "jeans", "#3975C6", hip_width_half=48, thigh_width_half=29,
                              hem_opening=16, inseam=70)
-        self.coat = garment("갈색 코트", "outerwear", "coat", "#795548", chest_width_half=54, total_length=95, sleeve_length=60)
-        self.draft = garment("저장 안 한 옷", "top", "tshirt", "#202020", saved=False)
-        self.shoes = garment("운동화", "shoes", "sneakers", "#FFFFFF")
+        self.coat = garment(self.user, "갈색 코트", "outerwear", "coat", "#795548", chest_width_half=54, total_length=95, sleeve_length=60)
+        self.draft = garment(self.user, "저장 안 한 옷", "top", "tshirt", "#202020", saved=False)
+        self.shoes = garment(self.user, "운동화", "shoes", "sneakers", "#FFFFFF")
 
     def post(self, url, data):
         return self.client.post(url, json.dumps(data), content_type="application/json")
@@ -55,6 +60,9 @@ class OutfitApiTests(TestCase):
         return self.post("/api/outfits/recommend/", {"body": BODY, "temp": 13, **extra})
 
     def test_recommends_outfits_from_my_saved_garments_only(self):
+        other = User.objects.create_user('other_owner', 'test-password')
+        garment(other, "다른 사람의 티셔츠", "top", "tshirt", "#FFFFFF", chest_width_half=50)
+        garment(other, "다른 사람의 청바지", "bottom", "jeans", "#3975C6", hip_width_half=50)
         response = self.recommend()
         self.assertEqual(response.status_code, 200)
         data = response.json()
@@ -72,6 +80,7 @@ class OutfitApiTests(TestCase):
         self.assertEqual(data["context"]["pref_fit"], "loose")  # from the stored profile
         self.assertEqual(data["context"]["styles"], ["미니멀"])
         self.assertEqual(Outfit.objects.count(), 3)
+        self.assertEqual(Outfit.objects.filter(user=self.user).count(), 3)
         self.assertEqual(response["Cache-Control"], "no-store")
 
     def test_labels_drive_the_fit_note_and_seen_outfits_rotate(self):

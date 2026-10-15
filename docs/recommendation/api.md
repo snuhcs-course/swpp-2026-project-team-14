@@ -1,6 +1,6 @@
 # 추천 API
 
-모든 요청·응답은 JSON(UTF-8)이며 인증은 아직 없다. 체형은 요청의 `body`로 받는다(앱의 `BodyProfileJson` 형식 그대로, 또는 `{height, chest, waist, hip, shoulder, inseam, …}` cm 값). 서버 쪽에서 체형을 읽는 곳은 `apps/body_profiles/profile.py`의 `body_from_request()` 하나다.
+모든 요청·응답은 JSON(UTF-8)이다. 코디 API와 옷장 분석·저장·조회에는 [로그인 API](../login/README.md)의 Bearer 토큰이 필요하며 본인 데이터만 사용한다. 날씨와 라벨 미리보기는 비로그인에서도 제공한다. 체형은 기존대로 요청의 `body`로 받는다(앱의 `BodyProfileJson` 형식 그대로, 또는 `{height, chest, waist, hip, shoulder, inseam, …}` cm 값). 서버 쪽에서 체형을 읽는 곳은 `apps/body_profiles/profile.py`의 `body_from_request()` 하나다. 사용자 DB의 선호 정보를 추천 계산에 새로 연결하지 않는다.
 
 ## 옷 등록: 추천 라벨
 

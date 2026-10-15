@@ -37,11 +37,28 @@ swpp-2026-project-team-14/
 |   `-- androidTest/java/com/swpp/stylemate/      # 옷장 UI·라벨 실패/재시도·사진 색상 선택·탭 연결·측정점 검사
 |-- backend/
 |   |-- config/
-|   |   |-- settings.py                          # 공통 API·MySQL·사진·모델 설정
+|   |   |-- settings.py                          # 공통 API·사용자 모델·MySQL·사진·모델 설정
 |   |   |-- urls.py                              # 체형·옷장 API 연결
 |   |   `-- test_settings.py                     # 외부 서비스 없는 옷장 테스트 환경
 |   |-- apps/
+|   |   |-- users/
+|   |   |   |-- models.py                        # 사용자·체형·취향·토큰 해시 저장
+|   |   |   |-- auth.py                          # 토큰 발급·만료 확인·DB 및 인증 접근 제한
+|   |   |   |-- limits.py                        # DB 공유 카운터·5회 실패 잠금·IP 요청 제한
+|   |   |   |-- profile.py                       # 체형 허용 필드·16종 치수·중첩 메타데이터 검증
+|   |   |   |-- urls.py                          # 가입·로그인·로그아웃·내 정보 경로
+|   |   |   |-- views.py                         # 인증·프로필 조회 및 부분 수정 API
+|   |   |   |-- migrations/0001_initial.py        # 사용자 테이블 최초 생성
+|   |   |   |-- migrations/0002_authtoken.py      # 만료 가능한 토큰 해시 테이블 생성
+|   |   |   |-- migrations/0003_authratelimit.py  # 인증 요청·실패 횟수 공유 테이블 생성
+|   |   |   |-- tests.py                         # 계정·토큰·프로필·계정 간 접근 차단 검사
+|   |   |   |-- test_security.py                 # 시도 제한·만료 경계·잘못된 프로필 입력 검사
+|   |   |   `-- test_migrations.py               # 기존 무소유 데이터 정리·소유 데이터 보존 검사
 |   |   |-- body_profiles/                      # 체형 분석 요청 처리
+|   |   |-- outfits/
+|   |   |   |-- models.py                        # 코디·소유 사용자·옷 연결 저장
+|   |   |   |-- migrations/0002_outfit_user.py    # 코디 소유 사용자 외래 키 추가
+|   |   |   `-- migrations/0003_alter_outfit_user.py # 무소유 코디 정리·소유자 필수 전환
 |   |   `-- wardrobe/
 |   |       |-- urls.py                          # 옷장 API 경로
 |   |       |-- views.py                         # 분석 초안·저장·수정·조회·추천 라벨 미리보기
@@ -49,9 +66,11 @@ swpp-2026-project-team-14/
 |   |       |-- landmarks.py                     # HRNet 추론·좌표 복원·치수별 경로 계산
 |   |       |-- schema.py                        # 속성 타입·한국어 선택지·Gemini 계약(추천용 details 포함)·입력 검증
 |   |       |-- editor.py                        # 치수 정의·측정값·저장 요청(추천 라벨 포함) 검증
-|   |       |-- models.py                        # 사진 경로·현재 옷 속성·치수·메모·추천 라벨 저장
+|   |       |-- models.py                        # 소유 사용자·사진 경로·옷 속성·치수·메모·추천 라벨 저장
 |   |       |-- migrations/0001_initial.py        # 옷장 테이블 최초 생성
 |   |       |-- migrations/0002_garment_labels.py # 추천 라벨 컬럼 추가
+|   |       |-- migrations/0003_garment_user.py   # 옷 소유 사용자 외래 키 추가
+|   |       |-- migrations/0004_alter_garment_user.py # 무소유 옷 정리·소유자 필수 전환
 |   |       |-- tests.py                         # AI 계약·DB 저장·재조회 검사
 |   |       `-- test_landmarks.py                # 원본 사진의 자동 측정점·좌표 변환 검사
 |   |-- recommendation/                          # 저장 라벨 → K-Fashion 입력, 계절·주색/서브색·모델 어휘 정규화
@@ -73,6 +92,6 @@ swpp-2026-project-team-14/
 - 저장: 옷 속성·치수·메모·사진 경로는 MySQL, 옷 사진은 서버 파일 저장소에 보관한다. 최초 AI 결과는 별도 복제하지 않는다.
 - DB 의존성: 체형 분석·측정점 API는 DB 없이 실행된다. 옷장 분석·조회·저장은 MySQL 설정이 필요하다.
 
-S3·사용자 구분·체형 프로필 영구 저장·추천 치수 비교는 미구현이다.
+가입·로그인·로그아웃·프로필 API와 계정별 옷·코디 접근 제한이 구현되었다. 소유자 외래 키는 필수이며 전환 마이그레이션은 소유자 없는 기존 행만 정리한다. 앱의 인증·비로그인 로컬 저장·계정 가져오기 연동과 S3·추천 치수 비교는 미구현이다. 인증 계약은 [로그인 문서](../login/README.md)를 따른다.
 
 화면 기준은 [디자인](design.md), 데이터·API 규칙은 [명세](wardrobe-spec.md), 등록 과정은 [데이터 흐름](wardrobe-flow.md), 실행·배포는 [실행 안내](local-development.md)를 따른다.

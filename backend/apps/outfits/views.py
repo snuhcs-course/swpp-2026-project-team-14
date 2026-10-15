@@ -22,7 +22,7 @@ from django.views.decorators.http import require_GET, require_http_methods, requ
 
 from apps.body_profiles.profile import body_from_request
 from apps.wardrobe.models import Garment
-from apps.wardrobe.views import require_database
+from apps.users.auth import require_auth
 from recommendation import preference, season, weather
 from recommendation.catalog import Catalog
 from recommendation.labeling import label
@@ -154,7 +154,7 @@ def _create(source: str, garments: list[tuple[str, Garment, str]], **fields) -> 
 
 
 @require_POST
-@require_database
+@require_auth
 def recommend_view(request):
     try:
         data = _read(request)
@@ -181,7 +181,7 @@ def recommend_view(request):
     except (ValueError, TypeError, KeyError, UnicodeDecodeError, OverflowError) as error:
         return _error("INVALID_REQUEST", 400, str(error))
 
-    garments = {str(g.id): g for g in Garment.objects.filter(saved=True)}
+    garments = {str(g.id): g for g in Garment.objects.filter(user=request.user, saved=True)}
     items = [i for i in (_garment_item(g, body) for g in garments.values()) if i]
     req = Request(body=body, pref_fit=pref_fit, styles=styles, temp=temp, wet=wet, mode="wardrobe",
                   anchor=f"w:{anchor}" if anchor else None, wardrobe=items, preference=taste,
@@ -197,17 +197,17 @@ def recommend_view(request):
     with transaction.atomic():
         for o in result["outfits"]:
             members = [(SLOT_CODE[i["slot"]], garments[i["id"][2:]], i.get("size", "")) for i in o["items"]]
-            outfits.append(_create(Outfit.Source.RECOMMENDED, members, score=o["total"], components=o["components"],
+            outfits.append(_create(Outfit.Source.RECOMMENDED, members, user=request.user, score=o["total"], components=o["components"],
                                    reasons=o["reasons"], context=context))
     return _json({"outfits": [serialize(o) for o in outfits], "notes": result["notes"], "band": result["band"],
                   "context": context})
 
 
 @require_http_methods(["GET", "POST"])
-@require_database
+@require_auth
 def outfits_view(request):
     if request.method == "GET":
-        saved = Outfit.objects.filter(saved=True).order_by("-updated_at").prefetch_related("items__garment")
+        saved = Outfit.objects.filter(user=request.user, saved=True).order_by("-updated_at").prefetch_related("items__garment")
         return _json({"outfits": [serialize(o) for o in saved]})
     try:
         data = _read(request)
@@ -219,7 +219,7 @@ def outfits_view(request):
         context = data.get("context", {})
         if not isinstance(context, dict) or len(json.dumps(context)) > 2000:
             raise ValueError("Invalid context")
-        found = {str(g.id): g for g in Garment.objects.filter(saved=True, pk__in=ids)} if ids else {}
+        found = {str(g.id): g for g in Garment.objects.filter(user=request.user, saved=True, pk__in=ids)} if ids else {}
         members = [(g.attributes.get("category"), g, "") for g in (found.get(i) for i in ids) if g]
         slots = [slot for slot, _, _ in members]
         if len(members) != len(ids) or len(set(slots)) != len(slots) or not {"top", "bottom"} <= set(slots) \
@@ -232,14 +232,14 @@ def outfits_view(request):
     except (ValueError, TypeError, UnicodeDecodeError, OverflowError) as error:
         return _error("INVALID_OUTFIT", 400, str(error))
     with transaction.atomic():
-        outfit = _create(source, members, saved=True, name=name.strip(), context=context)
+        outfit = _create(source, members, user=request.user, saved=True, name=name.strip(), context=context)
     return _json(serialize(outfit), 201)
 
 
 @require_http_methods(["GET", "PUT"])
-@require_database
+@require_auth
 def outfit_view(request, outfit_id):
-    outfit = get_object_or_404(Outfit, pk=outfit_id)
+    outfit = get_object_or_404(Outfit, pk=outfit_id, user=request.user)
     if request.method == "PUT":
         try:
             data = _read(request)
@@ -261,9 +261,9 @@ def outfit_view(request, outfit_id):
 
 
 @require_POST
-@require_database
+@require_auth
 def feedback_view(request, outfit_id):
-    outfit = get_object_or_404(Outfit, pk=outfit_id)
+    outfit = get_object_or_404(Outfit, pk=outfit_id, user=request.user)
     try:
         data = _read(request)
         value = data.get("feedback")
