@@ -2,6 +2,7 @@
 package com.swpp.stylemate.ui.wardrobe
 
 import com.swpp.stylemate.data.wardrobe.requestAnalysis
+import com.swpp.stylemate.data.AccountAccess
 
 import android.content.Context
 import android.os.Build
@@ -24,7 +25,7 @@ import org.json.JSONObject
 data class AnalysisState(val photo: String? = null, val busy: Boolean = false,
                          val result: JSONObject? = null, val error: String? = null)
 
-class GarmentAnalysisViewModel : ViewModel() {
+class GarmentAnalysisViewModel(private val account: AccountAccess? = null) : ViewModel() {
     private val mutableState = MutableStateFlow(AnalysisState())
     val state = mutableState.asStateFlow()
     private var job: Job? = null
@@ -42,7 +43,7 @@ class GarmentAnalysisViewModel : ViewModel() {
         val application = context.applicationContext
         job = viewModelScope.launch {
             try {
-                val result = requestAnalysis(application, photo, garmentType)
+                val result = requestAnalysis(application, photo, garmentType, account)
                 mutableState.value = AnalysisState(photo, result = result)
             } catch (error: CancellationException) {
                 throw error

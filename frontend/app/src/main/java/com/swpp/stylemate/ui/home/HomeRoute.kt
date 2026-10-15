@@ -17,13 +17,15 @@ import com.swpp.stylemate.data.BodyProfileJson
 import com.swpp.stylemate.data.recommendation.OutfitRepository
 import com.swpp.stylemate.data.recommendation.LocalTasteStore
 import com.swpp.stylemate.data.LocalUserStore
+import com.swpp.stylemate.ui.LocalAccountAccess
 import org.json.JSONObject
 
 @Composable
 fun HomeRoute(profile: BodyProfile?, onSetupProfile: () -> Unit, onOpenWardrobe: () -> Unit, modifier: Modifier = Modifier) {
     val context = LocalContext.current.applicationContext
+    val account = LocalAccountAccess.current
     val model: HomeViewModel = viewModel(factory = viewModelFactory {
-        initializer { HomeViewModel(OutfitRepository(BuildConfig.API_BASE_URL, local = LocalUserStore.forContext(context)), LocalTasteStore(context)) }
+        initializer { HomeViewModel(OutfitRepository(BuildConfig.API_BASE_URL, local = if (account == null) LocalUserStore.forContext(context) else null, account = account), LocalTasteStore(context, account?.userId)) }
     })
     val state by model.state.collectAsStateWithLifecycle()
     val body = remember(profile) { profile?.let { JSONObject(BodyProfileJson.encode(it)) } }
@@ -45,8 +47,9 @@ fun HomeRoute(profile: BodyProfile?, onSetupProfile: () -> Unit, onOpenWardrobe:
 @Composable
 fun CodiBookRoute(modifier: Modifier = Modifier) {
     val context = LocalContext.current.applicationContext
+    val account = LocalAccountAccess.current
     val model: CodiBookViewModel = viewModel(factory = viewModelFactory {
-        initializer { CodiBookViewModel(OutfitRepository(BuildConfig.API_BASE_URL, local = LocalUserStore.forContext(context))) }
+        initializer { CodiBookViewModel(OutfitRepository(BuildConfig.API_BASE_URL, local = if (account == null) LocalUserStore.forContext(context) else null, account = account)) }
     })
     val state by model.state.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { model.load() }

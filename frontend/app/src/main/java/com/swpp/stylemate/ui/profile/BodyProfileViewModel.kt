@@ -22,6 +22,9 @@ import com.swpp.stylemate.data.ReferenceMeasurements
 import com.swpp.stylemate.data.toggleStyle
 import com.swpp.stylemate.data.OnboardingProgress
 import com.swpp.stylemate.data.StyleProfile
+import com.swpp.stylemate.data.AccountAccess
+import com.swpp.stylemate.data.BodyProfileJson
+import kotlinx.coroutines.CancellationException
 import org.json.JSONObject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -54,6 +57,7 @@ data class SetupState(
     val preferredStyles: List<String> = emptyList(),
     /** Retake hint from the last failed analysis, shown on the input screen. */
     val errorMessage: String? = null,
+    val saving: Boolean = false,
 ) {
     val heightCm: Int? get() = heightText.toIntOrNull()?.takeIf { it in 100..220 }
     val weightKg: Int? get() = weightText.toIntOrNull()?.takeIf { it in 30..200 }
@@ -73,6 +77,7 @@ data class AppState(
 class BodyProfileViewModel(
     private val analyzer: BodyAnalyzer = RemoteBodyAnalyzer(BuildConfig.API_BASE_URL),
     private val store: BodyProfileStore = InMemoryBodyProfileStore(),
+    private val account: AccountAccess? = null,
 ) : ViewModel() {
 
     private fun loadAppState(): AppState = try {
@@ -85,10 +90,16 @@ class BodyProfileViewModel(
 
     private val _setup = MutableStateFlow(runCatching { restoreSetup() }.getOrDefault(SetupState()))
     val setup: StateFlow<SetupState> = _setup.asStateFlow()
+    private var fitChanged = false
+    private var moodsChanged = false
 
     fun reloadLocalData() {
         _app.value = loadAppState()
         if (_app.value.storageError == null) _setup.value = restoreSetup()
+    }
+
+    fun refreshAccountProfile() {
+        _app.update { it.copy(profile = store.load(), style = store.loadStyle()) }
     }
 
     private fun restoreSetup(): SetupState {
@@ -184,21 +195,31 @@ class BodyProfileViewModel(
     }; persistSetup() }
 
     fun setPreferredFit(fit: PreferredFit) {
+        if (_setup.value.saving) return
         _setup.update { it.copy(preferredFit = fit) }
-        store.saveStyle(store.loadStyle().copy(preferredFits = StyleProfile.fromLegacy(fit, emptyList()).preferredFits))
-        _app.update { it.copy(style = store.loadStyle()) }
+        fitChanged = true
+        if (account == null) {
+            store.saveStyle(store.loadStyle().copy(preferredFits = StyleProfile.fromLegacy(fit, emptyList()).preferredFits))
+            _app.update { it.copy(style = store.loadStyle()) }
+        }
         persistSetup()
     }
 
-    fun toggleStyle(style: String) { _setup.update {
+    fun toggleStyle(style: String) {
+        if (_setup.value.saving) return
+        _setup.update {
         it.copy(preferredStyles = toggleStyle(it.preferredStyles, style))
     }
-        store.saveStyle(store.loadStyle().copy(preferredStyles = StyleProfile.fromLegacy(_setup.value.preferredFit, _setup.value.preferredStyles).preferredStyles))
-        _app.update { it.copy(style = store.loadStyle()) }
+        moodsChanged = true
+        if (account == null) {
+            store.saveStyle(store.loadStyle().copy(preferredStyles = StyleProfile.fromLegacy(_setup.value.preferredFit, _setup.value.preferredStyles).preferredStyles))
+            _app.update { it.copy(style = store.loadStyle()) }
+        }
         persistSetup()
     }
 
     fun confirmProfile() {
+        if (_setup.value.saving) return
         val state = _setup.value
         val input = state.lastInput ?: return
         val profile = BodyProfile(
@@ -209,9 +230,27 @@ class BodyProfileViewModel(
             clothing = state.detectedClothing,
             reference = state.reference,
         )
-        store.save(profile)
-        store.saveOnboarding(OnboardingProgress(step = 8, completed = true))
-        _app.update { it.copy(profile = store.load(), setupVisible = false) }
+        fun saved() {
+            store.save(profile)
+            store.saveOnboarding(OnboardingProgress(step = 8, completed = true))
+            _app.update { it.copy(profile = store.load(), style = store.loadStyle(), setupVisible = false) }
+        }
+        if (account == null) saved() else {
+            _setup.update { it.copy(saving = true, errorMessage = null) }
+            viewModelScope.launch {
+                try {
+                    val body = JSONObject(BodyProfileJson.encode(profile)).apply { remove("preferred_fit"); remove("preferred_styles") }
+                    val patch = JSONObject().put("body_profile", body)
+                    val style = StyleProfile.fromLegacy(state.preferredFit, state.preferredStyles).json()
+                    if (fitChanged) patch.put("preferred_fits", style.getJSONArray("preferred_fits"))
+                    if (moodsChanged) patch.put("preferred_styles", style.getJSONArray("preferred_styles"))
+                    account.patchProfile(patch)
+                    saved()
+                } catch (error: CancellationException) { throw error }
+                catch (error: Exception) { _setup.update { it.copy(errorMessage = error.message ?: "저장하지 못했어요. 다시 시도해 주세요.") } }
+                finally { _setup.update { it.copy(saving = false) } }
+            }
+        }
     }
 
     fun skipSetup() {
@@ -231,6 +270,8 @@ class BodyProfileViewModel(
 
     /** Opens the flow again, pre-filled with the current profile (US-B4). */
     fun startReanalysis() {
+        fitChanged = false
+        moodsChanged = false
         val profile = _app.value.profile
         _setup.value = if (profile == null) {
             SetupState(preferredFit = _app.value.style.legacyFit(), preferredStyles = _app.value.style.styleLabels())
@@ -253,6 +294,13 @@ class BodyProfileViewModel(
         store.save(null)
         _app.update { it.copy(profile = null) }
     }
+
+    suspend fun deleteAccountProfile(): String? = try {
+        account?.patchProfile(JSONObject().put("body_profile", JSONObject.NULL))
+        deleteProfile()
+        null
+    } catch (error: CancellationException) { throw error }
+    catch (error: Exception) { error.message ?: "삭제하지 못했어요. 다시 시도해 주세요." }
 }
 
 /** Re-encoding also strips EXIF metadata (location, device) from the original photo. */

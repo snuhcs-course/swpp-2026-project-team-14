@@ -254,12 +254,13 @@ private fun EmptyState(title: String, text: String, action: String, onAction: ()
 @Composable
 fun GarmentThumbnail(path: String, name: String, modifier: Modifier = Modifier) {
     val context = androidx.compose.ui.platform.LocalContext.current.applicationContext
+    val account = com.swpp.stylemate.ui.LocalAccountAccess.current
     var bitmap by remember(path) { mutableStateOf<ImageBitmap?>(null) }
     var failed by remember(path) { mutableStateOf(false) }
     LaunchedEffect(path) {
         if (bitmap != null) return@LaunchedEffect
         try {
-            bitmap = WardrobeRepository.thumbnail(context, path)
+            bitmap = WardrobeRepository.thumbnail(context, path, account)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {

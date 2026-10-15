@@ -23,6 +23,12 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.key
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -38,6 +44,23 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.swpp.stylemate.data.LocalBodyProfileStore
+import com.swpp.stylemate.data.AccountAccess
+import com.swpp.stylemate.data.AuthRepository
+import com.swpp.stylemate.data.KeystoreSessionStore
+import com.swpp.stylemate.data.LocalUserStore
+import com.swpp.stylemate.BuildConfig
+import com.swpp.stylemate.ui.profile.AuthViewModel
+import com.swpp.stylemate.ui.profile.AuthPage
+import com.swpp.stylemate.ui.profile.LoginDialog
+import com.swpp.stylemate.ui.profile.RegistrationScreen
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.ViewModelStore
+import androidx.lifecycle.ViewModelStoreOwner
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import com.swpp.stylemate.ui.home.CodiBookRoute
 import com.swpp.stylemate.ui.home.HomeRoute
 import com.swpp.stylemate.ui.profile.AnalyzingScreen
@@ -56,15 +79,61 @@ private enum class Tab(val label: String, val icon: ImageVector) {
     PROFILE("마이프로필", Icons.Filled.Person),
 }
 
-/** The app's view model, with the body profile kept on the device. */
+val LocalAccountAccess = staticCompositionLocalOf<AccountAccess?> { null }
+
 @Composable
-private fun defaultBodyProfileViewModel(): BodyProfileViewModel {
+private fun defaultBodyProfileViewModel(account: AccountAccess?): BodyProfileViewModel {
     val context = LocalContext.current.applicationContext
-    return viewModel(factory = viewModelFactory { initializer { BodyProfileViewModel(store = LocalBodyProfileStore(context)) } })
+    return viewModel(factory = viewModelFactory { initializer { BodyProfileViewModel(store = LocalBodyProfileStore(context, account?.userId), account = account) } })
 }
 
 @Composable
-fun StyleMateApp(viewModel: BodyProfileViewModel = defaultBodyProfileViewModel()) {
+private fun defaultAuthViewModel(): AuthViewModel {
+    val context = LocalContext.current.applicationContext
+    return viewModel(factory = viewModelFactory { initializer {
+        AuthViewModel(AuthRepository(BuildConfig.API_BASE_URL, KeystoreSessionStore(context), cacheUser = { user ->
+            LocalUserStore.forContext(context, user.id).cacheAccountProfile(user)
+        }))
+    } })
+}
+
+@Composable
+fun StyleMateApp(viewModel: BodyProfileViewModel? = null, authModel: AuthViewModel = defaultAuthViewModel()) {
+    val auth by authModel.state.collectAsStateWithLifecycle()
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    DisposableEffect(lifecycle, authModel) {
+        val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_RESUME) authModel.refreshSession() }
+        lifecycle.addObserver(observer)
+        onDispose { lifecycle.removeObserver(observer) }
+    }
+    if (!auth.ready) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+        return
+    }
+    val scope = auth.session?.user?.id ?: "guest"
+    val owner = remember(scope) { object : ViewModelStoreOwner { override val viewModelStore = ViewModelStore() } }
+    DisposableEffect(owner) { onDispose { owner.viewModelStore.clear() } }
+    val account = remember(auth.session) { authModel.repository.account() }
+    CompositionLocalProvider(LocalViewModelStoreOwner provides owner, LocalAccountAccess provides account) {
+      key(scope) {
+        val profileModel = viewModel ?: defaultBodyProfileViewModel(account)
+        LaunchedEffect(auth.session?.user?.json()?.toString()) { if (account != null) profileModel.refreshAccountProfile() }
+        if (auth.page == AuthPage.REGISTER) RegistrationScreen(auth, { authModel.open(AuthPage.LOGIN) }, { id, password, confirmation -> authModel.submit(id, password, confirmation) })
+        else {
+            AppContent(profileModel, authModel)
+            if (auth.page == AuthPage.LOGIN) LoginDialog(auth, { authModel.open(AuthPage.NONE) }, { authModel.open(AuthPage.REGISTER) },
+                { id, password -> authModel.submit(id, password) })
+        }
+      }
+    }
+    auth.notice?.let { message ->
+        AlertDialog(onDismissRequest = authModel::dismissNotice, text = { Text(message) },
+            confirmButton = { TextButton(onClick = authModel::dismissNotice) { Text("확인") } })
+    }
+}
+
+@Composable
+private fun AppContent(viewModel: BodyProfileViewModel, authModel: AuthViewModel) {
     val app by viewModel.app.collectAsStateWithLifecycle()
     if (app.storageError != null) {
         Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
@@ -78,7 +147,7 @@ fun StyleMateApp(viewModel: BodyProfileViewModel = defaultBodyProfileViewModel()
     if (app.setupVisible) {
         ProfileSetupFlow(viewModel, canCancel = app.profile != null)
     } else {
-        MainTabs(viewModel)
+        MainTabs(viewModel, authModel)
     }
 }
 
@@ -108,7 +177,7 @@ private fun ProfileSetupFlow(viewModel: BodyProfileViewModel, canCancel: Boolean
         }
         SetupStep.ANALYZING -> AnalyzingScreen()
         SetupStep.REVIEW -> {
-            BackHandler { viewModel.startCapture() }
+            BackHandler { if (!state.saving) viewModel.startCapture() }
             ReviewScreen(
                 state = state,
                 onRetake = viewModel::startCapture,
@@ -122,9 +191,11 @@ private fun ProfileSetupFlow(viewModel: BodyProfileViewModel, canCancel: Boolean
 }
 
 @Composable
-private fun MainTabs(viewModel: BodyProfileViewModel) {
+private fun MainTabs(viewModel: BodyProfileViewModel, authModel: AuthViewModel) {
     val app by viewModel.app.collectAsStateWithLifecycle()
-    var tab by rememberSaveable { mutableStateOf(Tab.WARDROBE) }
+    val auth by authModel.state.collectAsStateWithLifecycle()
+    val account = LocalAccountAccess.current
+    var tab by rememberSaveable { mutableStateOf(if (auth.returnToProfile || auth.session != null) Tab.PROFILE else Tab.WARDROBE) }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -154,10 +225,27 @@ private fun MainTabs(viewModel: BodyProfileViewModel) {
             Tab.PROFILE -> MyProfileScreen(
                 profile = app.profile,
                 style = app.style,
-                onSaveStyle = viewModel::saveStyleProfile,
+                onSaveStyle = { style ->
+                    if (account == null) viewModel.saveStyleProfile(style)
+                    else {
+                        val patch = org.json.JSONObject()
+                        val values = style.json()
+                        if (style.preferredFits != app.style.preferredFits) patch.put("preferred_fits", values.getJSONArray("preferred_fits"))
+                        if (style.preferredStyles != app.style.preferredStyles) patch.put("preferred_styles", values.getJSONArray("preferred_styles"))
+                        if (style.favoriteColors != app.style.favoriteColors) patch.put("favorite_colors", values.getJSONArray("favorite_colors"))
+                        if (patch.length() > 0) account.patchProfile(patch)
+                        viewModel.refreshAccountProfile()
+                        null
+                    }
+                },
                 onReanalyze = viewModel::startReanalysis,
                 onDelete = viewModel::deleteProfile,
                 modifier = Modifier.padding(padding),
+                onLogin = { authModel.open(AuthPage.LOGIN) },
+                username = auth.session?.user?.username,
+                onLogout = authModel::logout,
+                authBusy = auth.busy,
+                onDeleteRemote = viewModel::deleteAccountProfile,
             )
         }
     }

@@ -13,6 +13,8 @@ import org.json.JSONObject
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 import com.swpp.stylemate.data.LocalUserStore
+import com.swpp.stylemate.data.AccountAccess
+import com.swpp.stylemate.data.AuthException
 
 data class Weather(val temp: Double, val apparent: Double, val label: String, val band: String,
                    val rain: Boolean, val snow: Boolean, val json: JSONObject)
@@ -45,6 +47,7 @@ class OutfitRepository(
     baseUrl: String,
     private val client: OkHttpClient = defaultClient(),
     private val local: LocalUserStore? = null,
+    private val account: AccountAccess? = null,
 ) {
     private val base = baseUrl.trimEnd('/')
 
@@ -107,6 +110,16 @@ class OutfitRepository(
             .put("garment_type", garmentType ?: JSONObject.NULL)).optJSONObject("labels")
 
     private suspend fun call(method: String, path: String, body: JSONObject? = null): JSONObject = withContext(Dispatchers.IO) {
+        if (account != null) {
+            try { return@withContext account.json(method, path, body) }
+            catch (error: AuthException) {
+                throw OutfitApiException(error.code, when (error.code) {
+                    "WARDROBE_TOO_SMALL" -> "상의와 하의를 한 벌씩 등록하면 코디를 만들어 드려요."
+                    "WEATHER_UNAVAILABLE" -> "날씨를 불러오지 못했어요."
+                    else -> error.message.orEmpty()
+                })
+            }
+        }
         val payload = body?.toString()?.toRequestBody("application/json".toMediaType())
         val request = Request.Builder().url(base + path).method(method, payload).build()
         val (status, text) = try {

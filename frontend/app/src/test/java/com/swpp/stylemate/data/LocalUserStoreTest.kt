@@ -113,6 +113,21 @@ class LocalUserStoreTest {
         assertThrows(Exception::class.java) { signedIn.image(record.getString("image_url")) }
     }
 
+    @Test fun loginCachesOnlyServerProfileAndDoesNotImportGuestData() {
+        val guest = store()
+        guest.saveStyle(StyleProfile(preferredStyles = listOf("cityboy"), favoriteColors = listOf("#1F2A44")))
+        val garment = draft(guest)
+        guest.saveGarment(garment.getString("id"), JSONObject().put("notes", "guest"))
+        val id = UUID.randomUUID().toString()
+        val account = LocalUserStore.inDirectory(temporary.root, id)
+        account.cacheAccountProfile(AccountUser(id, "member_1", null, StyleProfile()))
+        assertTrue(account.garments().isEmpty())
+        assertTrue(account.onboarding().completed)
+        assertTrue(account.style().favoriteColors.isEmpty())
+        assertEquals(1, store().garments().size)
+        assertEquals(listOf("#1F2A44"), store().style().favoriteColors)
+    }
+
     @Test fun savedOutfitsStaySavedWhenRecommendationReappears() {
         val record = JSONObject().put("id", UUID.randomUUID().toString()).put("saved", false).put("items", JSONArray())
         store().rememberOutfits(JSONArray().put(record))

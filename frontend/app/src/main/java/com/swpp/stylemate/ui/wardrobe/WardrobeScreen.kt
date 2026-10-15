@@ -6,6 +6,7 @@ import com.swpp.stylemate.BuildConfig
 import com.swpp.stylemate.data.BodyProfileJson
 import com.swpp.stylemate.data.LocalBodyProfileStore
 import com.swpp.stylemate.data.LocalUserStore
+import com.swpp.stylemate.ui.LocalAccountAccess
 import com.swpp.stylemate.data.recommendation.OutfitRepository
 import com.swpp.stylemate.ui.wardrobe.capture.MeasurementActivity
 import androidx.activity.result.PickVisualMediaRequest
@@ -66,6 +67,7 @@ data class WardrobeItem(val id: String, val name: String, val category: String, 
 @Composable
 fun WardrobeRoute() {
     val context = LocalContext.current
+    val account = LocalAccountAccess.current
     val activity = context as Activity
     val files = remember { CaptureFiles(context.applicationContext) }
     val preferences = remember { context.getSharedPreferences("camera-permission", 0) }
@@ -86,10 +88,10 @@ fun WardrobeRoute() {
     val needsFront = needsFrontPhoto(measured?.optString("category"))
     val garmentType = measured?.let { if (it.isNull("garment_type")) null else it.optString("garment_type") }
     val analysisPhoto = if (needsFront) frontPhoto else selected
-    val analysisModel: GarmentAnalysisViewModel = viewModel()
+    val analysisModel: GarmentAnalysisViewModel = viewModel(factory = viewModelFactory { initializer { GarmentAnalysisViewModel(account) } })
     val analysis by analysisModel.state.collectAsStateWithLifecycle()
     val wardrobeModel: WardrobeViewModel = viewModel(factory = viewModelFactory {
-        initializer { WardrobeViewModel(LocalUserStore.forContext(context)) }
+        initializer { WardrobeViewModel(LocalUserStore.forContext(context, account?.userId), account) }
     })
     val wardrobe by wardrobeModel.state.collectAsStateWithLifecycle()
     val labelsModel: GarmentLabelsViewModel = viewModel(factory = viewModelFactory {
@@ -97,7 +99,7 @@ fun WardrobeRoute() {
     })
     val labelState by labelsModel.state.collectAsStateWithLifecycle()
     // The body profile kept on the device (recommendation labels are computed on this body).
-    val body = remember { LocalBodyProfileStore(context).load()?.let { JSONObject(BodyProfileJson.encode(it)) } }
+    val body = remember { LocalBodyProfileStore(context, account?.userId).load()?.let { JSONObject(BodyProfileJson.encode(it)) } }
     var editingId by rememberSaveable { mutableStateOf<String?>(null) }
     var savedPhoto by remember(editingId) { mutableStateOf<ImageBitmap?>(null) }
     LaunchedEffect(analysisPhoto) { analysisModel.select(analysisPhoto) }
@@ -206,7 +208,7 @@ fun WardrobeRoute() {
         }
     }
     fun discard() {
-        analysis.result?.optString("id")?.takeIf { it.isNotBlank() }?.let { id ->
+        analysis.result?.optString("id")?.takeIf { account == null && it.isNotBlank() }?.let { id ->
             scope.launch(Dispatchers.IO) { LocalUserStore.forContext(context).discardDraft(id) }
         }
         files.delete(selected); files.delete(frontPhoto)
@@ -426,11 +428,12 @@ fun WardrobeScreen(items: List<WardrobeItem>, message: String?, cameraBusy: Bool
 @Composable
 private fun GarmentPhoto(path: String, name: String, onLoaded: (ImageBitmap?) -> Unit = {}) {
     val context = LocalContext.current.applicationContext
+    val account = LocalAccountAccess.current
     var bitmap by remember(path) { mutableStateOf<ImageBitmap?>(null) }
     var loading by remember(path) { mutableStateOf(true) }
     LaunchedEffect(path) {
         onLoaded(null)
-        try { bitmap = WardrobeRepository.thumbnail(context, path) }
+        try { bitmap = WardrobeRepository.thumbnail(context, path, account) }
         catch (error: kotlinx.coroutines.CancellationException) { throw error }
         catch (_: Exception) { bitmap = null }
         finally { loading = false }

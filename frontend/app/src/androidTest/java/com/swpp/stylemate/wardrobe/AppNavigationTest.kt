@@ -9,6 +9,9 @@ import androidx.compose.runtime.mutableStateOf
 import com.swpp.stylemate.data.FakeBodyAnalyzer
 import com.swpp.stylemate.data.StyleProfile
 import com.swpp.stylemate.ui.profile.MyProfileScreen
+import com.swpp.stylemate.ui.profile.AuthViewModel
+import com.swpp.stylemate.data.AuthRepository
+import com.swpp.stylemate.data.AuthSessionStore
 import org.junit.Assert.assertEquals
 import com.swpp.stylemate.ui.StyleMateApp
 import com.swpp.stylemate.ui.profile.BodyProfileViewModel
@@ -21,7 +24,9 @@ class AppNavigationTest {
 
     @Test fun onboardingOpensWardrobeAndProfileRemainsReachable() {
         val model = BodyProfileViewModel(FakeBodyAnalyzer(0))
-        compose.setContent { StyleMateTheme { StyleMateApp(model) } }
+        val auth = guestAuth()
+        compose.setContent { StyleMateTheme { StyleMateApp(model, auth) } }
+        compose.waitUntil(5_000) { compose.onAllNodesWithText("건너뛰기").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("건너뛰기").performClick()
         compose.onNodeWithText("내 옷장").assertIsDisplayed()
         compose.onNodeWithText("촬영하기").assertIsDisplayed()
@@ -55,7 +60,9 @@ class AppNavigationTest {
     @Test fun fitAndMoodCanBeSavedWithoutBodyMeasurements() {
         val model = BodyProfileViewModel(FakeBodyAnalyzer(0))
         model.skipSetup()
-        compose.setContent { StyleMateTheme { StyleMateApp(model) } }
+        val auth = guestAuth()
+        compose.setContent { StyleMateTheme { StyleMateApp(model, auth) } }
+        compose.waitUntil(5_000) { compose.onAllNodesWithText("마이프로필").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("마이프로필").performClick()
         compose.onAllNodesWithText("수정").onFirst().performScrollTo().performClick()
         compose.onNodeWithText("와이드").performClick()
@@ -66,4 +73,10 @@ class AppNavigationTest {
         compose.onNodeWithText("저장하기").performClick()
         compose.runOnIdle { assertEquals(listOf("cityboy"), model.app.value.style.preferredStyles); assertEquals(null, model.app.value.profile) }
     }
+
+    private fun guestAuth() = AuthViewModel(AuthRepository("http://127.0.0.1:1", object : AuthSessionStore {
+        override fun read(): String? = null
+        override fun write(value: String) = Unit
+        override fun clear() = Unit
+    }))
 }

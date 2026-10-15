@@ -95,6 +95,19 @@ class LocalUserStore(private val directory: File) {
     } ?: OnboardingProgress()
     fun saveOnboarding(progress: OnboardingProgress) = put("onboarding", progress.json())
 
+    fun cacheAccountProfile(user: AccountUser) = synchronized(lock) {
+        val data = read().put("style", user.style.json())
+        if (user.body == null) data.remove("body") else data.put("body", user.body)
+        if (!data.has("onboarding")) data.put("onboarding", OnboardingProgress(8, true).json())
+        write(snapshot, data.toString().toByteArray(Charsets.UTF_8))
+    }
+
+    fun cacheGarment(record: JSONObject) = upsert("garments", record)
+    fun cacheGarments(rows: JSONArray) = synchronized(lock) {
+        val data = read().put("garments", rows)
+        write(snapshot, data.toString().toByteArray(Charsets.UTF_8))
+    }
+
     private fun records(data: JSONObject, key: String) = data.optJSONArray(key) ?: JSONArray()
     private fun list(key: String): List<JSONObject> = synchronized(lock) {
         val array = records(read(), key)

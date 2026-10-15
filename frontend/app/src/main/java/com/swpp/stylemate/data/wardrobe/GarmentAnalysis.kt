@@ -4,6 +4,7 @@ package com.swpp.stylemate.data.wardrobe
 import android.content.Context
 import com.swpp.stylemate.BuildConfig
 import com.swpp.stylemate.data.LocalUserStore
+import com.swpp.stylemate.data.AccountAccess
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import java.net.HttpURLConnection
@@ -14,9 +15,10 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
 /** [garmentType]: the kind picked for AR measurement (a landmark type), sent as a hint for the AI. */
-internal suspend fun requestAnalysis(context: Context, photo: String, garmentType: String? = null): JSONObject = withContext(Dispatchers.IO) {
+internal suspend fun requestAnalysis(context: Context, photo: String, garmentType: String? = null, account: AccountAccess? = null): JSONObject = withContext(Dispatchers.IO) {
     val hint = garmentType?.takeIf { it in landmarkTypes }?.let { "?garment=$it" }.orEmpty()
-    val connection = URI("${BuildConfig.API_BASE_URL.trimEnd('/')}/api/wardrobe/analyze-preview/$hint").toURL().openConnection() as HttpURLConnection
+    val endpoint = if (account == null) "analyze-preview" else "analyze"
+    val connection = URI("${BuildConfig.API_BASE_URL.trimEnd('/')}/api/wardrobe/$endpoint/$hint").toURL().openConnection() as HttpURLConnection
     try {
         val bytes = context.contentResolver.openInputStream(CaptureFiles(context).uri(photo))!!.use { input ->
             val buffer = ByteArray(5 * 1024 * 1024 + 1)
@@ -32,12 +34,14 @@ internal suspend fun requestAnalysis(context: Context, photo: String, garmentTyp
         connection.connectTimeout = 5_000
         connection.readTimeout = 45_000
         connection.instanceFollowRedirects = false
+        account?.let { connection.setRequestProperty("Authorization", it.authorization()) }
         connection.requestMethod = "POST"
         connection.doOutput = true
         connection.setFixedLengthStreamingMode(bytes.size)
         connection.setRequestProperty("Content-Type", "image/jpeg")
         connection.outputStream.use { it.write(bytes) }
         val status = connection.responseCode
+        account?.checkResponse(status)
         val stream = if (status in 200..299) connection.inputStream else connection.errorStream
         val text = stream?.bufferedReader(Charsets.UTF_8)?.use { reader ->
             val chars = CharArray(64 * 1024)
@@ -65,7 +69,7 @@ internal suspend fun requestAnalysis(context: Context, photo: String, garmentTyp
         })
         check(result.has("attributes")) { "분석 응답을 읽지 못했습니다." }
         currentCoroutineContext().ensureActive()
-        LocalUserStore.forContext(context).createGarment(result, bytes)
+        if (account == null) LocalUserStore.forContext(context).createGarment(result, bytes) else result
     } catch (_: SocketTimeoutException) {
         error("응답 시간이 초과됐습니다. 잠시 후 다시 시도해 주세요.")
     } catch (_: java.io.IOException) {

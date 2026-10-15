@@ -105,7 +105,8 @@ fun ReviewScreen(
         actionLabel = "다시 찍기",
         onAction = onRetake,
         primaryLabel = "옷장 등록하고 시작하기  →",
-        primaryEnabled = true,
+        primaryEnabled = !state.saving,
+        navigationEnabled = !state.saving,
         onPrimary = onConfirm,
     ) { padding ->
         Column(
@@ -121,6 +122,7 @@ fun ReviewScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             state.warnings.forEach { WarningBanner(it) }
+            state.errorMessage?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             state.reference?.let { ReferenceNote(it, state.lastInput?.heightCm) }
             Spacer(Modifier.height(16.dp))
 

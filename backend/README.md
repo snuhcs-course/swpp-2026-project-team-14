@@ -62,7 +62,7 @@ curl -H "Host: localhost" http://localhost:8000/healthz/
 
 New Django apps go in `apps/` and are registered in `config/settings.py` / `config/urls.py` (layout: wiki → Directory Structure).
 
-Wardrobe database and account outfit endpoints require `Authorization: Bearer <token>`. Body analysis, landmarks, editor options, label previews and weather remain available without login. Guest Android storage is connected: `/api/wardrobe/analyze-preview/`, `/api/outfits/preview/` and `/api/outfits/preview/feedback/` calculate results without database or file persistence; the app stores its own garments, photos and outfits. Android login and account import are not connected yet. Apply migrations before using account APIs; the ownership migrations remove pre-login rows with no owner, as approved for this feature, while keeping owned records.
+Wardrobe database and account outfit endpoints require `Authorization: Bearer <token>`. Body analysis, landmarks, editor options, label previews and weather remain available without login. Guest Android storage is connected: `/api/wardrobe/analyze-preview/`, `/api/outfits/preview/` and `/api/outfits/preview/feedback/` calculate results without database or file persistence; the app stores its own garments, photos and outfits. Android registration, login, logout, expiry handling and authenticated account APIs are connected; guest-to-account import is still pending. Apply migrations before using account APIs; the ownership migrations remove pre-login rows with no owner, as approved for this feature, while keeping owned records.
 
 ```bash
 $env:DJANGO_DEBUG="1"

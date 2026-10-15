@@ -43,6 +43,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -68,8 +71,13 @@ private fun BodyDetailsScreen(
     onDelete: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    onDeleteRemote: (suspend () -> String?)? = null,
 ) {
     var confirmDelete by remember { mutableStateOf(false) }
+    var deleting by remember { mutableStateOf(false) }
+    var deleteError by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+    BackHandler(enabled = deleting) {}
 
     Column(
         modifier = modifier
@@ -121,13 +129,22 @@ private fun BodyDetailsScreen(
 
     if (confirmDelete) {
         AlertDialog(
-            onDismissRequest = { confirmDelete = false },
+            onDismissRequest = { if (!deleting) confirmDelete = false },
             title = { Text("체형 프로필을 삭제할까요?") },
-            text = { Text("저장된 체형과 치수가 지워져요. 선호 핏·무드·컬러는 유지돼요.") },
+            text = { Text(deleteError ?: "저장된 체형과 치수가 지워져요. 선호 핏·무드·컬러는 유지돼요.") },
             confirmButton = {
-                TextButton(onClick = { confirmDelete = false; onDelete() }) { Text("삭제") }
+                TextButton(enabled = !deleting, onClick = {
+                    if (onDeleteRemote == null) { confirmDelete = false; onDelete() }
+                    else {
+                        deleting = true
+                        scope.launch {
+                            try { deleteError = onDeleteRemote(); if (deleteError == null) confirmDelete = false }
+                            finally { deleting = false }
+                        }
+                    }
+                }) { Text(if (deleting) "삭제 중…" else "삭제") }
             },
-            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("취소") } },
+            dismissButton = { TextButton(enabled = !deleting, onClick = { confirmDelete = false }) { Text("취소") } },
         )
     }
 }
@@ -200,17 +217,21 @@ private val PROFILE_COLORS = linkedMapOf("#202020" to "블랙", "#FFFFFF" to "�
 fun MyProfileScreen(
     profile: BodyProfile?,
     style: StyleProfile,
-    onSaveStyle: (StyleProfile) -> String?,
+    onSaveStyle: suspend (StyleProfile) -> String?,
     onReanalyze: () -> Unit,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
     onLogin: (() -> Unit)? = null,
+    username: String? = null,
+    onLogout: () -> Unit = {},
+    authBusy: Boolean = false,
+    onDeleteRemote: (suspend () -> String?)? = null,
 ) {
     var page by rememberSaveable { mutableStateOf(ProfilePage.MAIN) }
     val back = { page = ProfilePage.MAIN }
     BackHandler(enabled = page != ProfilePage.MAIN, onBack = back)
     when (page) {
-        ProfilePage.BODY -> BodyDetailsScreen(profile, onReanalyze, onDelete, back, modifier)
+        ProfilePage.BODY -> BodyDetailsScreen(profile, onReanalyze, onDelete, back, modifier, onDeleteRemote)
         ProfilePage.FITS -> PreferenceEditor("선호하는 핏", FIT_LABELS, style.preferredFits, 5, false, modifier, back) {
             onSaveStyle(style.copy(preferredFits = it.ifEmpty { listOf("regular") }))
         }
@@ -224,9 +245,16 @@ fun MyProfileScreen(
             Spacer(Modifier.height(4.dp))
             Text("마이프로필", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             ProfileCard {
-                Text("내 정보를 계정에 보관하세요", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                if (onLogin != null) Button(onClick = onLogin, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp), shape = RoundedCornerShape(16.dp)) { Text("로그인") }
-                Text("비로그인 데이터는 이 기기에만 저장돼요. 앱 삭제 또는 데이터 초기화 시 사라질 수 있어요.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (username == null) {
+                    Text("내 정보를 계정에 보관하세요", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    if (onLogin != null) Button(onClick = onLogin, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp), shape = RoundedCornerShape(16.dp)) { Text("로그인") }
+                    Text("비로그인 데이터는 이 기기에만 저장돼요. 앱 삭제 또는 데이터 초기화 시 사라질 수 있어요.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                } else {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Column { Text(username, fontWeight = FontWeight.Bold); Text("로그인됨", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                        OutlinedButton(onClick = onLogout, enabled = !authBusy) { Text(if (authBusy) "처리 중…" else "로그아웃") }
+                    }
+                }
             }
             ProfileCard {
                 ProfileSectionHeader("선호하는 핏", "수정") { page = ProfilePage.FITS }
@@ -297,13 +325,21 @@ private fun ColorTags(colors: List<String>) {
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun PreferenceEditor(title: String, options: Map<String, String>, initial: List<String>, limit: Int, colors: Boolean,
-    modifier: Modifier, onBack: () -> Unit, onSave: (List<String>) -> String?) {
+    modifier: Modifier, onBack: () -> Unit, onSave: suspend (List<String>) -> String?) {
     var selected by rememberSaveable(title) { mutableStateOf(initial) }
     var error by remember { mutableStateOf<String?>(null) }
-    ScreenScaffold(title, "저장하기", true, {
-        error = onSave(selected)
-        if (error == null) onBack()
-    }, modifier = modifier, onBack = onBack, contentWindowInsets = WindowInsets(0, 0, 0, 0)) { padding ->
+    var saving by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    BackHandler(enabled = saving) {}
+    ScreenScaffold(title, if (saving) "저장 중…" else "저장하기", !saving, {
+        saving = true
+        scope.launch {
+            try { error = onSave(selected); if (error == null) onBack() }
+            catch (cancelled: CancellationException) { throw cancelled }
+            catch (failure: Exception) { error = failure.message ?: "저장하지 못했어요. 다시 시도해 주세요." }
+            finally { saving = false }
+        }
+    }, modifier = modifier, onBack = onBack, navigationEnabled = !saving, contentWindowInsets = WindowInsets(0, 0, 0, 0)) { padding ->
         Column(Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
             Text(if (colors) "좋아하는 컬러를 골라 저장하세요. 최대 8개까지 선택할 수 있어요." else "여러 개 선택할 수 있어요.", color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (colors) ProfileCard {
@@ -312,30 +348,30 @@ private fun PreferenceEditor(title: String, options: Map<String, String>, initia
             }
             ProfileCard {
                 Text(if (colors) "컬러 선택" else title, fontWeight = FontWeight.Bold)
-                if (colors) ColorChoices(options, selected, limit) { selected = it; error = null }
+                if (colors) ColorChoices(options, selected, limit, !saving) { selected = it; error = null }
                 else FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     options.forEach { (code, label) -> FilterChip(selected = code in selected,
                         onClick = { selected = if (code in selected) selected - code else selected + code; error = null },
-                        enabled = code in selected || selected.size < limit,
+                        enabled = !saving && (code in selected || selected.size < limit),
                         label = { Text(label) })
                     }
                 }
             }
             if (title == "선호하는 핏") Text("선택하지 않으면 레귤러로 저장돼요.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-            TextButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterHorizontally)) { Text("취소") }
+            TextButton(onClick = onBack, enabled = !saving, modifier = Modifier.align(Alignment.CenterHorizontally)) { Text("취소") }
         }
     }
 }
 
 @Composable
-private fun ColorChoices(options: Map<String, String>, selected: List<String>, limit: Int, onChange: (List<String>) -> Unit) {
+private fun ColorChoices(options: Map<String, String>, selected: List<String>, limit: Int, enabled: Boolean, onChange: (List<String>) -> Unit) {
     options.entries.chunked(4).forEach { row ->
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             row.forEach { (hex, label) ->
                 val checked = hex in selected
                 Surface(onClick = { onChange(if (checked) selected - hex else selected + hex) },
-                    enabled = checked || selected.size < limit, selected = checked,
+                    enabled = enabled && (checked || selected.size < limit), selected = checked,
                     shape = RoundedCornerShape(12.dp), color = Color.Transparent, modifier = Modifier.weight(1f)) {
                     Column(Modifier.padding(vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(8.dp)) {

@@ -4,6 +4,7 @@ package com.swpp.stylemate.data.wardrobe
 import android.graphics.BitmapFactory
 import android.content.Context
 import com.swpp.stylemate.data.LocalUserStore
+import com.swpp.stylemate.data.AccountAccess
 import org.json.JSONArray
 import com.swpp.stylemate.BuildConfig
 import androidx.compose.ui.graphics.ImageBitmap
@@ -15,13 +16,14 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
 object WardrobeRepository {
-    private suspend fun request(path: String, body: JSONObject? = null): ByteArray = withContext(Dispatchers.IO) {
+    private suspend fun request(path: String, body: JSONObject? = null, account: AccountAccess? = null): ByteArray = withContext(Dispatchers.IO) {
         require(path.startsWith("/api/wardrobe/"))
         val connection = URI("${BuildConfig.API_BASE_URL.trimEnd('/')}$path").toURL().openConnection() as HttpURLConnection
         try {
             connection.connectTimeout = 5_000
             connection.readTimeout = 15_000
             connection.instanceFollowRedirects = false
+            account?.let { connection.setRequestProperty("Authorization", it.authorization()) }
             if (body != null) {
                 connection.requestMethod = "PUT"
                 connection.doOutput = true
@@ -31,6 +33,7 @@ object WardrobeRepository {
                 connection.outputStream.use { it.write(bytes) }
             }
             val status = connection.responseCode
+            account?.checkResponse(status)
             check(status in 200..299) {
                 when (status) {
                     400 -> "입력한 옷 정보와 치수를 확인해 주세요."
@@ -56,7 +59,12 @@ object WardrobeRepository {
         } finally { connection.disconnect() }
     }
 
-    suspend fun json(path: String, body: JSONObject? = null, store: LocalUserStore): JSONObject = withContext(Dispatchers.IO) {
+    suspend fun json(path: String, body: JSONObject? = null, store: LocalUserStore, account: AccountAccess? = null): JSONObject = withContext(Dispatchers.IO) {
+        if (account != null && path != "/api/wardrobe/options/") {
+            val result = account.json(if (body == null) "GET" else "PUT", path, body)
+            if (path == "/api/wardrobe/items/") store.cacheGarments(result.getJSONArray("items")) else store.cacheGarment(result)
+            return@withContext result
+        }
         when {
             path == "/api/wardrobe/options/" -> try {
                 JSONObject(request(path).toString(Charsets.UTF_8)).also { store.put("catalog", it) }
@@ -72,8 +80,8 @@ object WardrobeRepository {
             }
         }
     }
-    suspend fun thumbnail(context: Context, path: String): ImageBitmap? = withContext(Dispatchers.IO) {
-        val bytes = if (path.startsWith("local:")) LocalUserStore.forContext(context).image(path) else request(path)
+    suspend fun thumbnail(context: Context, path: String, account: AccountAccess? = null): ImageBitmap? = withContext(Dispatchers.IO) {
+        val bytes = if (path.startsWith("local:")) LocalUserStore.forContext(context, account?.userId).image(path) else request(path, account = account)
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
         val options = BitmapFactory.Options().apply {
