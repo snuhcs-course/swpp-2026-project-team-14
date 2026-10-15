@@ -19,6 +19,24 @@ from .models import User
 
 
 class GuestImportTests(TestCase):
+    def test_replacing_linked_garment_cannot_change_category_or_image(self):
+        self.upload()
+        self.upload(self.bottom, category='bottom')
+        self.assertEqual(self.import_outfit().status_code, 200)
+        row = Garment.objects.get(pk=mapped_id(self.user.pk, 'garments', self.top))
+        original_image = row.image.name
+        before_files = set(self.media.rglob('*.jpg'))
+        version = self.preview(garments=[self.top])['garments'][self.top]['version']
+        rejected = self.upload(category='bottom', expected=version, replace=True)
+        self.assertEqual(rejected.status_code, 409, rejected.content)
+        self.assertEqual(rejected.json()['error'], 'GARMENT_CATEGORY_IN_USE')
+        row.refresh_from_db()
+        self.assertEqual(row.attributes['category'], 'top')
+        self.assertEqual(row.image.name, original_image)
+        self.assertEqual(set(self.media.rglob('*.jpg')), before_files)
+        accepted = self.upload(value=self.garment_value(name='새 이름'), expected=version, replace=True)
+        self.assertEqual(accepted.status_code, 200, accepted.content)
+
     def setUp(self):
         self.user = User.objects.create_user('import_owner', 'test-password')
         self.other = User.objects.create_user('other_owner', 'test-password')

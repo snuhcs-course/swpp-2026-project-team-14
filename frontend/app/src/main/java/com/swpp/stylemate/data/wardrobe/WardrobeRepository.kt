@@ -61,8 +61,13 @@ object WardrobeRepository {
 
     suspend fun json(path: String, body: JSONObject? = null, store: LocalUserStore, account: AccountAccess? = null): JSONObject = withContext(Dispatchers.IO) {
         if (account != null && path != "/api/wardrobe/options/") {
+            if (path == "/api/wardrobe/items/") {
+                val rows = account.list(path, "items")
+                store.cacheGarments(rows)
+                return@withContext JSONObject().put("items", rows)
+            }
             val result = account.json(if (body == null) "GET" else "PUT", path, body)
-            if (path == "/api/wardrobe/items/") store.cacheGarments(result.getJSONArray("items")) else store.cacheGarment(result)
+            store.cacheGarment(result)
             return@withContext result
         }
         when {

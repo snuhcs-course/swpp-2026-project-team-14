@@ -9,9 +9,9 @@ swpp-2026-project-team-14/
 |   |   |-- MainActivity.kt                       # 공통 앱 진입
 |   |   |-- data/
 |   |   |   |-- BodyMeasurements.kt              # 체형 치수·선호 정보 모델
-|   |   |   |-- LocalUserStore.kt                # 로컬 메타데이터·사진·계정별 가져오기 결과 보관
+|   |   |   |-- LocalUserStore.kt                # 로컬 메타데이터·사진·가져오기 결과·코디 연결 분류 변경 제한
 |   |   |   |-- BodyProfileStore.kt              # 체형·독립 스타일·온보딩 상태 저장 연결
-|   |   |   |-- AuthRepository.kt                # 인증·프로필·사진 업로드·세션 복원·만료·요청 검증
+|   |   |   |-- AuthRepository.kt                # 인증·프로필·세션·만료·응답 제한·계정 목록 분할 조회
 |   |   |   |-- GuestImportRepository.kt         # 가져오기 후보·충돌 조회·지문·계정별 재시도 처리
 |   |   |   |-- AuthSessionStore.kt              # Keystore AES-GCM 암호화 세션 보관·백업 제외
 |   |   |   |-- recommendation/                 # 코디 로컬 저장·취향 저장·서버 계산 요청
@@ -60,11 +60,12 @@ swpp-2026-project-team-14/
 |   |   |-- users/
 |   |   |   |-- models.py                        # 사용자·체형·취향·토큰 해시 저장
 |   |   |   |-- auth.py                          # 토큰 발급·만료 확인·DB 및 인증 접근 제한
+|   |   |   |-- pagination.py                    # 계정 목록 위치 고정 커서·계정/종류 검증·개수/바이트 제한
 |   |   |   |-- limits.py                        # DB 공유 카운터·5회 실패 잠금·IP 요청 제한
 |   |   |   |-- profile.py                       # 체형 허용 필드·16종 치수·중첩 메타데이터 검증
 |   |   |   |-- urls.py                          # 가입·로그인·로그아웃·내 정보·가져오기 경로
 |   |   |   |-- views.py                         # 인증·프로필 조회 및 부분 수정 API
-|   |   |   |-- imports.py                       # 인증 가져오기·버전 충돌·사진·코디 연결 저장
+|   |   |   |-- imports.py                       # 인증 가져오기·버전 충돌·사진·코디 연결 보존·분류 변경 제한
 |   |   |   |-- migrations/0001_initial.py        # 사용자 테이블 최초 생성
 |   |   |   |-- migrations/0002_authtoken.py      # 만료 가능한 토큰 해시 테이블 생성
 |   |   |   |-- migrations/0003_authratelimit.py  # 인증 요청·실패 횟수 공유 테이블 생성
@@ -75,7 +76,7 @@ swpp-2026-project-team-14/
 |   |   |-- body_profiles/                      # 체형 분석 요청 처리
 |   |   |-- outfits/
 |   |   |   |-- models.py                        # 코디·소유 사용자·옷 연결 저장
-|   |   |   |-- views.py                         # 계정 코디 API·비로그인 비저장 계산 API
+|   |   |   |-- views.py                         # 계정 코디 분할 조회·옷 UUID 검증·비로그인 비저장 계산 API
 |   |   |   |-- migrations/0002_outfit_user.py    # 코디 소유 사용자 외래 키 추가
 |   |   |   `-- migrations/0003_alter_outfit_user.py # 무소유 코디 정리·소유자 필수 전환
 |   |   `-- wardrobe/
@@ -85,7 +86,7 @@ swpp-2026-project-team-14/
 |   |       |-- landmarks.py                     # HRNet 추론·좌표 복원·치수별 경로 계산
 |   |       |-- schema.py                        # 속성 타입·한국어 선택지·Gemini 계약(추천용 details 포함)·입력 검증
 |   |       |-- editor.py                        # 치수 정의·측정값·저장 요청(추천 라벨 포함) 검증
-|   |       |-- models.py                        # 소유 사용자·사진 경로·옷 속성·치수·메모·추천 라벨 저장
+|   |       |-- models.py                        # 소유 사용자·옷 정보 저장·코디에 사용 중인 분류 변경 검증
 |   |       |-- migrations/0001_initial.py        # 옷장 테이블 최초 생성
 |   |       |-- migrations/0002_garment_labels.py # 추천 라벨 컬럼 추가
 |   |       |-- migrations/0003_garment_user.py   # 옷 소유 사용자 외래 키 추가

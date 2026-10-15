@@ -16,6 +16,26 @@ import com.swpp.stylemate.data.recommendation.OutfitRepository
 import com.swpp.stylemate.data.wardrobe.WardrobeRepository
 
 class LocalUserStoreTest {
+    @Test fun linkedGarmentCannotChangeCategoryAndFailedSavePreservesOriginal() {
+        val local = store()
+        val row = draft(local)
+        val id = row.getString("id")
+        local.saveGarment(id, JSONObject().put("notes", "original"))
+        local.rememberOutfits(JSONArray().put(JSONObject().put("id", UUID.randomUUID().toString())
+            .put("saved", false).put("items", JSONArray().put(JSONObject().put("garment_id", id).put("slot", "top")))))
+        val changed = JSONObject(row.getJSONObject("attributes").toString()).put("category", "bottom")
+        assertThrows(IllegalStateException::class.java) {
+            local.saveGarment(id, JSONObject().put("attributes", changed).put("notes", "changed"))
+        }
+        assertEquals("top", store().garment(id)!!.getJSONObject("attributes").getString("category"))
+        assertEquals("original", store().garment(id)!!.getString("notes"))
+        local.saveGarment(id, JSONObject().put("notes", "allowed"))
+        assertEquals("allowed", store().garment(id)!!.getString("notes"))
+        val unlinked = draft(local).getString("id")
+        local.saveGarment(unlinked, JSONObject().put("attributes", changed))
+        assertEquals("bottom", store().garment(unlinked)!!.getJSONObject("attributes").getString("category"))
+    }
+
     @get:Rule val temporary = TemporaryFolder(File("build/local-store-tests").apply { mkdirs() })
     private fun store() = LocalUserStore.inDirectory(temporary.root)
     private fun draft(store: LocalUserStore) = store.createGarment(

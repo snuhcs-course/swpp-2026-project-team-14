@@ -26,6 +26,8 @@ from apps.body_profiles.profile import body_from_request
 from apps.wardrobe.models import Garment
 from apps.wardrobe.editor import validate_record
 from apps.users.auth import require_auth
+from apps.users.models import User
+from apps.users.pagination import account_page
 from recommendation import preference, season, weather
 from recommendation.catalog import Catalog
 from recommendation.labeling import label
@@ -40,6 +42,7 @@ PREF_FITS = ("slim", "regular", "loose")
 SLOT_CODE = {slot: code for code, slot in WARDROBE_CATEGORY.items()}  # 상의 -> top
 MAX_COUNT = 5
 MAX_SEEN = 100
+MAX_PREVIEW_BYTES = 1024 * 1024
 
 
 SLOT_ORDER = ("outerwear", "top", "bottom")
@@ -200,6 +203,11 @@ def recommend_view(request):
         return _error("INVALID_REQUEST", 400, str(error))
     outfits = []
     with transaction.atomic():
+        User.objects.select_for_update().get(pk=request.user.pk)
+        garments = {str(g.id): g for g in Garment.objects.filter(user=request.user, saved=True)}
+        if any(i['id'][2:] not in garments or garments[i['id'][2:]].attributes['category'] != SLOT_CODE[i['slot']]
+               for o in result['outfits'] for i in o['items']):
+            return _error('GARMENT_CATEGORY_CHANGED', 409)
         for o in result["outfits"]:
             members = [(SLOT_CODE[i["slot"]], garments[i["id"][2:]], i.get("size", "")) for i in o["items"]]
             outfits.append(_create(Outfit.Source.RECOMMENDED, members, user=request.user, score=o["total"], components=o["components"],
@@ -210,7 +218,7 @@ def recommend_view(request):
 
 def _local_garments(data):
     rows = data.get('wardrobe')
-    if not isinstance(rows, list) or len(rows) > 100:
+    if not isinstance(rows, list):
         raise ValueError('Invalid local wardrobe')
     garments = {}
     for row in rows:
@@ -228,7 +236,7 @@ def _local_garments(data):
 def preview_view(request):
     """Use the same calculation for a device's wardrobe without reading or writing the DB."""
     try:
-        data = _read(request, 256 * 1024)
+        data = _read(request, MAX_PREVIEW_BYTES)
         garments = _local_garments(data)
         result, context = _calculate(data, garments)
         outfits = []
@@ -284,11 +292,11 @@ def preview_feedback(request):
 @require_auth
 def outfits_view(request):
     if request.method == "GET":
-        saved = Outfit.objects.filter(user=request.user, saved=True).order_by("-updated_at").prefetch_related("items__garment")
-        return _json({"outfits": [serialize(o) for o in saved]})
+        saved = Outfit.objects.filter(user=request.user, saved=True).prefetch_related("items__garment")
+        return account_page(request, saved, serialize, 'outfits', 'updated_at')
     try:
         data = _read(request)
-        ids = _strings(data.get("garment_ids"), 3, 40)
+        ids = list(dict.fromkeys(str(uuid.UUID(value)) for value in _strings(data.get("garment_ids"), 3, 40)))
         source = data.get("source", Outfit.Source.USER)
         name = data.get("name", "")
         if source not in (Outfit.Source.USER, Outfit.Source.CHAT) or not isinstance(name, str) or len(name) > 80:
@@ -296,20 +304,21 @@ def outfits_view(request):
         context = data.get("context", {})
         if not isinstance(context, dict) or len(json.dumps(context)) > 2000:
             raise ValueError("Invalid context")
-        found = {str(g.id): g for g in Garment.objects.filter(user=request.user, saved=True, pk__in=ids)} if ids else {}
-        members = [(g.attributes.get("category"), g, "") for g in (found.get(i) for i in ids) if g]
-        slots = [slot for slot, _, _ in members]
-        if len(members) != len(ids) or len(set(slots)) != len(slots) or not {"top", "bottom"} <= set(slots) \
-                or not set(slots) <= set(SLOT_ORDER):
-            raise ValueError("An outfit needs one saved top and one saved bottom (and optionally one outerwear)")
+        with transaction.atomic():
+            User.objects.select_for_update().get(pk=request.user.pk)
+            found = {str(g.id): g for g in Garment.objects.filter(user=request.user, saved=True, pk__in=ids)} if ids else {}
+            members = [(g.attributes.get("category"), g, "") for g in (found.get(i) for i in ids) if g]
+            slots = [slot for slot, _, _ in members]
+            if len(members) != len(ids) or len(set(slots)) != len(slots) or not {"top", "bottom"} <= set(slots) \
+                    or not set(slots) <= set(SLOT_ORDER):
+                raise ValueError("An outfit needs one saved top and one saved bottom (and optionally one outerwear)")
+            outfit = _create(source, members, user=request.user, saved=True, name=name.strip(), context=context)
     except TooLarge:
         return _error("BODY_TOO_LARGE", 413)
     except NotJson:
         return _error("JSON_REQUIRED", 415)
     except (ValueError, TypeError, UnicodeDecodeError, OverflowError) as error:
         return _error("INVALID_OUTFIT", 400, str(error))
-    with transaction.atomic():
-        outfit = _create(source, members, user=request.user, saved=True, name=name.strip(), context=context)
     return _json(serialize(outfit), 201)
 
 

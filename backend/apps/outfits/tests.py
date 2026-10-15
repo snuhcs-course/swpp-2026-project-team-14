@@ -1,6 +1,7 @@
 # AI-generated with Claude Code (Claude Opus 5.5), 2026-10-12, reviewed by Dongkun Moon
 """Outfit API tests on the in-memory database with the shipped models; no network, photos or AI key."""
 import json
+import base64
 import tempfile
 from unittest.mock import patch
 
@@ -34,6 +35,101 @@ def garment(user, name, category, sub, color, saved=True, labels=None, **measure
 
 
 class OutfitApiTests(TestCase):
+    def test_cursor_checks_owner_kind_and_invalid_positions(self):
+        def cursor(position):
+            return base64.urlsafe_b64encode(json.dumps(position).encode()).decode().rstrip('=')
+        at = self.tee.created_at.isoformat()
+        owner, pk = str(self.user.pk), str(self.tee.pk)
+        for invalid in (
+                cursor([str(uuid.uuid4()), 'items', at, pk]),
+                cursor([owner, 'outfits', at, pk]),
+                cursor([owner, 'items', '2026-10-16T00:00:00', pk]),
+                cursor([owner, 'items', '9999-12-31T23:59:59-23:59', pk]),
+                cursor([owner, 'items', at, 'invalid']),
+                cursor([owner, 'items', at, None]),
+                cursor({'not': 'a position'}), 'x' * 513, '%%%'):
+            with self.subTest(cursor=invalid):
+                self.assertEqual(self.client.get('/api/wardrobe/items/', {'after': invalid}).status_code, 400)
+
+    def test_next_page_survives_cursor_outfit_edit_or_unsave(self):
+        for change in ({'name': '수정'}, {'saved': False}):
+            with self.subTest(change=change):
+                Outfit.objects.filter(user=self.user).delete()
+                for _ in range(23):
+                    self.assertEqual(self.post('/api/outfits/', {'garment_ids': [str(self.tee.pk), str(self.jeans.pk)]}).status_code, 201)
+                first = self.client.get('/api/outfits/').json()
+                first_ids = {row['id'] for row in first['outfits']}
+                remaining = {str(pk) for pk in Outfit.objects.filter(user=self.user).exclude(pk__in=first_ids).values_list('pk', flat=True)}
+                anchor = first['outfits'][-1]['id']
+                edited = self.client.put(f'/api/outfits/{anchor}/', json.dumps(change), content_type='application/json')
+                self.assertEqual(edited.status_code, 200)
+                response = self.client.get('/api/outfits/', {'after': first['next']})
+                self.assertEqual(response.status_code, 200, response.content)
+                second = response.json()
+                self.assertEqual({row['id'] for row in second['outfits']}, remaining)
+                self.assertIsNone(second['next'])
+
+    def test_malformed_garment_ids_are_rejected_without_creating_outfits(self):
+        for invalid in ('not-a-uuid', '', 'z' * 36, 123, None, {}, True):
+            with self.subTest(value=invalid):
+                before = Outfit.objects.count()
+                response = self.post('/api/outfits/', {'garment_ids': [invalid, str(self.jeans.pk)]})
+                self.assertEqual(response.status_code, 400, response.content)
+                self.assertEqual(response.json()['error'], 'INVALID_OUTFIT')
+                self.assertEqual(Outfit.objects.count(), before)
+        missing = self.post('/api/outfits/', {'garment_ids': [str(uuid.uuid4()), str(self.jeans.pk)]})
+        self.assertEqual(missing.status_code, 400)
+
+    def test_linked_garment_category_cannot_change_but_other_edits_can(self):
+        response = self.post('/api/outfits/', {'garment_ids': [str(self.tee.pk), str(self.jeans.pk)]})
+        self.assertEqual(response.status_code, 201, response.content)
+        # Recommended/unsaved outfits also retain their slot invariant.
+        Outfit.objects.filter(pk=response.json()['id']).update(saved=False)
+        payload = {'attributes': {**self.tee.attributes, 'category': 'bottom', 'subcategory': 'jeans'},
+                   'dimensions': None, 'notes': 'must not persist'}
+        path = f'/api/wardrobe/items/{self.tee.pk}/'
+        blocked = self.client.put(path, json.dumps(payload), content_type='application/json')
+        self.assertEqual(blocked.status_code, 409, blocked.content)
+        self.assertEqual(blocked.json()['error'], 'GARMENT_CATEGORY_IN_USE')
+        self.tee.refresh_from_db()
+        self.assertEqual(self.tee.attributes['category'], 'top')
+        self.assertEqual(self.tee.notes, '')
+        payload['attributes'] = {**self.tee.attributes, 'name': '수정한 이름'}
+        self.assertEqual(self.client.put(path, json.dumps(payload), content_type='application/json').status_code, 200)
+        unlinked = f'/api/wardrobe/items/{self.small.pk}/'
+        payload['attributes'] = {**self.small.attributes, 'category': 'bottom', 'subcategory': 'jeans'}
+        self.assertEqual(self.client.put(unlinked, json.dumps(payload), content_type='application/json').status_code, 200)
+
+    def test_account_lists_are_bounded_complete_and_owner_scoped(self):
+        rows = [Garment(user=self.user, image='garments/x.jpg', saved=True,
+                        attributes=self.tee.attributes, dimensions=self.tee.dimensions, notes='한' * 2000)
+                for _ in range(122)]
+        Garment.objects.bulk_create(rows)
+        other = User.objects.create_user('list_other', 'test-password')
+        hidden = garment(other, '비공개', 'top', 'tshirt', '#FFFFFF')
+        seen, path = [], '/api/wardrobe/items/'
+        while path:
+            response = self.client.get(path)
+            self.assertEqual(response.status_code, 200, response.content)
+            self.assertLess(len(response.content), 256 * 1024)
+            page = response.json()
+            seen.extend(row['id'] for row in page['items'])
+            path = '/api/wardrobe/items/?after=' + page['next'] if page['next'] else None
+        expected = {str(pk) for pk in Garment.objects.filter(user=self.user, saved=True).values_list('pk', flat=True)}
+        self.assertEqual(len(seen), len(set(seen)))
+        self.assertEqual(set(seen), expected)
+        for cursor in ('bad-id', str(hidden.pk), str(uuid.uuid4())):
+            self.assertEqual(self.client.get('/api/wardrobe/items/', {'after': cursor}).status_code, 400)
+
+        for _ in range(23):
+            self.assertEqual(self.post('/api/outfits/', {'garment_ids': [str(self.tee.pk), str(self.jeans.pk)]}).status_code, 201)
+        first = self.client.get('/api/outfits/').json()
+        self.assertEqual(len(first['outfits']), 20)
+        second = self.client.get('/api/outfits/', {'after': first['next']}).json()
+        self.assertEqual(len(second['outfits']), 3)
+        self.assertIsNone(second['next'])
+        self.assertEqual(len({row['id'] for row in first['outfits'] + second['outfits']}), 23)
+
     def setUp(self):
         self.user = User.objects.create_user('outfit_owner', 'test-password')
         _, token = issue_token(self.user)
@@ -168,6 +264,15 @@ class WeatherTests(TestCase):
 
 
 class LocalWardrobePreviewTests(SimpleTestCase):
+    @patch('apps.outfits.views._calculate')
+    def test_preview_accepts_more_than_100_records_within_byte_limit(self, calculate):
+        calculate.return_value = ({'outfits': [], 'notes': [], 'band': {}}, {})
+        rows = [{**self.rows[0], 'id': str(uuid.uuid4())} for _ in range(101)]
+        response = self.post('/api/outfits/preview/', {'wardrobe': rows})
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertEqual(len(calculate.call_args.args[1]), 101)
+        self.assertEqual(self.post('/api/outfits/preview/', {'padding': 'x' * (1024 * 1024)}).status_code, 413)
+
     def setUp(self):
         self.rows = []
         for category, subtype in [('top', 'tshirt'), ('bottom', 'jeans')]:

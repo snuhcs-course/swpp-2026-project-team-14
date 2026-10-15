@@ -217,6 +217,8 @@ class AuthRepository(
             "INVALID_IMPORT" -> "가져올 데이터와 옷·코디 연결을 확인해 주세요."
             "IMPORT_STORAGE_FAILED" -> "사진을 보관하지 못했어요. 잠시 후 다시 시도해 주세요."
             "INVALID_IMAGE", "IMAGE_TOO_LARGE" -> "옷 사진의 형식이나 용량을 확인해 주세요."
+            "GARMENT_CATEGORY_IN_USE" -> "코디에 사용 중인 옷은 분류를 바꿀 수 없어요."
+            "GARMENT_CATEGORY_CHANGED" -> "옷 정보가 변경됐어요. 다시 시도해 주세요."
             else -> "요청을 처리하지 못했어요. 잠시 후 다시 시도해 주세요."
         }, retry)
     }
@@ -242,6 +244,24 @@ class AccountAccess internal constructor(private val repository: AuthRepository,
         repository.check(session)
     }
     suspend fun json(method: String, path: String, data: JSONObject? = null) = repository.request(method, path, data, session)
+    suspend fun list(path: String, key: String): org.json.JSONArray {
+        require(path in setOf("/api/wardrobe/items/", "/api/outfits/"))
+        val rows = org.json.JSONArray()
+        val cursors = mutableSetOf<String>()
+        var nextPath = path
+        do {
+            val page = json("GET", nextPath)
+            val items = page.getJSONArray(key)
+            for (index in 0 until items.length()) rows.put(items.getJSONObject(index))
+            val next = if (page.isNull("next")) null else page.getString("next")
+            if (next == null) break
+            if (next.length !in 1..512 || !next.matches(Regex("[A-Za-z0-9_-]+")) || !cursors.add(next)) {
+                throw AuthException("INVALID_RESPONSE", "목록을 읽지 못했어요. 다시 시도해 주세요.")
+            }
+            nextPath = "$path?after=$next"
+        } while (true)
+        return rows
+    }
     suspend fun patchProfile(data: JSONObject) = repository.patch(session, data)
     suspend fun refreshProfile() = repository.refresh(session)
     suspend fun upload(path: String, metadata: JSONObject, image: ByteArray) = repository.upload(path, metadata, image, session)

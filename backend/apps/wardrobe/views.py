@@ -6,18 +6,21 @@ from threading import BoundedSemaphore
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.exceptions import RequestDataTooBig
+from django.db import transaction
 from django.http import FileResponse, JsonResponse
 from django.shortcuts import get_object_or_404
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from apps.body_profiles.profile import body_from_request
 from apps.users.auth import require_auth
+from apps.users.models import User
+from apps.users.pagination import account_page
 from recommendation.labeling import label
 
 from .analysis import AnalysisError, MAX_IMAGE_BYTES, MODEL, analyze_image, prepare_image
 from .editor import catalog, validate_record
 from .schema import validate_ai_details, validate_attributes
-from .models import Garment
+from .models import Garment, CategoryInUse
 from .landmarks import GARMENTS, MAX_FRAME_BYTES, detect
 
 # Bound concurrent paid requests and image decode memory.
@@ -135,7 +138,7 @@ def labels(request):
 @require_GET
 @require_auth
 def items(request):
-    response = JsonResponse({'items': [serialize(item) for item in Garment.objects.filter(user=request.user, saved=True).order_by('-created_at')]})
+    response = account_page(request, Garment.objects.filter(user=request.user, saved=True), serialize, 'items')
     response['Cache-Control'] = 'no-store'
     return response
 
@@ -156,11 +159,18 @@ def item(request, item_id):
             return JsonResponse({'error': 'BODY_TOO_LARGE'}, status=413)
         except (ValueError, TypeError, UnicodeDecodeError, OverflowError):
             return JsonResponse({'error': 'INVALID_GARMENT'}, status=400)
-        for key, value in values.items():
-            setattr(garment, key, value)
-        # The analysis ID is reused on retry: saving never creates a second garment.
-        garment.saved = True
-        garment.save(update_fields=[*values, 'saved', 'updated_at'])
+        with transaction.atomic():
+            User.objects.select_for_update().get(pk=request.user.pk)
+            garment = get_object_or_404(Garment, pk=item_id, user=request.user)
+            try:
+                garment.check_category_change(values['attributes'])
+            except CategoryInUse:
+                return JsonResponse({'error': 'GARMENT_CATEGORY_IN_USE'}, status=409)
+            for key, value in values.items():
+                setattr(garment, key, value)
+            # The analysis ID is reused on retry: saving never creates a second garment.
+            garment.saved = True
+            garment.save(update_fields=[*values, 'saved', 'updated_at'])
     response = JsonResponse(serialize(garment))
     response['Cache-Control'] = 'no-store'
     return response

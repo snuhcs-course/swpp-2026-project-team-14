@@ -9,10 +9,87 @@ import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
+import org.junit.Rule
+import org.junit.rules.TemporaryFolder
+import java.io.File
+import org.json.JSONArray
+import com.swpp.stylemate.data.wardrobe.WardrobeRepository
+import com.swpp.stylemate.data.recommendation.OutfitRepository
+import com.swpp.stylemate.data.recommendation.OutfitApiException
 import java.time.Instant
 import java.util.UUID
 
 class AuthRepositoryTest {
+    @get:Rule val temporary = TemporaryFolder(File("build/account-list-tests").apply { mkdirs() })
+
+    @Test fun accountWardrobeLoadsEveryPageBeforeReplacingCache() = runBlocking {
+        signIn()
+        server.takeRequest()
+        val account = repository.account()!!
+        val local = LocalUserStore.inDirectory(temporary.root, firstId)
+        val cursor = UUID.randomUUID().toString()
+        fun row(id: String) = JSONObject().put("id", id).put("saved", true).put("notes", "한".repeat(2000))
+        // The combined list exceeds 256 KiB; each response remains bounded.
+        val pages = (0 until 7).map { page -> JSONArray((0 until 20).map { row("$page-$it") }) }
+        for ((index, rows) in pages.withIndex()) server.enqueue(response(JSONObject().put("items", rows)
+            .put("next", if (index < pages.lastIndex) UUID.nameUUIDFromBytes("$index".toByteArray()).toString() else JSONObject.NULL)))
+        val result = WardrobeRepository.json("/api/wardrobe/items/", store = local, account = account)
+        assertEquals(140, result.getJSONArray("items").length())
+        assertEquals(140, local.garments().size)
+        repeat(7) { index ->
+            val request = server.takeRequest()
+            assertEquals("Bearer ${"a".repeat(43)}", request.getHeader("Authorization"))
+            assertEquals(if (index == 0) "/api/wardrobe/items/" else "/api/wardrobe/items/?after=${UUID.nameUUIDFromBytes("${index - 1}".toByteArray())}", request.path)
+        }
+        server.enqueue(response(JSONObject().put("items", JSONArray().put(row("partial"))).put("next", cursor)))
+        server.enqueue(MockResponse().setResponseCode(503).setBody("{}"))
+        try { WardrobeRepository.json("/api/wardrobe/items/", store = local, account = account); fail() }
+        catch (_: AuthException) {}
+        assertEquals(140, local.garments().size)
+        assertNull(local.garment("partial"))
+    }
+
+    @Test fun accountListsRejectRepeatedOrUnsafeCursorsAndKeepResponseLimit() = runBlocking {
+        signIn()
+        val account = repository.account()!!
+        for (cursor in listOf("https://other.example/", "bad/id", "x".repeat(513))) {
+            server.enqueue(response(JSONObject().put("items", JSONArray()).put("next", cursor)))
+            try { account.list("/api/wardrobe/items/", "items"); fail() }
+            catch (error: AuthException) { assertEquals("INVALID_RESPONSE", error.code) }
+        }
+        val repeated = UUID.randomUUID().toString()
+        repeat(2) { server.enqueue(response(JSONObject().put("items", JSONArray()).put("next", repeated))) }
+        try { account.list("/api/wardrobe/items/", "items"); fail() }
+        catch (error: AuthException) { assertEquals("INVALID_RESPONSE", error.code) }
+        server.enqueue(response(JSONObject().put("items", JSONArray()).put("padding", "x".repeat(256 * 1024))))
+        try { account.list("/api/wardrobe/items/", "items"); fail() }
+        catch (error: AuthException) { assertEquals("INVALID_RESPONSE", error.code) }
+        assertNotNull(repository.status.value.session)
+    }
+
+    @Test fun savedAccountOutfitsLoadAllPages() = runBlocking {
+        signIn()
+        val cursor = UUID.randomUUID().toString()
+        fun outfit(id: String) = JSONObject().put("id", id).put("items", JSONArray()).put("saved", true)
+        server.enqueue(response(JSONObject().put("outfits", JSONArray().put(outfit(cursor))).put("next", cursor)))
+        server.enqueue(response(JSONObject().put("outfits", JSONArray().put(outfit("second"))).put("next", JSONObject.NULL)))
+        val outfits = OutfitRepository(server.url("/").toString(), account = repository.account()).saved()
+        assertEquals(listOf(cursor, "second"), outfits.map { it.id })
+    }
+
+    @Test fun savedAccountOutfitPageFailuresUseTheExceptionHandledByTheScreen() = runBlocking {
+        for ((status, expected) in listOf(503 to "HTTP_503", 401 to "AUTHENTICATION_REQUIRED")) {
+            signIn()
+            val repo = OutfitRepository(server.url("/").toString(), account = repository.account())
+            val cursor = UUID.randomUUID().toString()
+            server.enqueue(response(JSONObject().put("outfits", JSONArray()).put("next", cursor)))
+            server.enqueue(MockResponse().setResponseCode(status).setBody("{}"))
+            try { repo.saved(); fail() }
+            catch (error: OutfitApiException) { assertEquals(expected, error.code) }
+            assertEquals(status != 401, repository.status.value.session != null)
+        }
+    }
+
     private val server = MockWebServer()
     private val storage = MemorySessionStore()
     private var time = Instant.parse("2026-10-16T00:00:00Z")

@@ -2,7 +2,7 @@
 
 모든 요청·응답은 JSON(UTF-8)이다. 계정 코디 API와 옷장 DB 분석·저장·조회에는 [로그인 API](../login/README.md)의 Bearer 토큰이 필요하며 본인 데이터만 사용한다. 날씨·라벨·비저장 분석·코디 미리보기는 비로그인에서도 제공한다. 체형은 기존대로 요청의 `body`로 받는다(앱의 `BodyProfileJson` 형식 그대로, 또는 `{height, chest, waist, hip, shoulder, inseam, …}` cm 값). 서버 쪽에서 체형을 읽는 곳은 `apps/body_profiles/profile.py`의 `body_from_request()` 하나다. 사용자 DB의 선호 정보를 추천 계산에 새로 연결하지 않는다.
 
-현재 비로그인 앱은 `POST /api/outfits/preview/`에 기존 추천 요청과 `wardrobe` 배열(로컬 옷의 UUID·속성·치수·라벨 등)을 전달한다. 최대 100벌·256KiB이며 옷 ID 중복·잘못된 필드를 검증한다. 기존 추천 계산 결과를 반환하고 DB에 저장하지 않는다. 결과 ID는 같은 조합에 대해 유지되며 앱이 코디 저장 여부를 로컬에 관리한다. `POST /api/outfits/preview/feedback/`은 해당 코디·구성 옷·기존 취향으로 피드백을 계산한다(최대 64KiB). 계산은 온라인이며 서버 DB에 기록하지 않는다. 새 추천 알고리즘이나 사용자 DB 취향 연동은 추가하지 않는다.
+현재 비로그인 앱은 `POST /api/outfits/preview/`에 기존 추천 요청과 `wardrobe` 배열(로컬 옷의 UUID·속성·치수·라벨)을 전달한다. 요청 전체는 최대 1MiB이며 옷 ID 중복·잘못된 필드를 검증한다. 별도 100벌 제한은 두지 않는다. 앱은 메모·사진 경로·분석 캐시를 제외하고 전송하며, 같은 바이트 제한을 초과하면 계정 가져오기를 안내한다. 로컬 메모는 유지한다. 기존 추천 계산 결과를 반환하고 DB에 저장하지 않는다. 결과 ID는 같은 조합에 대해 유지되며 앱이 코디 저장 여부를 로컬에 관리한다. `POST /api/outfits/preview/feedback/`은 해당 코디·구성 옷·기존 취향으로 피드백을 계산한다(최대 64KiB). 계산은 온라인이며 서버 DB에 기록하지 않는다. 새 추천 알고리즘이나 사용자 DB 취향 연동은 추가하지 않는다.
 
 ## 옷 등록: 추천 라벨
 
@@ -85,7 +85,7 @@
 
 | 메서드·경로 | 동작 |
 | --- | --- |
-| `GET /api/outfits/` | 저장한 코디(코디북), 최근 순 |
+| `GET /api/outfits/` | 저장한 코디(코디북), 수정 시각·ID 내림차순. 최대 20개·항목 합계 128KiB, `next`가 있으면 `?after=<next>`로 커서를 그대로 전달하여 계속 조회 |
 | `POST /api/outfits/` | `{garment_ids, source: "user"\|"chat", name?, context?}`로 코디 저장. 상의·하의 각 1벌 필수, 아우터 선택. 201 |
 | `GET /api/outfits/{id}/` | 코디 하나 |
 | `PUT /api/outfits/{id}/` | `{saved?, name?}` 코디북 저장·이름 |

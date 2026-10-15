@@ -155,6 +155,14 @@ class LocalUserStore(private val directory: File) {
     fun saveGarment(id: String, payload: JSONObject): JSONObject = synchronized(lock) {
         val record = checkNotNull(garment(id)) { "옷 정보를 찾을 수 없어요." }
         require(payload.keys().asSequence().all { it in setOf("attributes", "dimensions", "notes", "labels") })
+        val category = payload.optJSONObject("attributes")?.getString("category")
+        if (category != null && category != record.getJSONObject("attributes").getString("category")) {
+            val linked = list("outfits").any { outfit ->
+                val items = outfit.getJSONArray("items")
+                (0 until items.length()).any { items.getJSONObject(it).getString("garment_id") == id }
+            }
+            check(!linked) { "코디에 사용 중인 옷은 분류를 바꿀 수 없어요." }
+        }
         payload.keys().forEach { record.put(it, payload.get(it)) }
         record.put("saved", true).put("updated_at", Instant.now().toString())
         upsert("garments", record)

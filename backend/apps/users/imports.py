@@ -18,7 +18,7 @@ from apps.body_profiles.profile import body_from_request
 from apps.outfits.models import Outfit, OutfitItem
 from apps.wardrobe.analysis import AnalysisError, MAX_IMAGE_BYTES, prepare_image
 from apps.wardrobe.editor import validate_record
-from apps.wardrobe.models import Garment
+from apps.wardrobe.models import Garment, CategoryInUse
 from .auth import require_auth
 from .models import User
 from .views import _finite_float, _json, _reject_nonfinite, _unique_object
@@ -40,6 +40,8 @@ def _errors(view):
             return view(*args, **kwargs)
         except (Changed, IntegrityError):
             return _json({'error': 'IMPORT_CHANGED'}, 409)
+        except CategoryInUse:
+            return _json({'error': 'GARMENT_CATEGORY_IN_USE'}, 409)
         except RequestDataTooBig:
             return _json({'error': 'BODY_TOO_LARGE'}, 413)
         except AnalysisError as error:
@@ -215,6 +217,8 @@ def garment(request, source_id):
             same = row is not None and row.saved and row.image.name == image_name and all(getattr(row, key) == val for key, val in values.items())
             status = _decision(same, _version(row), expected, row is not None, replace)
             if status == 'imported':
+                if row is not None:
+                    row.check_category_change(values['attributes'])
                 if not default_storage.exists(image_name):
                     image_name = default_storage.save(image_name, ContentFile(image))
                     created_image = image_name
