@@ -26,6 +26,7 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.semantics.semantics
@@ -184,14 +185,11 @@ fun OnboardingRoute(model: BodyProfileViewModel, onLogin: () -> Unit, guestStore
                         OnboardingTitle("자주 입는 옷부터 담아볼까요?")
                         Text("상의 2벌 · 하의 2벌 · 신발 1켤레를 권장해요.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                         OnboardingCard {
-                            Text("내 옷장 ${records.size}개", fontWeight = FontWeight.Bold)
-                            val filled = listOf("top" to 2, "bottom" to 2, "shoes" to 1).sumOf { (category, target) ->
-                                records.count { it.getJSONObject("attributes").optString("category") == category }.coerceAtMost(target)
-                            }
-                            LinearProgressIndicator(progress = { filled / 5f }, modifier = Modifier.fillMaxWidth())
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                for ((category, label, target) in listOf(Triple("top", "상의", 2), Triple("bottom", "하의", 2), Triple("shoes", "신발", 1))) {
-                                    Text("$label ${records.count { it.getJSONObject("attributes").optString("category") == category }}/$target", style = MaterialTheme.typography.labelMedium)
+                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                listOf(Triple("top", "상의", 2), Triple("bottom", "하의", 2), Triple("shoes", "신발", 1)).forEachIndexed { index, (category, label, target) ->
+                                    if (index > 0) VerticalDivider(Modifier.height(20.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                                    Text("$label ${records.count { it.getJSONObject("attributes").optString("category") == category }}/$target",
+                                        Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center, maxLines = 1)
                                 }
                             }
                         }

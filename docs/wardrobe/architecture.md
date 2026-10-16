@@ -33,7 +33,7 @@ swpp-2026-project-team-14/
 |   |       |   |-- GuestImportViewModel.kt      # 수동 가져오기·읽기 취소·충돌 선택·저장/새로고침 재시도
 |   |       |   |-- GuestImportDialog.kt         # 가져오기 확인·항목별 교체 선택·결과 팝업
 |   |       |   |-- BodyProfileViewModel.kt      # 체형 분석·온보딩 초안·핏 선택 확정/기본값·완료·계정 연결
-|   |       |   |-- OnboardingScreen.kt          # 공통 상단바·8페이지·선택적 분석·옷 등록 반복·완료/로그인
+|   |       |   |-- OnboardingScreen.kt          # 공통 상단바·8페이지·등록 개수 현황·선택적 분석·옷 등록 반복·완료/로그인
 |   |       |   |-- PhotoInputScreen.kt          # 체형 사진·기본 정보 입력·온보딩 상단바 연결
 |   |       |   |-- ReviewScreen.kt              # 체형 결과·치수 수정·온보딩 확인과 재분석 저장
 |   |       |   `-- MyProfileScreen.kt           # 핏·무드 즉시 저장·컬러 편집·간결한 계정 카드·가져오기·체형 상세
