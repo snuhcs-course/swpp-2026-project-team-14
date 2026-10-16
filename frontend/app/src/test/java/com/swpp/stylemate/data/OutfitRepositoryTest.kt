@@ -3,6 +3,11 @@ package com.swpp.stylemate.data
 
 import com.swpp.stylemate.data.recommendation.OutfitApiException
 import com.swpp.stylemate.data.recommendation.OutfitRepository
+import org.json.JSONArray
+import org.junit.Rule
+import org.junit.rules.TemporaryFolder
+import java.io.File
+import java.util.UUID
 import kotlinx.coroutines.runBlocking
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
@@ -17,6 +22,32 @@ import org.junit.Before
 import org.junit.Test
 
 class OutfitRepositoryTest {
+    @get:Rule val temporary = TemporaryFolder(File("build/preview-request-tests").apply { mkdirs() })
+
+    @Test fun localPreviewSendsOver100GarmentsWithoutNotesOrCachedAnalysisAndChecksByteLimit() = runBlocking {
+        val local = LocalUserStore.inDirectory(temporary.root)
+        fun row() = JSONObject().put("id", UUID.randomUUID().toString()).put("saved", true)
+            .put("attributes", JSONObject().put("name", "티셔츠").put("category", "top").put("subcategory", "tshirt")
+                .put("colors", JSONArray(listOf("#FFFFFF"))).put("styles", JSONArray()).put("fit_type", JSONObject.NULL)
+                .put("leg_shape", JSONObject.NULL).put("rise_type", JSONObject.NULL).put("skirt_shape", JSONObject.NULL))
+            .put("notes", "메모".repeat(1000)).put("model", "cached-model").put("details", JSONObject().put("print", "무지"))
+        local.cacheGarments(JSONArray((0 until 101).map { row() }))
+        server.enqueue(MockResponse().setBody("""{"outfits": [], "notes": [], "band": {"label": "x"}}"""))
+        val repo = OutfitRepository(server.url("/").toString(), local = local)
+        repo.recommend(body, null, null, emptyList())
+        val request = server.takeRequest()
+        assertEquals("/api/outfits/preview/", request.path)
+        val rows = JSONObject(request.body.readUtf8()).getJSONArray("wardrobe")
+        assertEquals(101, rows.length())
+        assertEquals(setOf("id", "attributes", "dimensions", "labels", "notes"), rows.getJSONObject(0).keys().asSequence().toSet())
+        assertEquals("", rows.getJSONObject(0).getString("notes"))
+        assertEquals(2000, local.garments().first().getString("notes").length)
+        local.cacheGarments(JSONArray((0 until 4000).map { row().put("notes", "") }))
+        try { repo.recommend(body, null, null, emptyList()); fail() }
+        catch (error: OutfitApiException) { assertEquals("BODY_TOO_LARGE", error.code) }
+        assertEquals(1, server.requestCount)
+    }
+
     private lateinit var server: MockWebServer
     private val body = JSONObject().put("height_cm", 162).put("gender", "female")
 

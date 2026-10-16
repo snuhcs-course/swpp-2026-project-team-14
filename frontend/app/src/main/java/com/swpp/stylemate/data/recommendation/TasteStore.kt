@@ -2,6 +2,7 @@
 package com.swpp.stylemate.data.recommendation
 
 import android.content.Context
+import com.swpp.stylemate.data.LocalUserStore
 import org.json.JSONException
 import org.json.JSONObject
 
@@ -21,18 +22,8 @@ class InMemoryTasteStore(private var taste: JSONObject? = null) : TasteStore {
     }
 }
 
-class SharedPrefsTasteStore(context: Context) : TasteStore {
-    private val prefs = context.applicationContext.getSharedPreferences("outfit_taste", Context.MODE_PRIVATE)
-
-    override fun load(): JSONObject? = prefs.getString(KEY, null)?.let {
-        try { JSONObject(it) } catch (e: JSONException) { null }
-    }
-
-    override fun save(taste: JSONObject?) {
-        prefs.edit().apply { if (taste == null) remove(KEY) else putString(KEY, taste.toString()) }.apply()
-    }
-
-    private companion object {
-        const val KEY = "taste_v1"
-    }
+class LocalTasteStore(context: Context, accountId: String? = null) : TasteStore {
+    private val store = LocalUserStore.forContext(context, accountId)
+    override fun load(): JSONObject? = store.get("taste")
+    override fun save(taste: JSONObject?) = store.put("taste", taste)
 }

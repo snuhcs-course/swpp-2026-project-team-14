@@ -82,6 +82,10 @@ class MeasurementActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        intent.getStringExtra("initial_category")?.takeIf { it in setOf("top", "bottom", "outerwear") }?.let {
+            category = it
+            landmarkType = when (it) { "bottom" -> "trousers"; "outerwear" -> "long_sleeve_outerwear"; else -> "short_sleeve_top" }
+        }
         renderer = MeasurementCamera(
             rotation = { surface.display?.rotation ?: 0 },
             onStatus = { text, canCapture -> runOnUiThread {
