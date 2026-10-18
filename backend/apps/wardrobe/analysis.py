@@ -10,7 +10,7 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 
 from .schema import COLOR_PALETTE, DETAIL_CHOICES, DETAIL_LISTS, ENUMS, SCHEMA, SUBCATEGORIES, validate_ai_attributes, validate_ai_details
 
-MODEL = 'gemini-3.1-flash-lite'
+MODEL = 'gemini-3.5-flash-lite'
 MAX_IMAGE_BYTES = 5 * 1024 * 1024
 MAX_IMAGE_PIXELS = 12_000_000
 MAX_RESPONSE_BYTES = 256 * 1024

@@ -25,7 +25,7 @@ data class WardrobeState(val records: List<JSONObject> = emptyList(), val catalo
                          val loading: Boolean = false, val saving: Boolean = false,
                          val error: String? = null, val saveError: String? = null, val savedId: String? = null)
 
-class WardrobeViewModel(private val store: LocalUserStore, private val account: AccountAccess? = null) : ViewModel() {
+class WardrobeViewModel(private val store: LocalUserStore, private val account: AccountAccess) : ViewModel() {
     private val mutableState = MutableStateFlow(WardrobeState())
     val state = mutableState.asStateFlow()
     init { refresh() }
@@ -39,11 +39,11 @@ class WardrobeViewModel(private val store: LocalUserStore, private val account: 
                 val cached = withContext(Dispatchers.IO) { store.get("catalog") }
                 mutableState.value = mutableState.value.copy(catalog = cached,
                     records = (0 until rows.length()).map { rows.getJSONObject(it) }, loading = false)
-                if (account != null) {
+                run {
                     val remote = WardrobeRepository.json("/api/wardrobe/items/", store = store, account = account).getJSONArray("items")
                     mutableState.value = mutableState.value.copy(records = (0 until remote.length()).map { remote.getJSONObject(it) })
                 }
-                val catalog = WardrobeRepository.json("/api/wardrobe/options/", store = store)
+                val catalog = WardrobeRepository.json("/api/wardrobe/options/", store = store, account = account)
                 mutableState.value = mutableState.value.copy(catalog = catalog, loading = false)
             } catch (error: CancellationException) { throw error }
             catch (error: Exception) { mutableState.value = mutableState.value.copy(loading = false, error = error.message ?: "옷장을 불러오지 못했습니다.") }
@@ -67,11 +67,4 @@ class WardrobeViewModel(private val store: LocalUserStore, private val account: 
 
     fun clearSaveState() { mutableState.value = mutableState.value.copy(savedId = null, saveError = null) }
 
-    fun discardDraft(id: String) {
-        if (account == null) viewModelScope.launch(Dispatchers.IO) {
-            try { store.discardDraft(id) }
-            catch (cancelled: CancellationException) { throw cancelled }
-            catch (_: Exception) { mutableState.value = mutableState.value.copy(error = "등록 중인 옷을 정리하지 못했어요.") }
-        }
-    }
 }

@@ -67,9 +67,10 @@ fun OnboardingHeader(step: Int, onBack: () -> Unit, onSkip: () -> Unit, enabled:
 }
 
 @Composable
-fun OnboardingRoute(model: BodyProfileViewModel, onLogin: () -> Unit, guestStore: LocalUserStore? = null) {
+fun OnboardingRoute(model: BodyProfileViewModel, accountStore: LocalUserStore? = null) {
     val context = LocalContext.current
-    val store = remember(guestStore) { guestStore ?: LocalUserStore.forContext(context) }
+    val account = checkNotNull(com.swpp.stylemate.ui.LocalAccountAccess.current)
+    val store = remember(accountStore, account.userId) { accountStore ?: LocalUserStore.forContext(context, account.userId) }
     val progress by model.onboarding.collectAsStateWithLifecycle()
     val app by model.app.collectAsStateWithLifecycle()
     val body by model.setup.collectAsStateWithLifecycle()
@@ -78,7 +79,10 @@ fun OnboardingRoute(model: BodyProfileViewModel, onLogin: () -> Unit, guestStore
     var refresh by remember { mutableIntStateOf(0) }
     LaunchedEffect(progress.step, refresh) {
         if (progress.step in setOf(6, 8)) {
-            try { records = withContext(Dispatchers.IO) { store.garments() }; loadError = null }
+            try {
+                val rows = WardrobeRepository.json("/api/wardrobe/items/", store = store, account = account).getJSONArray("items")
+                records = (0 until rows.length()).map { rows.getJSONObject(it) }; loadError = null
+            }
             catch (cancelled: CancellationException) { throw cancelled }
             catch (_: Exception) { loadError = "옷장을 불러오지 못했어요." }
         }
@@ -102,7 +106,7 @@ fun OnboardingRoute(model: BodyProfileViewModel, onLogin: () -> Unit, guestStore
         when (step) {
             1, 8 -> model.skipSetup()
             2 -> model.confirmOnboardingFits()
-            3 -> model.moveOnboarding(4)
+            3 -> model.confirmOnboardingStyles()
             4, 5 -> model.skipOnboardingBody()
             6 -> model.moveOnboarding(8)
             else -> model.finishOnboardingGarment()
@@ -112,7 +116,7 @@ fun OnboardingRoute(model: BodyProfileViewModel, onLogin: () -> Unit, guestStore
     BackHandler(enabled = busy) {}
     val header: @Composable () -> Unit = { OnboardingHeader(step, back, skip, !busy) }
     when (step) {
-        1 -> OnboardingWelcome(header, { model.moveOnboarding(2) }, onLogin)
+        1 -> OnboardingWelcome(header, { model.moveOnboarding(2) })
         4 -> if (body.step == SetupStep.ANALYZING) Column(Modifier.fillMaxSize()) {
             header(); Box(Modifier.weight(1f)) { AnalyzingScreen() }
         } else PhotoInputScreen(body, back, model::setPhoto, model::showError, model::setHeight,
@@ -123,13 +127,13 @@ fun OnboardingRoute(model: BodyProfileViewModel, onLogin: () -> Unit, guestStore
             localStore = store,
             onDraftChange = model::saveOnboardingGarment, onSaved = model::finishOnboardingGarment,
             onCancel = model::finishOnboardingGarment,
-            onboardingTopBar = { routeBack, enabled -> OnboardingHeader(7, routeBack, routeBack, enabled) })
+            onboardingTopBar = { routeBack, enabled -> OnboardingHeader(7, routeBack, routeBack, enabled && !busy) })
         else -> ScreenScaffold(title = "StyleMate", primaryLabel = when (step) {
             8 -> "첫 코디 보러 가기"
             else -> "다음"
-        }, primaryEnabled = loadError == null || step !in setOf(6, 8), onPrimary = {
+        }, primaryEnabled = !busy && (loadError == null || step !in setOf(6, 8)), onPrimary = {
             when (step) { 2 -> model.confirmOnboardingFits()
-                3 -> model.moveOnboarding(4); 6 -> model.moveOnboarding(8); 8 -> model.skipSetup() }
+                3 -> model.confirmOnboardingStyles(); 6 -> model.moveOnboarding(8); 8 -> model.skipSetup() }
         }, topBar = header) { padding ->
             Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp),
                 verticalArrangement = Arrangement.spacedBy(20.dp)) {
@@ -164,7 +168,7 @@ fun OnboardingRoute(model: BodyProfileViewModel, onLogin: () -> Unit, guestStore
                             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                 row.forEach { (code, label) ->
                                     val selected = code in app.style.preferredStyles
-                                    Card(onClick = { model.updateOnboardingStyle(app.style.copy(preferredStyles =
+                                    Card(enabled = !busy, onClick = { model.updateOnboardingStyle(app.style.copy(preferredStyles =
                                         if (selected) app.style.preferredStyles - code else app.style.preferredStyles + code)) },
                                         modifier = Modifier.weight(1f).semantics { this.selected = selected }, shape = RoundedCornerShape(12.dp),
                                         border = BorderStroke(1.dp, if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant),
@@ -212,8 +216,7 @@ fun OnboardingRoute(model: BodyProfileViewModel, onLogin: () -> Unit, guestStore
                         Text("등록한 옷 ${records.size}개", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                         loadError?.let { Text(it, color = MaterialTheme.colorScheme.error); TextButton(onClick = { refresh++ }) { Text("다시 불러오기") } }
                         GarmentSummary(records, store)
-                        Text("입력한 정보는 이 기기에 저장됐어요.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        OutlinedButton(onClick = { model.skipSetup(); if (model.onboarding.value.completed) onLogin() }, modifier = Modifier.fillMaxWidth()) { Text("로그인 / 회원가입") }
+                        Text("입력한 정보는 내 계정에 저장됐어요.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
                 Spacer(Modifier.height(4.dp))
@@ -235,19 +238,14 @@ private fun SelectionMark(selected: Boolean, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun OnboardingWelcome(header: @Composable () -> Unit, onStart: () -> Unit, onLogin: () -> Unit) {
+private fun OnboardingWelcome(header: @Composable () -> Unit, onStart: () -> Unit) {
     Scaffold(containerColor = MaterialTheme.colorScheme.background, topBar = header, bottomBar = {
         Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 20.dp).padding(top = 12.dp, bottom = 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally) {
             Button(onClick = onStart, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp), shape = RoundedCornerShape(16.dp)) {
                 Text("시작하기", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
             }
-            TextButton(onClick = onLogin) {
-                Text(buildAnnotatedString {
-                    withStyle(SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) { append("이미 계정이 있나요? ") }
-                    withStyle(SpanStyle(color = MaterialTheme.colorScheme.primary, textDecoration = TextDecoration.Underline)) { append("로그인") }
-                }, style = MaterialTheme.typography.bodyMedium)
-            }
+
         }
     }) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp),
@@ -271,11 +269,12 @@ private fun OnboardingCard(content: @Composable ColumnScope.() -> Unit) {
 @Composable
 private fun GarmentSummary(records: List<JSONObject>, store: LocalUserStore, onClick: ((JSONObject) -> Unit)? = null) {
     val context = LocalContext.current
+    val account = checkNotNull(com.swpp.stylemate.ui.LocalAccountAccess.current)
     records.chunked(2).forEach { row ->
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             row.forEach { record ->
                 val photo by produceState<ImageBitmap?>(null, record.getString("id")) {
-                    try { value = WardrobeRepository.thumbnail(context, record.getString("image_url"), localStore = store) }
+                    try { value = WardrobeRepository.thumbnail(context, record.getString("image_url"), account = account) }
                     catch (cancelled: CancellationException) { throw cancelled }
                     catch (_: Exception) { value = null }
                 }

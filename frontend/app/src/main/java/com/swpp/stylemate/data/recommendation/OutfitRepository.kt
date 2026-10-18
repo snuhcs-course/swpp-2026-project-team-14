@@ -1,18 +1,8 @@
 // AI-generated with Claude Code (Claude Opus 5.5), 2026-10-12, reviewed by Dongkun Moon
 package com.swpp.stylemate.data.recommendation
 
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
-import org.json.JSONException
 import org.json.JSONObject
-import java.io.IOException
-import java.util.concurrent.TimeUnit
-import com.swpp.stylemate.data.LocalUserStore
 import com.swpp.stylemate.data.AccountAccess
 import com.swpp.stylemate.data.AuthException
 
@@ -43,14 +33,7 @@ class OutfitApiException(val code: String, message: String) : Exception(message)
  * Outfit recommendation from the user's wardrobe (backend apps/outfits, docs/recommendation/api.md),
  * the weather, and the body-based labels of a garment being registered.
  */
-class OutfitRepository(
-    baseUrl: String,
-    private val client: OkHttpClient = defaultClient(),
-    private val local: LocalUserStore? = null,
-    private val account: AccountAccess? = null,
-) {
-    private val base = baseUrl.trimEnd('/')
-
+class OutfitRepository(private val account: AccountAccess) {
     suspend fun weather(): Weather = parseWeather(call("GET", "/api/weather/"))
 
     suspend fun recommend(body: JSONObject, weather: Weather?, preference: JSONObject?, seenKeys: List<String>,
@@ -62,41 +45,22 @@ class OutfitRepository(
             .put("preference", preference ?: JSONObject.NULL)
         if (weather != null) request.put("weather", weather.json) else request.put("temp", DEFAULT_TEMP)
         anchorId?.let { request.put("anchor_id", it) }
-        local?.let { request.put("wardrobe", JSONArray(withContext(Dispatchers.IO) { it.garments().map(::previewGarment) })) }
-        val result = call("POST", if (local == null) "/api/outfits/recommend/" else "/api/outfits/preview/", request)
-        local?.let { withContext(Dispatchers.IO) { it.rememberOutfits(result.getJSONArray("outfits")) } }
+        val result = call("POST", "/api/outfits/recommend/", request)
         return parseRecommendation(result)
     }
 
     suspend fun saved(): List<Outfit> {
-        local?.let { return withContext(Dispatchers.IO) { it.outfits().map(::parseOutfit) } }
-        val rows = if (account != null) {
-            try { account.list("/api/outfits/", "outfits") }
-            catch (error: AuthException) { throw OutfitApiException(error.code, error.message.orEmpty()) }
-        } else call("GET", "/api/outfits/").getJSONArray("outfits")
-        return rows.let { list ->
-        (0 until list.length()).map { parseOutfit(list.getJSONObject(it)) }
-        }
+        val rows = try { account.list("/api/outfits/", "outfits") }
+        catch (error: AuthException) { throw OutfitApiException(error.code, error.message.orEmpty()) }
+        return (0 until rows.length()).map { parseOutfit(rows.getJSONObject(it)) }
     }
 
     suspend fun setSaved(id: String, saved: Boolean): Outfit {
-        local?.let { return withContext(Dispatchers.IO) { parseOutfit(it.saveOutfit(id, saved)) } }
         return parseOutfit(call("PUT", "/api/outfits/$id/", JSONObject().put("saved", saved)))
     }
 
     /** Returns the outfit and the updated taste profile to keep on the device. */
     suspend fun feedback(id: String, value: String?, preference: JSONObject?): Pair<Outfit, JSONObject> {
-        if (local != null) {
-            val outfit = withContext(Dispatchers.IO) { checkNotNull(local.outfit(id)) }
-            val items = outfit.getJSONArray("items")
-            val ids = (0 until items.length()).map { items.getJSONObject(it).getString("garment_id") }.toSet()
-            val garments = withContext(Dispatchers.IO) { local.garments().filter { it.getString("id") in ids }.map(::previewGarment) }
-            val result = call("POST", "/api/outfits/preview/feedback/", JSONObject().put("outfit", outfit)
-                .put("wardrobe", JSONArray(garments)).put("feedback", value ?: JSONObject.NULL)
-                .put("preference", preference ?: JSONObject.NULL))
-            val updated = withContext(Dispatchers.IO) { local.setFeedback(id, value) }
-            return parseOutfit(updated) to result.getJSONObject("preference")
-        }
         val result = call("POST", "/api/outfits/$id/feedback/",
             JSONObject().put("feedback", value ?: JSONObject.NULL).put("preference", preference ?: JSONObject.NULL))
         return parseOutfit(result.getJSONObject("outfit")) to result.getJSONObject("preference")
@@ -113,29 +77,16 @@ class OutfitRepository(
             .put("details", details ?: JSONObject.NULL)
             .put("garment_type", garmentType ?: JSONObject.NULL)).optJSONObject("labels")
 
-    private suspend fun call(method: String, path: String, body: JSONObject? = null): JSONObject = withContext(Dispatchers.IO) {
-        if (account != null) {
-            try { return@withContext account.json(method, path, body) }
-            catch (error: AuthException) {
-                throw OutfitApiException(error.code, when (error.code) {
-                    "WARDROBE_TOO_SMALL" -> "상의와 하의를 한 벌씩 등록하면 코디를 만들어 드려요."
-                    "WEATHER_UNAVAILABLE" -> "날씨를 불러오지 못했어요."
-                    else -> error.message.orEmpty()
-                })
-            }
+    private suspend fun call(method: String, path: String, body: JSONObject? = null): JSONObject {
+        try { return account.json(method, path, body) }
+        catch (error: AuthException) {
+            throw OutfitApiException(error.code, when (error.code) {
+                "WARDROBE_TOO_SMALL" -> "상의와 하의를 한 벌씩 등록하면 코디를 만들어 드려요."
+                "WEATHER_UNAVAILABLE" -> "날씨를 불러오지 못했어요."
+                "NETWORK" -> NETWORK_ERROR
+                else -> if (error.code.startsWith("HTTP_") || error.code == "INVALID_RESPONSE") SERVER_ERROR else error.message.orEmpty()
+            })
         }
-        val bytes = body?.toString()?.toByteArray(Charsets.UTF_8)
-        if (path == "/api/outfits/preview/" && bytes != null && bytes.size > MAX_PREVIEW_BYTES) {
-            throw OutfitApiException("BODY_TOO_LARGE", "옷 정보가 너무 많아요. 계정으로 가져온 뒤 다시 시도해 주세요.")
-        }
-        val payload = bytes?.toRequestBody("application/json".toMediaType())
-        val request = Request.Builder().url(base + path).method(method, payload).build()
-        val (status, text) = try {
-            client.newCall(request).execute().use { it.code to it.body?.string().orEmpty() }
-        } catch (e: IOException) {
-            throw OutfitApiException("NETWORK", NETWORK_ERROR)
-        }
-        parseBody(status, text)
     }
 
     companion object {
@@ -143,32 +94,6 @@ class OutfitRepository(
         const val SERVER_ERROR = "코디를 불러오지 못했어요. 잠시 후 다시 시도해 주세요."
         const val DEFAULT_TEMP = 18.0
         const val MAX_SEEN = 60
-        const val MAX_PREVIEW_BYTES = 1024 * 1024
-
-        private fun previewGarment(row: JSONObject) = JSONObject()
-            .put("id", row.getString("id")).put("attributes", row.getJSONObject("attributes"))
-            .put("dimensions", row.opt("dimensions") ?: JSONObject.NULL)
-            .put("labels", row.opt("labels") ?: JSONObject.NULL).put("notes", "")
-
-        fun defaultClient(): OkHttpClient = OkHttpClient.Builder()
-            .connectTimeout(10, TimeUnit.SECONDS)
-            .readTimeout(30, TimeUnit.SECONDS) // the first recommendation loads the models
-            .build()
-
-        /** JSON body of a 2xx response, or an exception with the server's Korean hint. */
-        fun parseBody(status: Int, text: String): JSONObject {
-            val json = try { JSONObject(text) } catch (e: JSONException) { null }
-            if (status in 200..299 && json != null) return json
-            val code = json?.optString("error").orEmpty().ifEmpty { "HTTP_$status" }
-            val message = when (code) {
-                "WARDROBE_TOO_SMALL" -> "상의와 하의를 한 벌씩 등록하면 코디를 만들어 드려요."
-                "WEATHER_UNAVAILABLE" -> "날씨를 불러오지 못했어요."
-                "DATABASE_NOT_CONFIGURED" -> "서버의 DB 설정이 필요해요."
-                else -> json?.optString("hint").orEmpty().takeIf { status == 422 && it.isNotEmpty() } ?: SERVER_ERROR
-            }
-            throw OutfitApiException(code, message)
-        }
-
         fun parseWeather(json: JSONObject) = Weather(
             temp = json.getDouble("temp"),
             apparent = json.optDouble("apparent", json.getDouble("temp")),

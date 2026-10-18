@@ -20,6 +20,7 @@ import java.util.concurrent.TimeUnit
 class RemoteBodyAnalyzer(
     baseUrl: String,
     private val client: OkHttpClient = defaultClient(),
+    private val account: AccountAccess? = null,
 ) : BodyAnalyzer {
 
     private val endpoint = baseUrl.trimEnd('/') + "/api/body-profile/analyze/"
@@ -35,10 +36,11 @@ class RemoteBodyAnalyzer(
                 .addFormDataPart("gender", input.gender.name.lowercase())
                 .apply { input.weightKg?.let { addFormDataPart("weight_kg", it.toString()) } }
                 .build()
-            val request = Request.Builder().url(endpoint).post(body).build()
+            val access = checkNotNull(account) { "로그인이 필요해요." }
+            val request = Request.Builder().url(endpoint).header("Authorization", access.authorization()).post(body).build()
 
             val (status, text) = try {
-                client.newCall(request).execute().use { it.code to it.body?.string().orEmpty() }
+                client.newCall(request).execute().use { access.checkResponse(it.code); it.code to it.body?.string().orEmpty() }
             } catch (e: IOException) {
                 throw BodyAnalysisException(NETWORK_ERROR, "network", e)
             }

@@ -6,7 +6,6 @@ The team backend: a Django project (`config/` + `apps/`) deployed to the team14 
 | Endpoint | Purpose |
 |---|---|
 | `GET /healthz/` | Kubernetes readiness/liveness probe |
-| `GET /api/hello/` | smoke test (kept from the original `app.py`) |
 | `/api/auth/register/`, `/api/auth/login/`, `/api/auth/logout/`, `/api/users/me/` | ID/password authentication and account profile ([contract](../docs/login/README.md)) |
 | `POST /api/body-profile/analyze/` | body measurements from front + side photos (`apps/body_profiles/`) |
 | `/api/wardrobe/...` | garment photos, attributes, measurements and recommendation labels (`apps/wardrobe/`, [docs](../docs/wardrobe/wardrobe-spec.md)) |
@@ -62,7 +61,7 @@ curl -H "Host: localhost" http://localhost:8000/healthz/
 
 New Django apps go in `apps/` and are registered in `config/settings.py` / `config/urls.py` (layout: wiki → Directory Structure).
 
-Wardrobe database and account outfit endpoints require `Authorization: Bearer <token>`. Body analysis, landmarks, editor options, label previews and weather remain available without login. Guest Android storage is connected: `/api/wardrobe/analyze-preview/`, `/api/outfits/preview/` and `/api/outfits/preview/feedback/` calculate results without database or file persistence; the app stores its own garments, photos and outfits. Android registration, login, logout, expiry handling, authenticated account APIs and consent-based guest-to-account import are connected. Import endpoints and conflict/retry rules are documented in [the login contract](../docs/login/README.md#비로그인-저장과-계정-가져오기). Apply migrations before using account APIs; the ownership migrations remove pre-login rows with no owner, as approved for this feature, while keeping owned records.
+All service endpoints require `Authorization: Bearer <token>`, including body analysis, wardrobe landmarks/options/labels and weather. Only registration, login and `/healthz/` are public. Android starts at login, then runs onboarding in the account scope. Guest preview endpoints and guest service operation have been removed. Existing data imports remain available only after login; see [the current authentication contract](../docs/login/README.md). Existing account data and migrations are preserved.
 
 ```bash
 $env:DJANGO_DEBUG="1"
@@ -159,7 +158,7 @@ The endpoints under `/api/wardrobe/` provide analysis drafts, landmarks, editor 
 
 Copy `.env.example` to `.env` inside `backend/` and enter your MySQL account/database and Gemini key.
 `python-dotenv` loads this file; deployment environment variables take precedence. Credentials are git-ignored.
-Leave `MYSQL_DATABASE` empty to run body analysis and landmarks without a DB. Persistence endpoints return
+All service endpoints, including body analysis and landmarks, require a configured account database. Endpoints return
 `503 DATABASE_NOT_CONFIGURED` until configured, before any paid Gemini call.
 
 Once the MySQL database and account exist and `.env` is filled in:
@@ -185,5 +184,5 @@ without PyTorch or export dependencies. No manual model upload or model volume i
 empty volume over this directory. Backend CI checks actual HRNet inference inside the image.
 
 The cluster needs MySQL configuration, migrations, a persistent photo volume and write access for uid 10001
-before wardrobe persistence can run. Authentication and S3 are not integrated yet. The existing 1 Gi memory
+before authenticated service endpoints can run. Bearer authentication is integrated; S3 is not. The existing 1 Gi memory
 limit was sized for body analysis; remeasure it with HRNet before wardrobe deployment.

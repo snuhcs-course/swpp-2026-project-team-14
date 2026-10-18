@@ -3,7 +3,9 @@ from io import BytesIO
 from unittest.mock import patch
 
 import numpy as np
-from django.test import SimpleTestCase
+from django.test import TestCase
+from apps.users.auth import issue_token
+from apps.users.models import User
 from PIL import Image
 
 from .analysis import AnalysisError
@@ -13,7 +15,12 @@ from .tests import attributes, photo
 from .views import ANALYSIS_SLOTS
 
 
-class LandmarkTests(SimpleTestCase):
+class LandmarkTests(TestCase):
+    def setUp(self):
+        user = User.objects.create(username='landmark_owner')
+        _, token = issue_token(user)
+        self.client.defaults['HTTP_AUTHORIZATION'] = f'Bearer {token}'
+
     def test_letterbox_coordinates_round_trip_for_both_orientations(self):
         for size in ((300, 600), (600, 300)):
             with self.subTest(size=size):
@@ -57,7 +64,7 @@ class LandmarkTests(SimpleTestCase):
         engine.assert_not_called()
 
     @patch('apps.wardrobe.landmarks.session')
-    def test_endpoint_returns_points_without_db_or_cm(self, engine):
+    def test_authenticated_endpoint_returns_points_without_cm(self, engine):
         heatmaps = np.zeros((1, 294, 96, 72), dtype=np.float32)
         heatmaps[0, 6, 24, 18] = .9
         heatmaps[0, 24, 24, 54] = .9

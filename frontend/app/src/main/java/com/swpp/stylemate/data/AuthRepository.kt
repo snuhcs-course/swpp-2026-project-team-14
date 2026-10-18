@@ -219,7 +219,8 @@ class AuthRepository(
             "INVALID_IMAGE", "IMAGE_TOO_LARGE" -> "옷 사진의 형식이나 용량을 확인해 주세요."
             "GARMENT_CATEGORY_IN_USE" -> "코디에 사용 중인 옷은 분류를 바꿀 수 없어요."
             "GARMENT_CATEGORY_CHANGED" -> "옷 정보가 변경됐어요. 다시 시도해 주세요."
-            else -> "요청을 처리하지 못했어요. 잠시 후 다시 시도해 주세요."
+            else -> if (code == 422) json?.optString("hint").orEmpty().ifBlank { "요청을 처리하지 못했어요. 잠시 후 다시 시도해 주세요." }
+                    else "요청을 처리하지 못했어요. 잠시 후 다시 시도해 주세요."
         }, retry)
     }
 
@@ -262,7 +263,7 @@ class AccountAccess internal constructor(private val repository: AuthRepository,
         } while (true)
         return rows
     }
+    suspend fun upload(path: String, metadata: JSONObject, image: ByteArray) = repository.upload(path, metadata, image, session)
     suspend fun patchProfile(data: JSONObject) = repository.patch(session, data)
     suspend fun refreshProfile() = repository.refresh(session)
-    suspend fun upload(path: String, metadata: JSONObject, image: ByteArray) = repository.upload(path, metadata, image, session)
 }

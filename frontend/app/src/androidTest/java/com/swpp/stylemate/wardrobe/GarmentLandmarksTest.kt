@@ -38,7 +38,11 @@ class GarmentLandmarksTest {
         assumeTrue(InstrumentationRegistry.getArguments().getString("landmarkServer") == "true")
         val frame = Bitmap.createBitmap(576, 768, Bitmap.Config.ARGB_8888)
         try {
-            val result = GarmentLandmarks.detect(frame, "short_sleeve_top")
+            val context = InstrumentationRegistry.getInstrumentation().targetContext
+            val repo = com.swpp.stylemate.data.AuthRepository(com.swpp.stylemate.BuildConfig.API_BASE_URL, com.swpp.stylemate.data.KeystoreSessionStore(context))
+            repo.restore()
+            assumeTrue("Sign in before running the real landmark integration test", repo.account() != null)
+            val result = GarmentLandmarks.detect(frame, "short_sleeve_top", checkNotNull(repo.account()))
             assertTrue(result.elapsedMs >= 0)
             assertTrue(result.suggestions.keys.all { it in topMeasurementFields.map { field -> field.key } })
         } finally { frame.recycle() }

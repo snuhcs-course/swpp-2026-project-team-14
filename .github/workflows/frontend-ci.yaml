@@ -35,6 +35,9 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Configure school API endpoint
+        run: printf '%s\n' 'stylemate.apiBaseUrl=http://swpp26t14.147-46-242-169.sslip.io' >> local.properties
+
       - name: Unit tests
         run: ./gradlew --no-daemon testDebugUnitTest
 

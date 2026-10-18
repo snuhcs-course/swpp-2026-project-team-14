@@ -33,7 +33,7 @@ class GuestImportRepositoryTest {
             override fun clear() { value = null }
         })
         signIn(userId)
-        guest = LocalUserStore.inDirectory(temporary.root)
+        guest = LocalUserStore.legacyGuestInDirectory(temporary.root)
         importer = GuestImportRepository(guest, auth.account()!!)
     }
     @After fun close() { server.shutdown() }
@@ -97,7 +97,7 @@ class GuestImportRepositoryTest {
         assertTrue(request.getHeader("Content-Type")!!.startsWith("multipart/form-data"))
         assertTrue(request.getHeader("Authorization")!!.startsWith("Bearer "))
         assertTrue(request.body.readUtf8().contains("filename=\"garment.jpg\""))
-        assertTrue(GuestImportRepository(LocalUserStore.inDirectory(temporary.root), auth.account()!!).snapshot().records.isEmpty())
+        assertTrue(GuestImportRepository(LocalUserStore.legacyGuestInDirectory(temporary.root), auth.account()!!).snapshot().records.isEmpty())
         assertEquals(1, guest.garments().size)
         assertArrayEquals(byteArrayOf(1, 2, 3), guest.image("local:$id"))
     }

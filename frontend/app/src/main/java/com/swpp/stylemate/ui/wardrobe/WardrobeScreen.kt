@@ -74,8 +74,8 @@ fun WardrobeRoute(
     localStore: LocalUserStore? = null,
 ) {
     val context = LocalContext.current
-    val account = LocalAccountAccess.current
-    val store = remember(localStore, account?.userId) { localStore ?: LocalUserStore.forContext(context, account?.userId) }
+    val account = checkNotNull(LocalAccountAccess.current)
+    val store = remember(localStore, account.userId) { localStore ?: LocalUserStore.forContext(context, account.userId) }
     val activity = context as Activity
     val files = remember { CaptureFiles(context.applicationContext) }
     val preferences = remember { context.getSharedPreferences("camera-permission", 0) }
@@ -99,7 +99,7 @@ fun WardrobeRoute(
     val needsFront = needsFrontPhoto(measured?.optString("category"))
     val garmentType = measured?.let { if (it.isNull("garment_type")) null else it.optString("garment_type") }
     val analysisPhoto = if (needsFront) frontPhoto else selected
-    val analysisModel: GarmentAnalysisViewModel = viewModel(factory = viewModelFactory { initializer { GarmentAnalysisViewModel(account, store) } })
+    val analysisModel: GarmentAnalysisViewModel = viewModel(factory = viewModelFactory { initializer { GarmentAnalysisViewModel(account) } })
     val analysis by analysisModel.state.collectAsStateWithLifecycle()
     val wardrobeModel: WardrobeViewModel = viewModel(factory = viewModelFactory {
         initializer { WardrobeViewModel(store, account) }
@@ -107,7 +107,7 @@ fun WardrobeRoute(
     val wardrobe by wardrobeModel.state.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { wardrobeModel.refresh() }
     val labelsModel: GarmentLabelsViewModel = viewModel(factory = viewModelFactory {
-        initializer { GarmentLabelsViewModel(OutfitRepository(BuildConfig.API_BASE_URL)) }
+        initializer { GarmentLabelsViewModel(OutfitRepository(account)) }
     })
     val labelState by labelsModel.state.collectAsStateWithLifecycle()
     // The body profile kept on the device (recommendation labels are computed on this body).
@@ -242,9 +242,6 @@ fun WardrobeRoute(
         }
     }
     fun discard() {
-        analysis.result?.optString("id")?.takeIf { account == null && it.isNotBlank() }?.let { id ->
-            wardrobeModel.discardDraft(id)
-        }
         files.delete(selected); files.delete(frontPhoto)
         selected = null; frontPhoto = null; selectedMeasurements = null; editorDraftText = null; message = null
     }
@@ -489,12 +486,12 @@ fun WardrobeScreen(items: List<WardrobeItem>, message: String?, cameraBusy: Bool
 @Composable
 private fun GarmentPhoto(path: String, name: String, onLoaded: (ImageBitmap?) -> Unit = {}, store: LocalUserStore? = null) {
     val context = LocalContext.current.applicationContext
-    val account = LocalAccountAccess.current
+    val account = checkNotNull(LocalAccountAccess.current)
     var bitmap by remember(path) { mutableStateOf<ImageBitmap?>(null) }
     var loading by remember(path) { mutableStateOf(true) }
     LaunchedEffect(path) {
         onLoaded(null)
-        try { bitmap = WardrobeRepository.thumbnail(context, path, account, store) }
+        try { bitmap = WardrobeRepository.thumbnail(context, path, account) }
         catch (error: kotlinx.coroutines.CancellationException) { throw error }
         catch (_: Exception) { bitmap = null }
         finally { loading = false }
