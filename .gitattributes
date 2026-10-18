@@ -1,0 +1,4 @@
+# Shell scripts must keep LF endings so they run on Linux CI runners and in Docker.
+gradlew text eol=lf
+*.sh text eol=lf
+*.bat text eol=crlf

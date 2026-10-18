@@ -1,0 +1,313 @@
+<!doctype html>
+<!-- AI-generated with Claude Code (Claude Opus 5.5), 2026-10-10, reviewed by Dongkun Moon -->
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>코디 추천 테스트</title>
+<style>
+  :root { --tc:#C4552B; --tc-soft:#F6DDD2; --tc-ink:#8A3312; --cream:#F8F6F2; --sand:#F1ECE6; --ink:#1F1B18;
+          --muted:#8A8580; --line:#E4DED7; --good:#3F8F5A; --bad:#C4552B; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:"Pretendard","Malgun Gothic","Apple SD Gothic Neo",system-ui,sans-serif; background:var(--cream); color:var(--ink); }
+  header { display:flex; align-items:baseline; gap:12px; padding:14px 20px; border-bottom:1px solid var(--line); background:#fff; position:sticky; top:0; z-index:5; }
+  header h1 { font-size:18px; font-weight:800; }
+  header span { color:var(--muted); font-size:12px; }
+  .wrap { display:grid; grid-template-columns:330px 1fr; gap:18px; padding:18px; max-width:1360px; margin:0 auto; }
+  @media (max-width:900px) { .wrap { grid-template-columns:1fr; } }
+  aside { display:grid; gap:12px; align-content:start; }
+  .panel { background:#fff; border-radius:16px; padding:14px; border:1px solid var(--line); }
+  .panel h2 { font-size:13px; font-weight:800; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center; }
+  label.row { display:grid; grid-template-columns:72px 1fr; align-items:center; gap:8px; font-size:12px; margin:6px 0; color:#4a4540; }
+  input[type=number], select, input[type=text] { width:100%; border:1px solid var(--line); border-radius:8px; padding:6px 8px; font:inherit; font-size:13px; background:#fff; }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:4px 10px; }
+  .seg { display:flex; background:var(--sand); border-radius:10px; padding:3px; gap:3px; }
+  .seg button { flex:1; border:0; background:transparent; padding:7px 0; border-radius:8px; font:inherit; font-size:12px; color:var(--muted); cursor:pointer; }
+  .seg button.on { background:#fff; color:var(--ink); font-weight:700; box-shadow:0 1px 3px rgba(0,0,0,.08); }
+  .chips { display:flex; flex-wrap:wrap; gap:6px; }
+  .chip { border:1px solid var(--line); border-radius:999px; padding:5px 10px; font-size:12px; background:#fff; cursor:pointer; user-select:none; }
+  .chip.on { background:var(--tc-soft); border-color:var(--tc); color:var(--tc-ink); font-weight:700; }
+  .temp { display:flex; align-items:center; gap:10px; }
+  .temp input { flex:1; accent-color:var(--tc); }
+  .temp b { font-size:20px; min-width:52px; text-align:right; }
+  .ward { display:grid; gap:6px; }
+  .wi { display:grid; grid-template-columns:18px 1fr auto; gap:8px; align-items:center; font-size:12px; padding:6px 8px; border-radius:10px; background:var(--sand); }
+  .wi.anchor { outline:2px solid var(--tc); background:#FDF3EE; }
+  .wi .sw { width:18px; height:18px; border-radius:50%; border:1px solid rgba(0,0,0,.15); }
+  .wi small { color:var(--muted); display:block; }
+  .wi .x { border:0; background:none; cursor:pointer; color:var(--muted); font-size:14px; }
+  .wi.small small { color:var(--bad); }
+  .btn { border:0; border-radius:12px; padding:11px 14px; font:inherit; font-weight:700; cursor:pointer; }
+  .btn.primary { background:var(--tc); color:#fff; }
+  .btn.ghost { background:#fff; border:1px solid var(--line); color:var(--ink); }
+  .btn.small { padding:6px 10px; font-size:12px; border-radius:9px; }
+  .actions { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  main { display:grid; gap:14px; align-content:start; }
+  .notes { display:grid; gap:6px; }
+  .note { background:#FFF7E8; border:1px solid #F1D9A8; color:#7A5A16; border-radius:12px; padding:9px 12px; font-size:12.5px; }
+  .note.err { background:#FDEDEA; border-color:#F2B8AA; color:var(--tc-ink); }
+  .cards { display:grid; grid-template-columns:repeat(auto-fill,minmax(330px,1fr)); gap:14px; }
+  .card { background:#fff; border-radius:20px; padding:14px; border:1px solid var(--line); display:grid; gap:12px; align-content:start; }
+  .card.focus { outline:2px solid var(--tc); }
+  .top { display:flex; justify-content:space-between; align-items:center; }
+  .score b { font-size:28px; color:var(--tc); font-weight:800; }
+  .score span { font-size:12px; color:var(--muted); margin-left:4px; }
+  .tag { font-size:11px; background:var(--sand); border-radius:999px; padding:4px 9px; color:#5c5650; }
+  .board { position:relative; height:300px; border-radius:14px; background:linear-gradient(180deg,#FBF9F6,var(--sand)); overflow:hidden; }
+  .board .p { position:absolute; display:flex; align-items:center; justify-content:center; }
+  .board img { max-width:100%; max-height:100%; object-fit:contain; filter:drop-shadow(0 6px 10px rgba(0,0,0,.13)); }
+  .board .own { width:86%; height:70%; border-radius:14px; border:2px dashed var(--tc); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; font-size:12px; background:rgba(255,255,255,.7); text-align:center; padding:6px; }
+  .board .own .sw { width:40px; height:40px; border-radius:50%; border:1px solid rgba(0,0,0,.15); }
+  .board .lab { position:absolute; font-size:10px; background:rgba(255,255,255,.92); border-radius:6px; padding:2px 6px; color:var(--muted); }
+  .tryon-btn { position:absolute; left:10px; bottom:10px; background:var(--ink); color:#fff; border:0; border-radius:999px; padding:7px 12px; font:inherit; font-size:12px; cursor:pointer; }
+  .bars { display:grid; gap:6px; }
+  .bar { display:grid; grid-template-columns:56px 1fr 30px; gap:8px; align-items:center; font-size:12px; }
+  .track { height:7px; background:var(--sand); border-radius:99px; overflow:hidden; }
+  .fill { height:100%; background:var(--tc); border-radius:99px; }
+  .fill.n { background:#CFC8C0; }
+  .bar .v { text-align:right; color:var(--muted); }
+  .why { display:grid; gap:6px; }
+  .why div { font-size:12.5px; line-height:1.5; background:var(--cream); border-radius:10px; padding:8px 10px; }
+  .why small { display:block; color:var(--muted); font-size:11px; }
+  .items { display:grid; gap:8px; }
+  .item { display:grid; grid-template-columns:58px 1fr; gap:10px; }
+  .thumb { width:58px; height:70px; background:var(--sand); border-radius:10px; display:flex; align-items:center; justify-content:center; overflow:hidden; }
+  .thumb img { max-width:52px; max-height:64px; object-fit:contain; }
+  .item h3 { font-size:13px; }
+  .item .attrs { font-size:11px; color:var(--muted); margin-top:1px; }
+  .size { margin-top:4px; font-size:11px; background:#EEF5F0; color:#2E6B44; border-radius:7px; padding:4px 7px; }
+  .fb { display:flex; gap:5px; margin-top:5px; }
+  .fb button { font:inherit; font-size:11px; border:1px solid var(--line); background:#fff; border-radius:999px; padding:3px 8px; cursor:pointer; color:#5c5650; }
+  .fb button.done { border-color:var(--tc); color:var(--tc); background:#FDF3EE; }
+  .weights { display:flex; flex-wrap:wrap; gap:5px; }
+  .w { font-size:11px; border-radius:999px; padding:3px 8px; }
+  .w.p { background:#E7F2EA; color:#2E6B44; } .w.m { background:#FBE6E0; color:var(--tc-ink); }
+  details summary { cursor:pointer; font-size:12px; color:var(--muted); }
+  pre { font-size:11px; white-space:pre-wrap; background:var(--sand); border-radius:10px; padding:8px; margin-top:6px; }
+  .modal { position:fixed; inset:0; background:rgba(20,16,12,.55); display:none; align-items:center; justify-content:center; z-index:20; padding:20px; }
+  .modal.on { display:flex; }
+  .modal .box { background:#fff; border-radius:18px; padding:14px; max-width:520px; width:100%; display:grid; gap:10px; }
+  .modal img { width:100%; border-radius:12px; background:var(--sand); min-height:200px; }
+  .toast { position:fixed; bottom:22px; left:50%; transform:translateX(-50%); background:var(--ink); color:#fff; padding:10px 16px; border-radius:999px; font-size:13px; opacity:0; transition:opacity .2s; pointer-events:none; z-index:30; }
+  .toast.on { opacity:.95; }
+  .muted { color:var(--muted); font-size:12px; }
+  .loading { opacity:.45; pointer-events:none; }
+</style>
+</head>
+<body>
+<header><h1>오늘의 코디 · 추천 엔진 테스트</h1><span id="meta">카탈로그 불러오는 중…</span></header>
+<div class="wrap">
+  <aside>
+    <div class="panel">
+      <h2>체형 프로필 <span class="seg" style="width:150px"><button data-preset="female" class="on">여성 예시</button><button data-preset="male">남성 예시</button></span></h2>
+      <div class="grid2">
+        <label class="row">성별<select id="gender"><option value="female">여성</option><option value="male">남성</option></select></label>
+        <label class="row">키<input id="height" type="number"></label>
+        <label class="row">가슴둘레<input id="chest" type="number"></label>
+        <label class="row">허리둘레<input id="waist" type="number"></label>
+        <label class="row">엉덩이<input id="hip" type="number"></label>
+        <label class="row">어깨너비<input id="shoulder" type="number"></label>
+        <label class="row">다리안쪽<input id="inseam" type="number"></label>
+      </div>
+      <p class="muted" id="shape" style="margin-top:6px"></p>
+    </div>
+    <div class="panel">
+      <h2>선호</h2>
+      <div class="seg" id="fit"><button data-v="slim">슬림핏</button><button data-v="regular">레귤러핏</button><button data-v="loose" class="on">루즈핏</button></div>
+      <div class="chips" id="styles" style="margin-top:10px"></div>
+    </div>
+    <div class="panel">
+      <h2>날씨</h2>
+      <div class="temp"><input id="temp" type="range" min="-8" max="34" value="17"><b id="tempv">17°</b></div>
+    </div>
+    <div class="panel">
+      <h2>내 옷장 <span class="muted">눌러서 기준 옷 선택</span></h2>
+      <div class="ward" id="ward"></div>
+      <div class="grid2" style="margin-top:8px">
+        <select id="wcat"><option value="top:tshirt">티셔츠</option><option value="top:shirt">셔츠</option><option value="top:knitwear">니트</option><option value="top:hoodie">후드티</option><option value="bottom:jeans">청바지</option><option value="bottom:slacks">슬랙스</option><option value="bottom:skirt">스커트</option><option value="outerwear:jacket">재킷</option><option value="outerwear:coat">코트</option><option value="outerwear:cardigan">가디건</option></select>
+        <select id="wcolor"></select>
+      </div>
+      <button class="btn ghost small" id="wadd" style="margin-top:6px;width:100%">옷 추가 (치수 없이)</button>
+    </div>
+    <div class="panel">
+      <h2>추천 방식</h2>
+      <div class="seg" id="mode"><button data-v="new" class="on">바로 추천 (새 옷)</button><button data-v="anchor">내 옷으로 시작</button></div>
+    </div>
+    <div class="actions"><button class="btn ghost" id="more">다른 코디 보기</button><button class="btn primary" id="go">추천 받기</button></div>
+    <div class="panel">
+      <h2>내 취향 (기기 저장) <button class="btn ghost small" id="reset">초기화</button></h2>
+      <div class="weights" id="weights"><span class="muted">아직 학습된 취향이 없어요</span></div>
+    </div>
+  </aside>
+  <main>
+    <div class="notes" id="notes"></div>
+    <div class="cards" id="cards"></div>
+    <details class="panel"><summary>디버그: 필터와 후보 수</summary><pre id="debug"></pre></details>
+  </main>
+</div>
+<div class="modal" id="modal"><div class="box"><b>가상 모델 입혀보기</b><img id="tryimg" alt=""><p class="muted" id="trynote">AI가 만든 예시 이미지예요. 서버에 저장하지 않아요.</p><button class="btn ghost" id="close">닫기</button></div></div>
+<div class="toast" id="toast"></div>
+<script>
+const $ = s => document.querySelector(s);
+const PRESETS = {
+  female: {gender:"female", height:162, chest:84, waist:68, hip:94, shoulder:38, inseam:72},
+  male:   {gender:"male", height:175, chest:96, waist:82, hip:96, shoulder:46, inseam:80},
+};
+const WCOLORS = {"#202020":"검정","#FFFFFF":"흰색","#808080":"회색","#FFFFF0":"아이보리","#D6BE9A":"베이지","#795548":"갈색","#24344B":"네이비","#3975C6":"파랑","#4F7952":"초록","#7B8052":"카키","#C83C3C":"빨강","#E88A3D":"주황","#E8C547":"노랑","#E8A0B0":"분홍","#9165AD":"보라"};
+const KCOLORS = {"블랙":"#1E1E1E","화이트":"#F7F7F5","그레이":"#9A9A9A","베이지":"#D8C3A5","브라운":"#7B5134","네이비":"#1F2A44","카키":"#6B6B3A","스카이블루":"#9CC9EA","블루":"#2F5DA8","핑크":"#F2A7BC","레드":"#C62F2F","와인":"#722F37","오렌지":"#E8833A","옐로우":"#EED35A","그린":"#3F8F4F","민트":"#A8E0CF","라벤더":"#C3B4E6","퍼플":"#7A4FA0","실버":"#C0C0C0","골드":"#C9A447","네온":"#C6F432"};
+const SUB = {tshirt:"티셔츠",shirt:"셔츠",knitwear:"니트",hoodie:"후드티",jeans:"청바지",slacks:"슬랙스",skirt:"스커트",jacket:"재킷",coat:"코트",cardigan:"가디건"};
+const DEFAULT_WARDROBE = [
+  {id:"w1", attributes:{name:"흰 반팔 티셔츠", category:"top", subcategory:"tshirt", colors:["#FFFFFF"], fit_type:"regular"}, dimensions:{chest_width_half:50}},
+  {id:"w2", attributes:{name:"연청 청바지", category:"bottom", subcategory:"jeans", colors:["#3975C6"], leg_shape:"straight"}, dimensions:{waist_width_half:35, hip_width_half:51}},
+  {id:"w3", attributes:{name:"블랙 와이드 슬랙스 (작은 옷)", category:"bottom", subcategory:"slacks", colors:["#202020"], leg_shape:"wide"}, dimensions:{waist_width_half:31, hip_width_half:44}},
+  {id:"w4", attributes:{name:"베이지 트렌치코트", category:"outerwear", subcategory:"coat", colors:["#D6BE9A"], fit_type:"loose"}, dimensions:{chest_width_half:58}},
+];
+const state = { fit:"loose", styles:new Set(["미니멀","캐주얼"]), mode:"new", anchor:null, wardrobe:load("ward", DEFAULT_WARDROBE),
+                pref:load("pref", {weights:{}, excluded:[], liked:[]}), seen:[], outfits:[], seed:1, tooSmall:[] };
+function load(k, d) { try { return JSON.parse(localStorage.getItem("reco:"+k)) || d; } catch { return d; } }
+function save(k, v) { try { localStorage.setItem("reco:"+k, JSON.stringify(v)); } catch {} }
+function toast(t) { const e = $("#toast"); e.textContent = t; e.classList.add("on"); clearTimeout(e._t); e._t = setTimeout(() => e.classList.remove("on"), 2200); }
+async function api(path, body) {
+  const r = await fetch(path, {method: body ? "POST" : "GET", headers: {"Content-Type": "application/json"}, body: body ? JSON.stringify(body) : undefined});
+  const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status); return j;
+}
+function profile() {
+  const p = {pref_fit: state.fit, styles: [...state.styles]};
+  for (const k of ["gender","height","chest","waist","hip","shoulder","inseam"]) p[k] = $("#"+k).value;
+  return p;
+}
+function setPreset(name) {
+  const p = PRESETS[name];
+  for (const k in p) $("#"+k).value = p[k];
+  document.querySelectorAll("[data-preset]").forEach(b => b.classList.toggle("on", b.dataset.preset === name));
+  shapeHint();
+}
+function shapeHint() {
+  const c = +$("#chest").value, w = +$("#waist").value, h = +$("#hip").value;
+  let s = "판정 보류";
+  if (h/c >= 1.10) s = "하체 볼륨형"; else if (c/h >= 1.10) s = "상체 볼륨형"; else if (w/h <= 0.70) s = "허리 라인형"; else if (w/h >= 0.80) s = "일자형";
+  $("#shape").textContent = `체형: ${s} · 다리 비율 ${(+$("#inseam").value / +$("#height").value).toFixed(2)}`;
+}
+function renderWardrobe() {
+  const box = $("#ward"); box.innerHTML = "";
+  state.wardrobe.forEach(w => {
+    const a = w.attributes, small = state.tooSmall.includes("w:"+w.id);
+    const d = document.createElement("div");
+    d.className = "wi" + (state.anchor === "w:"+w.id ? " anchor" : "") + (small ? " small" : "");
+    d.innerHTML = `<span class="sw" style="background:${a.colors[0]}"></span><span>${a.name || SUB[a.subcategory]}<small>${small ? "몸보다 작아서 추천에서 제외" : (w.dimensions ? "치수 있음" : "치수 없음")}</small></span><button class="x" title="삭제">✕</button>`;
+    d.onclick = e => { if (e.target.classList.contains("x")) { state.wardrobe = state.wardrobe.filter(x => x !== w); save("ward", state.wardrobe); renderWardrobe(); return; }
+      state.anchor = state.anchor === "w:"+w.id ? null : "w:"+w.id; if (state.anchor) setMode("anchor"); renderWardrobe(); };
+    box.appendChild(d);
+  });
+}
+function setMode(m) { state.mode = m; document.querySelectorAll("#mode button").forEach(b => b.classList.toggle("on", b.dataset.v === m)); }
+function renderWeights(top) {
+  const w = top || Object.entries(state.pref.weights || {}).sort((a,b) => Math.abs(b[1]) - Math.abs(a[1])).slice(0, 10);
+  $("#weights").innerHTML = w.length ? w.map(([k,v]) => `<span class="w ${v>0?"p":"m"}">${k.replace(/^(상의|하의|아우터|원피스):/, "$1 ")} ${v>0?"+":""}${(+v).toFixed(1)}</span>`).join("")
+    + (state.pref.excluded?.length ? `<span class="w m">다시 보지 않기 ${state.pref.excluded.length}벌</span>` : "") : `<span class="muted">아직 학습된 취향이 없어요</span>`;
+}
+const LAYOUT = {
+  "상의+하의": {"상의":[8,4,84,46], "하의":[22,46,56,52]},
+  "아우터+상의+하의": {"아우터":[2,6,52,76], "상의":[52,2,46,44], "하의":[56,44,40,54]},
+  "원피스": {"원피스":[18,3,64,94]},
+  "아우터+원피스": {"아우터":[2,6,50,76], "원피스":[46,4,52,92]},
+};
+function pieceHTML(it) {
+  if (it.image) return `<img src="${it.image}" alt="${it.name}">`;
+  const hex = KCOLORS[it.attrs?.["색상"]] || "#ccc";
+  return `<div class="own"><span class="sw" style="background:${hex}"></span><b>내 옷</b>${it.name}</div>`;
+}
+function renderOutfits(res) {
+  state.outfits = res.outfits; state.tooSmall = res.debug.too_small || [];
+  renderWardrobe();
+  $("#notes").innerHTML = (res.notes || []).map(n => `<div class="note">${n}</div>`).join("");
+  $("#cards").innerHTML = "";
+  res.outfits.forEach((o, k) => {
+    const lay = LAYOUT[o.template] || {};
+    const c = document.createElement("section"); c.className = "card";
+    const comp = o.components;
+    const bar = (label, v, n) => `<div class="bar"><span>${label}</span><div class="track"><div class="fill ${n?"n":""}" style="width:${v}%"></div></div><span class="v">${v}</span></div>`;
+    c.innerHTML = `
+      <div class="top"><div class="score"><b>${o.total}</b><span>/100 · 코디 ${k+1}</span></div><span class="tag">${o.template.replaceAll("+"," + ")}</span></div>
+      <div class="board">${o.items.map(it => { const [x,y,w,h] = lay[it.slot] || [10,10,80,80];
+        return `<div class="p" style="left:${x}%;top:${y}%;width:${w}%;height:${h}%">${pieceHTML(it)}</div>`; }).join("")}
+        <button class="tryon-btn" data-k="${k}">입혀보기</button></div>
+      <div class="bars">${bar("궁합", comp.compat)}${bar("체형·핏", comp.body)}${bar("배색", comp.color)}${bar("계절", comp.season)}${bar("내 취향", comp.taste, !Object.keys(state.pref.weights||{}).length && !state.styles.size)}</div>
+      <div class="why">${o.reasons.map(r => `<div>${r.text}${r.sub ? `<small>${r.sub}</small>` : ""}</div>`).join("")}</div>
+      <div class="items">${o.items.map(it => `
+        <div class="item"><div class="thumb">${it.image ? `<img src="${it.image}" alt="">` : `<span class="sw" style="width:26px;height:26px;border-radius:50%;background:${KCOLORS[it.attrs?.["색상"]]||"#ccc"}"></span>`}</div>
+          <div><h3>${it.name}${it.source==="wardrobe" ? " · 내 옷" : ""}</h3>
+            <div class="attrs">${[it.slot, it.attrs["핏"], ...(it.attrs["소재"]||[]).slice(0,1), it.attrs["기장"], it.style].filter(Boolean).join(" · ")}</div>
+            ${it.size ? `<div class="size">${it.source==="wardrobe" ? "" : "추천 사이즈 · "}${it.size}</div>` : ""}
+            ${it.source==="wardrobe" ? "" : `<div class="fb"><button data-id="${it.id}" data-p="1">👍 좋아요</button><button data-id="${it.id}" data-p="-1">👎 별로예요</button><button data-id="${it.id}" data-p="-1" data-x="1">🚫 다시 보지 않기</button></div>`}
+          </div></div>`).join("")}</div>`;
+    $("#cards").appendChild(c);
+  });
+  $("#debug").textContent = JSON.stringify({band: res.band, ...res.debug}, null, 1);
+}
+async function run(more) {
+  if (more) state.seen.push(...state.outfits.flatMap(o => o.items.map(i => i.id))); else state.seen = [];
+  state.seed += 1;
+  $("main").classList.add("loading");
+  try {
+    const res = await api("/api/recommend", {profile: profile(), temp: +$("#temp").value, mode: state.mode, anchor: state.anchor,
+      wardrobe: state.wardrobe, preference: state.pref, seen: state.seen, seed: state.seed, count: 3});
+    renderOutfits(res);
+  } catch (e) { $("#notes").innerHTML = `<div class="note err">${e.message}</div>`; $("#cards").innerHTML = ""; }
+  $("main").classList.remove("loading");
+}
+async function feedback(body) {
+  const res = await api("/api/feedback", {...body, preference: state.pref, wardrobe: state.wardrobe});
+  state.pref = res.preference; save("pref", state.pref); renderWeights(res.top);
+  return res;
+}
+document.addEventListener("click", async e => {
+  const b = e.target.closest(".fb button");
+  if (b) {
+    const item = state.outfits.flatMap(o => o.items).find(i => i.id === b.dataset.id);
+    await feedback({events: [{item_id: b.dataset.id, polarity: +b.dataset.p, aspect: null, exclude: !!b.dataset.x}], items: [item]});
+    b.classList.add("done"); toast(b.dataset.x ? "다시 보지 않을게요 · '추천 받기'로 확인해 보세요" : "취향에 반영했어요 · '추천 받기'로 확인해 보세요");
+  }
+  const t = e.target.closest(".tryon-btn");
+  if (t) {
+    const o = state.outfits[+t.dataset.k];
+    $("#tryimg").removeAttribute("src"); $("#trynote").textContent = "가상 모델을 그리는 중이에요… (10~30초)"; $("#modal").classList.add("on");
+    try { const r = await api("/api/tryon", {profile: profile(), items: o.items}); $("#tryimg").src = r.image;
+      $("#trynote").textContent = "AI가 만든 예시 이미지예요. 사용자 사진은 쓰지 않았고, 서버에 저장하지 않아요."; }
+    catch (err) {
+      const why = {
+        AI_NOT_CONFIGURED: "backend/.env에 GEMINI_API_KEY가 없어서 입혀보기를 할 수 없어요.",
+        AI_RATE_LIMITED: "이 API 키에는 이미지 생성 사용량이 없어요(무료 등급은 이미지 모델 할당량 0). Google AI Studio에서 결제를 연결하면 바로 동작해요.",
+        AI_AUTH_FAILED: "API 키가 거부됐어요. 키를 확인해 주세요.",
+      }[err.message];
+      $("#trynote").textContent = why || "입혀보기 실패: " + err.message;
+    }
+  }
+});
+$("#close").onclick = () => $("#modal").classList.remove("on");
+$("#go").onclick = () => run(false);
+$("#more").onclick = () => run(true);
+$("#reset").onclick = () => { state.pref = {weights:{}, excluded:[], liked:[]}; save("pref", state.pref); renderWeights(); toast("취향을 초기화했어요"); };
+$("#temp").oninput = () => $("#tempv").textContent = $("#temp").value + "°";
+document.querySelectorAll("[data-preset]").forEach(b => b.onclick = () => setPreset(b.dataset.preset));
+document.querySelectorAll("#fit button").forEach(b => b.onclick = () => { state.fit = b.dataset.v; document.querySelectorAll("#fit button").forEach(x => x.classList.toggle("on", x === b)); });
+document.querySelectorAll("#mode button").forEach(b => b.onclick = () => setMode(b.dataset.v));
+["chest","waist","hip","inseam","height"].forEach(k => $("#"+k).oninput = shapeHint);
+$("#wcolor").innerHTML = Object.entries(WCOLORS).map(([h,n]) => `<option value="${h}">${n}</option>`).join("");
+$("#wadd").onclick = () => {
+  const [category, subcategory] = $("#wcat").value.split(":"), color = $("#wcolor").value;
+  state.wardrobe.push({id: "u" + Date.now(), attributes: {name: `${WCOLORS[color]} ${SUB[subcategory]}`, category, subcategory, colors: [color],
+    fit_type: "regular", leg_shape: "straight"}, dimensions: null});
+  save("ward", state.wardrobe); renderWardrobe();
+};
+(async () => {
+  setPreset("female");
+  const meta = await api("/api/meta");
+  $("#meta").innerHTML = `K-Fashion 카탈로그 ${meta.items.toLocaleString()}벌 (남성 공용 ${meta.unisex.toLocaleString()}벌) · 궁합 모델: 실제 코디가 바꿔치기 코디를 이기는 비율 ${(meta.compat.real_beats_swap*100).toFixed(0)}% · Gemini 키(입혀보기) ${meta.gemini ? "연결됨" : "없음"} · <a href="/wardrobe">내 옷장 추천 테스트 →</a>`;
+  $("#styles").innerHTML = meta.styles.map(s => `<span class="chip ${state.styles.has(s) ? "on" : ""}" data-s="${s}">${s}</span>`).join("");
+  document.querySelectorAll("#styles .chip").forEach(c => c.onclick = () => { state.styles.has(c.dataset.s) ? state.styles.delete(c.dataset.s) : state.styles.add(c.dataset.s); c.classList.toggle("on"); });
+  renderWardrobe(); renderWeights(); run(false);
+})();
+</script>
+</body>
+</html>

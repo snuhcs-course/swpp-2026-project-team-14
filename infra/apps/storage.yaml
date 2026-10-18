@@ -1,0 +1,25 @@
+# Local-path volumes survive Pod replacements, not deletion of the school server.
+# Keep PVCs in the SAME sync wave as their consumers (WaitForFirstConsumer).
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mysql-data
+  namespace: team14
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 8Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: wardrobe-media
+  namespace: team14
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 8Gi

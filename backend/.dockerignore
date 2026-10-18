@@ -1,0 +1,15 @@
+.venv/
+private/
+models/
+wardrobe/
+.env
+.env.*
+tests/
+scripts/*
+!scripts/prepare_landmarks.py
+**/__pycache__/
+.pytest_cache/
+*.md
+requirements-dev.txt
+requirements-benchmark.txt
+recommendation/demo/

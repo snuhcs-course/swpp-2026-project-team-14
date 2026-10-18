@@ -1,0 +1,15 @@
+{
+ "temperature": 0.1337,
+ "n": 3000,
+ "accuracy": 0.4923,
+ "nll": {
+  "default": 1.2618,
+  "calibrated": 1.201,
+  "uniform": 1.3863
+ },
+ "ece": {
+  "default": 0.093,
+  "calibrated": 0.0292
+ },
+ "masked_model": true
+}
