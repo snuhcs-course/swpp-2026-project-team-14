@@ -36,6 +36,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.swpp.stylemate.BuildConfig
+import com.swpp.stylemate.data.chat.ChatRepository
+import com.swpp.stylemate.data.recommendation.SharedPrefsTasteStore
+import com.swpp.stylemate.ui.chat.ChatRoute
+import com.swpp.stylemate.ui.chat.ChatViewModel
 import com.swpp.stylemate.data.SharedPrefsBodyProfileStore
 import com.swpp.stylemate.ui.home.CodiBookRoute
 import com.swpp.stylemate.ui.home.HomeRoute
@@ -115,38 +120,47 @@ private fun ProfileSetupFlow(viewModel: BodyProfileViewModel, canCancel: Boolean
 private fun MainTabs(viewModel: BodyProfileViewModel) {
     val app by viewModel.app.collectAsStateWithLifecycle()
     var tab by rememberSaveable { mutableStateOf(Tab.WARDROBE) }
+    val context = LocalContext.current.applicationContext
+    val chat: ChatViewModel = viewModel(factory = viewModelFactory {
+        initializer { ChatViewModel(ChatRepository(BuildConfig.API_BASE_URL), SharedPrefsTasteStore(context)) }
+    })
+    val chatting by chat.visible.collectAsStateWithLifecycle()
 
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        bottomBar = {
-            NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainer) {
-                Tab.entries.forEach { item ->
-                    NavigationBarItem(
-                        selected = tab == item,
-                        onClick = { tab = item },
-                        icon = { Icon(item.icon, contentDescription = null) },
-                        label = { Text(item.label) },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = MaterialTheme.colorScheme.primary,
-                            selectedTextColor = MaterialTheme.colorScheme.primary,
-                            indicatorColor = MaterialTheme.colorScheme.secondaryContainer,
-                        ),
-                    )
+    Box(Modifier.fillMaxSize()) {
+        Scaffold(
+            containerColor = MaterialTheme.colorScheme.background,
+            bottomBar = {
+                if (!chatting) NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainer) {
+                    Tab.entries.forEach { item ->
+                        NavigationBarItem(
+                            selected = tab == item,
+                            onClick = { tab = item },
+                            icon = { Icon(item.icon, contentDescription = null) },
+                            label = { Text(item.label) },
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = MaterialTheme.colorScheme.primary,
+                                selectedTextColor = MaterialTheme.colorScheme.primary,
+                                indicatorColor = MaterialTheme.colorScheme.secondaryContainer,
+                            ),
+                        )
+                    }
                 }
+            },
+        ) { padding ->
+            when (tab) {
+                Tab.HOME -> HomeRoute(app.profile, onSetupProfile = viewModel::startReanalysis,
+                    onOpenWardrobe = { tab = Tab.WARDROBE }, modifier = Modifier.padding(padding).consumeWindowInsets(padding),
+                    onChat = { outfit, weather -> chat.open(outfit, app.profile, weather) })
+                Tab.WARDROBE -> Box(Modifier.padding(padding).consumeWindowInsets(padding)) { WardrobeRoute() }
+                Tab.CODIBOOK -> CodiBookRoute(Modifier.padding(padding).consumeWindowInsets(padding))
+                Tab.PROFILE -> MyProfileScreen(
+                    profile = app.profile,
+                    onReanalyze = viewModel::startReanalysis,
+                    onDelete = viewModel::deleteProfile,
+                    modifier = Modifier.padding(padding),
+                )
             }
-        },
-    ) { padding ->
-        when (tab) {
-            Tab.HOME -> HomeRoute(app.profile, onSetupProfile = viewModel::startReanalysis,
-                onOpenWardrobe = { tab = Tab.WARDROBE }, modifier = Modifier.padding(padding).consumeWindowInsets(padding))
-            Tab.WARDROBE -> Box(Modifier.padding(padding).consumeWindowInsets(padding)) { WardrobeRoute() }
-            Tab.CODIBOOK -> CodiBookRoute(Modifier.padding(padding).consumeWindowInsets(padding))
-            Tab.PROFILE -> MyProfileScreen(
-                profile = app.profile,
-                onReanalyze = viewModel::startReanalysis,
-                onDelete = viewModel::deleteProfile,
-                modifier = Modifier.padding(padding),
-            )
         }
+        if (chatting) ChatRoute(chat)
     }
 }

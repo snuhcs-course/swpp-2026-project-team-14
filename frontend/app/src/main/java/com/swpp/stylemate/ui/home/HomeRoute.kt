@@ -14,12 +14,15 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.swpp.stylemate.BuildConfig
 import com.swpp.stylemate.data.BodyProfile
 import com.swpp.stylemate.data.BodyProfileJson
+import com.swpp.stylemate.data.recommendation.Outfit
+import com.swpp.stylemate.data.recommendation.Weather
 import com.swpp.stylemate.data.recommendation.OutfitRepository
 import com.swpp.stylemate.data.recommendation.SharedPrefsTasteStore
 import org.json.JSONObject
 
 @Composable
-fun HomeRoute(profile: BodyProfile?, onSetupProfile: () -> Unit, onOpenWardrobe: () -> Unit, modifier: Modifier = Modifier) {
+fun HomeRoute(profile: BodyProfile?, onSetupProfile: () -> Unit, onOpenWardrobe: () -> Unit, modifier: Modifier = Modifier,
+              onChat: (Outfit, Weather?) -> Unit) {
     val context = LocalContext.current.applicationContext
     val model: HomeViewModel = viewModel(factory = viewModelFactory {
         initializer { HomeViewModel(OutfitRepository(BuildConfig.API_BASE_URL), SharedPrefsTasteStore(context)) }
@@ -37,6 +40,7 @@ fun HomeRoute(profile: BodyProfile?, onSetupProfile: () -> Unit, onOpenWardrobe:
         onSetupProfile = onSetupProfile,
         onOpenWardrobe = onOpenWardrobe,
         onMessageShown = model::messageShown,
+        onChat = { state.current?.let { onChat(it, state.weather) } },
         modifier = modifier,
     )
 }
