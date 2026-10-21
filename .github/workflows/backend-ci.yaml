@@ -41,11 +41,22 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements-dev.txt
 
-      - name: Run tests
+      - name: Run tests with coverage
         run: |
-          python -m pytest -q
+          python -m pytest -q --cov --cov-report=
           python manage.py makemigrations --check --dry-run --settings=config.test_settings
-          python manage.py test apps.users apps.wardrobe apps.outfits --settings=config.test_settings --noinput
+          python -m coverage run --append manage.py test apps.users apps.wardrobe apps.outfits --settings=config.test_settings --noinput
+          python -m coverage report
+          python -m coverage html
+          python -m coverage json -o coverage.json
+          python scripts/coverage_by_component.py coverage.json >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: backend/htmlcov
 
   image:
     # Builds the production image and checks that the pose model loads inside it

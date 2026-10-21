@@ -36,6 +36,21 @@ Tests use a synthetic mannequin (`tests/synthetic.py`) with known dimensions ins
 User and wardrobe/outfit model/API tests use an isolated in-memory SQLite database; they do not migrate the configured MySQL database.
 `test_mediapipe_smoke.py` checks that the real model loads, and is skipped if the model is not downloaded.
 
+### Coverage
+
+Line and branch coverage with coverage.py (through pytest-cov). What is measured and what is left out is set in `.coveragerc`; pytest and the Django test runner write to the same data file.
+
+```bash
+.venv\Scripts\python -m pytest --cov --cov-report=
+.venv\Scripts\python -m coverage run --append manage.py test apps.users apps.wardrobe apps.outfits --settings=config.test_settings --noinput
+.venv\Scripts\python -m coverage report
+.venv\Scripts\python -m coverage html
+.venv\Scripts\python -m coverage json -o coverage.json
+.venv\Scripts\python scripts\coverage_by_component.py coverage.json
+```
+
+The HTML report is written to `htmlcov/index.html`; the last command prints statement and branch coverage per component. `pytest --cov` starts a new data file, so run it first. Backend CI runs the same commands and attaches the HTML report to each run.
+
 ## Docker image (what runs in the cluster)
 
 ```bash

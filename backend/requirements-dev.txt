@@ -1,3 +1,5 @@
 # Local development and CI tests.
 -r requirements.txt
 pytest==9.1.1
+pytest-cov==7.1.0  # line and branch coverage through coverage.py (settings in .coveragerc)
+coverage==7.16.2
