@@ -96,6 +96,8 @@ fun ReviewScreen(
     onFit: (PreferredFit) -> Unit,
     onToggleStyle: (String) -> Unit,
     onConfirm: () -> Unit,
+    topBar: (@Composable () -> Unit)? = null,
+    onboarding: Boolean = false,
 ) {
     var editing by remember { mutableStateOf<BodyMeasurement?>(null) }
 
@@ -104,9 +106,11 @@ fun ReviewScreen(
         onBack = onRetake,
         actionLabel = "다시 찍기",
         onAction = onRetake,
-        primaryLabel = "옷장 등록하고 시작하기  →",
-        primaryEnabled = true,
+        primaryLabel = if (onboarding) "확인하고 계속하기" else "저장하기",
+        primaryEnabled = !state.saving,
+        navigationEnabled = !state.saving,
         onPrimary = onConfirm,
+        topBar = topBar,
     ) { padding ->
         Column(
             modifier = Modifier
@@ -121,6 +125,7 @@ fun ReviewScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             state.warnings.forEach { WarningBanner(it) }
+            state.errorMessage?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             state.reference?.let { ReferenceNote(it, state.lastInput?.heightCm) }
             Spacer(Modifier.height(16.dp))
 
@@ -138,11 +143,12 @@ fun ReviewScreen(
 
             AllMeasurementsSection(state.measurements, onClick = { editing = it }, reference = state.reference)
 
-            SectionTitle("선호 핏")
-            FitSelector(selected = state.preferredFit, onSelect = onFit)
-
-            SectionTitle("선호 스타일", "최대 ${MAX_STYLES}개 선택")
-            StyleChips(selected = state.preferredStyles, onToggle = onToggleStyle)
+            if (!onboarding) {
+                SectionTitle("선호 핏")
+                FitSelector(selected = state.preferredFit, onSelect = onFit)
+                SectionTitle("선호 스타일", "최대 ${MAX_STYLES}개 선택")
+                StyleChips(selected = state.preferredStyles, onToggle = onToggleStyle)
+            }
             Spacer(Modifier.height(24.dp))
         }
     }
@@ -247,7 +253,7 @@ private fun FitSelector(selected: PreferredFit, onSelect: (PreferredFit) -> Unit
 private fun StyleChips(selected: List<String>, onToggle: (String) -> Unit) {
     val full = selected.size >= MAX_STYLES
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        STYLE_OPTIONS.forEach { style ->
+        STYLE_OPTIONS.map { if (it == "러블리") "시티보이" else it }.forEach { style ->
             val isSelected = style in selected
             FilterChip(
                 selected = isSelected,

@@ -249,15 +249,17 @@ private fun EmptyState(title: String, text: String, action: String, onAction: ()
     }
 }
 
-/** A wardrobe photo (GET /api/wardrobe/items/<id>/image/), kept in memory while the app runs. */
+/** Loads a wardrobe photo while its card is visible. */
 @Composable
 fun GarmentThumbnail(path: String, name: String, modifier: Modifier = Modifier) {
-    var bitmap by remember(path) { mutableStateOf(ThumbnailCache[path]) }
+    val context = androidx.compose.ui.platform.LocalContext.current.applicationContext
+    val account = com.swpp.stylemate.ui.LocalAccountAccess.current
+    var bitmap by remember(path) { mutableStateOf<ImageBitmap?>(null) }
     var failed by remember(path) { mutableStateOf(false) }
     LaunchedEffect(path) {
         if (bitmap != null) return@LaunchedEffect
         try {
-            bitmap = WardrobeRepository.thumbnail(path)?.also { ThumbnailCache[path] = it }
+            bitmap = WardrobeRepository.thumbnail(context, path, account)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -271,17 +273,5 @@ fun GarmentThumbnail(path: String, name: String, modifier: Modifier = Modifier) 
                 ?: if (failed) Text(name, style = MaterialTheme.typography.labelMedium, textAlign = TextAlign.Center)
                    else CircularProgressIndicator(Modifier.size(24.dp))
         }
-    }
-}
-
-private object ThumbnailCache {
-    private const val MAX = 40
-    private val map = object : LinkedHashMap<String, ImageBitmap>(MAX, 0.75f, true) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, ImageBitmap>?) = size > MAX
-    }
-
-    @Synchronized operator fun get(path: String): ImageBitmap? = map[path]
-    @Synchronized operator fun set(path: String, bitmap: ImageBitmap) {
-        map[path] = bitmap
     }
 }

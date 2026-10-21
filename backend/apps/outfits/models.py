@@ -1,13 +1,13 @@
-# AI-generated with Claude Code (Claude Opus 5.5), 2026-10-12, reviewed by Dongkun Moon
+# AI-generated with Claude Code (Claude Opus 5.5), 2026-10-12, reviewed by Dongkun Moon; user ownership added with Codex, 2026-10-16
 """코디 table: an outfit is a set of the user's garments, one per slot (outerwear, top, bottom).
 
-Recommended outfits are stored too, so likes/dislikes and "save" can refer to them by id. The owner
-column comes with the user table (login, Iteration 2): until then every outfit belongs to the one
-wardrobe of the server.
+Recommended outfits are stored too, so likes/dislikes and "save" can refer to them by id.
+Every stored outfit belongs to an authenticated user.
 """
 
 import uuid
 
+from django.conf import settings
 from django.db import models
 
 from apps.wardrobe.models import Garment
@@ -24,6 +24,8 @@ class Outfit(models.Model):
         DISLIKED = "disliked"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='outfits',
+                             on_delete=models.CASCADE)
     source = models.CharField(max_length=16, choices=Source.choices)
     saved = models.BooleanField(default=False, db_index=True)  # in the 코디북
     name = models.CharField(max_length=80, blank=True, default="")

@@ -7,6 +7,7 @@ The team backend: a Django project (`config/` + `apps/`) deployed to the team14 
 |---|---|
 | `GET /healthz/` | Kubernetes readiness/liveness probe |
 | `GET /api/hello/` | smoke test (kept from the original `app.py`) |
+| `/api/auth/register/`, `/api/auth/login/`, `/api/auth/logout/`, `/api/users/me/` | ID/password authentication and account profile ([contract](../docs/login/README.md)) |
 | `POST /api/body-profile/analyze/` | body measurements from front + side photos (`apps/body_profiles/`) |
 | `/api/wardrobe/...` | garment photos, attributes, measurements and recommendation labels (`apps/wardrobe/`, [docs](../docs/wardrobe/wardrobe-spec.md)) |
 | `/api/outfits/...`, `GET /api/weather/` | outfits from the user's own wardrobe, the 코디 table, weather (`apps/outfits/`, [docs](../docs/recommendation/api.md)) |
@@ -29,9 +30,11 @@ curl -L -o models/pose_landmarker_heavy.task https://storage.googleapis.com/medi
 
 ```bash
 .venv\Scripts\python -m pytest
+.venv\Scripts\python manage.py test apps.users apps.wardrobe apps.outfits --settings=config.test_settings --noinput
 ```
 
 Tests use a synthetic mannequin (`tests/synthetic.py`) with known dimensions instead of real body photos.
+User and wardrobe/outfit model/API tests use an isolated in-memory SQLite database; they do not migrate the configured MySQL database.
 `test_mediapipe_smoke.py` checks that the real model loads, and is skipped if the model is not downloaded.
 
 ## Docker image (what runs in the cluster)
@@ -58,6 +61,8 @@ curl -H "Host: localhost" http://localhost:8000/healthz/
 - uploads are kept in memory only; nothing is written to disk
 
 New Django apps go in `apps/` and are registered in `config/settings.py` / `config/urls.py` (layout: wiki → Directory Structure).
+
+Wardrobe database and account outfit endpoints require `Authorization: Bearer <token>`. Body analysis, landmarks, editor options, label previews and weather remain available without login. Guest Android storage is connected: `/api/wardrobe/analyze-preview/`, `/api/outfits/preview/` and `/api/outfits/preview/feedback/` calculate results without database or file persistence; the app stores its own garments, photos and outfits. Android registration, login, logout, expiry handling, authenticated account APIs and consent-based guest-to-account import are connected. Import endpoints and conflict/retry rules are documented in [the login contract](../docs/login/README.md#비로그인-저장과-계정-가져오기). Apply migrations before using account APIs; the ownership migrations remove pre-login rows with no owner, as approved for this feature, while keeping owned records.
 
 ```bash
 $env:DJANGO_DEBUG="1"

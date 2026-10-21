@@ -12,6 +12,9 @@ import org.json.JSONException
 import org.json.JSONObject
 import java.io.IOException
 import java.util.concurrent.TimeUnit
+import com.swpp.stylemate.data.LocalUserStore
+import com.swpp.stylemate.data.AccountAccess
+import com.swpp.stylemate.data.AuthException
 
 data class Weather(val temp: Double, val apparent: Double, val label: String, val band: String,
                    val rain: Boolean, val snow: Boolean, val json: JSONObject)
@@ -43,6 +46,8 @@ class OutfitApiException(val code: String, message: String) : Exception(message)
 class OutfitRepository(
     baseUrl: String,
     private val client: OkHttpClient = defaultClient(),
+    private val local: LocalUserStore? = null,
+    private val account: AccountAccess? = null,
 ) {
     private val base = baseUrl.trimEnd('/')
 
@@ -57,18 +62,41 @@ class OutfitRepository(
             .put("preference", preference ?: JSONObject.NULL)
         if (weather != null) request.put("weather", weather.json) else request.put("temp", DEFAULT_TEMP)
         anchorId?.let { request.put("anchor_id", it) }
-        return parseRecommendation(call("POST", "/api/outfits/recommend/", request))
+        local?.let { request.put("wardrobe", JSONArray(withContext(Dispatchers.IO) { it.garments().map(::previewGarment) })) }
+        val result = call("POST", if (local == null) "/api/outfits/recommend/" else "/api/outfits/preview/", request)
+        local?.let { withContext(Dispatchers.IO) { it.rememberOutfits(result.getJSONArray("outfits")) } }
+        return parseRecommendation(result)
     }
 
-    suspend fun saved(): List<Outfit> = call("GET", "/api/outfits/").getJSONArray("outfits").let { list ->
+    suspend fun saved(): List<Outfit> {
+        local?.let { return withContext(Dispatchers.IO) { it.outfits().map(::parseOutfit) } }
+        val rows = if (account != null) {
+            try { account.list("/api/outfits/", "outfits") }
+            catch (error: AuthException) { throw OutfitApiException(error.code, error.message.orEmpty()) }
+        } else call("GET", "/api/outfits/").getJSONArray("outfits")
+        return rows.let { list ->
         (0 until list.length()).map { parseOutfit(list.getJSONObject(it)) }
+        }
     }
 
-    suspend fun setSaved(id: String, saved: Boolean): Outfit =
-        parseOutfit(call("PUT", "/api/outfits/$id/", JSONObject().put("saved", saved)))
+    suspend fun setSaved(id: String, saved: Boolean): Outfit {
+        local?.let { return withContext(Dispatchers.IO) { parseOutfit(it.saveOutfit(id, saved)) } }
+        return parseOutfit(call("PUT", "/api/outfits/$id/", JSONObject().put("saved", saved)))
+    }
 
     /** Returns the outfit and the updated taste profile to keep on the device. */
     suspend fun feedback(id: String, value: String?, preference: JSONObject?): Pair<Outfit, JSONObject> {
+        if (local != null) {
+            val outfit = withContext(Dispatchers.IO) { checkNotNull(local.outfit(id)) }
+            val items = outfit.getJSONArray("items")
+            val ids = (0 until items.length()).map { items.getJSONObject(it).getString("garment_id") }.toSet()
+            val garments = withContext(Dispatchers.IO) { local.garments().filter { it.getString("id") in ids }.map(::previewGarment) }
+            val result = call("POST", "/api/outfits/preview/feedback/", JSONObject().put("outfit", outfit)
+                .put("wardrobe", JSONArray(garments)).put("feedback", value ?: JSONObject.NULL)
+                .put("preference", preference ?: JSONObject.NULL))
+            val updated = withContext(Dispatchers.IO) { local.setFeedback(id, value) }
+            return parseOutfit(updated) to result.getJSONObject("preference")
+        }
         val result = call("POST", "/api/outfits/$id/feedback/",
             JSONObject().put("feedback", value ?: JSONObject.NULL).put("preference", preference ?: JSONObject.NULL))
         return parseOutfit(result.getJSONObject("outfit")) to result.getJSONObject("preference")
@@ -86,7 +114,21 @@ class OutfitRepository(
             .put("garment_type", garmentType ?: JSONObject.NULL)).optJSONObject("labels")
 
     private suspend fun call(method: String, path: String, body: JSONObject? = null): JSONObject = withContext(Dispatchers.IO) {
-        val payload = body?.toString()?.toRequestBody("application/json".toMediaType())
+        if (account != null) {
+            try { return@withContext account.json(method, path, body) }
+            catch (error: AuthException) {
+                throw OutfitApiException(error.code, when (error.code) {
+                    "WARDROBE_TOO_SMALL" -> "상의와 하의를 한 벌씩 등록하면 코디를 만들어 드려요."
+                    "WEATHER_UNAVAILABLE" -> "날씨를 불러오지 못했어요."
+                    else -> error.message.orEmpty()
+                })
+            }
+        }
+        val bytes = body?.toString()?.toByteArray(Charsets.UTF_8)
+        if (path == "/api/outfits/preview/" && bytes != null && bytes.size > MAX_PREVIEW_BYTES) {
+            throw OutfitApiException("BODY_TOO_LARGE", "옷 정보가 너무 많아요. 계정으로 가져온 뒤 다시 시도해 주세요.")
+        }
+        val payload = bytes?.toRequestBody("application/json".toMediaType())
         val request = Request.Builder().url(base + path).method(method, payload).build()
         val (status, text) = try {
             client.newCall(request).execute().use { it.code to it.body?.string().orEmpty() }
@@ -101,6 +143,12 @@ class OutfitRepository(
         const val SERVER_ERROR = "코디를 불러오지 못했어요. 잠시 후 다시 시도해 주세요."
         const val DEFAULT_TEMP = 18.0
         const val MAX_SEEN = 60
+        const val MAX_PREVIEW_BYTES = 1024 * 1024
+
+        private fun previewGarment(row: JSONObject) = JSONObject()
+            .put("id", row.getString("id")).put("attributes", row.getJSONObject("attributes"))
+            .put("dimensions", row.opt("dimensions") ?: JSONObject.NULL)
+            .put("labels", row.opt("labels") ?: JSONObject.NULL).put("notes", "")
 
         fun defaultClient(): OkHttpClient = OkHttpClient.Builder()
             .connectTimeout(10, TimeUnit.SECONDS)

@@ -1,37 +1,50 @@
 # AI-generated with Codex, 2026-09-29, reviewed by Hyeon U Jeong; recommendation labels added with Claude Code (Claude Opus 5.5), 2026-10-12, reviewed by Dongkun Moon
 import json
 import uuid
-from functools import wraps
 from threading import BoundedSemaphore
 
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.exceptions import RequestDataTooBig
+from django.db import transaction
 from django.http import FileResponse, JsonResponse
 from django.shortcuts import get_object_or_404
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from apps.body_profiles.profile import body_from_request
+from apps.users.auth import require_auth
+from apps.users.models import User
+from apps.users.pagination import account_page
 from recommendation.labeling import label
 
 from .analysis import AnalysisError, MAX_IMAGE_BYTES, MODEL, analyze_image, prepare_image
 from .editor import catalog, validate_record
 from .schema import validate_ai_details, validate_attributes
-from .models import Garment
+from .models import Garment, CategoryInUse
 from .landmarks import GARMENTS, MAX_FRAME_BYTES, detect
 
 # Bound concurrent paid requests and image decode memory.
 ANALYSIS_SLOTS = BoundedSemaphore(1)
 
 
-def require_database(view):
-    @wraps(view)
-    def wrapped(request, *args, **kwargs):
-        engine = settings.DATABASES.get('default', {}).get('ENGINE')
-        if not engine or engine == 'django.db.backends.dummy':
-            return JsonResponse({'error': 'DATABASE_NOT_CONFIGURED'}, status=503)
-        return view(request, *args, **kwargs)
-    return wrapped
+@require_POST
+def analyze_preview(request):
+    """Guest analysis returns attributes only; the app owns the image and draft."""
+    if request.content_type not in ('image/jpeg', 'image/png', 'image/webp'):
+        return JsonResponse({'error': 'IMAGE_REQUIRED'}, status=415)
+    if not ANALYSIS_SLOTS.acquire(blocking=False):
+        return JsonResponse({'error': 'AI_BUSY'}, status=429)
+    try:
+        garment_type = request.GET.get('garment')
+        attributes, details = analyze_image(request.read(MAX_IMAGE_BYTES + 1), settings.GEMINI_API_KEY,
+                                            garment_type if garment_type in GARMENTS else None)
+        response = JsonResponse({'model': MODEL, 'attributes': attributes, 'details': details})
+        response['Cache-Control'] = 'no-store'
+        return response
+    except AnalysisError as error:
+        return JsonResponse({'error': error.code}, status=error.status)
+    finally:
+        ANALYSIS_SLOTS.release()
 
 
 @require_POST
@@ -52,7 +65,7 @@ def landmarks(request):
 
 
 @require_POST
-@require_database
+@require_auth
 def analyze(request):
     if request.content_type not in ('image/jpeg', 'image/png', 'image/webp'):
         return JsonResponse({'error': 'IMAGE_REQUIRED'}, status=415)
@@ -64,7 +77,7 @@ def analyze(request):
         garment_type = request.GET.get('garment')
         attributes, details = analyze_image(image, settings.GEMINI_API_KEY,
                                             garment_type if garment_type in GARMENTS else None)
-        garment = Garment(attributes=attributes)
+        garment = Garment(user=request.user, attributes=attributes)
         garment.image.save(f'{uuid.uuid4()}.jpg', ContentFile(prepare_image(image)), save=False)
         try:
             garment.save()
@@ -123,17 +136,17 @@ def labels(request):
 
 
 @require_GET
-@require_database
+@require_auth
 def items(request):
-    response = JsonResponse({'items': [serialize(item) for item in Garment.objects.filter(saved=True).order_by('-created_at')]})
+    response = account_page(request, Garment.objects.filter(user=request.user, saved=True), serialize, 'items')
     response['Cache-Control'] = 'no-store'
     return response
 
 
 @require_http_methods(['GET', 'PUT'])
-@require_database
+@require_auth
 def item(request, item_id):
-    garment = get_object_or_404(Garment, pk=item_id)
+    garment = get_object_or_404(Garment, pk=item_id, user=request.user)
     if request.method == 'PUT':
         if request.content_type != 'application/json':
             return JsonResponse({'error': 'JSON_REQUIRED'}, status=415)
@@ -146,20 +159,27 @@ def item(request, item_id):
             return JsonResponse({'error': 'BODY_TOO_LARGE'}, status=413)
         except (ValueError, TypeError, UnicodeDecodeError, OverflowError):
             return JsonResponse({'error': 'INVALID_GARMENT'}, status=400)
-        for key, value in values.items():
-            setattr(garment, key, value)
-        # The analysis ID is reused on retry: saving never creates a second garment.
-        garment.saved = True
-        garment.save(update_fields=[*values, 'saved', 'updated_at'])
+        with transaction.atomic():
+            User.objects.select_for_update().get(pk=request.user.pk)
+            garment = get_object_or_404(Garment, pk=item_id, user=request.user)
+            try:
+                garment.check_category_change(values['attributes'])
+            except CategoryInUse:
+                return JsonResponse({'error': 'GARMENT_CATEGORY_IN_USE'}, status=409)
+            for key, value in values.items():
+                setattr(garment, key, value)
+            # The analysis ID is reused on retry: saving never creates a second garment.
+            garment.saved = True
+            garment.save(update_fields=[*values, 'saved', 'updated_at'])
     response = JsonResponse(serialize(garment))
     response['Cache-Control'] = 'no-store'
     return response
 
 
 @require_GET
-@require_database
+@require_auth
 def item_image(request, item_id):
-    garment = get_object_or_404(Garment, pk=item_id, saved=True)
+    garment = get_object_or_404(Garment, pk=item_id, saved=True, user=request.user)
     try:
         response = FileResponse(garment.image.open('rb'), content_type='image/jpeg')
     except FileNotFoundError:

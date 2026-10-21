@@ -44,7 +44,8 @@ jobs:
       - name: Run tests
         run: |
           python -m pytest -q
-          python manage.py test apps.wardrobe apps.outfits --settings=config.test_settings --noinput
+          python manage.py makemigrations --check --dry-run --settings=config.test_settings
+          python manage.py test apps.users apps.wardrobe apps.outfits --settings=config.test_settings --noinput
 
   image:
     # Builds the production image and checks that the pose model loads inside it
