@@ -145,7 +145,7 @@ class OutfitRepository(
         const val MAX_SEEN = 60
         const val MAX_PREVIEW_BYTES = 1024 * 1024
 
-        private fun previewGarment(row: JSONObject) = JSONObject()
+        internal fun previewGarment(row: JSONObject) = JSONObject()
             .put("id", row.getString("id")).put("attributes", row.getJSONObject("attributes"))
             .put("dimensions", row.opt("dimensions") ?: JSONObject.NULL)
             .put("labels", row.opt("labels") ?: JSONObject.NULL).put("notes", "")

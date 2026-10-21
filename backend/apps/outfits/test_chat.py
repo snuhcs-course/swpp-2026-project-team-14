@@ -3,6 +3,8 @@ from unittest.mock import patch
 
 from django.test import TestCase
 
+from apps.users.auth import issue_token
+from apps.users.models import User
 from apps.wardrobe.models import Garment
 from recommendation import chat_intent
 from .models import Outfit
@@ -11,11 +13,14 @@ from .tests import BODY, garment
 
 class ChatApiTests(TestCase):
     def setUp(self):
-        self.top = garment('검정 티', 'top', 'tshirt', '#202020', chest_width_half=55, total_length=65, sleeve_length=20)
-        self.bright = garment('흰 셔츠', 'top', 'shirt', '#FFFFFF', chest_width_half=55, total_length=68, sleeve_length=60)
-        self.bottom = garment('슬랙스', 'bottom', 'slacks', '#202020', hip_width_half=55, inseam=72)
-        self.jeans = garment('청바지', 'bottom', 'jeans', '#3975C6', hip_width_half=55, inseam=72)
-        self.outer = garment('코트', 'outerwear', 'coat', '#795548', chest_width_half=60, total_length=100)
+        self.user = User.objects.create_user('chat_owner', 'test-password')
+        _, token = issue_token(self.user)
+        self.client.defaults['HTTP_AUTHORIZATION'] = f'Bearer {token}'
+        self.top = garment(self.user, '검정 티', 'top', 'tshirt', '#202020', chest_width_half=55, total_length=65, sleeve_length=20)
+        self.bright = garment(self.user, '흰 셔츠', 'top', 'shirt', '#FFFFFF', chest_width_half=55, total_length=68, sleeve_length=60)
+        self.bottom = garment(self.user, '슬랙스', 'bottom', 'slacks', '#202020', hip_width_half=55, inseam=72)
+        self.jeans = garment(self.user, '청바지', 'bottom', 'jeans', '#3975C6', hip_width_half=55, inseam=72)
+        self.outer = garment(self.user, '코트', 'outerwear', 'coat', '#795548', chest_width_half=60, total_length=100)
         self.ids = [str(self.top.id), str(self.bottom.id)]
 
     def post(self, **changes):
@@ -95,6 +100,26 @@ class ChatApiTests(TestCase):
         self.assertEqual(second.status_code, 200)
         self.assertEqual(first.json()['id'], second.json()['id'])
         self.assertEqual(Outfit.objects.count(), 1)
+
+    def test_account_chat_cannot_use_another_accounts_clothes(self):
+        other = User.objects.create_user('another_chat_owner', 'test-password')
+        other_top = garment(other, '다른 계정 티', 'top', 'tshirt', '#FFFFFF')
+        other_bottom = garment(other, '다른 계정 바지', 'bottom', 'jeans', '#3975C6')
+        response = self.post(garment_ids=[str(other_top.id), str(other_bottom.id)])
+        self.assertEqual(response.status_code, 422)
+
+    def test_guest_chat_uses_local_wardrobe_without_account(self):
+        self.client.defaults.pop('HTTP_AUTHORIZATION')
+        rows = [{'id': str(g.id), 'attributes': g.attributes, 'dimensions': g.dimensions,
+                 'labels': g.labels, 'notes': g.notes} for g in (self.top, self.bright, self.bottom)]
+        payload = {'body': BODY, 'temp': 16, 'garment_ids': self.ids, 'locked_ids': [str(self.bottom.id)],
+                   'directions': ['brighter'], 'wardrobe': rows}
+        response = self.client.post('/api/outfits/preview/chat/', json.dumps(payload), content_type='application/json')
+        self.assertEqual(response.status_code, 200, response.content)
+        data = response.json()
+        self.assertEqual(data['status'], 'updated')
+        self.assertTrue(all(item['image_url'].startswith('local:') for item in data['outfit']['items']))
+        self.assertFalse(Outfit.objects.exists())
 
     def test_schema_rejects_invented_or_conflicting_values(self):
         with self.assertRaises(ValueError):

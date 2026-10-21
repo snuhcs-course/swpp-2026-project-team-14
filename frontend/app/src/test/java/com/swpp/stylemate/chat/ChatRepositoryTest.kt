@@ -2,6 +2,7 @@ package com.swpp.stylemate.chat
 
 import com.swpp.stylemate.data.chat.ChatRepository
 import com.swpp.stylemate.data.chat.ChatRequest
+import com.swpp.stylemate.data.LocalUserStore
 import com.swpp.stylemate.data.recommendation.Outfit
 import com.swpp.stylemate.data.recommendation.OutfitApiException
 import com.swpp.stylemate.data.recommendation.OutfitGarment
@@ -13,8 +14,11 @@ import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
+import org.junit.Rule
+import org.junit.rules.TemporaryFolder
 
 class ChatRepositoryTest {
+    @get:Rule val folder = TemporaryFolder()
     private lateinit var server: MockWebServer
     private lateinit var repository: ChatRepository
     private val outfit = Outfit("outfit-1", "w:a+w:b", null, listOf(
@@ -74,6 +78,25 @@ class ChatRepositoryTest {
             JSONObject(), null, null, emptyList(), emptyList())
         assertEquals("I don't want knit", com.swpp.stylemate.ui.chat.ChatViewModel.conversationText(request))
         assertTrue(com.swpp.stylemate.ui.chat.ChatViewModel.summary(request).contains("유지: 바지"))
+    }
+
+    @Test fun guestChatUsesDeviceWardrobeAndSavesToDeviceCodibook() = runBlocking {
+        val local = LocalUserStore.inDirectory(folder.root)
+        listOf("a" to "top", "b" to "bottom").forEach { (id, category) ->
+            local.cacheGarment(JSONObject().put("id", id).put("saved", true)
+                .put("attributes", JSONObject().put("name", id).put("category", category))
+                .put("dimensions", JSONObject.NULL).put("labels", JSONObject.NULL))
+        }
+        val guest = ChatRepository(server.url("/").toString(), local = local)
+        server.enqueue(MockResponse().setBody("""{"status":"unchanged","message":"유지했어요","outfit":null,"changed_ids":[],"locked_ids":[],"unlock_ids":[],"notes":[]}"""))
+        guest.edit(ChatRequest(outfit, emptySet(), setOf("formal"), "", JSONObject(), null, null, emptyList(), emptyList()))
+        val sent = server.takeRequest()
+        assertEquals("/api/outfits/preview/chat/", sent.path)
+        assertEquals(2, JSONObject(sent.body.readUtf8()).getJSONArray("wardrobe").length())
+        val saved = guest.save(outfit, "local-token")
+        assertTrue(saved.saved)
+        assertEquals("chat", local.outfit(outfit.id)?.getString("source"))
+        assertEquals(1, local.outfits().size)
     }
 
 }

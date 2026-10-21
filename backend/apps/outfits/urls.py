@@ -2,11 +2,12 @@
 from django.urls import path
 
 from . import views
-from .chat import chat_view
+from .chat import chat_view, preview_chat_view
 
 urlpatterns = [
     path("preview/", views.preview_view),
     path("preview/feedback/", views.preview_feedback),
+    path("preview/chat/", preview_chat_view),
     path("", views.outfits_view),
     path("recommend/", views.recommend_view),
     path("chat/", chat_view),

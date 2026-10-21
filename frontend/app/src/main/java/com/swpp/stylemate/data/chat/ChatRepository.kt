@@ -4,6 +4,9 @@ import com.swpp.stylemate.data.recommendation.Outfit
 import com.swpp.stylemate.data.recommendation.OutfitApiException
 import com.swpp.stylemate.data.recommendation.OutfitRepository
 import com.swpp.stylemate.data.recommendation.Weather
+import com.swpp.stylemate.data.AccountAccess
+import com.swpp.stylemate.data.AuthException
+import com.swpp.stylemate.data.LocalUserStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -42,6 +45,8 @@ class ChatRepository(
     baseUrl: String,
     private val client: OkHttpClient = OutfitRepository.defaultClient().newBuilder()
         .readTimeout(40, TimeUnit.SECONDS).callTimeout(50, TimeUnit.SECONDS).build(),
+    private val local: LocalUserStore? = null,
+    private val account: AccountAccess? = null,
 ) {
     private val base = baseUrl.trimEnd('/')
 
@@ -57,7 +62,10 @@ class ChatRepository(
                 JSONObject().put("role", role).put("text", text.take(500))
             }))
         if (input.weather != null) body.put("weather", input.weather.json) else body.put("temp", 18)
-        val json = post("/api/outfits/chat/", body)
+        local?.let { store -> body.put("wardrobe", JSONArray(withContext(Dispatchers.IO) {
+            store.garments().map(OutfitRepository::previewGarment)
+        })) }
+        val json = post(if (local == null) "/api/outfits/chat/" else "/api/outfits/preview/chat/", body)
         return try {
             ChatResult(json.getString("status"), json.getString("message"),
                 json.optJSONObject("outfit")?.let(OutfitRepository::parseOutfit),
@@ -69,7 +77,18 @@ class ChatRepository(
     }
 
     suspend fun save(outfit: Outfit, saveId: String): Outfit = try {
-        OutfitRepository.parseOutfit(post("/api/outfits/", JSONObject()
+        if (local != null) withContext(Dispatchers.IO) {
+            val row = JSONObject().put("id", outfit.id).put("key", outfit.key).put("source", "chat")
+                .put("saved", true).put("name", "대화로 만든 코디").put("score", JSONObject.NULL)
+                .put("components", JSONObject()).put("reasons", JSONArray(outfit.reasons.map { reason ->
+                    JSONObject().put("kind", reason.kind).put("text", reason.text).put("sub", reason.sub)
+                })).put("feedback", JSONObject.NULL).put("created_at", outfit.createdAt)
+                .put("items", JSONArray(outfit.items.map { item -> JSONObject()
+                    .put("garment_id", item.garmentId).put("slot", item.slot).put("name", item.name)
+                    .put("image_url", item.imageUrl).put("note", item.note) }))
+            local.rememberOutfits(JSONArray().put(row))
+            OutfitRepository.parseOutfit(local.saveOutfit(outfit.id, true))
+        } else OutfitRepository.parseOutfit(post("/api/outfits/", JSONObject()
             .put("garment_ids", JSONArray(outfit.items.map { it.garmentId }))
             .put("source", "chat").put("name", "대화로 만든 코디")
             .put("context", JSONObject().put("chat_save_id", saveId))))
@@ -78,6 +97,10 @@ class ChatRepository(
     }
 
     private suspend fun post(path: String, body: JSONObject): JSONObject = withContext(Dispatchers.IO) {
+        if (account != null) {
+            try { return@withContext account.json("POST", path, body) }
+            catch (e: AuthException) { throw OutfitApiException(e.code, e.message.orEmpty()) }
+        }
         val request = Request.Builder().url(base + path)
             .post(body.toString().toRequestBody("application/json".toMediaType())).build()
         val (status, text) = try {

@@ -101,7 +101,9 @@ Open-Meteo 현재 날씨(기본 서울): `{temp, apparent, precipitation, rain, 
 
 ### POST /api/outfits/chat/
 
-내 옷장 안에서 코디 수정안을 만든다. 이 요청은 코디 테이블에 저장하지 않는다.
+로그인한 사용자의 저장된 옷장에서 코디 수정안을 만든다. 계정 인증이 필요하며 이 요청은 코디 테이블에 저장하지 않는다.
+
+비로그인 사용자는 `POST /api/outfits/preview/chat/`에 같은 필드와 기기에 저장한 옷의 `wardrobe` 배열을 보낸다. `wardrobe` 형식은 `/api/outfits/preview/`와 같다. 응답 이미지 주소는 `local:<옷 ID>`이며 서버 DB를 사용하지 않는다. 비로그인 채팅 코디 저장은 기기 코디북에 한다.
 
 ```json
 {
