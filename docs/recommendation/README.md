@@ -8,7 +8,7 @@
 
 - 체형은 지금은 기기(`BodyProfileStore.kt`)에 있고 요청마다 같이 보낸다. 서버는 `apps/body_profiles/profile.py`의 `body_from_request()` 한 곳에서만 체형을 읽으므로 user table이 생기면 이 함수만 바꾸면 된다.
 - 취향(좋아요·별로예요로 배운 속성 가중치)도 기기(`TasteStore.kt`)에 두고 요청마다 보낸다. 서버는 상태를 갖지 않는다.
-- 신발은 K-Fashion에 없어 이번 추천에서 뺐다. 채팅으로 코디를 고치는 기능은 주현 님 담당이라 여기서 다루지 않는다(홈 화면의 `onChat` 자리만 열어 둠).
+- 신발은 K-Fashion에 없어 이번 추천에서 뺐다. 홈의 `대화로 수정하기`에서 옷 잠금·수정 방향 버튼·자유 입력으로 코디를 고친다. 채팅 API는 아래와 [API 계약](api.md#채팅-코디-수정)을 참고한다.
 
 ## 구조
 
@@ -125,5 +125,14 @@ cd backend
 ## 남은 일
 
 - user table 연결: `body_from_request()`를 request.user 기반으로 바꾸고 `Outfit`·`Garment`에 owner를 둔다.
-- 신발 추천(K-Fashion에 없음), 채팅 편집 연결(`HomeScreen(onChat = …)`, `POST /api/outfits/` source=chat).
+- 신발 추천(K-Fashion에 없음).
 - (여유가 되면) 옷장 밖의 옷 추천: 같은 엔진이 K-Fashion 카탈로그에서 고르는 경로(`mode="new"`, 테스트 페이지 `/`)가 이미 있다.
+
+## 채팅 편집
+
+`홈 → 대화로 수정하기 → 옷을 터치해 유지 잠금 → 수정 방향 선택 / 메시지 입력 → 수정 결과 → 추가 수정·되돌리기·코디북 저장`.
+
+- 앱: `ui/chat/ChatViewModel.kt`가 홈 코디별 대화·잠금·요청 스냅샷·저장 상태를 유지하고 `ChatScreen.kt`가 표시한다. 채팅에서는 하단 탭바를 숨긴다.
+- 서버: `apps/outfits/chat.py`가 저장된 옷만으로 미리보기를 만든다. 잠금과 자연어로 지정한 유지 조건은 `search.Request.fixed`로 강제한다. 수정 결과는 명시적으로 저장할 때만 DB에 기록한다.
+- 자연어: `recommendation/chat_intent.py`가 Gemini 또는 OpenRouter의 구조화된 출력으로 요청을 읽는다. 버튼만 선택하면 모델을 호출하지 않는다. 모델 호출 실패는 재시도 가능한 오류이며 키워드 대체 해석은 없다.
+- 로컬 샘플 옷: `cd backend` 후 `.venv/bin/python scripts/seed_chat_wardrobe.py`. 로컬 DB에 가상 옷 14벌과 그림 썸네일을 추가하고, 같은 샘플 ID가 이미 있으면 유지한다. API 키를 사용하지 않는다.
