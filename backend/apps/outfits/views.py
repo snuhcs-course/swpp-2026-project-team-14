@@ -232,6 +232,17 @@ def outfits_view(request):
     except (ValueError, TypeError, UnicodeDecodeError, OverflowError) as error:
         return _error("INVALID_OUTFIT", 400, str(error))
     with transaction.atomic():
+        # Serialize saves of the same garments, including a retry after a lost response.
+        list(Garment.objects.select_for_update().filter(pk__in=ids).order_by('pk'))
+        save_id = context.get('chat_save_id') if source == Outfit.Source.CHAT else None
+        if save_id is not None:
+            if not isinstance(save_id, str) or not 1 <= len(save_id) <= 64:
+                return _error('INVALID_OUTFIT', 400)
+            existing = Outfit.objects.filter(source=source, context__chat_save_id=save_id).first()
+            if existing:
+                if existing.key != '+'.join(sorted(f'w:{gid}' for gid in ids)):
+                    return _error('INVALID_OUTFIT', 409)
+                return _json(serialize(existing))
         outfit = _create(source, members, saved=True, name=name.strip(), context=context)
     return _json(serialize(outfit), 201)
 
