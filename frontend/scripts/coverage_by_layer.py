@@ -30,7 +30,7 @@ def layer(class_name: str) -> str | None:
         simple in ("BuildConfig", "R")
         or simple.startswith(("BuildConfig$", "R$", "ComposableSingletons"))
     ):
-    return None
+        return None
     if rest.startswith("data/"):
         return "data"
     if "ViewModel" in simple.split("$", 1)[0]:
