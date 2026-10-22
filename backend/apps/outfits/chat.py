@@ -48,34 +48,24 @@ def read(data, request):
     return body, current, locked, directions, text.strip(), history, pref_fit, styles, temp, wet, context, taste, seen
 
 
-def preview(garments, items, context, reasons=None, key=None, local=False):
+def preview(garments, items, context, reasons=None, key=None):
     key = key or '+'.join(sorted(i.id for i in items))
     return {'id': str(uuid.uuid5(uuid.NAMESPACE_URL, 'stylemate/chat/' + key)), 'key': key,
             'source': 'chat', 'saved': False, 'name': '', 'score': None, 'components': {},
             'reasons': reasons or [], 'context': context, 'feedback': None, 'created_at': timezone.now().isoformat(),
             'items': [{'garment_id': i.id[2:], 'slot': views.SLOT_CODE[i.slot],
                        'name': garments[i.id[2:]].attributes.get('name', ''),
-                       'image_url': f'local:{i.id[2:]}' if local else f'/api/wardrobe/items/{i.id[2:]}/image/',
+                       'image_url': f'/api/wardrobe/items/{i.id[2:]}/image/',
                        'note': i.fit_note or ''} for i in sorted(items, key=lambda i: views.SLOT_ORDER.index(views.SLOT_CODE[i.slot]))]}
 
 
 @require_POST
 @require_auth
 def chat_view(request):
-    return _handle(request, local=False)
-
-
-@require_POST
-def preview_chat_view(request):
-    return _handle(request, local=True)
-
-
-def _handle(request, local):
     try:
-        data = views._read(request, views.MAX_PREVIEW_BYTES if local else views.MAX_REQUEST_BYTES)
+        data = views._read(request)
         args = read(data, request)
-        garments = views._local_garments(data) if local else {
-            str(g.id): g for g in Garment.objects.filter(user=request.user, saved=True)}
+        garments = {str(g.id): g for g in Garment.objects.filter(user=request.user, saved=True)}
     except views.TooLarge:
         return views._error('BODY_TOO_LARGE', 413)
     except views.NotJson:
@@ -85,14 +75,14 @@ def _handle(request, local):
     if not SLOTS_GATE.acquire(blocking=False):
         return views._error('CHAT_BUSY', 429, '다른 코디를 수정 중이에요. 잠시 후 다시 시도해 주세요.')
     try:
-        return process(garments, local, *args)
+        return process(garments, *args)
     except chat_intent.ChatModelError:
         return views._error('CHAT_MODEL_UNAVAILABLE', 503, '요청을 해석하지 못했어요. 잠시 후 다시 시도해 주세요.')
     finally:
         SLOTS_GATE.release()
 
 
-def process(garments, local, body, current_ids, locked, directions, text, history, pref_fit, styles, temp, wet, context, taste, seen):
+def process(garments, body, current_ids, locked, directions, text, history, pref_fit, styles, temp, wet, context, taste, seen):
     if any(gid not in garments for gid in current_ids):
         return views._error('CURRENT_GARMENT_MISSING', 422, '수정 중인 옷이 삭제됐어요. 홈에서 코디를 다시 골라 주세요.')
     current = {garments[gid].attributes.get('category'): gid for gid in current_ids}
@@ -202,6 +192,6 @@ def process(garments, local, body, current_ids, locked, directions, text, histor
     if new_locked:
         message += ' 잠근 옷은 그대로 유지했어요.'
     context = {**context, 'pref_fit': pref_fit, 'styles': styles}
-    out = preview(garments, selected, context, changed['reasons'], changed['key'], local=local)
+    out = preview(garments, selected, context, changed['reasons'], changed['key'])
     return response('updated', message, outfit=out, changed_ids=changed_ids, locked_ids=new_locked,
                     notes=notes + result['notes'])

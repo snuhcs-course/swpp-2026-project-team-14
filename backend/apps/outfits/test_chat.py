@@ -108,17 +108,10 @@ class ChatApiTests(TestCase):
         response = self.post(garment_ids=[str(other_top.id), str(other_bottom.id)])
         self.assertEqual(response.status_code, 422)
 
-    def test_guest_chat_uses_local_wardrobe_without_account(self):
+    def test_chat_requires_login_and_guest_preview_is_removed(self):
         self.client.defaults.pop('HTTP_AUTHORIZATION')
-        rows = [{'id': str(g.id), 'attributes': g.attributes, 'dimensions': g.dimensions,
-                 'labels': g.labels, 'notes': g.notes} for g in (self.top, self.bright, self.bottom)]
-        payload = {'body': BODY, 'temp': 16, 'garment_ids': self.ids, 'locked_ids': [str(self.bottom.id)],
-                   'directions': ['brighter'], 'wardrobe': rows}
-        response = self.client.post('/api/outfits/preview/chat/', json.dumps(payload), content_type='application/json')
-        self.assertEqual(response.status_code, 200, response.content)
-        data = response.json()
-        self.assertEqual(data['status'], 'updated')
-        self.assertTrue(all(item['image_url'].startswith('local:') for item in data['outfit']['items']))
+        self.assertEqual(self.post().status_code, 401)
+        self.assertEqual(self.client.post('/api/outfits/preview/chat/').status_code, 404)
         self.assertFalse(Outfit.objects.exists())
 
     def test_schema_rejects_invented_or_conflicting_values(self):

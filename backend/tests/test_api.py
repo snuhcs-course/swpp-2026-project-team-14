@@ -4,6 +4,9 @@ import numpy as np
 import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, override_settings
+from django.test.utils import setup_databases, teardown_databases
+from apps.users.auth import issue_token
+from apps.users.models import User
 
 from body_analysis import BodyAnalysisPipeline
 from apps.body_profiles import services
@@ -20,10 +23,19 @@ def png(name: str) -> SimpleUploadedFile:
     return SimpleUploadedFile(name, data.tobytes(), content_type="image/png")
 
 
+@pytest.fixture(scope='module')
+def authenticated_database():
+    old_config = setup_databases(verbosity=0, interactive=False)
+    user = User.objects.create(username='body_owner')
+    _, token = issue_token(user)
+    yield token
+    teardown_databases(old_config, verbosity=0)
+
+
 @pytest.fixture
-def client():
+def client(authenticated_database):
     services.set_pipeline(BodyAnalysisPipeline(FakeEstimator(syn.front_pose(), syn.side_pose())))
-    yield Client()
+    yield Client(HTTP_AUTHORIZATION=f'Bearer {authenticated_database}')
     services.set_pipeline(None)
 
 

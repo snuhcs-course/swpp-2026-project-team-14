@@ -24,6 +24,8 @@ from PIL import Image, ImageDraw
 
 from apps.wardrobe.editor import dimension_fields, validate_record
 from apps.wardrobe.models import Garment
+from apps.outfits.models import Outfit
+from apps.users.models import User
 
 
 # slug, name, category, subcategory, colour, styles, fit, sleeve/leg length
@@ -75,8 +77,39 @@ def main():
     database = settings.DATABASES.get('default', {})
     if database.get('HOST') not in ('127.0.0.1', 'localhost'):
         raise SystemExit('This script is for a local database only.')
+    username = 'samplechat'
+    password = 'samplechat2026'
+    user = User.objects.filter(username=username).first()
+    if user is None:
+        user = User.objects.create_user(username, password)
+    if user.body_profile is None:
+        user.body_profile = {
+            'height_cm': 170, 'weight_kg': 65, 'gender': 'unspecified',
+            'measurements': [
+                {'type': 'chest', 'value_cm': 92, 'confidence': 'medium', 'edited_by_user': True},
+                {'type': 'waist', 'value_cm': 76, 'confidence': 'medium', 'edited_by_user': True},
+                {'type': 'hip', 'value_cm': 94, 'confidence': 'medium', 'edited_by_user': True},
+                {'type': 'shoulder_width', 'value_cm': 43, 'confidence': 'medium', 'edited_by_user': True},
+                {'type': 'inseam', 'value_cm': 77, 'confidence': 'medium', 'edited_by_user': True},
+            ],
+            'clothing': {'top_loose': False, 'bottom_loose': False},
+        }
+        user.preferred_fits = ['regular']
+        user.preferred_styles = ['minimal', 'classic']
+        user.full_clean()
+        user.save(update_fields=['body_profile', 'preferred_fits', 'preferred_styles', 'updated_at'])
     created = 0
+    adopted = 0
+    adopted_outfits = 0
     with transaction.atomic():
+        sample_ids = {uuid5(NAMESPACE_URL, 'stylemate/local-chat-samples/' + slug)
+                      for slug, *_ in SAMPLES}
+        adopted = Garment.objects.filter(pk__in=sample_ids, user__isnull=True).update(user=user)
+        for outfit in Outfit.objects.filter(user__isnull=True).prefetch_related('items'):
+            if all(item.garment_id in sample_ids for item in outfit.items.all()):
+                outfit.user = user
+                outfit.save(update_fields=['user'])
+                adopted_outfits += 1
         for slug, name, category, subcategory, color, styles, fit, length in SAMPLES:
             gid = uuid5(NAMESPACE_URL, 'stylemate/local-chat-samples/' + slug)
             if Garment.objects.filter(pk=gid).exists():
@@ -102,7 +135,7 @@ def main():
                 for key, value in values.items()}}
             record = validate_record(dict(attributes=attributes, dimensions=dimensions,
                                           notes='채팅·추천 개발용 가상 데이터. 이미지와 치수는 샘플입니다.'))
-            garment = Garment(id=gid, saved=True, **record)
+            garment = Garment(id=gid, user=user, saved=True, **record)
             # Stable image names also avoid duplicates if a DB transaction is retried.
             filename = f'garments/chat-samples/{slug}.png'
             storage = garment.image.storage
@@ -112,7 +145,8 @@ def main():
             garment.save(force_insert=True)
             created += 1
             print(f'Added: {name}')
-    print(f'Created {created}; already present {len(SAMPLES) - created}; saved total {Garment.objects.filter(saved=True).count()}.')
+    print(f'Account: {username}; created clothes: {created}; adopted clothes: {adopted}; '
+          f'adopted outfits: {adopted_outfits}; account clothes: {Garment.objects.filter(user=user, saved=True).count()}.')
 
 
 if __name__ == '__main__':

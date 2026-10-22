@@ -11,6 +11,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
 from body_analysis import AnalysisError, AnalysisInput, Gender
+from apps.users.auth import require_auth
 
 from . import services
 
@@ -37,8 +38,9 @@ def _number(value: str | None, low: float, high: float) -> float | None:
     return number if low <= number <= high else None
 
 
-@csrf_exempt  # token auth for the mobile client comes with P7; no cookies are used here
+@csrf_exempt
 @require_POST
+@require_auth
 def analyze(request):
     # Above this size Django's memory upload handler drops the files without an error.
     if int(request.META.get("CONTENT_LENGTH") or 0) > settings.FILE_UPLOAD_MAX_MEMORY_SIZE:

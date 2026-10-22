@@ -33,7 +33,7 @@ class InMemoryBodyProfileStore(private var profile: BodyProfile? = null) : BodyP
 }
 
 class LocalBodyProfileStore(private val store: LocalUserStore) : BodyProfileStore {
-    constructor(context: Context, accountId: String? = null) : this(LocalUserStore.forContext(context, accountId))
+    constructor(context: Context, accountId: String) : this(LocalUserStore.forContext(context, accountId))
     override fun load(): BodyProfile? = store.get("body")?.toString()?.let(BodyProfileJson::decode)?.let {
         // New profile styles remain intact; the old recommendation contract only knows these labels.
         it.copy(preferredFit = loadStyle().legacyFit(), preferredStyles = loadStyle().styleLabels().filter { label -> label in STYLE_OPTIONS })

@@ -61,15 +61,15 @@ class DatabaseConfigurationTests(SimpleTestCase):
                 self.assertEqual(response.json(), {'error': 'DATABASE_NOT_CONFIGURED'})
         analyze.assert_not_called()
 
-    @patch('apps.wardrobe.views.settings')
-    @patch('apps.wardrobe.views.detect', return_value={'suggestions': []})
-    def test_landmarks_and_options_do_not_require_database(self, detect, settings):
+    @patch('apps.users.auth.settings')
+    @patch('apps.wardrobe.views.detect')
+    def test_shared_endpoints_require_database_before_inference(self, detect, settings):
         settings.DATABASES = {}
-        self.assertEqual(self.client.get('/api/wardrobe/options/').status_code, 200)
+        self.assertEqual(self.client.get('/api/wardrobe/options/').status_code, 503)
         response = self.client.post('/api/wardrobe/landmarks/?garment=short_sleeve_top',
                                    photo(), content_type='image/jpeg')
-        self.assertEqual(response.status_code, 200)
-        detect.assert_called_once()
+        self.assertEqual(response.status_code, 503)
+        detect.assert_not_called()
 
 
 class SchemaTests(SimpleTestCase):
@@ -146,16 +146,6 @@ class InitialMigrationTests(TransactionTestCase):
         self.assertEqual(garment.dimensions, dimensions)
         self.assertEqual(garment.notes, '')
         self.assertFalse(garment.saved)
-
-
-class GuestAnalysisTests(SimpleTestCase):
-    @patch('apps.wardrobe.views.analyze_image', return_value=(attributes(), None))
-    def test_guest_preview_does_not_need_database_or_create_draft(self, analyze):
-        response = self.client.post('/api/wardrobe/analyze-preview/', photo(), content_type='image/jpeg')
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(set(response.json()), {'model', 'attributes', 'details'})
-        self.assertEqual(response['Cache-Control'], 'no-store')
-        analyze.assert_called_once()
 
 
 class ImageTests(SimpleTestCase):

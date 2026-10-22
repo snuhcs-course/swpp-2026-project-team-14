@@ -22,7 +22,7 @@ class InMemoryTasteStore(private var taste: JSONObject? = null) : TasteStore {
     }
 }
 
-class LocalTasteStore(context: Context, accountId: String? = null) : TasteStore {
+class LocalTasteStore(context: Context, accountId: String) : TasteStore {
     private val store = LocalUserStore.forContext(context, accountId)
     override fun load(): JSONObject? = store.get("taste")
     override fun save(taste: JSONObject?) = store.put("taste", taste)

@@ -2,7 +2,8 @@ package com.swpp.stylemate.chat
 
 import com.swpp.stylemate.data.chat.ChatRepository
 import com.swpp.stylemate.data.chat.ChatRequest
-import com.swpp.stylemate.data.LocalUserStore
+import com.swpp.stylemate.data.TEST_TOKEN
+import com.swpp.stylemate.data.testAccount
 import com.swpp.stylemate.data.recommendation.Outfit
 import com.swpp.stylemate.data.recommendation.OutfitApiException
 import com.swpp.stylemate.data.recommendation.OutfitGarment
@@ -14,18 +15,15 @@ import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
-import org.junit.Rule
-import org.junit.rules.TemporaryFolder
 
 class ChatRepositoryTest {
-    @get:Rule val folder = TemporaryFolder()
     private lateinit var server: MockWebServer
     private lateinit var repository: ChatRepository
     private val outfit = Outfit("outfit-1", "w:a+w:b", null, listOf(
         OutfitGarment("a", "top", "셔츠", "/a.png", ""),
         OutfitGarment("b", "bottom", "바지", "/b.png", "")), emptyList(), false, "", null, "")
 
-    @Before fun setup() { server = MockWebServer(); server.start(); repository = ChatRepository(server.url("/").toString()) }
+    @Before fun setup() { server = MockWebServer(); server.start(); val base = server.url("/").toString(); repository = ChatRepository(base, testAccount(base)) }
     @After fun close() { server.shutdown() }
 
     @Test fun freeTextAndLocksTravelTogetherAndUnlockIsExplicit() = runBlocking {
@@ -35,6 +33,7 @@ class ChatRepositoryTest {
         val request = server.takeRequest()
         val json = JSONObject(request.body.readUtf8())
         assertEquals("/api/outfits/chat/", request.path)
+        assertEquals("Bearer $TEST_TOKEN", request.getHeader("Authorization"))
         assertEquals("바지도 바꿔줘", json.getString("text"))
         assertEquals("b", json.getJSONArray("locked_ids").getString(0))
         assertEquals("formal", json.getJSONArray("directions").getString(0))
@@ -78,25 +77,6 @@ class ChatRepositoryTest {
             JSONObject(), null, null, emptyList(), emptyList())
         assertEquals("I don't want knit", com.swpp.stylemate.ui.chat.ChatViewModel.conversationText(request))
         assertTrue(com.swpp.stylemate.ui.chat.ChatViewModel.summary(request).contains("유지: 바지"))
-    }
-
-    @Test fun guestChatUsesDeviceWardrobeAndSavesToDeviceCodibook() = runBlocking {
-        val local = LocalUserStore.inDirectory(folder.root)
-        listOf("a" to "top", "b" to "bottom").forEach { (id, category) ->
-            local.cacheGarment(JSONObject().put("id", id).put("saved", true)
-                .put("attributes", JSONObject().put("name", id).put("category", category))
-                .put("dimensions", JSONObject.NULL).put("labels", JSONObject.NULL))
-        }
-        val guest = ChatRepository(server.url("/").toString(), local = local)
-        server.enqueue(MockResponse().setBody("""{"status":"unchanged","message":"유지했어요","outfit":null,"changed_ids":[],"locked_ids":[],"unlock_ids":[],"notes":[]}"""))
-        guest.edit(ChatRequest(outfit, emptySet(), setOf("formal"), "", JSONObject(), null, null, emptyList(), emptyList()))
-        val sent = server.takeRequest()
-        assertEquals("/api/outfits/preview/chat/", sent.path)
-        assertEquals(2, JSONObject(sent.body.readUtf8()).getJSONArray("wardrobe").length())
-        val saved = guest.save(outfit, "local-token")
-        assertTrue(saved.saved)
-        assertEquals("chat", local.outfit(outfit.id)?.getString("source"))
-        assertEquals(1, local.outfits().size)
     }
 
 }

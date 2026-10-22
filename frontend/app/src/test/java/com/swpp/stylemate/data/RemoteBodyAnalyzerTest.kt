@@ -26,7 +26,7 @@ class RemoteBodyAnalyzerTest {
     @After
     fun tearDown() = server.shutdown()
 
-    private fun analyzer() = RemoteBodyAnalyzer(server.url("/").toString())
+    private fun analyzer() = RemoteBodyAnalyzer(server.url("/").toString(), account = testAccount(server.url("/").toString()))
 
     private fun analyzeExpectingError(): BodyAnalysisException {
         try {
@@ -36,6 +36,18 @@ class RemoteBodyAnalyzerTest {
         }
         fail("expected BodyAnalysisException")
         throw AssertionError()
+    }
+
+    @Test fun bodyRequestsCarryTheAccountTokenAndUnauthorizedResponsesExpireIt() = runBlocking {
+        val account = testAccount(server.url("/").toString())
+        server.enqueue(MockResponse().setResponseCode(401).setBody("{}"))
+        try {
+            RemoteBodyAnalyzer(server.url("/").toString(), account = account).analyze(input, photos)
+            fail("Expected authentication failure")
+        } catch (error: AuthException) { assertEquals("AUTHENTICATION_REQUIRED", error.code) }
+        assertEquals("Bearer $TEST_TOKEN", server.takeRequest().getHeader("Authorization"))
+        try { account.authorization(); fail("Expired token must not be reused") }
+        catch (error: AuthException) { assertEquals("SESSION_CHANGED", error.code) }
     }
 
     @Test

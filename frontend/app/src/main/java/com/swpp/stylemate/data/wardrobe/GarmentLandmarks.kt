@@ -3,6 +3,8 @@ package com.swpp.stylemate.data.wardrobe
 
 import android.graphics.Bitmap
 import com.swpp.stylemate.BuildConfig
+import com.swpp.stylemate.data.AccountAccess
+import com.swpp.stylemate.data.AuthException
 import java.io.ByteArrayOutputStream
 import java.net.HttpURLConnection
 import java.net.URI
@@ -16,7 +18,7 @@ data class LandmarkResult(val suggestions: Map<String, LandmarkPath>, val elapse
 
 /** All positions refer to the uploaded viewport; the server never produces cm values. */
 object GarmentLandmarks {
-    suspend fun detect(bitmap: Bitmap, garment: String): LandmarkResult = withContext(Dispatchers.IO) {
+    suspend fun detect(bitmap: Bitmap, garment: String, account: AccountAccess): LandmarkResult = withContext(Dispatchers.IO) {
         require(garment in landmarkTypes)
         val scale = minOf(1f, 768f / maxOf(bitmap.width, bitmap.height))
         val reduced = Bitmap.createScaledBitmap(bitmap, maxOf(1, (bitmap.width * scale).toInt()), maxOf(1, (bitmap.height * scale).toInt()), true)
@@ -27,12 +29,15 @@ object GarmentLandmarks {
             connection.connectTimeout = 2_000
             connection.readTimeout = 8_000
             connection.instanceFollowRedirects = false
+            connection.setRequestProperty("Authorization", account.authorization())
             connection.requestMethod = "POST"
             connection.doOutput = true
             connection.setRequestProperty("Content-Type", "image/jpeg")
             connection.setFixedLengthStreamingMode(bytes.size)
             connection.outputStream.use { it.write(bytes) }
-            check(connection.responseCode in 200..299) { "자동 점을 찾지 못했습니다. 직접 지정할 수 있습니다." }
+            val status = connection.responseCode
+            account.checkResponse(status)
+            check(status in 200..299) { "자동 점을 찾지 못했습니다. 직접 지정할 수 있습니다." }
             val body = connection.inputStream.bufferedReader().use { reader ->
                 val chars = CharArray(1024 * 1024)
                 var count = 0
@@ -46,6 +51,7 @@ object GarmentLandmarks {
             }
             parse(JSONObject(body), garment)
         } catch (error: kotlinx.coroutines.CancellationException) { throw error }
+        catch (error: AuthException) { throw error }
         catch (_: java.io.IOException) {
             error("점 탐지 서버에 연결할 수 없습니다. 직접 지정할 수 있습니다.")
         } catch (_: Exception) {

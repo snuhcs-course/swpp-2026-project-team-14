@@ -76,13 +76,20 @@ data class AppState(
 )
 
 class BodyProfileViewModel(
-    private val analyzer: BodyAnalyzer = RemoteBodyAnalyzer(BuildConfig.API_BASE_URL),
+    analyzer: BodyAnalyzer? = null,
     private val store: BodyProfileStore = InMemoryBodyProfileStore(),
     private val account: AccountAccess? = null,
 ) : ViewModel() {
+    private val analyzer: BodyAnalyzer = analyzer ?: RemoteBodyAnalyzer(BuildConfig.API_BASE_URL, account = account)
 
     private fun loadAppState(): AppState = try {
-        AppState(profile = store.load(), style = store.loadStyle(), setupVisible = !store.loadOnboarding().completed)
+        val progress = store.loadOnboarding()
+        val draft = JSONObject(progress.draft)
+        val cached = store.loadStyle()
+        val moods = draft.optJSONArray("preferred_styles")
+        val style = if (!progress.completed && moods != null) cached.copy(
+            preferredStyles = (0 until moods.length()).map { moods.getString(it) }) else cached
+        AppState(profile = store.load(), style = style, setupVisible = !progress.completed)
     } catch (_: Exception) {
         AppState(setupVisible = false, storageError = "저장된 정보를 불러오지 못했어요. 기존 데이터는 유지됩니다.")
     }
@@ -102,7 +109,8 @@ class BodyProfileViewModel(
     }
 
     fun refreshAccountProfile() {
-        _app.update { it.copy(profile = store.load(), style = store.loadStyle()) }
+        val cached = loadAppState()
+        _app.update { it.copy(profile = cached.profile, style = cached.style, storageError = cached.storageError) }
     }
 
     private fun restoreSetup(): SetupState {
@@ -152,7 +160,11 @@ class BodyProfileViewModel(
     fun updateOnboardingStyle(style: StyleProfile) {
         val error = saveStyleProfile(style)
         if (error != null) _setup.update { it.copy(errorMessage = error) }
-        else _setup.update { it.copy(errorMessage = null) }
+        else try {
+            val draft = JSONObject(_onboarding.value.draft).put("preferred_styles", JSONArray(style.preferredStyles))
+            saveProgress(_onboarding.value.copy(draft = draft.toString()))
+            _setup.update { it.copy(errorMessage = null) }
+        } catch (_: Exception) { showError("선택 내용을 저장하지 못했어요. 다시 시도해 주세요.") }
     }
 
     fun setOnboardingFits(fits: List<String>) {
@@ -167,7 +179,25 @@ class BodyProfileViewModel(
         val values = JSONObject(_onboarding.value.draft).optJSONArray("preferred_fits")
         val fits = (0 until (values?.length() ?: 0)).map { values!!.getString(it) }
         val error = saveStyleProfile(_app.value.style.copy(preferredFits = fits))
-        if (error != null) showError(error) else moveOnboarding(3)
+        if (error != null) showError(error) else persistOnboardingStyle("preferred_fits") { moveOnboarding(3) }
+    }
+
+    fun confirmOnboardingStyles() = persistOnboardingStyle("preferred_styles") { moveOnboarding(4) }
+
+    private fun persistOnboardingStyle(field: String, onSaved: () -> Unit) {
+        if (_setup.value.saving) return
+        if (account == null) { onSaved(); return }
+        val style = _app.value.style
+        _setup.update { it.copy(saving = true, errorMessage = null) }
+        viewModelScope.launch {
+            try {
+                account.patchProfile(JSONObject().put(field, style.json().getJSONArray(field)))
+                refreshAccountProfile()
+                onSaved()
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (error: Exception) { showError(error.message ?: "스타일을 저장하지 못했어요. 다시 시도해 주세요.") }
+            finally { _setup.update { it.copy(saving = false) } }
+        }
     }
 
     fun skipOnboardingBody() {

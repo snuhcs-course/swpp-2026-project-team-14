@@ -10,7 +10,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.runtime.*
@@ -22,45 +21,31 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import com.swpp.stylemate.ui.components.ScreenScaffold
 
+/** Authentication is the app's entry point; there is no guest dismiss action. */
 @Composable
-fun LoginDialog(state: AuthUiState, onDismiss: () -> Unit, onRegister: () -> Unit, onSubmit: (String, String) -> Unit) {
+fun LoginScreen(state: AuthUiState, onRegister: () -> Unit, onSubmit: (String, String) -> Unit) {
     var username by rememberSaveable { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-    Dialog(onDismissRequest = { if (!state.busy) onDismiss() },
-        properties = DialogProperties(dismissOnBackPress = !state.busy, dismissOnClickOutside = !state.busy, usePlatformDefaultWidth = false)) {
-        Surface(Modifier.padding(24.dp).widthIn(max = 440.dp).fillMaxWidth().imePadding(),
-            shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainer,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
-            Column(Modifier.verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Box(Modifier.fillMaxWidth()) {
-                    Text("로그인", Modifier.align(Alignment.Center), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                    IconButton(onClick = onDismiss, enabled = !state.busy, modifier = Modifier.align(Alignment.CenterEnd)) { Icon(Icons.Filled.Close, contentDescription = "닫기") }
-                }
-                Text("StyleMate", Modifier.align(Alignment.CenterHorizontally), style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                UsernameField(username, { username = it }, !state.busy)
-                PasswordField("비밀번호", password, { password = it }, !state.busy)
-                AuthError(state)
-                Button(onClick = { onSubmit(username, password) }, enabled = !state.busy && state.retrySeconds == 0,
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp), shape = RoundedCornerShape(16.dp)) {
-                    Text(if (state.busy) "로그인 중…" else "로그인", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
-                }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-                    Text("계정이 없으신가요?", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    TextButton(onClick = onRegister, enabled = !state.busy) {
-                        Text("회원가입", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, textDecoration = TextDecoration.Underline)
-                    }
-                }
+    ScreenScaffold("StyleMate", if (state.busy) "로그인 중…" else "로그인", !state.busy && state.retrySeconds == 0,
+        { onSubmit(username, password) }, modifier = Modifier.imePadding()) { padding ->
+        Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp)) {
+            Spacer(Modifier.height(24.dp))
+            Text("나에게 맞는 스타일의 시작", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            Text("로그인하고 내 옷장과 맞춤 코디를 만나보세요.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            UsernameField(username, { username = it }, !state.busy)
+            PasswordField("비밀번호", password, { password = it }, !state.busy)
+            AuthError(state)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+                Text("계정이 없으신가요?", style = MaterialTheme.typography.bodyMedium)
+                TextButton(onClick = onRegister, enabled = !state.busy) { Text("회원가입", fontWeight = FontWeight.SemiBold) }
             }
         }
     }

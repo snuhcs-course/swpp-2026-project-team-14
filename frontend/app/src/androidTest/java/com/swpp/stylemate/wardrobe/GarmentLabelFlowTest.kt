@@ -34,7 +34,7 @@ class GarmentLabelFlowTest {
             Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1).code(code)
                 .message("test").body(body.toResponseBody()).build()
         }.build()
-        val model = GarmentLabelsViewModel(OutfitRepository("http://localhost", client))
+        val model = GarmentLabelsViewModel(OutfitRepository(checkNotNull(com.swpp.stylemate.authenticatedRepository(client).account())))
         val fixture = JSONObject(InstrumentationRegistry.getInstrumentation().context.assets
             .open("wardrobe-editor.json").bufferedReader().use { it.readText() })
         val attrs = fixture.getJSONObject("attributes").put("category", "top")
