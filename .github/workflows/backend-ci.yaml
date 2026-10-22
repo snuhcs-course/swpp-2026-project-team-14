@@ -39,13 +39,24 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y default-libmysqlclient-dev pkg-config
 
       - name: Install dependencies
+        id: deps
         run: pip install -r requirements-dev.txt
 
-      - name: Run tests with coverage
+      # 테스트가 실패해도 리포트 단계가 돌도록 테스트와 리포트 생성을 별도 step으로 나눔
+      - name: Run pytest with coverage
+        run: python -m pytest -q --cov --cov-report=
+
+      - name: Check migrations
+        if: ${{ !cancelled() && steps.deps.outcome == 'success' }}
+        run: python manage.py makemigrations --check --dry-run --settings=config.test_settings
+
+      - name: Run Django tests with coverage
+        if: ${{ !cancelled() && steps.deps.outcome == 'success' }}
+        run: python -m coverage run --append manage.py test apps.users apps.wardrobe apps.outfits --settings=config.test_settings --noinput
+
+      - name: Generate coverage report
+        if: ${{ !cancelled() && steps.deps.outcome == 'success' }}
         run: |
-          python -m pytest -q --cov --cov-report=
-          python manage.py makemigrations --check --dry-run --settings=config.test_settings
-          python -m coverage run --append manage.py test apps.users apps.wardrobe apps.outfits --settings=config.test_settings --noinput
           python -m coverage report
           python -m coverage html
           python -m coverage json -o coverage.json
