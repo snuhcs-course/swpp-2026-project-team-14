@@ -44,7 +44,8 @@ class ChatRepository(
     baseUrl: String,
     private val account: AccountAccess,
     private val client: OkHttpClient = OkHttpClient.Builder().connectTimeout(10, TimeUnit.SECONDS)
-        .readTimeout(40, TimeUnit.SECONDS).callTimeout(50, TimeUnit.SECONDS).build(),
+        .readTimeout(40, TimeUnit.SECONDS).callTimeout(50, TimeUnit.SECONDS)
+        .followRedirects(false).followSslRedirects(false).build(),
 ) {
     private val base = baseUrl.trimEnd('/')
 
