@@ -295,3 +295,7 @@ Known limitation found by the tests: a waist that is flat over several cm leaves
 - **Integration:** analyze → confirm → get → delete round trip.
 - **UI (Compose test):** state transitions; "분석하기" disabled without both photos and a valid height; 4th style chip disabled; warning banner shown for detected loose clothing.
 - **Smoke:** Galaxy S23 against a dev server.
+
+## Authentication update (2026-10-17)
+
+Body analysis now requires `Authorization: Bearer <token>` and a configured account database, like every other service feature. The Android client attaches its account token and returns to login on 401. Login/registration and `/healthz/` remain public. See [the authentication contract](../login/README.md).

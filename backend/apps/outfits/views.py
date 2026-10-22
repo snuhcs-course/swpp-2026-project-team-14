@@ -24,7 +24,6 @@ from django.utils import timezone
 
 from apps.body_profiles.profile import body_from_request
 from apps.wardrobe.models import Garment
-from apps.wardrobe.editor import validate_record
 from apps.users.auth import require_auth
 from apps.users.models import User
 from apps.users.pagination import account_page
@@ -42,7 +41,6 @@ PREF_FITS = ("slim", "regular", "loose")
 SLOT_CODE = {slot: code for code, slot in WARDROBE_CATEGORY.items()}  # 상의 -> top
 MAX_COUNT = 5
 MAX_SEEN = 100
-MAX_PREVIEW_BYTES = 1024 * 1024
 
 
 SLOT_ORDER = ("outerwear", "top", "bottom")
@@ -216,78 +214,6 @@ def recommend_view(request):
                   "context": context})
 
 
-def _local_garments(data):
-    rows = data.get('wardrobe')
-    if not isinstance(rows, list):
-        raise ValueError('Invalid local wardrobe')
-    garments = {}
-    for row in rows:
-        if not isinstance(row, dict):
-            raise ValueError('Invalid garment')
-        garment_id = str(uuid.UUID(row['id']))
-        if garment_id in garments:
-            raise ValueError('Duplicate garment')
-        values = validate_record({key: row[key] for key in ('attributes', 'dimensions', 'notes', 'labels') if key in row})
-        garments[garment_id] = Garment(id=garment_id, image='', saved=True, **values)
-    return garments
-
-
-@require_POST
-def preview_view(request):
-    """Use the same calculation for a device's wardrobe without reading or writing the DB."""
-    try:
-        data = _read(request, MAX_PREVIEW_BYTES)
-        garments = _local_garments(data)
-        result, context = _calculate(data, garments)
-        outfits = []
-        for outfit in result['outfits']:
-            items = []
-            for item in outfit['items']:
-                garment_id = item['id'][2:]
-                garment = garments[garment_id]
-                items.append({'garment_id': garment_id, 'slot': SLOT_CODE[item['slot']],
-                              'name': garment.attributes.get('name', ''), 'colors': garment.attributes.get('colors', []),
-                              'image_url': f'local:{garment_id}', 'note': item.get('size', '')})
-            outfits.append({'id': str(uuid.uuid5(uuid.NAMESPACE_URL, outfit['key'])), 'key': outfit['key'],
-                            'items': items, 'score': outfit['total'], 'components': outfit['components'],
-                            'reasons': outfit['reasons'], 'saved': False, 'name': '', 'feedback': None,
-                            'created_at': timezone.now().isoformat()})
-        return _json({'outfits': outfits, 'notes': result['notes'], 'band': result['band'], 'context': context})
-    except TooLarge:
-        return _error('BODY_TOO_LARGE', 413)
-    except NotJson:
-        return _error('JSON_REQUIRED', 415)
-    except RecommendError as error:
-        return _error(error.code, 422, str(error))
-    except (ValueError, TypeError, KeyError, AttributeError, UnicodeDecodeError, OverflowError, RecursionError):
-        return _error('INVALID_REQUEST', 400)
-
-
-@require_POST
-def preview_feedback(request):
-    try:
-        data = _read(request)
-        garments = _local_garments(data)
-        outfit = data['outfit']
-        value = data.get('feedback')
-        if not isinstance(outfit, dict) or value not in ('liked', 'disliked', None):
-            raise ValueError('Invalid feedback')
-        taste = _preference(data.get('preference'))
-        if value != outfit.get('feedback') and value is not None:
-            items = [to_item({'id': str(g.id), 'attributes': g.attributes, 'labels': g.labels}) for g in garments.values()]
-            by_id = {i.id: {'slot': i.slot, 'attrs': i.attrs, 'style': i.style} for i in items if i}
-            sign = 1 if value == 'liked' else -1
-            taste = preference.apply_feedback(taste, [{'item_id': gid, 'polarity': sign} for gid in by_id], by_id)
-        outfit['feedback'] = value
-        return _json({'outfit': outfit, 'preference': taste})
-    except TooLarge:
-        return _error('BODY_TOO_LARGE', 413)
-    except NotJson:
-        return _error('JSON_REQUIRED', 415)
-    except (ValueError, TypeError, KeyError, AttributeError, UnicodeDecodeError, OverflowError, RecursionError):
-        return _error('INVALID_REQUEST', 400)
-
-
 @require_http_methods(["GET", "POST"])
 @require_auth
 def outfits_view(request):
@@ -376,6 +302,7 @@ def feedback_view(request, outfit_id):
 
 
 @require_GET
+@require_auth
 def weather_view(request):
     try:
         lat = _number(float(request.GET.get("lat", weather.SEOUL[0])), -90, 90)

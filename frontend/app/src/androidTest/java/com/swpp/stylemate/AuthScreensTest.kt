@@ -20,7 +20,7 @@ import com.swpp.stylemate.data.AuthRepository
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
 import com.swpp.stylemate.ui.profile.AuthUiState
-import com.swpp.stylemate.ui.profile.LoginDialog
+import com.swpp.stylemate.ui.profile.LoginScreen
 import com.swpp.stylemate.ui.profile.RegistrationScreen
 import com.swpp.stylemate.ui.theme.StyleMateTheme
 import org.junit.Assert.*
@@ -72,7 +72,7 @@ class AuthScreensTest {
 
     @Test fun loginMasksPasswordAndPreservesExactInputForSubmission() {
         var submitted: Pair<String, String>? = null
-        compose.setContent { StyleMateTheme { LoginDialog(AuthUiState(ready = true), {}, {}, { id, pw -> submitted = id to pw }) } }
+        compose.setContent { StyleMateTheme { LoginScreen(AuthUiState(ready = true), {}, { id, pw -> submitted = id to pw }) } }
         capture("login")
         compose.onNodeWithText("아이디").performTextInput("member_1")
         compose.onNodeWithText("비밀번호").performTextInput(" password_123 ")
@@ -90,7 +90,7 @@ class AuthScreensTest {
 
     @Test fun busyLoginDisablesSubmissionAndRegistrationButShowsServerErrorAndCooldown() {
         var state by mutableStateOf(AuthUiState(ready = true, busy = true))
-        compose.setContent { StyleMateTheme { LoginDialog(state, {}, {}, { _, _ -> fail("Duplicate submission") }) } }
+        compose.setContent { StyleMateTheme { LoginScreen(state, {}, { _, _ -> fail("Duplicate submission") }) } }
         compose.onNodeWithText("로그인 중…").assertIsNotEnabled()
         compose.onNodeWithText("회원가입").assertIsNotEnabled()
         compose.runOnIdle { state = AuthUiState(ready = true, retrySeconds = 300, error = "로그인 시도가 잠시 제한됐어요.") }

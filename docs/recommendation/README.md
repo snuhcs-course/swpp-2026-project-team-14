@@ -6,8 +6,8 @@
 
 `옷 등록(현우): AR 치수(상의는 뒷면) → 상의·아우터는 앞면 사진 → Gemini 분석(세부 종류·스타일 제안 + details) → 치수·체형으로 추천 라벨 계산 → 사용자 확인·수정 → 저장 → 홈: 날씨 + 내 옷장 → 코디 3개 → 좋아요·별로예요·코디북 저장`
 
-- 체형은 지금은 기기(`BodyProfileStore.kt`)에 있고 요청마다 같이 보낸다. 서버는 `apps/body_profiles/profile.py`의 `body_from_request()` 한 곳에서만 체형을 읽으므로 user table이 생기면 이 함수만 바꾸면 된다.
-- 취향(좋아요·별로예요로 배운 속성 가중치)도 기기(`TasteStore.kt`)에 두고 요청마다 보낸다. 서버는 상태를 갖지 않는다.
+- 체형은 계정 프로필 API와 계정별 캐시(`BodyProfileStore.kt`)에 보관하며 요청마다 같이 보낸다. 서버는 `apps/body_profiles/profile.py`의 `body_from_request()` 한 곳에서만 체형을 읽으므로 user table이 생기면 이 함수만 바꾸면 된다.
+- 취향(좋아요·별로예요로 배운 속성 가중치)도 기기(`TasteStore.kt`)에 두고 요청마다 보낸다. 취향 캐시는 계정별로 분리하며 서버 계산은 상태를 갖지 않는다.
 - 신발은 K-Fashion에 없어 이번 추천에서 뺐다. 채팅으로 코디를 고치는 기능은 주현 님 담당이라 여기서 다루지 않는다(홈 화면의 `onChat` 자리만 열어 둠).
 
 ## 구조
@@ -124,6 +124,9 @@ cd backend
 
 ## 남은 일
 
-- user table 연결: `body_from_request()`를 request.user 기반으로 바꾸고 `Outfit`·`Garment`에 owner를 둔다.
 - 신발 추천(K-Fashion에 없음), 채팅 편집 연결(`HomeScreen(onChat = …)`, `POST /api/outfits/` source=chat).
 - (여유가 되면) 옷장 밖의 옷 추천: 같은 엔진이 K-Fashion 카탈로그에서 고르는 경로(`mode="new"`, 테스트 페이지 `/`)가 이미 있다.
+
+## 로그인 필수 전환
+
+추천·피드백·날씨·라벨은 Bearer 인증 후 호출한다. 게스트 preview API는 제거했으며 로그인한 계정의 옷장을 사용한다. 사용자 소유권과 계정 프로필 저장은 구현되어 있고, 추천 알고리즘 자체는 이번 전환에서 변경하지 않았다. [인증 계약](../login/README.md)을 따른다.

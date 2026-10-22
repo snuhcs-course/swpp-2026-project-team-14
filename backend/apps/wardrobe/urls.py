@@ -4,7 +4,6 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
-    path('analyze-preview/', views.analyze_preview),
     path('analyze/', views.analyze),
     path('landmarks/', views.landmarks),
     path('options/', views.editor_options),

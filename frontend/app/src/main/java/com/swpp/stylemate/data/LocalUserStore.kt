@@ -45,7 +45,7 @@ data class OnboardingProgress(val step: Int = 1, val completed: Boolean = false,
     fun json() = JSONObject().put("step", step).put("completed", completed).put("draft", JSONObject(draft))
 }
 
-/** One private snapshot per guest/account. Writes replace the previous file atomically. */
+/** One private cache and onboarding draft per account. Writes replace the previous file atomically. */
 class LocalUserStore(private val directory: File) {
     private val snapshot get() = File(directory, "data.json")
 
@@ -98,7 +98,6 @@ class LocalUserStore(private val directory: File) {
     fun cacheAccountProfile(user: AccountUser) = synchronized(lock) {
         val data = read().put("style", user.style.json())
         if (user.body == null) data.remove("body") else data.put("body", user.body)
-        if (!data.has("onboarding")) data.put("onboarding", OnboardingProgress(8, true).json())
         write(snapshot, data.toString().toByteArray(Charsets.UTF_8))
     }
 
@@ -219,10 +218,14 @@ class LocalUserStore(private val directory: File) {
 
     companion object {
         private val lock = Any()
-        fun forContext(context: Context, accountId: String? = null): LocalUserStore =
+        // Only the authenticated import flow reads the old guest snapshot; service screens never use it.
+        internal fun legacyGuestForContext(context: Context): LocalUserStore =
+            legacyGuestInDirectory(File(context.applicationContext.filesDir, "local-users"))
+        internal fun legacyGuestInDirectory(root: File) = LocalUserStore(File(root, "guest"))
+        fun forContext(context: Context, accountId: String): LocalUserStore =
             inDirectory(File(context.applicationContext.filesDir, "local-users"), accountId)
-        fun inDirectory(root: File, accountId: String? = null): LocalUserStore {
-            val scope = accountId?.let { UUID.fromString(it).toString() } ?: "guest"
+        fun inDirectory(root: File, accountId: String): LocalUserStore {
+            val scope = UUID.fromString(accountId).toString()
             return LocalUserStore(File(root, scope))
         }
     }

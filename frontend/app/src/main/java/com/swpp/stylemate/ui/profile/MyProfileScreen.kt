@@ -234,7 +234,6 @@ fun MyProfileScreen(
     onReanalyze: () -> Unit,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
-    onLogin: (() -> Unit)? = null,
     username: String? = null,
     onLogout: () -> Unit = {},
     authBusy: Boolean = false,
@@ -275,24 +274,20 @@ fun MyProfileScreen(
                         Icon(PROFILE_IMPORT_ICON, contentDescription = "이 기기의 데이터 가져오기", tint = MaterialTheme.colorScheme.primary)
                     }
                 }
+
             }
             Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.fillMaxWidth()) {
                 Row(Modifier.padding(horizontal = 16.dp, vertical = 18.dp).fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    if (username == null) {
-                        Text("내 정보를 계정에 보관하세요", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                        if (onLogin != null) Button(onClick = onLogin, enabled = !inlineSaving, shape = RoundedCornerShape(12.dp)) { Text("로그인") }
-                    } else {
-                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            Text(username, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Text("로그인됨", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        OutlinedButton(onClick = onLogout, enabled = !authBusy && !inlineSaving, shape = RoundedCornerShape(12.dp)) { Text(if (authBusy) "처리 중…" else "로그아웃") }
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(username.orEmpty(), fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text("로그인됨", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    OutlinedButton(onClick = onLogout, enabled = !authBusy && !inlineSaving, shape = RoundedCornerShape(12.dp)) {
+                        Text(if (authBusy) "처리 중…" else "로그아웃")
                     }
                 }
             }
-            if (username == null) Text("비로그인 데이터는 이 기기에만 저장돼요. 앱 삭제 또는 데이터 초기화 시 사라질 수 있어요.",
-                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             inlineError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             ProfileCard {
                 Text("선호하는 핏", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
