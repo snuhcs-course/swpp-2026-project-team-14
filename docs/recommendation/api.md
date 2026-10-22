@@ -95,3 +95,48 @@
 ### GET /api/weather/?lat=&lon=
 
 Open-Meteo 현재 날씨(기본 서울): `{temp, apparent, precipitation, rain, snow, wind, label, source, band}`. 실패하면 502 `WEATHER_UNAVAILABLE`. 10분 캐시.
+
+## 채팅 코디 수정
+
+### POST /api/outfits/chat/
+
+로그인한 사용자의 저장된 옷장에서 코디 수정안을 만든다. 계정 인증이 필요하며 이 요청은 코디 테이블에 저장하지 않는다.
+
+요청에는 계정 Bearer 토큰을 넣는다. 미인증 요청은 401이며 비로그인 채팅 미리보기 경로는 제공하지 않는다.
+
+```json
+{
+  "body": {"height_cm": 170, "gender": "unspecified", "measurements": []},
+  "weather": {"temp": 16, "apparent": 15, "rain": false, "snow": false},
+  "garment_ids": ["현재-상의-id", "현재-하의-id"],
+  "locked_ids": ["현재-하의-id"],
+  "directions": ["brighter", "formal"],
+  "text": "상의는 흰 셔츠로 바꿔줘",
+  "preference": null,
+  "seen_keys": [],
+  "history": [{"role": "user", "text": "이전 요청"}, {"role": "assistant", "text": "이전 응답"}]
+}
+```
+
+- `body`, 현재 `garment_ids` 필수. 날씨는 기존 추천 API와 같이 `weather` 또는 `temp`로 전달한다.
+- `directions`와 `text` 중 하나 이상 필요. `text`는 최대 400자, `history`는 최대 6개(각 500자).
+- 버튼 값: `brighter`, `darker`, `warmer`, `cooler`, `formal`, `casual`, `looser`, `fitted`, `colorful`, `simpler`, `different`.
+- `locked_ids`는 사용자가 UI에서 직접 잠근 옷이며 현재 코디에 포함된 옷만 허용한다. 모델이 해석한 `keep_slots`는 해당 요청에만 적용하고 `locked_ids`에 추가하지 않는다. 앱도 서버 응답으로 잠금을 새로 만들지 않는다. 잠금은 서버의 후보·코디 구성 제약이며 점수에 따른 변경을 허용하지 않는다.
+- 버튼만 사용하면 모델 호출이 없다. 자유 입력은 서버의 `CHAT_PROVIDER=auto|gemini|openrouter`로 해석한다. `auto`는 `OPENROUTER_API_KEY`가 있으면 OpenRouter, 그 외 Gemini를 사용한다. OpenRouter 모델은 `OPENROUTER_CHAT_MODEL`, Gemini 모델은 `GEMINI_TEXT_MODEL`로 지정한다. 키는 서버 `.env`에만 둔다.
+- 모델은 변경/유지 슬롯·방향·색 제외·특정 옷·아우터 제거·확인 질문을 구조화한다. 잠금과 충돌하면 변경 전에 확인한다. 모델 실패 시 대체 해석 없이 503 `CHAT_MODEL_UNAVAILABLE`로 응답한다.
+
+응답 공통 필드: `{status, message, outfit, changed_ids, locked_ids, unlock_ids, notes, parsed_by}`.
+
+| status | 동작 |
+| --- | --- |
+| `updated` | `outfit`에 기존 코디 응답 형식의 수정안. 새 점수는 표시하지 않는다 (`score: null`). 다음 수정 기준으로 사용 |
+| `unchanged` | 조건을 만족하는 다른 코디 없음. 기존 코디 유지 |
+| `clarify` | `message`의 확인 질문 표시. 기존 코디 유지 |
+| `unlock` | `unlock_ids`의 잠금 해제 동의를 먼저 받는다. 동의 시 동일 요청에서 해당 잠금만 빼고 재요청 |
+| `undo` | 앱이 보관한 이전 코디로 복원 |
+
+400 `INVALID_CHAT_REQUEST`, 422 `CURRENT_GARMENT_MISSING`, 429 `CHAT_BUSY`, 503 `CHAT_MODEL_UNAVAILABLE`은 메시지와 함께 같은 요청의 재시도를 제공한다.
+
+저장은 기존 `POST /api/outfits/`에 `{garment_ids, source: "chat", name?, context: {chat_save_id: "클라이언트 UUID"}}`로 요청한다. 같은 `chat_save_id`의 재요청은 기존 코디를 반환하여 응답 유실 후 재시도로 인한 중복 저장을 방지한다. `chat_save_id`는 최대 64자다.
+
+앱 대화는 홈 코디별로 메모리에 유지되며 뒤로 가기·재진입·화면 회전에 보존된다. 앱 프로세스 종료 후 대화 복원은 지원하지 않는다.

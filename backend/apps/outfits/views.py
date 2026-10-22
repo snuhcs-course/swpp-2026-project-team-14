@@ -230,8 +230,17 @@ def outfits_view(request):
         context = data.get("context", {})
         if not isinstance(context, dict) or len(json.dumps(context)) > 2000:
             raise ValueError("Invalid context")
+        save_id = context.get("chat_save_id") if source == Outfit.Source.CHAT else None
+        if save_id is not None and (not isinstance(save_id, str) or not 1 <= len(save_id) <= 64):
+            raise ValueError("Invalid chat save id")
         with transaction.atomic():
             User.objects.select_for_update().get(pk=request.user.pk)
+            if save_id is not None:
+                existing = Outfit.objects.filter(user=request.user, source=source, context__chat_save_id=save_id).first()
+                if existing:
+                    if existing.key != '+'.join(sorted(f'w:{gid}' for gid in ids)):
+                        return _error('INVALID_OUTFIT', 409)
+                    return _json(serialize(existing))
             found = {str(g.id): g for g in Garment.objects.filter(user=request.user, saved=True, pk__in=ids)} if ids else {}
             members = [(g.attributes.get("category"), g, "") for g in (found.get(i) for i in ids) if g]
             slots = [slot for slot, _, _ in members]

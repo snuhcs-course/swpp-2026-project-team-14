@@ -63,8 +63,7 @@ import java.util.Locale
 private val SLOT_WIDTH = mapOf("outerwear" to 0.82f, "top" to 0.72f, "bottom" to 0.62f)
 
 /**
- * 오늘의 코디 (mock-up p.3). [onChat] opens the chat editor (주현 님's page) when it exists; until then
- * the main button shows the next outfit.
+ * 오늘의 코디 (mock-up p.3). [onChat] opens the chat editor for the current outfit.
  */
 @Composable
 fun HomeScreen(

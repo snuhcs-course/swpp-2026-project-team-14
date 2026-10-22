@@ -12,9 +12,6 @@ omit =
     */test_*.py
     tests/*
     recommendation/demo/*
-    # used only by the local test page (recommendation/demo) and offline scripts, not by apps/;
-    # put stylist.py back once the app imports it (PR #28 uses stylist._want_score)
-    recommendation/stylist.py
     recommendation/decision.py
     recommendation/intent.py
     recommendation/tryon.py
