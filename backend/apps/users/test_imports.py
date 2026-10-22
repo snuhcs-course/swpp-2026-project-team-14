@@ -16,6 +16,7 @@ from apps.wardrobe.models import Garment
 from .auth import issue_token
 from .imports import mapped_id
 from .models import User
+from datetime import timedelta
 
 
 class GuestImportTests(TestCase):
@@ -99,8 +100,10 @@ class GuestImportTests(TestCase):
         self.assertEqual(kept.json()['status'], 'kept')
         row = Garment.objects.get()
         self.assertEqual(row.attributes['name'], '로컬 옷')
-        row.notes = '다른 화면에서 수정'
-        row.save()
+        Garment.objects.filter(pk=row.pk).update(
+        notes='다른 화면에서 수정',
+        updated_at=row.updated_at + timedelta(seconds=1),
+    )
         changed = self.upload(value=value, expected=version, replace=True)
         self.assertEqual(changed.status_code, 409)
         version = self.preview(garments=[self.top])['garments'][self.top]['version']

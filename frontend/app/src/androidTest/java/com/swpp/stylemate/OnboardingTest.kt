@@ -84,9 +84,9 @@ class OnboardingTest {
             assertEquals(listOf("wide"), store.style().preferredFits)
             assertEquals(listOf("casual"), store.style().preferredStyles)
         }
-        compose.onNodeWithText("키 (cm)").performTextInput("170")
+        compose.onNodeWithText("키 (cm) *").performScrollTo().performTextInput("170")
         compose.runOnIdle { current = model(); generation++ }
-        compose.onNodeWithText("키 (cm)").assertTextContains("170")
+        compose.onNodeWithText("키 (cm) *").performScrollTo().assertTextContains("170")
         compose.onNodeWithText("건너뛰기").performClick()
         compose.waitUntil(5_000) { current.onboarding.value.step == 6 }
         compose.onNodeWithText("건너뛰기").performClick()

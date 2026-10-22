@@ -20,16 +20,17 @@ import sys
 import xml.etree.ElementTree as ET
 
 ROOT = "com/swpp/stylemate/"
-GENERATED = ("BuildConfig", "R", "R$", "ComposableSingletons")
-
 
 def layer(class_name: str) -> str | None:
     if not class_name.startswith(ROOT):
         return None
     rest = class_name[len(ROOT):]
     simple = rest.rsplit("/", 1)[-1]
-    if simple.startswith(GENERATED):
-        return None
+    if (
+        simple in ("BuildConfig", "R")
+        or simple.startswith(("BuildConfig$", "R$", "ComposableSingletons"))
+    ):
+    return None
     if rest.startswith("data/"):
         return "data"
     if "ViewModel" in simple.split("$", 1)[0]:
