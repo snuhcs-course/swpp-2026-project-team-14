@@ -48,6 +48,10 @@ import com.swpp.stylemate.data.AccountAccess
 import com.swpp.stylemate.data.AuthRepository
 import com.swpp.stylemate.data.KeystoreSessionStore
 import com.swpp.stylemate.data.GuestImportRepository
+import com.swpp.stylemate.data.chat.ChatRepository
+import com.swpp.stylemate.data.recommendation.LocalTasteStore
+import com.swpp.stylemate.ui.chat.ChatRoute
+import com.swpp.stylemate.ui.chat.ChatViewModel
 import com.swpp.stylemate.ui.profile.GuestImportViewModel
 import com.swpp.stylemate.ui.profile.GuestImportDialog
 import com.swpp.stylemate.data.LocalUserStore
@@ -213,11 +217,18 @@ private fun MainTabs(viewModel: BodyProfileViewModel, authModel: AuthViewModel, 
     val auth by authModel.state.collectAsStateWithLifecycle()
     val account = checkNotNull(LocalAccountAccess.current)
     var tab by rememberSaveable { mutableStateOf(Tab.HOME) }
+    val context = LocalContext.current.applicationContext
+    val chat: ChatViewModel = viewModel(factory = viewModelFactory {
+        initializer { ChatViewModel(ChatRepository(BuildConfig.API_BASE_URL, account = account),
+            LocalTasteStore(context, account.userId)) }
+    })
+    val chatting by chat.visible.collectAsStateWithLifecycle()
 
+    Box(Modifier.fillMaxSize()) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
-            NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainer) {
+            if (!chatting) NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainer) {
                 Tab.entries.forEach { item ->
                     NavigationBarItem(
                         selected = tab == item,
@@ -236,7 +247,8 @@ private fun MainTabs(viewModel: BodyProfileViewModel, authModel: AuthViewModel, 
     ) { padding ->
         when (tab) {
             Tab.HOME -> HomeRoute(app.profile, onSetupProfile = viewModel::startReanalysis,
-                onOpenWardrobe = { tab = Tab.WARDROBE }, modifier = Modifier.padding(padding).consumeWindowInsets(padding))
+                onOpenWardrobe = { tab = Tab.WARDROBE }, modifier = Modifier.padding(padding).consumeWindowInsets(padding),
+                onChat = { outfit, weather -> chat.open(outfit, app.profile, weather) })
             Tab.WARDROBE -> Box(Modifier.padding(padding).consumeWindowInsets(padding)) { WardrobeRoute() }
             Tab.CODIBOOK -> CodiBookRoute(Modifier.padding(padding).consumeWindowInsets(padding))
             Tab.PROFILE -> MyProfileScreen(
@@ -264,5 +276,7 @@ private fun MainTabs(viewModel: BodyProfileViewModel, authModel: AuthViewModel, 
                 onDeleteRemote = viewModel::deleteAccountProfile,
             )
         }
+    }
+    if (chatting) ChatRoute(chat)
     }
 }

@@ -64,6 +64,8 @@ class Request:
     seen_outfits: list[str] = field(default_factory=list)  # outfit keys already shown ("id+id")
     count: int = 3
     seed: int = 0
+    fixed: dict[str, str] = field(default_factory=dict)  # chat: slot -> garment that must remain
+    directions: dict[str, list[str]] = field(default_factory=dict)  # chat: requested changes by slot
 
 
 @dataclass
@@ -130,6 +132,10 @@ def recommend(catalog: Catalog, req: Request) -> dict:
             filtered["성별"] += 1
             return None
         penalty = 0.0
+        if req.directions.get(item.slot):
+            from recommendation.stylist import _want_score
+            penalty -= 0.3 * float(np.mean([_want_score(w, item, None) for w in req.directions[item.slot]
+                                          if w not in ('warmer', 'cooler')] or [0.0]))
         if season.allowed(band, req.temp, item.slot, item.attrs, item.warmth):
             if not relax_weather:
                 filtered["날씨"] += 1
@@ -153,9 +159,10 @@ def recommend(catalog: Catalog, req: Request) -> dict:
     source = {s: [w for w in owned if w.slot == s] for s in SLOTS} if wardrobe_only else catalog.by_slot
     pools: dict[str, list[_Cand]] = {}
     for slot in SLOTS:
-        cands = [c for c in (candidate(i) for i in source.get(slot, [])) if c]
+        available = [i for i in source.get(slot, []) if not req.fixed.get(slot) or i.id == req.fixed[slot]]
+        cands = [c for c in (candidate(i, relax_weather=slot in req.fixed) for i in available) if c]
         if not cands and wardrobe_only and slot in ("상의", "하의"):
-            cands = [c for c in (candidate(i, relax_weather=True) for i in source[slot]) if c]
+            cands = [c for c in (candidate(i, relax_weather=True) for i in available) if c]
             if cands:
                 notes.append(f"오늘 날씨에 맞는 {slot}{josa(slot, '이', '가')} 없어서 가장 가까운 옷으로 골랐어요.")
         cands.sort(key=lambda c: -c.unary)
@@ -167,6 +174,12 @@ def recommend(catalog: Catalog, req: Request) -> dict:
         pools[anchor.slot] = [a]
 
     templates = [(t, w) for t, w in band.templates if not (req.body.male and "원피스" in t)]
+    if req.fixed:
+        if any(not pools.get(s) for s in req.fixed):
+            raise RecommendError('유지할 옷으로 코디를 만들 수 없어요. 잠금을 풀거나 옷장 정보를 확인해 주세요.')
+        templates = [(t, w) for t, w in templates if set(req.fixed) <= set(t)]
+        if not templates:
+            templates = [((('아우터',) if '아우터' in req.fixed else ()) + ('상의', '하의'), 1.0)]
     if anchor is not None:
         templates = [(t, w) for t, w in templates if anchor.slot in t] or [((anchor.slot,), 1.0)]
     cache: dict = {}
@@ -175,7 +188,7 @@ def recommend(catalog: Catalog, req: Request) -> dict:
         if any(not pools.get(s) for s in slots):
             continue
         scored += _score_template(catalog, band, slots, t_weight, [pools[s] for s in slots], context_style, cache)
-    if not scored and wardrobe_only and pools.get("상의") and pools.get("하의"):
+    if not scored and wardrobe_only and pools.get("상의") and pools.get("하의") and '아우터' not in req.fixed:
         scored = _score_template(catalog, band, ("상의", "하의"), 1.0, [pools["상의"], pools["하의"]], context_style, cache)
         if band.outer in {"recommended", "required"}:
             notes.append("오늘은 아우터가 필요한 날씨인데 맞는 아우터가 없어 상의와 하의만 골랐어요.")

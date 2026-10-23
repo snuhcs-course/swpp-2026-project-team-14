@@ -38,8 +38,18 @@ jobs:
       - name: Configure school API endpoint
         run: printf '%s\n' 'stylemate.apiBaseUrl=http://swpp26t14.147-46-242-169.sslip.io' >> local.properties
 
-      - name: Unit tests
-        run: ./gradlew --no-daemon testDebugUnitTest
+      - name: Unit tests with coverage
+        run: ./gradlew --no-daemon createDebugUnitTestCoverageReport
+
+      - name: Coverage by layer
+        run: python3 scripts/coverage_by_layer.py app/build/reports/coverage/test/debug/report.xml >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-unit-coverage
+          path: frontend/app/build/reports/coverage/test/debug
 
       - name: Build debug APK
         run: ./gradlew --no-daemon assembleDebug

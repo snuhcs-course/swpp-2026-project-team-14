@@ -18,7 +18,7 @@ def _describe(slot: str, key: str, value: str) -> str:
     if key == "카테고리":
         return CATEGORY_WORD.get(value, value)
     if key == "핏":
-        return f"{FIT_WORD.get(value, value)}핏 {slot_word}" if value != "노멀" else f"기본핏 {slot_word}"
+        return f"{FIT_WORD.get(value, value).removesuffix('핏')}핏 {slot_word}" if value != "노멀" else f"기본핏 {slot_word}"
     if key == "소재":
         return f"{value} {slot_word}"
     if key == "기장":

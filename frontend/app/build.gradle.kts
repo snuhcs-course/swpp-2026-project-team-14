@@ -22,12 +22,20 @@ android {
         minSdk = 26
         targetSdk = 36
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        versionCode = 1
-        versionName = "0.1-prototype"
+        versionCode = 2
+        versionName = "0.2.0"
         buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrl\"")
     }
 
     buildTypes {
+        debug {
+            // JaCoCo line/branch coverage: createDebugUnitTestCoverageReport (JVM unit tests).
+            // Device-test coverage instruments the debug APK itself, so it is opt-in:
+            // -PandroidTestCoverage createDebugAndroidTestCoverageReport, or createAggregatedCoverageReport
+            // for unit + device tests together; see the wiki Testing Documentation
+            enableUnitTestCoverage = true
+            enableAndroidTestCoverage = project.hasProperty("androidTestCoverage")
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(
