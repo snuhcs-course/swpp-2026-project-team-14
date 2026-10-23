@@ -7,3 +7,9 @@ models/*.task
 private/
 
 wardrobe/garment-landmarks/
+# coverage data and reports
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+coverage.json

@@ -47,15 +47,20 @@ import com.swpp.stylemate.data.LocalBodyProfileStore
 import com.swpp.stylemate.data.AccountAccess
 import com.swpp.stylemate.data.AuthRepository
 import com.swpp.stylemate.data.KeystoreSessionStore
-import com.swpp.stylemate.data.LocalUserStore
 import com.swpp.stylemate.data.GuestImportRepository
+import com.swpp.stylemate.data.chat.ChatRepository
+import com.swpp.stylemate.data.recommendation.LocalTasteStore
+import com.swpp.stylemate.ui.chat.ChatRoute
+import com.swpp.stylemate.ui.chat.ChatViewModel
+import com.swpp.stylemate.ui.profile.GuestImportViewModel
+import com.swpp.stylemate.ui.profile.GuestImportDialog
+import com.swpp.stylemate.data.LocalUserStore
 import com.swpp.stylemate.BuildConfig
 import com.swpp.stylemate.ui.profile.AuthViewModel
 import com.swpp.stylemate.ui.profile.AuthPage
-import com.swpp.stylemate.ui.profile.LoginDialog
+import com.swpp.stylemate.ui.profile.LoginScreen
+import com.swpp.stylemate.data.RemoteBodyAnalyzer
 import com.swpp.stylemate.ui.profile.RegistrationScreen
-import com.swpp.stylemate.ui.profile.GuestImportViewModel
-import com.swpp.stylemate.ui.profile.GuestImportDialog
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.lifecycle.Lifecycle
@@ -86,9 +91,9 @@ private enum class Tab(val label: String, val icon: ImageVector) {
 val LocalAccountAccess = staticCompositionLocalOf<AccountAccess?> { null }
 
 @Composable
-private fun defaultBodyProfileViewModel(account: AccountAccess?): BodyProfileViewModel {
+private fun defaultBodyProfileViewModel(account: AccountAccess): BodyProfileViewModel {
     val context = LocalContext.current.applicationContext
-    return viewModel(factory = viewModelFactory { initializer { BodyProfileViewModel(store = LocalBodyProfileStore(context, account?.userId), account = account) } })
+    return viewModel(factory = viewModelFactory { initializer { BodyProfileViewModel(analyzer = RemoteBodyAnalyzer(BuildConfig.API_BASE_URL, account = account), store = LocalBodyProfileStore(context, account.userId), account = account) } })
 }
 
 @Composable
@@ -115,28 +120,29 @@ fun StyleMateApp(viewModel: BodyProfileViewModel? = null, authModel: AuthViewMod
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
         return
     }
-    val scope = auth.session?.user?.id ?: "guest"
-    val owner = remember(scope) { object : ViewModelStoreOwner { override val viewModelStore = ViewModelStore() } }
-    DisposableEffect(owner) { onDispose { owner.viewModelStore.clear() } }
     val account = remember(auth.session) { authModel.repository.account() }
-    CompositionLocalProvider(LocalViewModelStoreOwner provides owner, LocalAccountAccess provides account) {
-      key(scope) {
-        val profileModel = viewModel ?: defaultBodyProfileViewModel(account)
-        val importModel: GuestImportViewModel? = if (account == null) null else viewModel(factory = viewModelFactory {
-            initializer { GuestImportViewModel(GuestImportRepository(LocalUserStore.forContext(context), account)) }
-        })
-        LaunchedEffect(auth.session?.user?.json()?.toString()) { if (account != null) profileModel.refreshAccountProfile() }
-        if (auth.page == AuthPage.REGISTER) RegistrationScreen(auth, { authModel.open(AuthPage.LOGIN) }, { id, password, confirmation -> authModel.submit(id, password, confirmation) })
-        else {
-            AppContent(profileModel, authModel, importModel)
-            if (auth.page == AuthPage.LOGIN) LoginDialog(auth, { authModel.open(AuthPage.NONE) }, { authModel.open(AuthPage.REGISTER) },
-                { id, password -> authModel.submit(id, password) })
-            if (auth.page == AuthPage.NONE && importModel != null) {
+    if (account == null) {
+        if (auth.page == AuthPage.REGISTER) {
+            RegistrationScreen(auth, { authModel.open(AuthPage.LOGIN) }, { id, password, confirmation -> authModel.submit(id, password, confirmation) })
+        } else {
+            LoginScreen(auth, { authModel.open(AuthPage.REGISTER) }, { id, password -> authModel.submit(id, password) })
+        }
+    } else {
+        val scope = account.userId
+        val owner = remember(scope) { object : ViewModelStoreOwner { override val viewModelStore = ViewModelStore() } }
+        DisposableEffect(owner) { onDispose { owner.viewModelStore.clear() } }
+        CompositionLocalProvider(LocalViewModelStoreOwner provides owner, LocalAccountAccess provides account) {
+            key(scope) {
+                val profileModel = viewModel ?: defaultBodyProfileViewModel(account)
+                LaunchedEffect(auth.session?.user?.json()?.toString()) { profileModel.refreshAccountProfile() }
+                val importModel: GuestImportViewModel = viewModel(factory = viewModelFactory {
+                    initializer { GuestImportViewModel(GuestImportRepository(LocalUserStore.legacyGuestForContext(context), account)) }
+                })
+                AppContent(profileModel, authModel, importModel)
                 val importing by importModel.state.collectAsStateWithLifecycle()
                 GuestImportDialog(importing, importModel::confirm, importModel::decide, importModel::retry, importModel::close)
             }
         }
-      }
     }
     auth.notice?.let { message ->
         AlertDialog(onDismissRequest = authModel::dismissNotice, text = { Text(message) },
@@ -145,7 +151,7 @@ fun StyleMateApp(viewModel: BodyProfileViewModel? = null, authModel: AuthViewMod
 }
 
 @Composable
-private fun AppContent(viewModel: BodyProfileViewModel, authModel: AuthViewModel, importModel: GuestImportViewModel?) {
+private fun AppContent(viewModel: BodyProfileViewModel, authModel: AuthViewModel, importModel: GuestImportViewModel) {
     val app by viewModel.app.collectAsStateWithLifecycle()
     val onboarding by viewModel.onboarding.collectAsStateWithLifecycle()
     if (app.storageError != null) {
@@ -158,7 +164,7 @@ private fun AppContent(viewModel: BodyProfileViewModel, authModel: AuthViewModel
         return
     }
     if (!onboarding.completed) {
-        OnboardingRoute(viewModel, onLogin = { authModel.open(AuthPage.LOGIN) })
+        OnboardingRoute(viewModel)
     } else if (app.setupVisible) {
         ProfileSetupFlow(viewModel, canCancel = true)
     } else {
@@ -206,16 +212,23 @@ private fun ProfileSetupFlow(viewModel: BodyProfileViewModel, canCancel: Boolean
 }
 
 @Composable
-private fun MainTabs(viewModel: BodyProfileViewModel, authModel: AuthViewModel, importModel: GuestImportViewModel?) {
+private fun MainTabs(viewModel: BodyProfileViewModel, authModel: AuthViewModel, importModel: GuestImportViewModel) {
     val app by viewModel.app.collectAsStateWithLifecycle()
     val auth by authModel.state.collectAsStateWithLifecycle()
-    val account = LocalAccountAccess.current
-    var tab by rememberSaveable { mutableStateOf(if (auth.returnToProfile || auth.session != null) Tab.PROFILE else Tab.HOME) }
+    val account = checkNotNull(LocalAccountAccess.current)
+    var tab by rememberSaveable { mutableStateOf(Tab.HOME) }
+    val context = LocalContext.current.applicationContext
+    val chat: ChatViewModel = viewModel(factory = viewModelFactory {
+        initializer { ChatViewModel(ChatRepository(BuildConfig.API_BASE_URL, account = account),
+            LocalTasteStore(context, account.userId)) }
+    })
+    val chatting by chat.visible.collectAsStateWithLifecycle()
 
+    Box(Modifier.fillMaxSize()) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
-            NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainer) {
+            if (!chatting) NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainer) {
                 Tab.entries.forEach { item ->
                     NavigationBarItem(
                         selected = tab == item,
@@ -234,15 +247,15 @@ private fun MainTabs(viewModel: BodyProfileViewModel, authModel: AuthViewModel, 
     ) { padding ->
         when (tab) {
             Tab.HOME -> HomeRoute(app.profile, onSetupProfile = viewModel::startReanalysis,
-                onOpenWardrobe = { tab = Tab.WARDROBE }, modifier = Modifier.padding(padding).consumeWindowInsets(padding))
+                onOpenWardrobe = { tab = Tab.WARDROBE }, modifier = Modifier.padding(padding).consumeWindowInsets(padding),
+                onChat = { outfit, weather -> chat.open(outfit, app.profile, weather) })
             Tab.WARDROBE -> Box(Modifier.padding(padding).consumeWindowInsets(padding)) { WardrobeRoute() }
             Tab.CODIBOOK -> CodiBookRoute(Modifier.padding(padding).consumeWindowInsets(padding))
             Tab.PROFILE -> MyProfileScreen(
                 profile = app.profile,
                 style = app.style,
                 onSaveStyle = { style ->
-                    if (account == null) viewModel.saveStyleProfile(style)
-                    else {
+                    run {
                         val patch = org.json.JSONObject()
                         val values = style.json()
                         if (style.preferredFits != app.style.preferredFits) patch.put("preferred_fits", values.getJSONArray("preferred_fits"))
@@ -256,13 +269,14 @@ private fun MainTabs(viewModel: BodyProfileViewModel, authModel: AuthViewModel, 
                 onReanalyze = viewModel::startReanalysis,
                 onDelete = viewModel::deleteProfile,
                 modifier = Modifier.padding(padding),
-                onLogin = { authModel.open(AuthPage.LOGIN) },
                 username = auth.session?.user?.username,
                 onLogout = authModel::logout,
+                onImport = importModel::open,
                 authBusy = auth.busy,
                 onDeleteRemote = viewModel::deleteAccountProfile,
-                onImport = importModel?.let { { it.open() } },
             )
         }
+    }
+    if (chatting) ChatRoute(chat)
     }
 }

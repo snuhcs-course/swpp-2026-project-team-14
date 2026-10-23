@@ -28,6 +28,14 @@ android {
     }
 
     buildTypes {
+        debug {
+            // JaCoCo line/branch coverage: createDebugUnitTestCoverageReport (JVM unit tests).
+            // Device-test coverage instruments the debug APK itself, so it is opt-in:
+            // -PandroidTestCoverage createDebugAndroidTestCoverageReport, or createAggregatedCoverageReport
+            // for unit + device tests together; see the wiki Testing Documentation
+            enableUnitTestCoverage = true
+            enableAndroidTestCoverage = project.hasProperty("androidTestCoverage")
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(

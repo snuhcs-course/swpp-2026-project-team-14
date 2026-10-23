@@ -1,8 +1,7 @@
 # 추천 API
 
-모든 요청·응답은 JSON(UTF-8)이다. 계정 코디 API와 옷장 DB 분석·저장·조회에는 [로그인 API](../login/README.md)의 Bearer 토큰이 필요하며 본인 데이터만 사용한다. 날씨·라벨·비저장 분석·코디 미리보기는 비로그인에서도 제공한다. 체형은 기존대로 요청의 `body`로 받는다(앱의 `BodyProfileJson` 형식 그대로, 또는 `{height, chest, waist, hip, shoulder, inseam, …}` cm 값). 서버 쪽에서 체형을 읽는 곳은 `apps/body_profiles/profile.py`의 `body_from_request()` 하나다. 사용자 DB의 선호 정보를 추천 계산에 새로 연결하지 않는다.
+모든 요청·응답은 JSON(UTF-8)이다. 모든 서비스 API(날씨·라벨 포함)에는 [로그인 API](../login/README.md)의 Bearer 토큰이 필요하며 본인 데이터만 사용한다. 비로그인 미리보기 API는 제거했으며 로그인한 계정의 옷장만 사용한다. 체형은 기존대로 요청의 `body`로 받는다(앱의 `BodyProfileJson` 형식 그대로, 또는 `{height, chest, waist, hip, shoulder, inseam, …}` cm 값). 서버 쪽에서 체형을 읽는 곳은 `apps/body_profiles/profile.py`의 `body_from_request()` 하나다. 사용자 DB의 선호 정보를 추천 계산에 새로 연결하지 않는다.
 
-현재 비로그인 앱은 `POST /api/outfits/preview/`에 기존 추천 요청과 `wardrobe` 배열(로컬 옷의 UUID·속성·치수·라벨)을 전달한다. 요청 전체는 최대 1MiB이며 옷 ID 중복·잘못된 필드를 검증한다. 별도 100벌 제한은 두지 않는다. 앱은 메모·사진 경로·분석 캐시를 제외하고 전송하며, 같은 바이트 제한을 초과하면 계정 가져오기를 안내한다. 로컬 메모는 유지한다. 기존 추천 계산 결과를 반환하고 DB에 저장하지 않는다. 결과 ID는 같은 조합에 대해 유지되며 앱이 코디 저장 여부를 로컬에 관리한다. `POST /api/outfits/preview/feedback/`은 해당 코디·구성 옷·기존 취향으로 피드백을 계산한다(최대 64KiB). 계산은 온라인이며 서버 DB에 기록하지 않는다. 새 추천 알고리즘이나 사용자 DB 취향 연동은 추가하지 않는다.
 
 ## 옷 등록: 추천 라벨
 
@@ -96,3 +95,48 @@
 ### GET /api/weather/?lat=&lon=
 
 Open-Meteo 현재 날씨(기본 서울): `{temp, apparent, precipitation, rain, snow, wind, label, source, band}`. 실패하면 502 `WEATHER_UNAVAILABLE`. 10분 캐시.
+
+## 채팅 코디 수정
+
+### POST /api/outfits/chat/
+
+로그인한 사용자의 저장된 옷장에서 코디 수정안을 만든다. 계정 인증이 필요하며 이 요청은 코디 테이블에 저장하지 않는다.
+
+요청에는 계정 Bearer 토큰을 넣는다. 미인증 요청은 401이며 비로그인 채팅 미리보기 경로는 제공하지 않는다.
+
+```json
+{
+  "body": {"height_cm": 170, "gender": "unspecified", "measurements": []},
+  "weather": {"temp": 16, "apparent": 15, "rain": false, "snow": false},
+  "garment_ids": ["현재-상의-id", "현재-하의-id"],
+  "locked_ids": ["현재-하의-id"],
+  "directions": ["brighter", "formal"],
+  "text": "상의는 흰 셔츠로 바꿔줘",
+  "preference": null,
+  "seen_keys": [],
+  "history": [{"role": "user", "text": "이전 요청"}, {"role": "assistant", "text": "이전 응답"}]
+}
+```
+
+- `body`, 현재 `garment_ids` 필수. 날씨는 기존 추천 API와 같이 `weather` 또는 `temp`로 전달한다.
+- `directions`와 `text` 중 하나 이상 필요. `text`는 최대 400자, `history`는 최대 6개(각 500자).
+- 버튼 값: `brighter`, `darker`, `warmer`, `cooler`, `formal`, `casual`, `looser`, `fitted`, `colorful`, `simpler`, `different`.
+- `locked_ids`는 사용자가 UI에서 직접 잠근 옷이며 현재 코디에 포함된 옷만 허용한다. 모델이 해석한 `keep_slots`는 해당 요청에만 적용하고 `locked_ids`에 추가하지 않는다. 앱도 서버 응답으로 잠금을 새로 만들지 않는다. 잠금은 서버의 후보·코디 구성 제약이며 점수에 따른 변경을 허용하지 않는다.
+- 버튼만 사용하면 모델 호출이 없다. 자유 입력은 서버의 `CHAT_PROVIDER=auto|gemini|openrouter`로 해석한다. `auto`는 `OPENROUTER_API_KEY`가 있으면 OpenRouter, 그 외 Gemini를 사용한다. OpenRouter 모델은 `OPENROUTER_CHAT_MODEL`, Gemini 모델은 `GEMINI_TEXT_MODEL`로 지정한다. 키는 서버 `.env`에만 둔다.
+- 모델은 변경/유지 슬롯·방향·색 제외·특정 옷·아우터 제거·확인 질문을 구조화한다. 잠금과 충돌하면 변경 전에 확인한다. 모델 실패 시 대체 해석 없이 503 `CHAT_MODEL_UNAVAILABLE`로 응답한다.
+
+응답 공통 필드: `{status, message, outfit, changed_ids, locked_ids, unlock_ids, notes, parsed_by}`.
+
+| status | 동작 |
+| --- | --- |
+| `updated` | `outfit`에 기존 코디 응답 형식의 수정안. 새 점수는 표시하지 않는다 (`score: null`). 다음 수정 기준으로 사용 |
+| `unchanged` | 조건을 만족하는 다른 코디 없음. 기존 코디 유지 |
+| `clarify` | `message`의 확인 질문 표시. 기존 코디 유지 |
+| `unlock` | `unlock_ids`의 잠금 해제 동의를 먼저 받는다. 동의 시 동일 요청에서 해당 잠금만 빼고 재요청 |
+| `undo` | 앱이 보관한 이전 코디로 복원 |
+
+400 `INVALID_CHAT_REQUEST`, 422 `CURRENT_GARMENT_MISSING`, 429 `CHAT_BUSY`, 503 `CHAT_MODEL_UNAVAILABLE`은 메시지와 함께 같은 요청의 재시도를 제공한다.
+
+저장은 기존 `POST /api/outfits/`에 `{garment_ids, source: "chat", name?, context: {chat_save_id: "클라이언트 UUID"}}`로 요청한다. 같은 `chat_save_id`의 재요청은 기존 코디를 반환하여 응답 유실 후 재시도로 인한 중복 저장을 방지한다. `chat_save_id`는 최대 64자다.
+
+앱 대화는 홈 코디별로 메모리에 유지되며 뒤로 가기·재진입·화면 회전에 보존된다. 앱 프로세스 종료 후 대화 복원은 지원하지 않는다.

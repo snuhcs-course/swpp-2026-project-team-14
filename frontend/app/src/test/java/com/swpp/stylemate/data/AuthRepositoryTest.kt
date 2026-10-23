@@ -49,6 +49,21 @@ class AuthRepositoryTest {
         assertNull(local.garment("partial"))
     }
 
+    @Test fun editorOptionsUseAuthenticationAndNeverHideExpiryBehindCachedOptions() = runBlocking {
+        signIn()
+        server.takeRequest()
+        val account = checkNotNull(repository.account())
+        val local = LocalUserStore.inDirectory(temporary.root, firstId)
+        server.enqueue(response(JSONObject().put("options", "current")))
+        assertEquals("current", WardrobeRepository.json("/api/wardrobe/options/", store = local, account = account).getString("options"))
+        assertEquals("Bearer ${"a".repeat(43)}", server.takeRequest().getHeader("Authorization"))
+        server.enqueue(MockResponse().setResponseCode(401).setBody("{}"))
+        try { WardrobeRepository.json("/api/wardrobe/options/", store = local, account = account); fail("Cached options must not bypass expiry") }
+        catch (error: AuthException) { assertEquals("AUTHENTICATION_REQUIRED", error.code) }
+        assertNull(repository.status.value.session)
+        assertEquals("current", local.get("catalog")!!.getString("options"))
+    }
+
     @Test fun accountListsRejectRepeatedOrUnsafeCursorsAndKeepResponseLimit() = runBlocking {
         signIn()
         val account = repository.account()!!
@@ -73,14 +88,14 @@ class AuthRepositoryTest {
         fun outfit(id: String) = JSONObject().put("id", id).put("items", JSONArray()).put("saved", true)
         server.enqueue(response(JSONObject().put("outfits", JSONArray().put(outfit(cursor))).put("next", cursor)))
         server.enqueue(response(JSONObject().put("outfits", JSONArray().put(outfit("second"))).put("next", JSONObject.NULL)))
-        val outfits = OutfitRepository(server.url("/").toString(), account = repository.account()).saved()
+        val outfits = OutfitRepository(checkNotNull(repository.account())).saved()
         assertEquals(listOf(cursor, "second"), outfits.map { it.id })
     }
 
     @Test fun savedAccountOutfitPageFailuresUseTheExceptionHandledByTheScreen() = runBlocking {
         for ((status, expected) in listOf(503 to "HTTP_503", 401 to "AUTHENTICATION_REQUIRED")) {
             signIn()
-            val repo = OutfitRepository(server.url("/").toString(), account = repository.account())
+            val repo = OutfitRepository(checkNotNull(repository.account()))
             val cursor = UUID.randomUUID().toString()
             server.enqueue(response(JSONObject().put("outfits", JSONArray()).put("next", cursor)))
             server.enqueue(MockResponse().setResponseCode(status).setBody("{}"))

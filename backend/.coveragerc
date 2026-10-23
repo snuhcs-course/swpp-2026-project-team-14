@@ -1,0 +1,29 @@
+# Line and branch coverage for the backend (pytest and the Django test runner share one data file).
+# Commands: see backend/README.md, "Coverage".
+[run]
+branch = True
+source =
+    body_analysis
+    recommendation
+    apps
+omit =
+    */migrations/*
+    */tests.py
+    */test_*.py
+    tests/*
+    recommendation/demo/*
+    recommendation/decision.py
+    recommendation/intent.py
+    recommendation/tryon.py
+    recommendation/gemini.py
+    body_analysis/cli.py
+
+[report]
+precision = 1
+skip_empty = True
+exclude_also =
+    if __name__ == .__main__.:
+    raise NotImplementedError
+
+[html]
+directory = htmlcov

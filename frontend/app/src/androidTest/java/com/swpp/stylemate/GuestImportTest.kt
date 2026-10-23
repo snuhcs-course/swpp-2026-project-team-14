@@ -54,7 +54,7 @@ class GuestImportTest {
             val password = UUID.randomUUID().toString()
             auth.authenticate(username, password, password)
             val access = auth.account()!!
-            val guest = LocalUserStore.inDirectory(root)
+            val guest = LocalUserStore.legacyGuestInDirectory(root)
             guest.put("body", JSONObject("""{"height_cm":175,"weight_kg":68,"gender":"male","measurements":[],"clothing":{"top_loose":false,"bottom_loose":false}}"""))
             guest.saveStyle(StyleProfile(listOf("wide"), listOf("minimal")))
             val bitmap = Bitmap.createBitmap(24, 24, Bitmap.Config.ARGB_8888).apply { eraseColor(android.graphics.Color.WHITE) }
@@ -99,7 +99,7 @@ class GuestImportTest {
             val plan = importer.preview(initial)
             assertTrue(plan.conflicts.isEmpty())
             importer.importRecord(initial.records.first(), plan, false)
-            val resumed = GuestImportRepository(LocalUserStore.inDirectory(root), access)
+            val resumed = GuestImportRepository(LocalUserStore.legacyGuestInDirectory(root), access)
             val pending = resumed.snapshot()
             assertEquals(4, pending.records.size)
             compose.runOnIdle { failCache = true; importModel.open() }
@@ -163,7 +163,7 @@ class GuestImportTest {
             auth.restore()
             lateinit var model: GuestImportViewModel
             compose.runOnIdle {
-                model = GuestImportViewModel(GuestImportRepository(LocalUserStore.inDirectory(root), auth.account()!!))
+                model = GuestImportViewModel(GuestImportRepository(LocalUserStore.legacyGuestInDirectory(root), auth.account()!!))
                 model.open()
                 model.open()
             }

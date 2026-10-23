@@ -6,6 +6,7 @@ on:
     branches: [main]
     paths:
       - 'backend/**'
+      - '.github/workflows/backend-release.yaml'
   workflow_dispatch:
 
 permissions:
@@ -14,10 +15,11 @@ permissions:
 
 concurrency:
   group: backend-deploy-main
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   deploy:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
 
     env:
@@ -26,6 +28,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
       - name: Build image
         run: |
@@ -53,5 +57,10 @@ jobs:
             infra/apps/backend.yaml
 
           git add infra/apps/backend.yaml
+          if git diff --cached --quiet; then
+            echo "Deployment already uses this image."
+            exit 0
+          fi
           git commit -m "deploy: backend sha-$GITHUB_SHA"
-          git push
+          git pull --rebase origin main
+          git push origin HEAD:main

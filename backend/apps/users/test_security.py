@@ -147,3 +147,49 @@ class ProfileValidationTests(TestCase):
                 response = self.client.patch('/api/users/me/', body, content_type='application/json')
                 self.assertEqual(response.status_code, 400)
         self.assertEqual(self.client.patch('/api/users/me/', b' ' * 8193, content_type='application/json').status_code, 413)
+
+
+class ServiceAuthenticationTests(TestCase):
+    """Public authentication/health only; shared features remain available to account owners."""
+    endpoints = [
+        ('get', '/api/users/me/'), ('post', '/api/auth/logout/'),
+        ('post', '/api/body-profile/analyze/'), ('post', '/api/wardrobe/analyze/'),
+        ('post', '/api/wardrobe/landmarks/'), ('get', '/api/wardrobe/options/'),
+        ('post', '/api/wardrobe/labels/'), ('get', '/api/wardrobe/items/'),
+        ('post', '/api/outfits/recommend/'), ('get', '/api/outfits/'),
+        ('get', '/api/weather/'),
+        ('post', '/api/users/me/import/preview/'),
+        ('put', '/api/users/me/import/profile/style/'),
+        ('post', '/api/users/me/import/garments/00000000-0000-0000-0000-000000000001/'),
+        ('put', '/api/users/me/import/outfits/00000000-0000-0000-0000-000000000001/'),
+    ]
+
+    def test_missing_and_invalid_tokens_reject_before_body_parsing_or_inference(self):
+        from unittest.mock import patch
+        with patch('apps.wardrobe.views.analyze_image') as analysis, patch('apps.wardrobe.views.detect') as landmarks, patch('apps.body_profiles.views.services.analyze') as body, patch('apps.outfits.views.weather.current') as weather:
+            for authorization in ('', 'Bearer invalid', 'Bearer ' + 'x' * 43):
+                for method, url in self.endpoints:
+                    with self.subTest(url=url, authorization=authorization):
+                        response = getattr(self.client, method)(url, HTTP_AUTHORIZATION=authorization)
+                        self.assertEqual(response.status_code, 401)
+                        self.assertEqual(response.json()['error'], 'AUTHENTICATION_REQUIRED')
+            for provider in (analysis, landmarks, body, weather):
+                provider.assert_not_called()
+
+    def test_valid_token_can_access_shared_options_and_logout_revokes_access(self):
+        from apps.users.auth import issue_token
+        from apps.users.models import User
+        user = User.objects.create(username='service_owner')
+        _, token = issue_token(user)
+        headers = {'HTTP_AUTHORIZATION': f'Bearer {token}'}
+        self.assertEqual(self.client.get('/api/wardrobe/options/', **headers).status_code, 200)
+        self.assertEqual(self.client.post('/api/auth/logout/', **headers).status_code, 204)
+        self.assertEqual(self.client.get('/api/wardrobe/options/', **headers).status_code, 401)
+
+    def test_guest_only_routes_and_unused_smoke_endpoint_are_removed(self):
+        from django.urls import resolve, Resolver404
+        for url in ('/api/outfits/preview/', '/api/outfits/preview/feedback/',
+                    '/api/wardrobe/analyze-preview/', '/api/hello/'):
+            with self.subTest(url=url), self.assertRaises(Resolver404):
+                resolve(url)
+        self.assertEqual(self.client.get('/healthz/').status_code, 200)

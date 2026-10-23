@@ -22,32 +22,6 @@ import org.junit.Before
 import org.junit.Test
 
 class OutfitRepositoryTest {
-    @get:Rule val temporary = TemporaryFolder(File("build/preview-request-tests").apply { mkdirs() })
-
-    @Test fun localPreviewSendsOver100GarmentsWithoutNotesOrCachedAnalysisAndChecksByteLimit() = runBlocking {
-        val local = LocalUserStore.inDirectory(temporary.root)
-        fun row() = JSONObject().put("id", UUID.randomUUID().toString()).put("saved", true)
-            .put("attributes", JSONObject().put("name", "티셔츠").put("category", "top").put("subcategory", "tshirt")
-                .put("colors", JSONArray(listOf("#FFFFFF"))).put("styles", JSONArray()).put("fit_type", JSONObject.NULL)
-                .put("leg_shape", JSONObject.NULL).put("rise_type", JSONObject.NULL).put("skirt_shape", JSONObject.NULL))
-            .put("notes", "메모".repeat(1000)).put("model", "cached-model").put("details", JSONObject().put("print", "무지"))
-        local.cacheGarments(JSONArray((0 until 101).map { row() }))
-        server.enqueue(MockResponse().setBody("""{"outfits": [], "notes": [], "band": {"label": "x"}}"""))
-        val repo = OutfitRepository(server.url("/").toString(), local = local)
-        repo.recommend(body, null, null, emptyList())
-        val request = server.takeRequest()
-        assertEquals("/api/outfits/preview/", request.path)
-        val rows = JSONObject(request.body.readUtf8()).getJSONArray("wardrobe")
-        assertEquals(101, rows.length())
-        assertEquals(setOf("id", "attributes", "dimensions", "labels", "notes"), rows.getJSONObject(0).keys().asSequence().toSet())
-        assertEquals("", rows.getJSONObject(0).getString("notes"))
-        assertEquals(2000, local.garments().first().getString("notes").length)
-        local.cacheGarments(JSONArray((0 until 4000).map { row().put("notes", "") }))
-        try { repo.recommend(body, null, null, emptyList()); fail() }
-        catch (error: OutfitApiException) { assertEquals("BODY_TOO_LARGE", error.code) }
-        assertEquals(1, server.requestCount)
-    }
-
     private lateinit var server: MockWebServer
     private val body = JSONObject().put("height_cm", 162).put("gender", "female")
 
@@ -59,7 +33,7 @@ class OutfitRepositoryTest {
     @After
     fun tearDown() = server.shutdown()
 
-    private fun repository() = OutfitRepository(server.url("/").toString())
+    private fun repository() = OutfitRepository(testAccount(server.url("/").toString()))
 
     private val outfitJson = """{"id": "o1", "source": "recommended", "saved": false, "name": "", "key": "w:a+w:b",
         "score": 74, "components": {"compat": 60}, "context": {}, "feedback": null, "created_at": "2026-10-12T09:00:00",
@@ -81,10 +55,14 @@ class OutfitRepositoryTest {
         assertEquals("가을 간절기", weather.band)
         val result = repo.recommend(body, weather, null, listOf("w:x+w:y"))
 
-        assertEquals("/api/weather/", server.takeRequest().path)
+        val weatherRequest = server.takeRequest()
+        assertEquals("/api/weather/", weatherRequest.path)
+        assertEquals("Bearer $TEST_TOKEN", weatherRequest.getHeader("Authorization"))
         val request = server.takeRequest()
         assertEquals("POST", request.method)
         assertEquals("/api/outfits/recommend/", request.path)
+        assertEquals("Bearer $TEST_TOKEN", request.getHeader("Authorization"))
+        assertFalse(JSONObject(request.body.clone().readUtf8()).has("wardrobe"))
         val sent = JSONObject(request.body.readUtf8())
         assertEquals(162, sent.getJSONObject("body").getInt("height_cm"))
         assertEquals(17.4, sent.getJSONObject("weather").getDouble("apparent"), 1e-9)
@@ -145,6 +123,18 @@ class OutfitRepositoryTest {
                 assertEquals(message, e.message)
             }
         }
+    }
+
+    @Test fun unauthorizedRecommendationExpiresTheAccountWithoutGuestFallback() = runBlocking {
+        val account = testAccount(server.url("/").toString())
+        val repo = OutfitRepository(account)
+        server.enqueue(MockResponse().setResponseCode(401).setBody("{}"))
+        try { repo.recommend(body, null, null, emptyList()); fail("Expected login requirement") }
+        catch (error: OutfitApiException) { assertEquals("AUTHENTICATION_REQUIRED", error.code) }
+        assertEquals("/api/outfits/recommend/", server.takeRequest().path)
+        try { repo.recommend(body, null, null, emptyList()); fail("Expired session must not make another request") }
+        catch (error: OutfitApiException) { assertEquals("SESSION_CHANGED", error.code) }
+        assertEquals(1, server.requestCount)
     }
 
     @Test

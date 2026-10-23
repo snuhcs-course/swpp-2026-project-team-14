@@ -2,6 +2,11 @@
 package com.swpp.stylemate.ui.wardrobe.capture
 
 import com.swpp.stylemate.data.wardrobe.*
+import com.swpp.stylemate.data.AuthRepository
+import com.swpp.stylemate.data.AccountAccess
+import com.swpp.stylemate.data.KeystoreSessionStore
+import com.swpp.stylemate.data.AuthException
+import com.swpp.stylemate.BuildConfig
 import com.swpp.stylemate.ui.theme.StyleMateTheme
 import com.swpp.stylemate.ui.components.ScreenScaffold
 import com.swpp.stylemate.ui.wardrobe.MeasurementSummary
@@ -53,6 +58,9 @@ import kotlin.math.round
 data class SelectedMeasurement(val field: MeasurementField, val points: List<Offset>, val cm: Float, val assisted: Boolean = false)
 
 class MeasurementActivity : ComponentActivity() {
+    private val authRepository by lazy { AuthRepository(BuildConfig.API_BASE_URL, KeystoreSessionStore(applicationContext)) }
+    private var account: AccountAccess? = null
+    private var authRestored = false
     private lateinit var surface: GLSurfaceView
     private lateinit var renderer: MeasurementCamera
     private var session: Session? = null
@@ -109,6 +117,13 @@ class MeasurementActivity : ComponentActivity() {
             preserveEGLContextOnPause = true
             setRenderer(renderer)
         }
+        lifecycleScope.launch {
+            authRepository.restore()
+            account = authRepository.account()
+            authRestored = true
+            if (account == null) finish()
+            else if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED) && snapshot == null) startAr()
+        }
         setContent {
             StyleMateTheme {
                 val captured = snapshot
@@ -136,7 +151,9 @@ class MeasurementActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         cameraResumed = true
-        if (snapshot == null) startAr()
+        authRepository.expireIfNeeded()
+        if (authRestored && authRepository.account() == null) { finish(); return }
+        if (snapshot == null && account != null) startAr()
     }
 
     private fun startAr() {
@@ -314,7 +331,7 @@ class MeasurementActivity : ComponentActivity() {
         val requested = SystemClock.uptimeMillis()
         liveJob = lifecycleScope.launch {
             try {
-                val result = GarmentLandmarks.detect(bitmap, type)
+                val result = GarmentLandmarks.detect(bitmap, type, checkNotNull(account))
                 if (epoch == landmarkEpoch && snapshot == null && cameraResumed && SystemClock.uptimeMillis() - requested <= 1200 && renderer.matchesPreview(preview.pose)) {
                     livePairs = result.suggestions
                     lastPreviewTime = requested
@@ -322,6 +339,7 @@ class MeasurementActivity : ComponentActivity() {
                     landmarkStatus = if (livePairs.isEmpty()) "옷 전체를 화면에 맞춰 주세요." else "점 위치를 확인하세요."
                 }
             } catch (error: CancellationException) { throw error }
+            catch (error: AuthException) { finish() }
             catch (error: Exception) {
                 if (epoch == landmarkEpoch && snapshot == null) {
                     livePairs = emptyMap()
@@ -340,7 +358,7 @@ class MeasurementActivity : ComponentActivity() {
         measurements.keys.filter { measurements[it]?.assisted == true }.toList().forEach { measurements.remove(it) }
         try {
             liveJob?.join()
-            val result = GarmentLandmarks.detect(captured.bitmap, type)
+            val result = GarmentLandmarks.detect(captured.bitmap, type, checkNotNull(account))
             if (epoch != landmarkEpoch || snapshot !== captured) return
             result.suggestions.forEach { (key, path) ->
                 if (measurements[key]?.assisted == false) return@forEach
@@ -352,6 +370,7 @@ class MeasurementActivity : ComponentActivity() {
             }
             landmarkStatus = if (measurements.isEmpty()) "점을 직접 지정해 주세요." else "점 위치를 확인하세요."
         } catch (error: CancellationException) { throw error }
+            catch (error: AuthException) { finish() }
         catch (error: Exception) { if (epoch == landmarkEpoch) landmarkStatus = error.message ?: "점을 직접 지정해 주세요." }
         finally { if (epoch == landmarkEpoch) landmarkBusy = false }
     }
