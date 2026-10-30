@@ -98,7 +98,11 @@ class FakeIntent:
     def parse(self, text, ctx):
         self.calls += 1
         if self.failures:
-            self.errors.last = self.failures.pop(0)
+            name = self.failures.pop(0)
+            if name.startswith("AI_"):  # GeminiError(code)
+                self.errors.last, self.errors.gemini_code = "GeminiError", name
+            else:
+                self.errors.last = name
             raise self.ChatModelError()
         return output(), "gemini", None
 
@@ -123,8 +127,19 @@ def test_infra_error_is_retried_then_succeeds():
 
 
 def test_infra_error_after_all_retries_is_reported():
-    (out, error), calls = run(["GeminiError"] * 3)
-    assert out is None and error == "infra:GeminiError" and calls == 3
+    (out, error), calls = run(["AI_RATE_LIMITED"] * 3)
+    assert out is None and error == "infra:AI_RATE_LIMITED" and calls == 3
+
+
+def test_empty_or_unreadable_model_response_is_a_format_error():
+    (out, error), calls = run(["AI_INVALID_RESPONSE"])
+    assert out is None and error == "format:AI_INVALID_RESPONSE" and calls == 1
+
+
+@pytest.mark.parametrize("code", ["AI_TIMEOUT", "AI_UNAVAILABLE", "AI_AUTH_FAILED", "AI_PROVIDER_ERROR"])
+def test_provider_side_gemini_errors_are_infra(code):
+    (out, error), _ = run([code], retries=0)
+    assert error == f"infra:{code}"
 
 
 def test_shipped_cases_are_well_formed():

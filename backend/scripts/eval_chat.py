@@ -22,6 +22,8 @@ EVAL_DIR = ROOT / "eval" / "chat"
 
 PASS_RATE = 0.8  # RUBRIC.md: 케이스 통과율 80% 이상
 FORMAT_ERRORS = {"ValueError", "TypeError", "KeyError", "IndexError", "AttributeError"}  # 응답 형식·스키마 위반
+# GeminiError 중 모델 응답 자체가 비었거나 읽을 수 없는 경우는 형식 오류, 나머지(한도·인증·시간 초과·연결)는 인프라 오류
+FORMAT_GEMINI_CODES = {"AI_INVALID_RESPONSE"}
 
 
 def _has_want(wants: list[dict], want: str, slot: str | None) -> bool:
@@ -80,6 +82,7 @@ class _ErrorType(logging.Handler):
     def __init__(self) -> None:
         super().__init__(logging.WARNING)
         self.last: str | None = None
+        self.gemini_code: str | None = None  # 마지막 GeminiError의 code (로그에는 타입 이름만 남으므로 따로 기록)
 
     def emit(self, record: logging.LogRecord) -> None:
         if record.args:
@@ -89,14 +92,15 @@ class _ErrorType(logging.Handler):
 def run_case(chat_intent, case: dict, wardrobe: list[dict], errors: _ErrorType, retries: int, delay: float):
     """(output | None, 오류 종류 | None). 인프라 오류는 retries번까지 다시 시도한다."""
     for attempt in range(retries + 1):
-        errors.last = None
+        errors.last = errors.gemini_code = None
         try:
             output, _, _ = chat_intent.parse(case["request"], context(case, wardrobe))
             return output, None
         except chat_intent.ChatModelError:
-            kind = "format" if errors.last in FORMAT_ERRORS else "infra"
+            name = errors.gemini_code if errors.last == "GeminiError" and errors.gemini_code else errors.last
+            kind = "format" if name in FORMAT_ERRORS or name in FORMAT_GEMINI_CODES else "infra"
             if kind == "format" or attempt == retries:
-                return None, f"{kind}:{errors.last}"
+                return None, f"{kind}:{name}"
             time.sleep(delay * 4)
     return None, "infra:unknown"
 
@@ -121,6 +125,16 @@ def main() -> int:
     cases = [c for c in data["cases"] if not args.case or c["id"] in args.case]
     errors = _ErrorType()
     logging.getLogger("recommendation.chat_intent").addHandler(errors)
+    original_generate = gemini.generate
+
+    def recording_generate(*args, **kwargs):
+        try:
+            return original_generate(*args, **kwargs)
+        except gemini.GeminiError as error:
+            errors.gemini_code = error.code
+            raise
+
+    gemini.generate = recording_generate  # chat_intent는 gemini.generate를 모듈 속성으로 호출함
 
     rows = []
     for index, case in enumerate(cases):
