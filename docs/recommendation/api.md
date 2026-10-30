@@ -140,3 +140,16 @@ Open-Meteo 현재 날씨(기본 서울): `{temp, apparent, precipitation, rain, 
 저장은 기존 `POST /api/outfits/`에 `{garment_ids, source: "chat", name?, context: {chat_save_id: "클라이언트 UUID"}}`로 요청한다. 같은 `chat_save_id`의 재요청은 기존 코디를 반환하여 응답 유실 후 재시도로 인한 중복 저장을 방지한다. `chat_save_id`는 최대 64자다.
 
 앱 대화는 홈 코디별로 메모리에 유지되며 뒤로 가기·재진입·화면 회전에 보존된다. 앱 프로세스 종료 후 대화 복원은 지원하지 않는다.
+
+### POST /api/outfits/chat/feedback/
+
+채팅 추천 결과의 만족도(좋아요/별로예요)를 저장한다. 요청: {"garment_ids": [...], "feedback": "liked" | "disliked" | null, "preference": 기기에 저장된 취향 프로필 | null}. Bearer 인증이 필요하고 garment_ids는 본인의 저장된 옷으로 상의 1·하의 1(+아우터 1)이어야 한다.
+
+채팅 코디는 DB 행이 없는 미리보기라서, 같은 옷 조합(key)의 source=chat 코디가 있으면 그 행을 재사용하고(코디북에 저장된 행 우선) 없으면 saved=False로 새로 만든다. 좋아요 반영 규칙은 POST /api/outfits/{id}/feedback/과 같다: 값이 바뀌면 코디의 모든 옷 속성으로 취향 가중치를 올리거나 내리고, 같은 값을 다시 보내거나 null(취소)이면 가중치는 그대로다. 응답: {"outfit": 코디, "preference": 갱신된 취향 프로필}.
+
+오류: 400 INVALID_FEEDBACK(잘못된 값·옷 구성), 401, 404 CHAT_FEEDBACK_NOT_FOUND(남긴 적 없는 만족도 취소), 413, 415.
+
+### 채팅 만족도 평가
+
+`python manage.py chat_satisfaction`이 만족도 = 좋아요 / (좋아요 + 별로예요)를 source=chat이고 만족도를 남긴 코디로 집계한다. 홈 추천의 좋아요와 만족도를 남기지 않은 채팅 코디는 제외한다. 통과 기준은 데이터를 모으기 전에 정한 **50% 이상**이며(`apps/outfits/management/commands/chat_satisfaction.py`의 PASS_THRESHOLD), 결과를 보고 바꾸지 않는다.
+
