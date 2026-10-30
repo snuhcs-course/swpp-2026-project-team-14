@@ -77,5 +77,6 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
     testImplementation(libs.junit)
     testImplementation(libs.okhttp.mockwebserver)
+    testImplementation(libs.kotlinx.coroutines.test) // viewModelScope(Main) 대체용
     testImplementation(libs.org.json) // real org.json for JVM tests (Android's copy is a stub there)
 }

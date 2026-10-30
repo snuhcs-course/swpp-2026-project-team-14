@@ -79,4 +79,49 @@ class ChatRepositoryTest {
         assertTrue(com.swpp.stylemate.ui.chat.ChatViewModel.summary(request).contains("유지: 바지"))
     }
 
+
+    @Test fun feedbackSendsGarmentsValueAndTasteAndReadsTheUpdatedTaste() = runBlocking {
+        server.enqueue(MockResponse().setBody("""{"outfit":{"id":"chat-1","key":"w:a+w:b","score":null,"saved":false,
+            "feedback":"liked","items":[],"reasons":[]},"preference":{"weights":{"색상:블랙":0.3}}}"""))
+        val (updated, preference) = repository.feedback(outfit, "liked", JSONObject().put("weights", JSONObject()))
+        val request = server.takeRequest()
+        val json = JSONObject(request.body.readUtf8())
+        assertEquals("/api/outfits/chat/feedback/", request.path)
+        assertEquals("Bearer $TEST_TOKEN", request.getHeader("Authorization"))
+        assertEquals(listOf("a", "b"), (0 until json.getJSONArray("garment_ids").length()).map { json.getJSONArray("garment_ids").getString(it) })
+        assertEquals("liked", json.getString("feedback"))
+        assertTrue(json.getJSONObject("preference").has("weights"))
+        assertEquals("liked", updated.feedback)
+        assertEquals(0.3, preference.getJSONObject("weights").getDouble("색상:블랙"), 0.0)
+    }
+
+    @Test fun cancellingFeedbackSendsJsonNull() = runBlocking {
+        server.enqueue(MockResponse().setBody("""{"outfit":{"id":"chat-1","key":"w:a+w:b","score":null,"saved":false,
+            "feedback":null,"items":[],"reasons":[]},"preference":{"weights":{}}}"""))
+        val (updated, _) = repository.feedback(outfit, null, null)
+        val json = JSONObject(server.takeRequest().body.readUtf8())
+        assertTrue(json.isNull("feedback"))
+        assertTrue(json.isNull("preference"))
+        assertNull(updated.feedback)
+    }
+
+    @Test fun feedbackResponseWithoutPreferenceIsRejected() = runBlocking {
+        server.enqueue(MockResponse().setBody("""{"outfit":{"id":"chat-1","key":"w:a+w:b","score":null,"saved":false,"items":[],"reasons":[]}}"""))
+        try {
+            repository.feedback(outfit, "liked", null)
+            fail("expected failure")
+        } catch (e: OutfitApiException) {
+            assertEquals("INVALID_RESPONSE", e.code)
+        }
+    }
+
+    @Test fun feedbackServerErrorKeepsItsHint() = runBlocking {
+        server.enqueue(MockResponse().setResponseCode(400).setBody("""{"error":"INVALID_FEEDBACK","hint":"Invalid feedback"}"""))
+        try {
+            repository.feedback(outfit, "liked", null)
+            fail("expected failure")
+        } catch (e: OutfitApiException) {
+            assertEquals("INVALID_FEEDBACK", e.code)
+        }
+    }
 }
