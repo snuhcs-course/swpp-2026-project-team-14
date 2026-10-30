@@ -7,6 +7,7 @@ from .chat import chat_view
 urlpatterns = [
     path("", views.outfits_view),
     path("recommend/", views.recommend_view),
+    path("match-external/", views.match_external_view),
     path("chat/", chat_view),
     path("<uuid:outfit_id>/", views.outfit_view),
     path("<uuid:outfit_id>/feedback/", views.feedback_view),
