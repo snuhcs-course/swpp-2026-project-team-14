@@ -81,6 +81,19 @@ class ChatRepository(
         throw OutfitApiException("INVALID_RESPONSE", "저장 결과를 확인하지 못했어요. 다시 시도해 주세요.")
     }
 
+    /** 채팅 추천 코디의 만족도(liked / disliked / null=취소)를 저장하고, 갱신된 코디와 취향 프로필을 돌려준다. */
+    suspend fun feedback(outfit: Outfit, value: String?, preference: JSONObject?): Pair<Outfit, JSONObject> {
+        val json = post("/api/outfits/chat/feedback/", JSONObject()
+            .put("garment_ids", JSONArray(outfit.items.map { it.garmentId }))
+            .put("feedback", value ?: JSONObject.NULL)
+            .put("preference", preference ?: JSONObject.NULL))
+        return try {
+            OutfitRepository.parseOutfit(json.getJSONObject("outfit")) to json.getJSONObject("preference")
+        } catch (e: JSONException) {
+            throw OutfitApiException("INVALID_RESPONSE", "만족도를 저장하지 못했어요. 다시 시도해 주세요.")
+        }
+    }
+
     private suspend fun post(path: String, body: JSONObject): JSONObject = withContext(Dispatchers.IO) {
         val authorization = try { account.authorization() }
             catch (e: AuthException) { throw OutfitApiException(e.code, e.message.orEmpty()) }

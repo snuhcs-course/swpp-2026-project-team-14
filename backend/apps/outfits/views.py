@@ -6,6 +6,7 @@ GET  /api/outfits/                    saved outfits (코디북)
 POST /api/outfits/                    save an outfit made from garment ids (user or chat)
 GET|PUT /api/outfits/<id>/            one outfit; PUT {saved, name}
 POST /api/outfits/<id>/feedback/      like / dislike; returns the updated taste profile
+POST /api/outfits/chat/feedback/      like / dislike on a chat recommendation (by garment ids)
 GET  /api/weather/?lat=&lon=          current weather (Open-Meteo)
 """
 
@@ -149,6 +150,17 @@ def serialize(outfit: Outfit) -> dict:
     }
 
 
+def _members(user, ids: list[str]) -> list[tuple[str, Garment, str]]:
+    """본인의 저장된 옷으로 상의 1·하의 1(+아우터 1) 코디를 구성한다. 조건이 안 맞으면 ValueError."""
+    found = {str(g.id): g for g in Garment.objects.filter(user=user, saved=True, pk__in=ids)} if ids else {}
+    members = [(g.attributes.get("category"), g, "") for g in (found.get(i) for i in ids) if g]
+    slots = [slot for slot, _, _ in members]
+    if len(members) != len(ids) or len(set(slots)) != len(slots) or not {"top", "bottom"} <= set(slots) \
+            or not set(slots) <= set(SLOT_ORDER):
+        raise ValueError("An outfit needs one saved top and one saved bottom (and optionally one outerwear)")
+    return members
+
+
 def _create(source: str, garments: list[tuple[str, Garment, str]], **fields) -> Outfit:
     """garments: (slot code, garment, note)."""
     outfit = Outfit.objects.create(source=source, key="+".join(sorted(f"w:{g.id}" for _, g, _ in garments)), **fields)
@@ -241,12 +253,7 @@ def outfits_view(request):
                     if existing.key != '+'.join(sorted(f'w:{gid}' for gid in ids)):
                         return _error('INVALID_OUTFIT', 409)
                     return _json(serialize(existing))
-            found = {str(g.id): g for g in Garment.objects.filter(user=request.user, saved=True, pk__in=ids)} if ids else {}
-            members = [(g.attributes.get("category"), g, "") for g in (found.get(i) for i in ids) if g]
-            slots = [slot for slot, _, _ in members]
-            if len(members) != len(ids) or len(set(slots)) != len(slots) or not {"top", "bottom"} <= set(slots) \
-                    or not set(slots) <= set(SLOT_ORDER):
-                raise ValueError("An outfit needs one saved top and one saved bottom (and optionally one outerwear)")
+            members = _members(request.user, ids)
             outfit = _create(source, members, user=request.user, saved=True, name=name.strip(), context=context)
     except TooLarge:
         return _error("BODY_TOO_LARGE", 413)
@@ -297,6 +304,12 @@ def feedback_view(request, outfit_id):
         return _error("JSON_REQUIRED", 415)
     except (ValueError, TypeError, UnicodeDecodeError, OverflowError) as error:
         return _error("INVALID_FEEDBACK", 400, str(error))
+    taste = _apply_feedback(outfit, value, taste)
+    return _json({"outfit": serialize(outfit), "preference": taste})
+
+
+def _apply_feedback(outfit: Outfit, value: str | None, taste: dict) -> dict:
+    """코디의 좋아요/별로예요를 저장하고, 값이 바뀌었으면 취향 가중치에 반영한 새 taste를 돌려준다."""
     changed = value != outfit.feedback
     outfit.feedback = value
     outfit.save(update_fields=["feedback", "updated_at"])
@@ -307,6 +320,41 @@ def feedback_view(request, outfit_id):
         garments = {i.id: {"slot": i.slot, "attrs": i.attrs, "style": i.style} for i in items if i}
         sign = 1 if value == Outfit.Feedback.LIKED else -1
         taste = preference.apply_feedback(taste, [{"item_id": gid, "polarity": sign} for gid in garments], garments)
+    return taste
+
+
+@require_POST
+@require_auth
+def chat_feedback_view(request):
+    """채팅 추천 코디의 만족도(좋아요/별로예요)를 저장한다.
+
+    채팅 코디는 DB 행이 없는 미리보기라서, 같은 옷 조합의 채팅 코디 행이 있으면 재사용하고
+    없으면 코디북 밖(saved=False)에 새로 만든다. 만족도 평가는 source=chat 행의 feedback으로 집계한다.
+    """
+    try:
+        data = _read(request)
+        ids = list(dict.fromkeys(str(uuid.UUID(value)) for value in _strings(data.get("garment_ids"), 3, 40)))
+        value = data.get("feedback")
+        if value not in (Outfit.Feedback.LIKED, Outfit.Feedback.DISLIKED, None):
+            raise ValueError("Invalid feedback")
+        taste = _preference(data.get("preference"))
+        key = "+".join(sorted(f"w:{gid}" for gid in ids))
+        with transaction.atomic():
+            User.objects.select_for_update().get(pk=request.user.pk)
+            # 코디북에 저장된 같은 조합이 있으면 그 행에 남긴다
+            outfit = Outfit.objects.filter(user=request.user, source=Outfit.Source.CHAT, key=key) \
+                .order_by("-saved", "created_at").first()
+            if outfit is None:
+                if value is None:
+                    return _error("CHAT_FEEDBACK_NOT_FOUND", 404, "취소할 만족도가 없어요.")
+                outfit = _create(Outfit.Source.CHAT, _members(request.user, ids), user=request.user, saved=False)
+            taste = _apply_feedback(outfit, value, taste)
+    except TooLarge:
+        return _error("BODY_TOO_LARGE", 413)
+    except NotJson:
+        return _error("JSON_REQUIRED", 415)
+    except (ValueError, TypeError, UnicodeDecodeError, OverflowError) as error:
+        return _error("INVALID_FEEDBACK", 400, str(error))
     return _json({"outfit": serialize(outfit), "preference": taste})
 
 
