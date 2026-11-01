@@ -57,5 +57,7 @@
 
 ## 실행 조건
 
-- 모델: 서비스와 같은 `gemini-3.1-flash-lite`, temperature 0
-- 케이스당 1회 호출, 결과(케이스별 출력·통과 여부·사유, 집계, 실행 일시, 모델명)는 파일로 저장해 커밋한다.
+- 제공자·모델: 서비스와 평가가 공유하는 `chat_intent.model_config()`로 선택한다. `CHAT_PROVIDER` 기본값은 `auto`이며 OpenRouter 키가 있으면 OpenRouter, 없으면 Gemini를 사용한다. temperature는 0이다.
+- 서버에서 선택된 제공자·모델을 확인한 뒤 같은 환경으로 평가한다. `--expected-provider`와 `--expected-model`에 확인한 값을 지정하면 불일치 시 모델 호출 전에 중단한다. 실행 절차는 [README.md](README.md)를 따른다.
+- 케이스당 1회 호출하며 인프라 오류만 정해진 횟수만큼 재시도한다. 결과(케이스별 출력·통과 여부·사유, 집계, 실행 일시, 실제 제공자·모델명·temperature)는 파일로 저장해 커밋한다.
+- 기존 `results/20261031-011359.json`은 Gemini 직접 호출의 결과다. 서비스 평가 근거에는 서버의 제공자·모델 확인 기록을 함께 남긴다.
