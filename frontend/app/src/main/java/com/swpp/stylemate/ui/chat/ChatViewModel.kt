@@ -49,6 +49,8 @@ data class ChatState(
     val feedbacks: Map<String, String> = emptyMap(),  // 코디 key -> liked / disliked
     val feedbackPending: Set<String> = emptySet(),
     val feedbackMessages: Map<String, String> = emptyMap(),  // 코디 key -> 저장 결과 안내 또는 오류
+    val feedbackLoaded: Set<String> = emptySet(),
+    val feedbackLoading: Set<String> = emptySet(),
     val notice: String? = null,
 ) {
     val busy get() = turns.any { it.loading }
@@ -188,11 +190,32 @@ class ChatViewModel(private val repository: ChatRepository, private val taste: T
         }
     }
 
-    /** 채팅 추천 코디에 좋아요/별로예요. 같은 버튼을 다시 누르면 취소 (홈과 같은 규칙). */
+    /** Each visible result reads the server rating before enabling its rating buttons. */
+    fun loadFeedback(outfit: Outfit) {
+        val sessionId = activeId ?: return
+        val s = mutableState.value
+        if (outfit.key in s.feedbackLoaded || outfit.key in s.feedbackLoading || outfit.key in s.feedbackPending) return
+        update { it.copy(feedbackLoading = it.feedbackLoading + outfit.key,
+            feedbackMessages = it.feedbackMessages - outfit.key) }
+        viewModelScope.launch {
+            try {
+                val value = repository.feedbackState(outfit)
+                update(sessionId) { it.copy(feedbackLoading = it.feedbackLoading - outfit.key,
+                    feedbackLoaded = it.feedbackLoaded + outfit.key,
+                    feedbacks = if (value == null) it.feedbacks - outfit.key else it.feedbacks + (outfit.key to value)) }
+            } catch (e: CancellationException) { throw e }
+            catch (e: OutfitApiException) {
+                update(sessionId) { it.copy(feedbackLoading = it.feedbackLoading - outfit.key,
+                    feedbackMessages = it.feedbackMessages + (outfit.key to (e.message ?: "만족도를 불러오지 못했어요."))) }
+            }
+        }
+    }
+
+    /** 채팅 추천 코디에 좋아요/별로예요. 같은 버튼을 다시 누르면 취소. */
     fun feedback(outfit: Outfit, value: String) {
         val sessionId = activeId ?: return
         val s = mutableState.value
-        if (outfit.key in s.feedbackPending) return
+        if (s.feedbackPending.isNotEmpty() || outfit.key in s.feedbackLoading) return
         val newValue = if (s.feedbacks[outfit.key] == value) null else value
         update { it.copy(feedbackPending = it.feedbackPending + outfit.key, feedbackMessages = it.feedbackMessages - outfit.key) }
         viewModelScope.launch {
@@ -200,6 +223,7 @@ class ChatViewModel(private val repository: ChatRepository, private val taste: T
                 val (_, preference) = repository.feedback(outfit, newValue, taste.load())
                 taste.save(preference)
                 update(sessionId) { it.copy(feedbackPending = it.feedbackPending - outfit.key,
+                    feedbackLoaded = it.feedbackLoaded + outfit.key,
                     feedbacks = if (newValue == null) it.feedbacks - outfit.key else it.feedbacks + (outfit.key to newValue),
                     feedbackMessages = when (newValue) {
                         "liked" -> it.feedbackMessages + (outfit.key to "비슷한 코디를 더 자주 추천할게요.")

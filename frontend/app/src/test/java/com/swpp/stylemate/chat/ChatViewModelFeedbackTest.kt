@@ -69,6 +69,63 @@ class ChatViewModelFeedbackTest {
 
     private fun sent(): JSONObject = JSONObject(server.takeRequest(5, TimeUnit.SECONDS)!!.body.readUtf8())
 
+    private fun loaded(): ChatState = runBlocking {
+        withTimeout(5_000) { viewModel.state.first { outfit.key !in it.feedbackLoading } }
+    }
+
+    private fun storedRating(value: String?) = MockResponse().setBody(JSONObject()
+        .put("key", outfit.key).put("feedback", value ?: JSONObject.NULL).toString())
+
+    @Test fun aNewViewModelRestoresTheServerRatingBeforeCancellingIt() {
+        server.enqueue(storedRating("liked"))
+        viewModel.loadFeedback(outfit)
+        val restored = loaded()
+        assertEquals("liked", restored.feedbacks[outfit.key])
+        assertTrue(outfit.key in restored.feedbackLoaded)
+        assertEquals(0.1, taste.load()!!.getJSONObject("weights").getDouble("색상:화이트"), 0.0)
+        assertEquals("/api/outfits/chat/feedback/state/", server.takeRequest(5, TimeUnit.SECONDS)!!.path)
+        server.enqueue(response(null, 0.0))
+        viewModel.feedback(outfit, "liked")
+        assertNull(settled().feedbacks[outfit.key])
+        assertTrue(sent().isNull("feedback"))
+    }
+
+    @Test fun feedbackIsBlockedWhileThePreviousRatingIsLoading() {
+        server.enqueue(storedRating("disliked").setBodyDelay(300, TimeUnit.MILLISECONDS))
+        viewModel.loadFeedback(outfit)
+        viewModel.loadFeedback(outfit)
+        viewModel.feedback(outfit, "liked")
+        assertEquals("disliked", loaded().feedbacks[outfit.key])
+        assertEquals(1, server.requestCount)
+        viewModel.loadFeedback(outfit)
+        assertEquals(1, server.requestCount)
+    }
+
+    @Test fun aFailedRatingLookupCanBeRetried() {
+        server.enqueue(MockResponse().setResponseCode(503).setBody("""{"error":"TEMPORARY","hint":"다시 불러와 주세요."}"""))
+        viewModel.loadFeedback(outfit)
+        val failed = loaded()
+        assertFalse(outfit.key in failed.feedbackLoaded)
+        assertEquals("다시 불러와 주세요.", failed.feedbackMessages[outfit.key])
+        server.enqueue(storedRating(null))
+        viewModel.loadFeedback(outfit)
+        val retried = loaded()
+        assertTrue(outfit.key in retried.feedbackLoaded)
+        assertNull(retried.feedbackMessages[outfit.key])
+        assertNull(retried.feedbacks[outfit.key])
+    }
+
+    @Test fun anotherSessionsLookupDoesNotChangeTheVisibleRating() {
+        server.enqueue(storedRating("liked").setBodyDelay(200, TimeUnit.MILLISECONDS))
+        viewModel.loadFeedback(outfit)
+        viewModel.open(outfit.copy(id = "another-session"), profile, null)
+        assertTrue(viewModel.state.value.feedbacks.isEmpty())
+        viewModel.open(outfit, profile, null)
+        assertEquals("liked", loaded().feedbacks[outfit.key])
+        viewModel.open(outfit.copy(id = "another-session"), profile, null)
+        assertTrue(viewModel.state.value.feedbacks.isEmpty())
+    }
+
     @Test fun likeIsPendingUntilTheServerAnswers() {
         server.enqueue(response("liked", 0.3).setBodyDelay(300, TimeUnit.MILLISECONDS))
         viewModel.feedback(outfit, "liked")

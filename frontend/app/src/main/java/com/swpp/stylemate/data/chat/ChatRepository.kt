@@ -81,7 +81,21 @@ class ChatRepository(
         throw OutfitApiException("INVALID_RESPONSE", "저장 결과를 확인하지 못했어요. 다시 시도해 주세요.")
     }
 
-    /** 채팅 추천 코디의 만족도(liked / disliked / null=취소)를 저장하고, 갱신된 코디와 취향 프로필을 돌려준다. */
+    /** Read the persisted chat rating, independently of the Codi Book rating. */
+    suspend fun feedbackState(outfit: Outfit): String? {
+        val json = post("/api/outfits/chat/feedback/state/", JSONObject()
+            .put("garment_ids", JSONArray(outfit.items.map { it.garmentId })))
+        return try {
+            if (json.getString("key") != outfit.key || !json.has("feedback")) throw JSONException("Invalid key")
+            if (json.isNull("feedback")) null else json.getString("feedback").also {
+                if (it !in setOf("liked", "disliked")) throw JSONException("Invalid feedback")
+            }
+        } catch (e: JSONException) {
+            throw OutfitApiException("INVALID_RESPONSE", "만족도를 불러오지 못했어요. 다시 시도해 주세요.")
+        }
+    }
+
+    /** 채팅 추천 코디의 만족도(liked / disliked / null=취소)를 저장하고 갱신된 취향을 반환한다. */
     suspend fun feedback(outfit: Outfit, value: String?, preference: JSONObject?): Pair<Outfit, JSONObject> {
         val json = post("/api/outfits/chat/feedback/", JSONObject()
             .put("garment_ids", JSONArray(outfit.items.map { it.garmentId }))

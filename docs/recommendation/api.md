@@ -145,11 +145,15 @@ Open-Meteo 현재 날씨(기본 서울): `{temp, apparent, precipitation, rain, 
 
 채팅 추천 결과의 만족도(좋아요/별로예요)를 저장한다. 요청: {"garment_ids": [...], "feedback": "liked" | "disliked" | null, "preference": 기기에 저장된 취향 프로필 | null}. Bearer 인증이 필요하고 garment_ids는 본인의 저장된 옷으로 상의 1·하의 1(+아우터 1)이어야 한다.
 
-채팅 코디는 DB 행이 없는 미리보기라서, 같은 옷 조합(key)의 source=chat 코디가 있으면 그 행을 재사용하고(코디북에 저장된 행 우선) 없으면 saved=False로 새로 만든다. 좋아요 반영 규칙은 POST /api/outfits/{id}/feedback/과 같다: 값이 바뀌면 코디의 모든 옷 속성으로 취향 가중치를 올리거나 내리고, 같은 값을 다시 보내거나 null(취소)이면 가중치는 그대로다. 응답: {"outfit": 코디, "preference": 갱신된 취향 프로필}.
+채팅 코디는 같은 사용자·옷 조합(key)의 source=chat 코디를 재사용하고, 없으면 saved=False로 만든다. 코디북에 저장할 때 이 행을 saved=True로 전환하고 저장 재시도 토큰을 유지한다. 채팅 만족도는 FeedbackRecord의 channel=chat으로 사용자·옷 조합별 한 건을 저장하며 코디북 평가(channel=outfit)와 구분한다. 기존 중복 코디 행이 있어도 채팅 만족도는 한 건이다.
+
+첫 평가 요청의 기기 취향을 FeedbackTaste.baseline으로 보관하고, 이후 평가의 옷 속성 스냅샷을 순서대로 기존 취향 알고리즘에 적용한다. 채팅 평가를 바꾸면 기존 평가를 교체하고, null(취소)이면 해당 평가를 제외하고 재계산하므로 이후 다른 코디의 평가를 유지한다. 같은 값의 재요청은 평가를 추가하거나 시각을 변경하지 않고 서버 취향을 반환한다. 코디북 평가는 기존의 값 변경 시 학습하는 규칙을 유지한다. 응답: {"outfit": 코디, "preference": 갱신된 취향 프로필}. 앱은 응답의 preference를 계정별 기기 저장소에 저장한다.
 
 오류: 400 INVALID_FEEDBACK(잘못된 값·옷 구성), 401, 404 CHAT_FEEDBACK_NOT_FOUND(남긴 적 없는 만족도 취소), 413, 415.
 
 ### 채팅 만족도 평가
 
-`python manage.py chat_satisfaction`이 만족도 = 좋아요 / (좋아요 + 별로예요)를 source=chat이고 만족도를 남긴 코디로 집계한다. 홈 추천의 좋아요와 만족도를 남기지 않은 채팅 코디는 제외한다. 통과 기준은 데이터를 모으기 전에 정한 **50% 이상**이며(`apps/outfits/management/commands/chat_satisfaction.py`의 PASS_THRESHOLD), 결과를 보고 바꾸지 않는다.
+`POST /api/outfits/chat/feedback/state/`에 `{garment_ids: [...]}`를 보내면 본인 코디의 채팅 평가 `{key, feedback}`를 조회한다. 평가가 없으면 feedback은 null이며 조회는 DB를 변경하지 않는다. 앱의 채팅 결과 카드는 평가 조회 후 버튼을 활성화하고, 조회 실패 시 다시 불러오기를 제공한다. 앱 재실행 후 같은 옷 조합이 표시되면 서버의 평가 상태를 복원한다. 대화 내용의 프로세스 종료 후 복원 범위는 기존과 같다.
+
+채팅 만족도 집계의 기간·참여 계정·표본 수·통과 기준은 [chat-satisfaction.md](chat-satisfaction.md)를 따른다. 구현 배포 전 공용 Outfit.feedback에 있던 평가는 입력 화면을 구분할 수 없으므로 새 채팅 평가 기록부터 집계한다.
 

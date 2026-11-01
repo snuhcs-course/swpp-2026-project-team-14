@@ -115,6 +115,30 @@ class ChatRepositoryTest {
         }
     }
 
+    @Test fun feedbackStateReadsThePersistedChatRatingWithAuthentication() = runBlocking {
+        server.enqueue(MockResponse().setBody("""{"key":"w:a+w:b","feedback":"liked"}"""))
+        assertEquals("liked", repository.feedbackState(outfit))
+        val request = server.takeRequest()
+        assertEquals("/api/outfits/chat/feedback/state/", request.path)
+        assertEquals("Bearer $TEST_TOKEN", request.getHeader("Authorization"))
+        assertEquals(2, JSONObject(request.body.readUtf8()).getJSONArray("garment_ids").length())
+    }
+
+    @Test fun feedbackStateDistinguishesUnratedFromMalformedResponses() = runBlocking {
+        server.enqueue(MockResponse().setBody("""{"key":"w:a+w:b","feedback":null}"""))
+        assertNull(repository.feedbackState(outfit))
+        for (body in listOf("""{"key":"another","feedback":"liked"}""",
+                            """{"key":"w:a+w:b"}""", """{"key":"w:a+w:b","feedback":"invalid"}""")) {
+            server.enqueue(MockResponse().setBody(body))
+            try {
+                repository.feedbackState(outfit)
+                fail("expected invalid response")
+            } catch (e: OutfitApiException) {
+                assertEquals("INVALID_RESPONSE", e.code)
+            }
+        }
+    }
+
     @Test fun feedbackServerErrorKeepsItsHint() = runBlocking {
         server.enqueue(MockResponse().setResponseCode(400).setBody("""{"error":"INVALID_FEEDBACK","hint":"Invalid feedback"}"""))
         try {

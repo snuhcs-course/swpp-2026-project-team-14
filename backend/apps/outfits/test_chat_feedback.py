@@ -1,15 +1,18 @@
 """채팅 추천 만족도(좋아요/별로예요) API와 만족도 집계 명령 테스트."""
 
 import json
+from datetime import timedelta
 from io import StringIO
 
-from django.core.management import call_command
+from django.core.management import call_command, CommandError
 from django.test import TestCase
+from django.utils import timezone
 
 from apps.users.auth import issue_token
 from apps.users.models import User
-from .management.commands.chat_satisfaction import satisfaction
-from .models import Outfit
+from .management.commands.chat_satisfaction import satisfaction, MIN_RESPONSES
+from .models import Outfit, FeedbackRecord, FeedbackTaste
+from recommendation import preference
 from .tests import garment
 from .views import _create, _members
 
@@ -61,11 +64,117 @@ class ChatFeedbackApiTests(TestCase):
         self.assertTrue(all(disliked["preference"]["weights"].get(k, 0) < v
                             for k, v in liked["preference"]["weights"].items()))
 
-    def test_cancel_clears_feedback_without_moving_weights(self):
+    def test_cancel_reverts_the_chat_contribution(self):
         liked = self.post("liked").json()
         cleared = self.post(None, preference=liked["preference"]).json()
         self.assertIsNone(cleared["outfit"]["feedback"])
-        self.assertEqual(cleared["preference"]["weights"], liked["preference"]["weights"])
+        self.assertEqual(cleared["preference"]["weights"], {})
+        self.assertEqual(cleared["preference"]["liked"], [])
+
+    def test_like_save_cancel_and_relike_use_one_outfit_and_one_rating(self):
+        first = self.post("liked").json()
+        payload = {"garment_ids": self.ids, "source": "chat", "context": {"chat_save_id": "save-one"}}
+        saved = self.client.post("/api/outfits/", json.dumps(payload), content_type="application/json")
+        self.assertEqual(saved.status_code, 201)
+        self.assertEqual(saved.json()["id"], first["outfit"]["id"])
+        self.assertTrue(saved.json()["saved"])
+        self.assertEqual(self.chat_rows().count(), 1)
+        cleared = self.post(None, preference=first["preference"]).json()
+        self.assertEqual(FeedbackRecord.objects.filter(channel="chat", feedback__isnull=False).count(), 0)
+        self.assertEqual(cleared["preference"]["weights"], {})
+        again = self.post("liked", preference=cleared["preference"]).json()
+        self.assertEqual(again["preference"]["weights"], first["preference"]["weights"])
+        self.assertEqual(FeedbackRecord.objects.filter(channel="chat").count(), 1)
+
+    def test_all_save_retry_tokens_remain_bound_to_the_original_combination(self):
+        self.post("liked")
+        for token in ("first", "second", "third"):
+            payload = {"garment_ids": self.ids, "source": "chat", "context": {"chat_save_id": token}}
+            self.assertIn(self.client.post("/api/outfits/", json.dumps(payload), content_type="application/json").status_code,
+                          (200, 201))
+        for token in ("first", "second", "third"):
+            payload = {"garment_ids": [str(self.knit.id), str(self.jeans.id)], "source": "chat",
+                       "context": {"chat_save_id": token}}
+            self.assertEqual(self.client.post("/api/outfits/", json.dumps(payload), content_type="application/json").status_code, 409)
+        self.assertEqual(self.chat_rows().count(), 1)
+
+    def test_legacy_duplicate_outfits_cannot_split_the_current_chat_rating(self):
+        first = self.post("liked").json()
+        _create(Outfit.Source.CHAT, _members(self.user, self.ids), user=self.user, saved=True, feedback="liked")
+        cleared = self.post(None, preference=first["preference"]).json()
+        self.assertIsNone(cleared["outfit"]["feedback"])
+        self.assertFalse(self.chat_rows().filter(feedback__isnull=False).exists())
+        self.assertEqual(FeedbackRecord.objects.filter(channel="chat").count(), 1)
+
+    def test_cancel_preserves_later_home_feedback_and_replays_clipping_and_decay(self):
+        baseline = {"weights": {"색상:화이트": 1.95, "별도": 0.8}, "liked": [], "excluded": []}
+        liked = self.post("liked", preference=baseline).json()
+        home = _create(Outfit.Source.RECOMMENDED, _members(self.user, [str(self.knit.id), str(self.jeans.id)]), user=self.user)
+        response = self.client.post(f"/api/outfits/{home.id}/feedback/",
+                                    json.dumps({"feedback": "liked", "preference": liked["preference"]}),
+                                    content_type="application/json").json()
+        cleared = self.post(None, preference=response["preference"]).json()
+        event = FeedbackRecord.objects.get(channel="outfit")
+        expected = preference.apply_feedback(FeedbackTaste.objects.get(user=self.user).baseline,
+            [{"item_id": gid, "polarity": 1} for gid in event.garments], event.garments)
+        self.assertEqual(cleared["preference"]["weights"], expected["weights"])
+        self.assertEqual(cleared["preference"]["liked"], expected["liked"])
+
+    def test_switching_rating_replaces_its_effect_and_retry_returns_server_taste(self):
+        self.post("liked")
+        disliked = self.post("disliked").json()
+        retry = self.post("disliked", preference=None).json()
+        self.assertEqual(disliked["preference"]["weights"], retry["preference"]["weights"])
+        self.assertTrue(all(v < 0 for v in retry["preference"]["weights"].values()))
+        self.assertEqual(FeedbackRecord.objects.filter(channel="chat").count(), 1)
+
+    def test_cancelling_one_chat_rating_preserves_another_chat_rating(self):
+        first = self.post("liked").json()
+        second_ids = [str(self.knit.id), str(self.jeans.id)]
+        second = self.post("liked", ids=second_ids, preference=first["preference"]).json()
+        cleared = self.post(None, preference=second["preference"]).json()
+        remaining = FeedbackRecord.objects.get(channel="chat", feedback__isnull=False)
+        expected = preference.apply_feedback(preference.empty(),
+            [{"item_id": gid, "polarity": 1} for gid in remaining.garments], remaining.garments)
+        self.assertEqual(cleared["preference"]["weights"], expected["weights"])
+        self.assertEqual(cleared["preference"]["liked"], expected["liked"])
+
+    def test_retry_does_not_move_an_old_rating_into_the_he_period(self):
+        self.post("liked")
+        old = timezone.now() - timedelta(days=10)
+        FeedbackRecord.objects.filter(user=self.user, channel="chat").update(rated_at=old)
+        self.post("liked")
+        self.assertEqual(FeedbackRecord.objects.get(user=self.user, channel="chat").rated_at, old)
+
+    def test_codibook_rating_does_not_change_chat_rating_or_its_timestamp(self):
+        liked = self.post("liked").json()
+        event = FeedbackRecord.objects.get(channel="chat")
+        original_time = event.rated_at
+        self.client.post(f"/api/outfits/{liked['outfit']['id']}/feedback/",
+                         json.dumps({"feedback": "disliked", "preference": liked["preference"]}),
+                         content_type="application/json")
+        event.refresh_from_db()
+        self.assertEqual(event.feedback, "liked")
+        self.assertEqual(event.rated_at, original_time)
+        self.assertEqual(self.client.post(self.path + "state/", json.dumps({"garment_ids": self.ids}),
+                                         content_type="application/json").json()["feedback"], "liked")
+
+    def test_state_lookup_is_authenticated_owner_scoped_and_has_no_side_effects(self):
+        state = self.path + "state/"
+        def lookup(ids):
+            return self.client.post(state, json.dumps({"garment_ids": ids}), content_type="application/json")
+        self.assertIsNone(lookup(self.ids).json()["feedback"])
+        self.assertFalse(Outfit.objects.exists())
+        self.assertFalse(FeedbackTaste.objects.exists())
+        self.post("liked")
+        self.assertEqual(lookup(list(reversed(self.ids))).json()["feedback"], "liked")
+        other = User.objects.create_user("state_other", "test-password")
+        foreign = garment(other, "남의 상의", "top", "tshirt", "#FFFFFF")
+        self.assertEqual(lookup([str(foreign.id), str(self.jeans.id)]).status_code, 400)
+        self.assertEqual(lookup(["bad"]).status_code, 400)
+        self.assertEqual(self.client.get(state).status_code, 405)
+        self.client.defaults.pop("HTTP_AUTHORIZATION")
+        self.assertEqual(lookup(self.ids).status_code, 401)
 
     def test_cancel_without_previous_feedback_creates_nothing(self):
         response = self.post(None)
@@ -117,46 +226,70 @@ class ChatFeedbackApiTests(TestCase):
 class ChatSatisfactionCommandTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user("satisfaction_owner", "test-password")
-        tops = [garment(self.user, f"상의{i}", "top", "tshirt", "#FFFFFF") for i in range(4)]
-        self.jeans = garment(self.user, "청바지", "bottom", "jeans", "#3975C6")
-        self.tops = tops
+        self.since = timezone.now() - timedelta(hours=1)
 
-    def outfit(self, top, source, feedback):
-        outfit = _create(source, _members(self.user, [str(top.id), str(self.jeans.id)]), user=self.user)
-        outfit.feedback = feedback
-        outfit.save()
+    def rating(self, feedback="liked", *, channel="chat", user=None, at=None):
+        return FeedbackRecord.objects.create(user=user or self.user, channel=channel,
+            key=f"combination:{FeedbackRecord.objects.count()}", feedback=feedback,
+            rated_at=at or self.since + timedelta(minutes=30))
 
-    def test_rate_counts_only_rated_chat_outfits(self):
-        self.outfit(self.tops[0], Outfit.Source.CHAT, "liked")
-        self.outfit(self.tops[1], Outfit.Source.CHAT, "disliked")
-        self.outfit(self.tops[2], Outfit.Source.CHAT, None)  # 만족도를 안 남긴 채팅 코디는 제외
-        self.outfit(self.tops[3], Outfit.Source.RECOMMENDED, "liked")  # 홈 추천 좋아요는 제외
-        result = satisfaction()
-        self.assertEqual((result["liked"], result["disliked"], result["total"]), (1, 1, 2))
+    def result(self, **options):
+        return satisfaction(since=self.since, participants=[self.user.username], **options)
+
+    def command(self, **options):
+        out = StringIO()
+        call_command("chat_satisfaction", since=self.since.isoformat(), participants=[self.user.username], stdout=out, **options)
+        return out.getvalue()
+
+    def test_exact_minimum_and_threshold_pass(self):
+        for i in range(MIN_RESPONSES):
+            self.rating("liked" if i < MIN_RESPONSES / 2 else "disliked")
+        result = self.result()
         self.assertEqual(result["rate"], 0.5)
-        self.assertTrue(result["passed"])  # 기준 50% "이상"
+        self.assertTrue(result["passed"])
+        self.assertIn("→ PASS", self.command())
 
     def test_below_threshold_fails(self):
-        self.outfit(self.tops[0], Outfit.Source.CHAT, "liked")
-        self.outfit(self.tops[1], Outfit.Source.CHAT, "disliked")
-        self.outfit(self.tops[2], Outfit.Source.CHAT, "disliked")
-        result = satisfaction()
-        self.assertAlmostEqual(result["rate"], 1 / 3)
+        for i in range(MIN_RESPONSES):
+            self.rating("liked" if i == 0 else "disliked")
+        result = self.result()
         self.assertFalse(result["passed"])
-        out = StringIO()
-        call_command("chat_satisfaction", stdout=out)
-        self.assertIn("만족도 33.3% (기준 50% 이상) → 미달", out.getvalue())
+        self.assertEqual(result["verdict"], "FAIL")
+        self.assertIn("→ FAIL", self.command())
 
     def test_no_responses_is_reported_without_a_verdict(self):
-        result = satisfaction()
+        result = self.result()
         self.assertIsNone(result["rate"])
         self.assertFalse(result["passed"])
-        out = StringIO()
-        call_command("chat_satisfaction", stdout=out)
-        self.assertIn("응답이 아직 없습니다", out.getvalue())
+        self.assertIn("→ INCOMPLETE", self.command())
 
-    def test_passing_result_is_reported(self):
-        self.outfit(self.tops[0], Outfit.Source.CHAT, "liked")
-        out = StringIO()
-        call_command("chat_satisfaction", stdout=out)
-        self.assertIn("만족도 100.0% (기준 50% 이상) → 통과", out.getvalue())
+    def test_one_like_and_minimum_minus_one_are_incomplete(self):
+        for _ in range(MIN_RESPONSES - 1):
+            self.rating()
+            self.assertEqual(self.result()["verdict"], "INCOMPLETE")
+        self.assertIn("100.0%", self.command())
+        self.assertIn("→ INCOMPLETE", self.command())
+
+    def test_only_in_period_allowlisted_current_chat_ratings_count(self):
+        end = timezone.now() + timedelta(minutes=1)
+        self.rating(at=self.since)
+        self.rating("disliked")
+        self.rating(None)
+        self.rating(channel="outfit")
+        self.rating(at=self.since - timedelta(seconds=1))
+        self.rating(at=end)
+        team = User.objects.create_user("team_test", "test-password")
+        self.rating(user=team)
+        result = self.result(until=end)
+        self.assertEqual((result["liked"], result["disliked"], result["total"]), (1, 1, 2))
+
+    def test_command_rejects_invalid_periods_unknown_accounts_and_missing_scope(self):
+        for value in ("bad", "2026-11-01T00:00:00", "2026-13-99T00:00:00+09:00"):
+            with self.subTest(value=value), self.assertRaises(CommandError):
+                call_command("chat_satisfaction", since=value, participants=[self.user.username])
+        with self.assertRaises(CommandError):
+            self.command(until=(self.since - timedelta(seconds=1)).isoformat())
+        with self.assertRaises(CommandError):
+            call_command("chat_satisfaction", since=self.since.isoformat(), participants=["missing_user"])
+        with self.assertRaises(CommandError):
+            call_command("chat_satisfaction")

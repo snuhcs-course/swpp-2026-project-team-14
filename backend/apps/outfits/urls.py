@@ -9,6 +9,7 @@ urlpatterns = [
     path("recommend/", views.recommend_view),
     path("chat/", chat_view),
     path("chat/feedback/", views.chat_feedback_view),
+    path("chat/feedback/state/", views.chat_feedback_state_view),
     path("<uuid:outfit_id>/", views.outfit_view),
     path("<uuid:outfit_id>/feedback/", views.feedback_view),
 ]
