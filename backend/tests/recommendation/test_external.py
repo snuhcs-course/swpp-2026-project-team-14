@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from recommendation.catalog import Item
-from recommendation.external import ExternalModelUnavailable, matching_search
+from recommendation.external import ExternalModelUnavailable, matching_search, _wardrobe_score
 
 
 class ModelDouble:
@@ -162,3 +162,33 @@ def test_unsupported_source_slot_is_rejected_before_model_call():
     with pytest.raises(ValueError):
         matching_search(Item("w:one", "신발", {"카테고리": "운동화"}), model)
     assert model.calls == []
+
+
+@pytest.mark.parametrize("key", ["카테고리", "색상", "핏"])
+@pytest.mark.parametrize("replacement", [None, "unknown", []])
+def test_missing_or_unknown_attributes_never_improve_the_same_garments_score(key, replacement):
+    model = ModelDouble()
+    complete = {"카테고리": "셔츠", "색상": "블랙", "핏": "오버사이즈"}
+    score = _wardrobe_score(model, model.probabilities, complete)
+    incomplete = {**complete, key: replacement}
+    assert _wardrobe_score(model, model.probabilities, incomplete) < score
+
+
+def test_partial_garment_no_longer_beats_a_complete_match_by_dropping_weak_attributes():
+    model = ModelDouble()
+    # Real log-probability scale: a color-only garment used to score -0.1 vs -0.7 for the complete match.
+    model.probabilities["카테고리"][2] = -1.0
+    model.probabilities["색상"][6] = -0.1
+    model.probabilities["핏"][4] = -1.0
+    complete = Item("w:complete", "상의", {"카테고리": "셔츠", "색상": "블랙", "핏": "오버사이즈"}, name="전체 정보")
+    partial = Item("w:partial", "상의", {"색상": "블랙"}, name="색상만")
+    result = matching_search(Item("w:source", "하의", {"카테고리": "팬츠"}), model, wardrobe=[partial, complete])
+    assert [m["garment_id"] for m in result["wardrobe_matches"]] == ["complete", "partial"]
+
+
+def test_no_usable_attributes_are_excluded_and_complete_scores_are_unchanged():
+    model = ModelDouble()
+    assert _wardrobe_score(model, model.probabilities, {}) is None
+    assert _wardrobe_score(model, model.probabilities, {"카테고리": "unknown"}) is None
+    assert _wardrobe_score(model, model.probabilities,
+                           {"카테고리": "셔츠", "색상": "블랙", "핏": "오버사이즈"}) == pytest.approx(5.0)

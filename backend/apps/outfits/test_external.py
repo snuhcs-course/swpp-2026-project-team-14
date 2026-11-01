@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 from django.test import TestCase
+from onnxruntime.capi.onnxruntime_pybind11_state import Fail, InvalidGraph, InvalidProtobuf, NoSuchFile, RuntimeException
 
 from apps.users.auth import issue_token
 from apps.users.models import User
@@ -101,14 +102,41 @@ class ExternalMatchApiTests(TestCase):
     def test_missing_or_failed_model_is_retryable_without_database_changes(self):
         for failure in ("missing", "load", "inference"):
             with self.subTest(failure=failure), self.assertLogs("apps.outfits.views", level="ERROR"):
-                self.models.side_effect = RuntimeError("unavailable") if failure == "load" else None
+                self.models.side_effect = FileNotFoundError("unavailable") if failure == "load" else None
                 self.models.return_value = SimpleNamespace(masked=None if failure == "missing" else self.model)
-                self.model.slot_logprobs.side_effect = RuntimeError("unavailable") if failure == "inference" else None
+                self.model.slot_logprobs.side_effect = Fail("unavailable") if failure == "inference" else None
                 response = self.post()
                 self.assertEqual(response.status_code, 503)
                 self.assertEqual(response.json()["error"], "EXTERNAL_MODEL_UNAVAILABLE")
                 self.assertIn("다시 시도", response.json()["hint"])
         self.assertFalse(Outfit.objects.exists())
+
+    def test_corrupt_model_files_are_retryable(self):
+        errors = [json.JSONDecodeError("invalid model metadata", "{", 0),
+                  InvalidGraph("invalid graph"), InvalidProtobuf("invalid protobuf"), NoSuchFile("missing model")]
+        for error in errors:
+            with self.subTest(error=type(error).__name__), self.assertLogs("apps.outfits.views", level="ERROR"):
+                self.models.side_effect = error
+                self.assertEqual(self.post().status_code, 503)
+        self.assertFalse(Outfit.objects.exists())
+
+    def test_expected_runtime_failure_is_retryable(self):
+        self.model.slot_logprobs.side_effect = RuntimeException("execution failed")
+        with self.assertLogs("apps.outfits.views", level="ERROR"):
+            self.assertEqual(self.post().status_code, 503)
+
+    def test_unexpected_loading_and_inference_bugs_are_not_hidden_as_503(self):
+        for error in (RuntimeError("code bug"), KeyError("missing variable"), AttributeError("code bug")):
+            with self.subTest(stage="loading", error=type(error).__name__):
+                self.models.side_effect = error
+                with self.assertRaises(type(error)):
+                    self.post()
+            self.models.side_effect = None
+            with self.subTest(stage="inference", error=type(error).__name__):
+                self.model.slot_logprobs.side_effect = error
+                with self.assertRaises(type(error)):
+                    self.post()
+            self.model.slot_logprobs.side_effect = None
 
     def test_wardrobe_matches_include_only_own_saved_target_slot_garments(self):
         other = User.objects.create_user("external_other_owner", "test-password")

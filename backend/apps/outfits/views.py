@@ -22,6 +22,7 @@ from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 from django.utils import timezone
+from onnxruntime.capi.onnxruntime_pybind11_state import Fail, InvalidGraph, InvalidProtobuf, NoSuchFile
 
 from apps.body_profiles.profile import body_from_request
 from apps.wardrobe.models import Garment
@@ -30,7 +31,7 @@ from apps.users.models import User
 from apps.users.pagination import account_page
 from recommendation import preference, season, weather
 from recommendation.catalog import Catalog
-from recommendation.external import matching_search
+from recommendation.external import ExternalModelUnavailable, matching_search
 from recommendation.labeling import label
 from recommendation.search import RecommendError, Request, recommend
 from recommendation.vocab import PROFILE_STYLES, WARDROBE_CATEGORY
@@ -241,14 +242,18 @@ def match_external_view(request):
                     "dimensions": garment.dimensions, "labels": garment.labels})
     if item is None:
         return _error("UNSUPPORTED_EXTERNAL_CATEGORY", 422, "상의, 하의, 아우터에서 어울리는 옷을 찾아보세요.")
+    others = Garment.objects.filter(user=request.user, saved=True).exclude(pk=garment.id)
+    wardrobe = [candidate for g in others if (candidate := to_item({"id": str(g.id), "attributes": g.attributes,
+                "dimensions": g.dimensions, "labels": g.labels})) is not None]
     try:
-        others = Garment.objects.filter(user=request.user, saved=True).exclude(pk=garment.id)
-        wardrobe = [candidate for g in others if (candidate := to_item({"id": str(g.id), "attributes": g.attributes,
-                    "dimensions": g.dimensions, "labels": g.labels})) is not None]
-        result = matching_search(item, models().masked, request.user.preferred_styles, wardrobe)
-    except Exception:
-        # Missing/corrupt model files and invalid predictions must stay retryable.
-        logger.exception("External matching model unavailable")
+        masked = models().masked
+    except (OSError, json.JSONDecodeError, Fail, InvalidGraph, InvalidProtobuf, NoSuchFile):
+        logger.exception("External matching model loading failed")
+        return _error("EXTERNAL_MODEL_UNAVAILABLE", 503, "추천을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.")
+    try:
+        result = matching_search(item, masked, request.user.preferred_styles, wardrobe)
+    except ExternalModelUnavailable:
+        logger.exception("External matching prediction unavailable")
         return _error("EXTERNAL_MODEL_UNAVAILABLE", 503, "추천을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.")
     return _json({"source_garment_id": str(garment.id), **result})
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 from urllib.parse import urlencode
 
 import numpy as np
+from onnxruntime.capi.onnxruntime_pybind11_state import Fail, RuntimeException
 
 from recommendation.catalog import CATEGORY_WORD, FIT_WORD, Item
 from recommendation.vocab import BOTTOM_FITS, CATEGORIES, COLORS, PROFILE_STYLES, UPPER_FITS, WARDROBE_STYLES
@@ -17,6 +18,7 @@ SEARCH_BASE = "https://www.musinsa.com/search/goods"
 PLAIN_PATTERN = "무지"  # 무늬 없음은 검색어에 넣지 않는다 (상품명에 잘 안 쓰여 결과가 줄어듦)
 SCORED_KEYS = ("카테고리", "색상", "핏")
 WARDROBE_MATCH_LIMIT = 3
+MISSING_ATTRIBUTE_PENALTY = 1.0
 
 
 class ExternalModelUnavailable(Exception):
@@ -56,17 +58,25 @@ def _pattern(model, probabilities: dict) -> str | None:
 
 
 def _wardrobe_score(model, probabilities: dict, attrs: dict) -> float | None:
-    """옷장 옷의 카테고리·색상·핏이 모델 예측과 얼마나 맞는지 (평균 로그확률)."""
+    """세 속성의 평균. 누락값은 해당 속성의 최저 유효 점수보다 1 낮게 처리한다."""
     index = {value: i for i, value in enumerate(model.values)}
     values = []
+    matched = 0
     for key in SCORED_KEYS:
         raw = attrs.get(key)
         value = raw[0] if isinstance(raw, list) and raw else raw
         position = index.get((key, value)) if value else None
         scores = probabilities.get(key)
+        known = [float(scores[i]) for (kind, _), i in index.items()
+                 if kind == key and scores is not None and i < len(scores) and np.isfinite(scores[i])]
+        if not known:
+            return None
         if position is not None and scores is not None and position < len(scores) and np.isfinite(scores[position]):
             values.append(float(scores[position]))
-    return float(np.mean(values)) if values else None
+            matched += 1
+        else:
+            values.append(min(known) - MISSING_ATTRIBUTE_PENALTY)
+    return float(np.mean(values)) if matched else None
 
 
 def _wardrobe_matches(model, probabilities: dict, target: str, wardrobe: list[Item]) -> list[dict]:
@@ -92,7 +102,10 @@ def matching_search(item: Item, model, preferred_styles: list[str] | None = None
         raise ValueError("Unsupported garment category")
     profile_style = next((mapped[0] for style in preferred_styles or []
                           if (mapped := WARDROBE_STYLES.get(style) or PROFILE_STYLES.get(style))), None)
-    probabilities = model.slot_logprobs({item.slot: item.attrs}, profile_style or item.style, target)
+    try:
+        probabilities = model.slot_logprobs({item.slot: item.attrs}, profile_style or item.style, target)
+    except (Fail, RuntimeException) as error:
+        raise ExternalModelUnavailable("Model inference unavailable") from error
     category, _ = _best(_candidates(model, probabilities, "카테고리", CATEGORIES[target]))
     color, color_share = _best(_candidates(model, probabilities, "색상", COLORS))
     fit, fit_share = _best(_candidates(model, probabilities, "핏", BOTTOM_FITS if target == "하의" else UPPER_FITS))

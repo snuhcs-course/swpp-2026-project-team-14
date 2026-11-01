@@ -106,6 +106,10 @@ Open-Meteo 현재 날씨(기본 서울): `{temp, apparent, precipitation, rain, 
 
 상의 선택 시 하의, 하의·아우터 선택 시 상의를 추천한다. 기존 마스킹 모델의 대상 슬롯별 카테고리·핏 허용값으로 후보를 제한하고 색상·핏·종류를 예측한다. 계정 선호 스타일 중 기존 어휘로 변환되는 첫 값을 문맥으로 사용하며, 없으면 선택한 옷의 스타일을 사용한다.
 
+옷장 후보 점수는 카테고리·색상·핏 세 항목의 평균이다. 누락되거나 사전에 없는 속성, 유효 점수가 없는 속성값에는 해당 속성의 최저 유효 모델 점수에서 1을 뺀 값을 적용한다. 유효한 속성이 하나도 없는 옷은 제외한다. 따라서 속성 누락만으로 같은 옷의 점수가 높아지지 않는다.
+
+모델 파일 읽기·JSON 파싱·ONNX 로딩 오류와 명시적인 예측 불가 오류는 503 EXTERNAL_MODEL_UNAVAILABLE로 처리한다. ONNX 추론의 Fail·RuntimeException도 예측 불가 오류로 변환한다. 일반 코드 예외는 공통 서버 오류 처리로 전달한다.
+
 title(검색어)은 "색상 핏 [패턴] 종류" 순서다(예: "블랙 오버핏 스트라이프 셔츠"). 패턴은 모델의 프린트 예측이며 무지이거나 예측이 없으면 생략하고, attributes.pattern에는 "무지"로 담는다. search_url은 https://www.musinsa.com/search/goods 에 title을 URL 인코딩한 keyword만 붙인다. 무신사 필터 파라미터는 검색어마다 달라지는 내부 ID라 사용하지 않는다. 사용자가 바로가기를 누를 때 외부 검색 페이지를 연다. 서버는 해당 주소에 요청하거나 상품 정보를 수집하지 않고 DB도 변경하지 않는다. 실제 상품의 재고·가격·치수·검색 순위는 검증하지 않는다.
 
 오류: 400 INVALID_EXTERNAL_REQUEST, 401 AUTHENTICATION_REQUIRED, 404 EXTERNAL_GARMENT_NOT_FOUND(다른 계정·초안·없는 옷 포함), 413 BODY_TOO_LARGE, 415 JSON_REQUIRED, 422 UNSUPPORTED_EXTERNAL_CATEGORY(신발), 503 EXTERNAL_MODEL_UNAVAILABLE. 모델 파일·추론·유효 속성 예측 실패는 503과 재시도 안내를 반환한다.
