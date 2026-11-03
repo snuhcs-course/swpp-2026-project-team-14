@@ -12,7 +12,7 @@ from .models import Garment
 from .tests import attributes, envelope, photo
 
 
-@override_settings(GEMINI_API_KEY='test-key')
+@override_settings(OPENROUTER_API_KEY='test-key')
 class WornRegistrationTests(TestCase):
     def setUp(self):
         self.owner = User.objects.create_user('worn_owner', 'test-password')
@@ -85,9 +85,9 @@ class WornRegistrationTests(TestCase):
 
     def test_target_prompt_does_not_relax_existing_analysis(self):
         original = json.loads(_build_request(photo(), 'test-key').data)
-        self.assertEqual(original['systemInstruction']['parts'][0]['text'], PROMPT)
+        self.assertEqual(original['messages'][0]['content'], PROMPT)
         target = json.loads(_build_request(photo(), 'test-key', target_category='outerwear').data)
-        prompt = target['systemInstruction']['parts'][0]['text']
+        prompt = target['messages'][0]['content']
         self.assertIn('worn outerwear', prompt)
         self.assertIn('ignore their features completely', prompt)
         self.assertIn('multiple people', prompt)

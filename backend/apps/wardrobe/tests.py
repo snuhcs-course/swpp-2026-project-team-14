@@ -33,14 +33,8 @@ def envelope(data=None, finish='STOP'):
             'image_status': 'single',
             'attributes': {key: attributes()[key] for key in AI_FIELDS},
         }
-    response = {
-        'candidates': [
-            {
-                'finishReason': finish,
-                'content': {'parts': [{'text': json.dumps(data)}]},
-            },
-        ],
-    }
+    response = {'choices': [{'finish_reason': 'stop' if finish == 'STOP' else finish,
+                             'message': {'content': json.dumps(data)}}]}
     return json.dumps(response).encode()
 
 
@@ -162,7 +156,7 @@ class ImageTests(SimpleTestCase):
             self.assertEqual(error.exception.code, code)
 
 
-class GeminiTests(SimpleTestCase):
+class OpenRouterVisionTests(SimpleTestCase):
     def mock_response(self, opener, body):
         response = MagicMock()
         response.__enter__.return_value.read.return_value = body
@@ -173,14 +167,17 @@ class GeminiTests(SimpleTestCase):
         self.mock_response(opener, envelope())
         self.assertEqual(analyze_image(photo(), 'test-secret')[0]['name'], '흰색 티셔츠')
         request = opener.return_value.open.call_args.args[0]
-        self.assertIn(MODEL, request.full_url)
+        self.assertEqual(request.full_url, 'https://openrouter.ai/api/v1/chat/completions')
         self.assertNotIn('test-secret', request.full_url)
         self.assertNotIn('test-secret', request.data.decode())
-        self.assertEqual(request.get_header('X-goog-api-key'), 'test-secret')
+        self.assertEqual(request.get_header('Authorization'), 'Bearer test-secret')
+        self.assertIsNone(request.get_header('X-goog-api-key'))
         body = json.loads(request.data)
-        self.assertEqual(body['contents'][0]['parts'][0]['inlineData']['mimeType'], 'image/jpeg')
-        self.assertIn('responseJsonSchema', body['generationConfig'])
-        schema = body['generationConfig']['responseJsonSchema']['properties']['attributes']
+        self.assertEqual(body['model'], MODEL)
+        self.assertTrue(body['messages'][1]['content'][0]['image_url']['url'].startswith('data:image/jpeg;base64,'))
+        self.assertTrue(body['response_format']['json_schema']['strict'])
+        self.assertEqual(body['provider'], {'require_parameters': True, 'allow_fallbacks': False})
+        schema = body['response_format']['json_schema']['schema']['properties']['attributes']
         self.assertEqual(set(schema['properties']), {'name', 'category', 'colors', 'subcategory', 'styles'})
         self.assertEqual(schema['properties']['styles']['maxItems'], 2)
         self.assertEqual(schema['properties']['colors']['maxItems'], 2)
@@ -250,7 +247,7 @@ class GeminiTests(SimpleTestCase):
         self.mock_response(opener, envelope())
         analyze_image(photo(), 'test-key')
         body = json.loads(opener.return_value.open.call_args.args[0].data)
-        schema = body['generationConfig']['responseJsonSchema']
+        schema = body['response_format']['json_schema']['schema']
         self.assertIn('details', schema['required'])
         self.assertEqual(set(schema['properties']['details']['properties']),
                          {'print', 'neckline', 'collar', 'design_details', 'materials'})
@@ -293,20 +290,40 @@ class GeminiTests(SimpleTestCase):
     def test_measured_garment_type_is_a_prompt_hint(self, opener):
         self.mock_response(opener, envelope())
         analyze_image(photo(), 'test-key', 'shorts')
-        text = json.loads(opener.return_value.open.call_args.args[0].data)['contents'][0]['parts'][1]['text']
+        text = json.loads(opener.return_value.open.call_args.args[0].data)['messages'][1]['content'][1]['text']
         self.assertIn('measured it as shorts', text)
         analyze_image(photo(), 'test-key', 'gown')
-        text = json.loads(opener.return_value.open.call_args.args[0].data)['contents'][0]['parts'][1]['text']
+        text = json.loads(opener.return_value.open.call_args.args[0].data)['messages'][1]['content'][1]['text']
         self.assertEqual(text, 'Classify this garment.')
 
     @patch('apps.wardrobe.analysis.build_opener')
     def test_provider_failures_are_sanitized_and_not_retried(self, opener):
-        for status, code in ((400, 'AI_REQUEST_INVALID'), (404, 'AI_MODEL_UNAVAILABLE'),
+        for status, code in ((400, 'AI_REQUEST_INVALID'), (402, 'AI_CREDITS_REQUIRED'), (404, 'AI_MODEL_UNAVAILABLE'),
                              (429, 'AI_RATE_LIMITED'), (403, 'AI_AUTH_FAILED'), (500, 'AI_PROVIDER_ERROR')):
             opener.reset_mock()
             opener.return_value.open.side_effect = HTTPError('https://provider', status, 'private error', {}, BytesIO(b'private detail'))
             with self.assertRaises(AnalysisError) as error:
                 analyze_image(photo(), 'test-key')
+            self.assertEqual(str(error.exception), code)
+            opener.return_value.open.assert_called_once()
+
+    @override_settings(OPENROUTER_VISION_MODEL='test/vision-model')
+    @patch('apps.wardrobe.analysis.build_opener')
+    def test_model_setting_is_used_without_google_fallback(self, opener):
+        self.mock_response(opener, envelope())
+        analyze_image(photo(), 'router-only-key')
+        request = opener.return_value.open.call_args.args[0]
+        self.assertEqual(json.loads(request.data)['model'], 'test/vision-model')
+        self.assertEqual(request.full_url, 'https://openrouter.ai/api/v1/chat/completions')
+        opener.return_value.open.assert_called_once()
+
+    @patch('apps.wardrobe.analysis.build_opener')
+    def test_embedded_provider_errors_are_sanitized_and_not_retried(self, opener):
+        for status, code in [(402, 'AI_CREDITS_REQUIRED'), (429, 'AI_RATE_LIMITED'), (503, 'AI_PROVIDER_ERROR')]:
+            opener.reset_mock()
+            self.mock_response(opener, json.dumps({'error': {'code': status, 'message': 'private provider detail'}}).encode())
+            with self.assertRaises(AnalysisError) as error:
+                analyze_image(photo(), 'router-only-key')
             self.assertEqual(str(error.exception), code)
             opener.return_value.open.assert_called_once()
 
@@ -318,7 +335,7 @@ class GeminiTests(SimpleTestCase):
         self.assertEqual(error.exception.code, 'AI_TIMEOUT')
 
 
-@override_settings(GEMINI_API_KEY='test-key')
+@override_settings(OPENROUTER_API_KEY='test-key')
 class AnalysisEndpointTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user('wardrobe_owner', 'test-password')
@@ -356,15 +373,27 @@ class AnalysisEndpointTests(TestCase):
         self.assertEqual(self.client.post('/api/wardrobe/analyze/', '{}', content_type='application/json').status_code, 415)
         analyze.assert_not_called()
 
-    @override_settings(GEMINI_API_KEY='')
+    @override_settings(OPENROUTER_API_KEY='', GEMINI_API_KEY='unused-google-key')
     def test_key_missing_returns_safe_error(self):
         response = self.client.post('/api/wardrobe/analyze/', photo(), content_type='image/jpeg')
         self.assertEqual(response.status_code, 503)
         self.assertEqual(response.json(), {'error': 'AI_NOT_CONFIGURED'})
 
+    @patch('apps.wardrobe.views.analyze_image', return_value=(attributes(), None))
+    def test_second_analysis_is_allowed_without_using_landmark_slot(self, analyze):
+        from .views import ANALYSIS_SLOTS, LANDMARK_SLOTS
+        with ANALYSIS_SLOTS, LANDMARK_SLOTS:
+            response = self.client.post('/api/wardrobe/analyze/', photo(), content_type='image/jpeg')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(analyze.call_args.args[1], 'test-key')
+
     def test_busy(self):
         from .views import ANALYSIS_SLOTS
-        with ANALYSIS_SLOTS:
+        from contextlib import ExitStack
+        from django.conf import settings
+        with ExitStack() as stack:
+            for _ in range(settings.WARDROBE_ANALYSIS_CONCURRENCY):
+                stack.enter_context(ANALYSIS_SLOTS)
             response = self.client.post('/api/wardrobe/analyze/', photo(), content_type='image/jpeg')
         self.assertEqual(response.status_code, 429)
 

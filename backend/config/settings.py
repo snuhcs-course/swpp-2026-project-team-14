@@ -71,3 +71,7 @@ MEDIA_ROOT = Path(os.environ.get("WARDROBE_MEDIA_ROOT", str(BASE_DIR / "private/
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "").strip()
 OPENROUTER_IMAGE_MODEL = os.environ.get("OPENROUTER_IMAGE_MODEL", "google/gemini-2.5-flash-image").strip()
 WORN_SEGMENTATION_MODEL = Path(os.environ.get("WORN_SEGMENTATION_MODEL", str(BASE_DIR / "models/segformer_clothes.onnx")))
+
+# Original-photo understanding uses a paid vision model through OpenRouter.
+OPENROUTER_VISION_MODEL = os.environ.get("OPENROUTER_VISION_MODEL", "google/gemini-3.5-flash-lite").strip()
+WARDROBE_ANALYSIS_CONCURRENCY = max(1, min(4, int(os.environ.get("WARDROBE_ANALYSIS_CONCURRENCY", "2"))))
