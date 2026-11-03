@@ -59,7 +59,7 @@ swpp-2026-project-team-14/
 |   |               |-- MeasurementActivity.kt  # 세션 복원·인증 측정점·실측 촬영·확인·수정
 |   |               `-- MeasurementCamera.kt    # AR 카메라·촬영 프레임 고정
 |   |-- debug/
-|   |   |-- AndroidManifest.xml                  # 개발 빌드 전용 UI 미리보기 실행 항목
+|   |   |-- AndroidManifest.xml                  # 개발 빌드 전용 UI 미리보기 Activity(앱 목록 미표시, adb로 실행)
 |   |   `-- java/com/swpp/stylemate/ui/wardrobe/
 |   |       |-- WornPreviewActivity.kt            # 개인 앱 파일의 기존 이미지·예시 값으로 UI만 체험, 네트워크/저장 없음
 |   |       `-- WornPreviewReviewScreen.kt        # 서비스 공용 확인 화면에 로컬 이미지·예시 상태/설정만 제공
