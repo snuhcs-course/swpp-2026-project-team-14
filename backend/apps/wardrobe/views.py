@@ -18,7 +18,7 @@ from apps.users.models import User
 from apps.users.pagination import account_page
 from recommendation.labeling import label
 
-from .analysis import AnalysisError, MAX_IMAGE_BYTES, MODEL, analyze_image, prepare_image
+from .analysis import AnalysisError, MAX_IMAGE_BYTES, model_name, analyze_image, prepare_image
 from .editor import catalog, validate_record
 from .schema import validate_ai_details, validate_attributes
 from .models import Garment, CategoryInUse, WornGeneration
@@ -26,7 +26,8 @@ from .worn_estimates import suggestions, estimate_matches
 from .landmarks import GARMENTS, MAX_FRAME_BYTES, detect
 
 # Bound concurrent paid requests and image decode memory.
-ANALYSIS_SLOTS = BoundedSemaphore(1)
+ANALYSIS_SLOTS = BoundedSemaphore(settings.WARDROBE_ANALYSIS_CONCURRENCY)
+LANDMARK_SLOTS = BoundedSemaphore(1)
 
 
 @require_POST
@@ -34,7 +35,7 @@ ANALYSIS_SLOTS = BoundedSemaphore(1)
 def landmarks(request):
     if request.content_type not in ('image/jpeg', 'image/png', 'image/webp'):
         return JsonResponse({'error': 'IMAGE_REQUIRED'}, status=415)
-    if not ANALYSIS_SLOTS.acquire(blocking=False):
+    if not LANDMARK_SLOTS.acquire(blocking=False):
         return JsonResponse({'error': 'AI_BUSY'}, status=429)
     try:
         result = detect(request.read(MAX_FRAME_BYTES + 1), request.GET.get('garment'))
@@ -44,7 +45,7 @@ def landmarks(request):
     except AnalysisError as error:
         return JsonResponse({'error': error.code}, status=error.status)
     finally:
-        ANALYSIS_SLOTS.release()
+        LANDMARK_SLOTS.release()
 
 
 @require_POST
@@ -72,7 +73,7 @@ def _analyze(request, target=None):
             existing = Garment.objects.filter(user=request.user, request_key=request_key).first()
             if existing:
                 generation = WornGeneration.objects.get(garment=existing)
-                result = JsonResponse({**serialize(existing), 'details': generation.details, 'model': MODEL})
+                result = JsonResponse({**serialize(existing), 'details': generation.details, 'model': model_name()})
                 result['Cache-Control'] = 'no-store'
                 return result
             return _analyze_once(request, target, request_key)
@@ -90,12 +91,12 @@ def _analyze_once(request, target=None, request_key=None):
         garment_type = request.GET.get('garment')
         labels_value = estimates = None
         if target:
-            attributes, details, *wearing = analyze_image(image, settings.GEMINI_API_KEY,
+            attributes, details, *wearing = analyze_image(image, settings.OPENROUTER_API_KEY,
                                                         target_category=target, include_wearing=True)
             labels_value, estimates = suggestions(attributes, details, wearing[0] if wearing else None,
                                                   request.user.body_profile)
         else:
-            attributes, details = analyze_image(image, settings.GEMINI_API_KEY,
+            attributes, details = analyze_image(image, settings.OPENROUTER_API_KEY,
                                                 garment_type if garment_type in GARMENTS else None)
         garment = Garment(user=request.user, attributes=attributes,
                           labels=labels_value, estimated_dimensions=estimates,
@@ -109,7 +110,7 @@ def _analyze_once(request, target=None, request_key=None):
         except Exception:
             garment.image.delete(save=False)
             raise
-        response = JsonResponse({'id': str(garment.id), 'model': MODEL, 'attributes': attributes, 'details': details,
+        response = JsonResponse({'id': str(garment.id), 'model': model_name(), 'attributes': attributes, 'details': details,
                                  **(serialize(garment) if target else {})})
         response['Cache-Control'] = 'no-store'
         return response

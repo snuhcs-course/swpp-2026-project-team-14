@@ -12,7 +12,7 @@ from .analysis import AnalysisError
 from .editor import TOP_DIMENSIONS, validate_record
 from .landmarks import MAX_FRAME_BYTES, decode, detect, prepare_frame
 from .tests import attributes, photo
-from .views import ANALYSIS_SLOTS
+from .views import LANDMARK_SLOTS
 
 
 class LandmarkTests(TestCase):
@@ -81,17 +81,17 @@ class LandmarkTests(TestCase):
 
     @patch('apps.wardrobe.landmarks.session', side_effect=AnalysisError('LANDMARK_NOT_CONFIGURED', 503))
     def test_busy_and_failure_release_slot(self, engine):
-        ANALYSIS_SLOTS.acquire()
+        LANDMARK_SLOTS.acquire()
         try:
             self.assertEqual(self.client.post('/api/wardrobe/landmarks/?garment=trousers', photo(), content_type='image/jpeg').status_code, 429)
             engine.assert_not_called()
         finally:
-            ANALYSIS_SLOTS.release()
+            LANDMARK_SLOTS.release()
         response = self.client.post('/api/wardrobe/landmarks/?garment=trousers', photo(), content_type='image/jpeg')
         self.assertEqual(response.status_code, 503)
         self.assertEqual(response.json(), {'error': 'LANDMARK_NOT_CONFIGURED'})
-        self.assertTrue(ANALYSIS_SLOTS.acquire(blocking=False))
-        ANALYSIS_SLOTS.release()
+        self.assertTrue(LANDMARK_SLOTS.acquire(blocking=False))
+        LANDMARK_SLOTS.release()
 
     def test_assisted_measurements_preserve_provenance(self):
         measurement = {'value': 45.123, 'source': 'arcore_assisted',

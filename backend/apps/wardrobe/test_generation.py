@@ -19,7 +19,7 @@ from .worn import generate
 from recommendation.labeling import options
 
 
-@override_settings(GEMINI_API_KEY='test-key')
+@override_settings(OPENROUTER_API_KEY='test-key')
 class GenerationFlowTests(TestCase):
     def setUp(self):
         user = User.objects.create_user('generation_owner', 'test-password')

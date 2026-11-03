@@ -55,6 +55,7 @@ internal fun detectionErrorMessage(code: String): String = when (code) {
     "IMAGE_NO_PERSON" -> "옷을 입은 사람이 보이는 사진을 골라 주세요."
     "IMAGE_TARGET_UNCLEAR" -> "등록할 옷을 구분하지 못했어요. 옷이 더 잘 보이는 다른 사진을 골라 주세요."
     "AI_RATE_LIMITED", "AI_BUSY" -> "분석 요청이 많습니다. 잠시 후 다른 사진으로 다시 시도해 주세요."
+    "AI_CREDITS_REQUIRED" -> "옷 분석 서비스의 잔액이 부족해요. 관리자에게 충전을 요청해 주세요."
     "AI_TIMEOUT", "DETECTION_INTERRUPTED" -> "옷 찾기가 시간 안에 끝나지 않았어요. 사진을 다시 선택해 주세요."
     "AI_NOT_CONFIGURED", "AI_AUTH_FAILED", "AI_MODEL_UNAVAILABLE" -> "서버의 옷 분석 API 설정을 확인해 주세요."
     "AI_REQUEST_INVALID" -> "서버 오류로 사진을 분석하지 못했어요. 잠시 후 다시 시도해 주세요."

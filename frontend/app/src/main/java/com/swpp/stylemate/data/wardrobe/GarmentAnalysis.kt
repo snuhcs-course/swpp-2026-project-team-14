@@ -61,6 +61,8 @@ internal suspend fun requestAnalysis(context: Context, photo: String, garmentTyp
             "AI_NOT_CONFIGURED" -> "서버에 API 키를 설정해 주세요."
             "AI_AUTH_FAILED" -> "서버의 API 키를 확인해 주세요."
             "AI_RATE_LIMITED", "AI_BUSY" -> "잠시 후 다시 분석해 주세요."
+            "AI_CREDITS_REQUIRED" -> "옷 분석 서비스의 잔액이 부족해요. 관리자에게 충전을 요청해 주세요."
+            "AI_MODEL_UNAVAILABLE", "AI_REQUEST_INVALID" -> "서버의 옷 분석 API 설정을 확인해 주세요."
             "AI_TIMEOUT" -> "분석 시간이 초과됐습니다. 다시 시도해 주세요."
             "IMAGE_MULTIPLE" -> "옷 한 벌만 촬영해 주세요."
             "IMAGE_TARGET_UNCLEAR" -> "선택한 옷을 구분하지 못했습니다. 영역과 옷 종류를 다시 골라 주세요."

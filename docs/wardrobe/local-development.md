@@ -21,7 +21,11 @@ python -m venv .venv
 | `MYSQL_HOST`, `MYSQL_PORT` | MySQL 서버 주소·포트. 로컬 기본 예시: `127.0.0.1:3306` |
 | `MYSQL_DATABASE` | 사용할 기존 DB 이름 |
 | `MYSQL_USER`, `MYSQL_PASSWORD` | 해당 DB에 접근 가능한 계정 |
-| `GEMINI_API_KEY` | Gemini API 키. 서버에서만 사용 |
+| `GEMINI_API_KEY` | Gemini 직접 호출을 선택한 다른 기능용. 옷 분석·옷 찾기는 사용하지 않음 |
+| `OPENROUTER_API_KEY` | 옷 분석·옷 찾기·펼침 생성용 서버 키 |
+| `OPENROUTER_VISION_MODEL` | 원본 분석·옷 찾기 모델. 기본 `google/gemini-3.5-flash-lite` |
+| `OPENROUTER_IMAGE_MODEL` | 펼침 이미지 생성 모델. 기본 `google/gemini-2.5-flash-image` |
+| `WARDROBE_ANALYSIS_CONCURRENCY` | 프로세스별 외부 분석 동시 건수. 기본 2, 1~4로 제한 |
 | `DJANGO_SECRET_KEY` | Django 비밀 키 |
 | `DJANGO_DEBUG` | 개발 시 `1`, 배포 시 `0` |
 | `DJANGO_ALLOWED_HOSTS` | 쉼표로 구분한 서버 호스트 이름·주소 |
@@ -47,7 +51,7 @@ MySQL에 사용할 DB와 계정을 준비한 뒤 `.env`를 입력하고 다음 �
 
 ## 4. 모델 준비
 
-착용 사진 등록의 펼침 생성은 `OPENROUTER_API_KEY`, `OPENROUTER_IMAGE_MODEL`(기본 `google/gemini-2.5-flash-image`)을 서버 `.env`에 설정한다. 기존 `GEMINI_API_KEY`는 원본 옷 정보 분석에 계속 사용한다. 로컬 의류 분할 가중치는 `python manage.py prepare_worn_model`로 다운로드·검증한다. 기본 위치는 `backend/models/segformer_clothes.onnx`이고 `WORN_SEGMENTATION_MODEL` 절대 경로로 변경할 수 있다. Docker는 동일 고정 버전·체크섬 파일을 이미지에 포함한다. 임시 실험 경로와 별도 PyTorch 설치는 필요 없다.
+착용 사진 등록의 펼침 생성은 `OPENROUTER_API_KEY`, `OPENROUTER_IMAGE_MODEL`(기본 `google/gemini-2.5-flash-image`)을 서버 `.env`에 설정한다. 일반 옷 사진 분석과 착용 사진의 후보·특징 분석은 같은 `OPENROUTER_API_KEY`와 `OPENROUTER_VISION_MODEL`을 사용한다. 분석 실패 시 무료 Gemini 키로 자동 전환하거나 재요청하지 않는다. 모델의 이미지 입력과 구조화 JSON 지원을 확인해야 하며, OpenRouter [구조화 출력](https://openrouter.ai/docs/guides/features/structured-outputs)의 `require_parameters`를 적용한다. OpenRouter도 잔액·제공자 한도로 402·429가 발생할 수 있다. 로컬 의류 분할 가중치는 `python manage.py prepare_worn_model`로 다운로드·검증한다. 기본 위치는 `backend/models/segformer_clothes.onnx`이고 `WORN_SEGMENTATION_MODEL` 절대 경로로 변경할 수 있다. Docker는 동일 고정 버전·체크섬 파일을 이미지에 포함한다. 임시 실험 경로와 별도 PyTorch 설치는 필요 없다.
 
 체형 모델은 [백엔드 안내](../../backend/README.md)에 따라 `backend/models/pose_landmarker_heavy.task`에 준비한다.
 
@@ -140,7 +144,7 @@ adb shell am start -n com.swpp.stylemate/.ui.wardrobe.WornPreviewActivity
 | 구성 | 배포 설정 |
 | --- | --- |
 | MySQL | 환경변수 입력 후 `python manage.py migrate` 실행 |
-| Gemini | 컨테이너 환경에 `GEMINI_API_KEY` 입력 |
+| 옷 분석·생성 | `OPENROUTER_API_KEY`, 선택적으로 `OPENROUTER_VISION_MODEL`·`OPENROUTER_IMAGE_MODEL` 입력 |
 | 옷 사진 | 영구 볼륨 연결, uid 10001에 쓰기 권한 부여 |
 | HRNet | Docker 빌드에서 준비, 기본 경로 `/app/wardrobe/garment-landmarks` 사용 |
 

@@ -91,10 +91,10 @@ class PhotoEstimateMathTests(SimpleTestCase):
         self.assertEqual(seen['fit'], '루즈')
         send.assert_called_once()
         original = json.loads(_build_request(photo(), 'test-key').data)
-        self.assertNotIn('wearing', original['generationConfig']['responseJsonSchema']['properties'])
+        self.assertNotIn('wearing', original['response_format']['json_schema']['schema']['properties'])
 
 
-@override_settings(GEMINI_API_KEY='test-key')
+@override_settings(OPENROUTER_API_KEY='test-key')
 class PhotoEstimateApiTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user('estimate_owner', 'test-password', body_profile=profile())
