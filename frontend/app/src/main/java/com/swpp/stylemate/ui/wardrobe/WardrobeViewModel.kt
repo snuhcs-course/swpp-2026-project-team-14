@@ -26,7 +26,9 @@ import org.json.JSONObject
 
 data class WardrobeState(val records: List<JSONObject> = emptyList(), val catalog: JSONObject? = null,
                          val loading: Boolean = false, val saving: Boolean = false,
-                         val error: String? = null, val saveError: String? = null, val savedId: String? = null)
+                         val error: String? = null, val saveError: String? = null, val savedId: String? = null,
+                         val deletingId: String? = null, val deleteError: String? = null,
+                         val deletedId: String? = null)
 
 data class ExternalMatchState(val garmentId: String? = null, val loading: Boolean = false,
                               val result: ExternalRecommendation? = null, val error: String? = null)
@@ -40,14 +42,14 @@ class WardrobeViewModel(private val store: LocalUserStore, private val account: 
     init { refresh() }
 
     fun refresh() {
-        if (mutableState.value.loading || mutableState.value.saving) return
+        if (mutableState.value.loading || mutableState.value.saving || mutableState.value.deletingId != null) return
         mutableState.value = mutableState.value.copy(loading = true, error = null)
         viewModelScope.launch {
             try {
                 val rows = org.json.JSONArray(withContext(Dispatchers.IO) { store.garments() })
                 val cached = withContext(Dispatchers.IO) { store.get("catalog") }
                 mutableState.value = mutableState.value.copy(catalog = cached,
-                    records = (0 until rows.length()).map { rows.getJSONObject(it) }, loading = false)
+                    records = (0 until rows.length()).map { rows.getJSONObject(it) })
                 run {
                     val remote = WardrobeRepository.json("/api/wardrobe/items/", store = store, account = account).getJSONArray("items")
                     mutableState.value = mutableState.value.copy(records = (0 until remote.length()).map { remote.getJSONObject(it) })
@@ -60,7 +62,7 @@ class WardrobeViewModel(private val store: LocalUserStore, private val account: 
     }
 
     fun save(id: String, payload: JSONObject) {
-        if (mutableState.value.saving || mutableState.value.loading) return
+        if (mutableState.value.saving || mutableState.value.loading || mutableState.value.deletingId != null) return
         mutableState.value = mutableState.value.copy(saving = true, saveError = null)
         viewModelScope.launch {
             try {
@@ -75,6 +77,27 @@ class WardrobeViewModel(private val store: LocalUserStore, private val account: 
     }
 
     fun clearSaveState() { mutableState.value = mutableState.value.copy(savedId = null, saveError = null) }
+
+    fun delete(id: String) {
+        val current = mutableState.value
+        if (current.loading || current.saving || current.deletingId != null || current.records.none { it.optString("id") == id }) return
+        mutableState.value = current.copy(deletingId = id, deleteError = null)
+        viewModelScope.launch {
+            try {
+                WardrobeRepository.delete(id, store, account)
+                if (mutableExternalMatch.value.garmentId == id) closeExternalMatch()
+                mutableState.value = mutableState.value.copy(deletingId = null, deleteError = null, deletedId = id,
+                    records = mutableState.value.records.filter { it.optString("id") != id })
+            } catch (error: CancellationException) { throw error }
+            catch (error: Exception) {
+                mutableState.value = mutableState.value.copy(deletingId = null,
+                    deleteError = error.message ?: "삭제하지 못했습니다. 다시 시도해 주세요.")
+            }
+        }
+    }
+
+    fun clearDeleteError() { mutableState.value = mutableState.value.copy(deleteError = null) }
+    fun clearDeleted() { mutableState.value = mutableState.value.copy(deletedId = null) }
 
     fun matchExternal(garmentId: String) {
         externalMatchJob?.cancel()

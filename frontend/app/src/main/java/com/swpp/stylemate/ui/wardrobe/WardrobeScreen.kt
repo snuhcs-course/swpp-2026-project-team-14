@@ -43,6 +43,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.res.painterResource
+import com.swpp.stylemate.R
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -72,6 +74,7 @@ fun WardrobeRoute(
     onCancel: (() -> Unit)? = null,
     onboardingTopBar: (@Composable (onBack: () -> Unit, enabled: Boolean) -> Unit)? = null,
     localStore: LocalUserStore? = null,
+    onDeleted: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val account = checkNotNull(LocalAccountAccess.current)
@@ -106,6 +109,9 @@ fun WardrobeRoute(
         initializer { WardrobeViewModel(store, account) }
     })
     val wardrobe by wardrobeModel.state.collectAsStateWithLifecycle()
+    LaunchedEffect(wardrobe.deletedId) {
+        if (wardrobe.deletedId != null) { wardrobeModel.clearDeleted(); onDeleted() }
+    }
     val externalMatch by wardrobeModel.externalMatch.collectAsStateWithLifecycle()
     var actionItemId by rememberSaveable { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) { wardrobeModel.refresh() }
@@ -340,6 +346,9 @@ fun WardrobeRoute(
             onWornPhoto = { wornRegistration = true },
             onCapture = { wardrobeModel.clearSaveState(); takePhoto() },
             onItemClick = { actionItemId = it.id },
+            onDelete = { wardrobeModel.delete(it.id) },
+            deletingId = wardrobe.deletingId, deleteError = wardrobe.deleteError,
+            onDeleteDismiss = wardrobeModel::clearDeleteError,
             loading = wardrobe.loading,
             onRetry = if (wardrobe.error != null) ({ wardrobeModel.refresh() }) else null)
       }
@@ -474,7 +483,34 @@ fun WardrobeRoute(
 fun WardrobeScreen(items: List<WardrobeItem>, message: String?, cameraBusy: Boolean,
                    onCapture: () -> Unit,
                    onItemClick: (WardrobeItem) -> Unit = {}, loading: Boolean = false, onRetry: (() -> Unit)? = null,
-                   onWornPhoto: (() -> Unit)? = null) {
+                   onWornPhoto: (() -> Unit)? = null,
+                   onDelete: ((WardrobeItem) -> Unit)? = null, deletingId: String? = null,
+                   deleteError: String? = null, onDeleteDismiss: () -> Unit = {}) {
+    var pendingDeleteId by rememberSaveable { mutableStateOf<String?>(null) }
+    val pendingDelete = items.firstOrNull { it.id == pendingDeleteId }
+    LaunchedEffect(items) {
+        if (pendingDeleteId != null && pendingDelete == null) pendingDeleteId = null
+    }
+    if (pendingDelete != null && onDelete != null) {
+        val deleting = deletingId != null
+        fun dismissDelete() {
+            if (!deleting) { pendingDeleteId = null; onDeleteDismiss() }
+        }
+        AlertDialog(
+            onDismissRequest = ::dismissDelete,
+            title = { Text("의상 삭제") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("해당 의상을 삭제하시겠습니까?")
+                    Text("이 의상이 포함된 코디도 함께 삭제됩니다.", style = MaterialTheme.typography.bodyMedium)
+                    deleteError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                    if (deleting) LinearProgressIndicator(Modifier.fillMaxWidth())
+                }
+            },
+            confirmButton = { TextButton(onClick = { onDelete(pendingDelete) }, enabled = !deleting) { Text("예") } },
+            dismissButton = { TextButton(onClick = ::dismissDelete, enabled = !deleting) { Text("아니요") } },
+        )
+    }
     var choosingMethod by rememberSaveable { mutableStateOf(false) }
     if (choosingMethod) RegistrationMethodSheet(onDismiss = { choosingMethod = false },
         onWornPhoto = onWornPhoto?.let { { choosingMethod = false; it() } },
@@ -522,12 +558,20 @@ fun WardrobeScreen(items: List<WardrobeItem>, message: String?, cameraBusy: Bool
                     contentPadding = PaddingValues(bottom = 12.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     items(visible, key = { it.id }) { garment ->
-                        Card(onClick = { onItemClick(garment) }, shape = RoundedCornerShape(16.dp),
+                        Card(onClick = { onItemClick(garment) }, enabled = deletingId == null, shape = RoundedCornerShape(16.dp),
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
                             Box(Modifier.fillMaxWidth().aspectRatio(1f), contentAlignment = Alignment.Center) {
                                 if (garment.thumbnail != null) Image(garment.thumbnail, garment.name, Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
                                 else if (garment.imageUrl != null) GarmentPhoto(garment.imageUrl, garment.name)
                                 else Text("사진 없음", style = MaterialTheme.typography.labelSmall)
+                                if (onDelete != null) IconButton(
+                                    onClick = { onDeleteDismiss(); pendingDeleteId = garment.id },
+                                    modifier = Modifier.align(Alignment.TopEnd),
+                                    enabled = !loading && deletingId == null,
+                                ) {
+                                    Icon(painterResource(R.drawable.ic_remove_garment), "${garment.name} 삭제",
+                                        Modifier.size(24.dp), tint = MaterialTheme.colorScheme.primary)
+                                }
                             }
                             Column(Modifier.fillMaxWidth().padding(12.dp).heightIn(min = cardTextHeight),
                                 verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically)) {

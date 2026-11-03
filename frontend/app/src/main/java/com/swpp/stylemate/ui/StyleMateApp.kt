@@ -213,6 +213,7 @@ private fun ProfileSetupFlow(viewModel: BodyProfileViewModel, canCancel: Boolean
 
 @Composable
 private fun MainTabs(viewModel: BodyProfileViewModel, authModel: AuthViewModel, importModel: GuestImportViewModel) {
+    var wardrobeRevision by rememberSaveable { mutableStateOf(0) }
     val app by viewModel.app.collectAsStateWithLifecycle()
     val auth by authModel.state.collectAsStateWithLifecycle()
     val account = checkNotNull(LocalAccountAccess.current)
@@ -248,9 +249,9 @@ private fun MainTabs(viewModel: BodyProfileViewModel, authModel: AuthViewModel, 
         when (tab) {
             Tab.HOME -> HomeRoute(app.profile, onSetupProfile = viewModel::startReanalysis,
                 onOpenWardrobe = { tab = Tab.WARDROBE }, modifier = Modifier.padding(padding).consumeWindowInsets(padding),
-                onChat = { outfit, weather -> chat.open(outfit, app.profile, weather) })
-            Tab.WARDROBE -> Box(Modifier.padding(padding).consumeWindowInsets(padding)) { WardrobeRoute() }
-            Tab.CODIBOOK -> CodiBookRoute(Modifier.padding(padding).consumeWindowInsets(padding))
+                onChat = { outfit, weather -> chat.open(outfit, app.profile, weather) }, wardrobeRevision = wardrobeRevision)
+            Tab.WARDROBE -> Box(Modifier.padding(padding).consumeWindowInsets(padding)) { WardrobeRoute(onDeleted = { wardrobeRevision++ }) }
+            Tab.CODIBOOK -> CodiBookRoute(Modifier.padding(padding).consumeWindowInsets(padding), wardrobeRevision = wardrobeRevision)
             Tab.PROFILE -> MyProfileScreen(
                 profile = app.profile,
                 style = app.style,

@@ -176,9 +176,23 @@ def items(request):
     return response
 
 
-@require_http_methods(['GET', 'PUT'])
+@require_http_methods(['GET', 'PUT', 'DELETE'])
 @require_auth
 def item(request, item_id):
+    if request.method == 'DELETE':
+        from apps.outfits.models import Outfit
+
+        with transaction.atomic():
+            # Match the lock used when creating/editing outfits and importing account data.
+            User.objects.select_for_update().get(pk=request.user.pk)
+            garment = Garment.objects.filter(pk=item_id, user=request.user).first()
+            if garment is None:
+                return JsonResponse({'error': 'GARMENT_NOT_FOUND'}, status=404)
+            Outfit.objects.filter(user=request.user, items__garment=garment).delete()
+            garment.delete()
+        response = JsonResponse({'deleted_id': str(item_id)})
+        response['Cache-Control'] = 'no-store'
+        return response
     garment = get_object_or_404(Garment, pk=item_id, user=request.user)
     if request.method == 'PUT':
         if request.content_type != 'application/json':
