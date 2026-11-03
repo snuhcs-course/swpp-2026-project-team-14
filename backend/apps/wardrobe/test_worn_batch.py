@@ -35,6 +35,15 @@ def candidates():
                 ('bottom', '검정 반바지', 'shorts', [200, 600, 800, 900])]]
 
 
+def layered_candidates():
+    rows = candidates()
+    rows[1]['attributes'].update(category='bottom', subcategory='skirt', name='회색 플리츠 스커트')
+    rows[1]['bounds'] = [250, 450, 800, 700]
+    rows[2]['attributes'].update(subcategory='slacks', name='회색 슬랙스')
+    rows[2]['bounds'] = [200, 600, 850, 950]
+    return rows
+
+
 class WornDetectionTests(SimpleTestCase):
     def result(self, rows=None, people=1):
         values = []
@@ -86,6 +95,21 @@ class WornDetectionTests(SimpleTestCase):
             with self.assertRaises(AnalysisError) as error:
                 worn_detection.detect(source(), 'test-key')
             self.assertEqual(error.exception.code, code)
+
+    @patch('apps.wardrobe.worn_detection._send_request')
+    def test_visible_skirt_over_trousers_is_three_distinct_candidates(self, send):
+        rows = layered_candidates()
+        send.return_value = self.result(rows)
+        result = worn_detection.detect(source(), 'test-key')
+        self.assertEqual([r['attributes']['subcategory'] for r in result], ['coat', 'skirt', 'slacks'])
+        self.assertEqual([r['bounds'] for r in result], [r['bounds'] for r in rows])
+        self.assertEqual(len({r['id'] for r in result}), 3)
+        send.assert_called_once()
+        duplicated = deepcopy(rows)
+        duplicated[1]['attributes']['subcategory'] = 'jeans'
+        send.return_value = self.result(duplicated)
+        with self.assertRaises(AnalysisError):
+            worn_detection.detect(source(), 'test-key')  # two trouser groups remain ambiguous
 
     def test_crop_uses_original_pixels_and_normalized_coordinate_order(self):
         output = Image.open(BytesIO(worn_detection.crop(source(), [250, 250, 750, 750])))
@@ -155,6 +179,21 @@ class WornBatchFlowTests(TestCase):
             self.assertIsNone(item['labels']['fit'])
             self.assertIsNone(item['labels']['length'])  # shorts also must be chosen by the user
         self.assertEqual(self.post(path + 'prepare/', {'candidate_ids': [str(uuid.uuid4())]}).status_code, 400)
+
+    def test_layered_skirt_and_trousers_prepare_and_save_as_separate_garments(self):
+        with patch('apps.wardrobe.worn_detection.detect', return_value=layered_candidates()):
+            photo = self.client.post('/api/wardrobe/worn-photos/?request_id=' + str(uuid.uuid4()),
+                                     source(), content_type='image/jpeg').json()
+        path = '/api/wardrobe/worn-photos/' + photo['id'] + '/'
+        result = self.post(path + 'prepare/', {'candidate_ids': [c['id'] for c in photo['candidates']]})
+        self.assertEqual(result.status_code, 200)
+        records = result.json()['items']
+        self.assertEqual([r['attributes']['subcategory'] for r in records], ['coat', 'skirt', 'slacks'])
+        self.generate(records)  # mocked image generation, no external calls
+        saved = self.post(path + 'save/', {'items': [self.payload(r) for r in records]})
+        self.assertEqual(saved.status_code, 200)
+        self.assertEqual(Garment.objects.filter(saved=True).count(), 3)
+        self.assertEqual(WornGeneration.objects.values('candidate_id').distinct().count(), 3)
 
     def test_batch_save_requires_each_image_approval_and_is_atomic(self):
         photo, path, selected, records = self.drafts()
