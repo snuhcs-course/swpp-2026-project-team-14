@@ -50,6 +50,25 @@ class DummyWardrobeTests(TestCase):
         self.assertEqual(Garment.objects.filter(user=self.user).count(), len(_items()) + 1)
         self.assertTrue(Garment.objects.filter(pk=own.pk).exists())
 
+    def test_deleted_dummy_items_stay_deleted_and_keep_the_shared_image(self):
+        other = User.objects.create_user('dummy_04', PASSWORD)
+        ensure_dummy_wardrobe(self.user)
+        ensure_dummy_wardrobe(other)
+        garment = Garment.objects.filter(user=self.user).first()
+        _, token = issue_token(self.user)
+        auth = {'HTTP_AUTHORIZATION': f'Bearer {token}'}
+        self.assertEqual(self.client.delete(f'/api/wardrobe/items/{garment.pk}/', **auth).status_code, 200)
+        self.client.get('/api/wardrobe/items/', **auth)
+        self.login()
+        self.assertEqual(Garment.objects.filter(user=self.user).count(), len(_items()) - 1)
+        self.assertTrue((self.media / garment.image.name).exists())
+        twin = Garment.objects.get(user=other, image=garment.image.name)
+        _, other_token = issue_token(other)
+        response = self.client.get(f'/api/wardrobe/items/{twin.pk}/image/', HTTP_AUTHORIZATION=f'Bearer {other_token}')
+        self.assertEqual(response.status_code, 200)
+        self.assertGreater(len(b''.join(response.streaming_content)), 1000)
+        response.close()  # release the file handle before the temp media folder is removed
+
     def test_existing_session_gets_it_from_the_wardrobe_list(self):
         _, token = issue_token(self.user)
         response = self.client.get('/api/wardrobe/items/', HTTP_AUTHORIZATION=f'Bearer {token}')

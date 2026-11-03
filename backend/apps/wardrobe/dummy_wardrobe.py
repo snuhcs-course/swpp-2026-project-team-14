@@ -4,9 +4,10 @@
 Enabled only when HE_DUMMY_WARDROBE is set. Remove this module, its data folder (he_dummy/) and the
 three call sites (login/register, wardrobe list, recommend) after HE.
 
-Each image is stored once in media and shared by every account's garment rows; no code path deletes
-a saved garment's image, so sharing is safe. Garment IDs are stable per account, so repeated calls
-only add what is missing and never duplicate or overwrite the user's own garments.
+Each image is stored once in media and shared by every account's garment rows; deleting a garment
+removes only its row (Django never deletes FileField files), so sharing is safe. Garment IDs are
+stable per account. The set is added once: if the account holds any dummy garment, nothing is added,
+so items a tester deletes stay deleted. The user's own garments are never touched.
 """
 
 import json
@@ -43,12 +44,10 @@ def ensure_dummy_wardrobe(user):
     if not settings.HE_DUMMY_WARDROBE:
         return
     ids = {uuid5(NAMESPACE_URL, f'stylemate-he-dummy/{user.pk}/{item["file"]}'): item for item in _items()}
-    existing = set(Garment.objects.filter(user=user, pk__in=ids).values_list('pk', flat=True))
-    missing = [(pk, item) for pk, item in ids.items() if pk not in existing]
-    if not missing:
-        return
+    if Garment.objects.filter(user=user, pk__in=ids).exists():
+        return  # already given; deleted items must not come back
     rows = []
-    for pk, item in missing:
+    for pk, item in ids.items():
         labels = label(item['attributes'], None)
         if labels is not None:
             labels['confirmed'] = True
