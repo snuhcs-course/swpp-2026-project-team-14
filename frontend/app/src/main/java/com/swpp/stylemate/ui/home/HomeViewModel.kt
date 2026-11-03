@@ -93,12 +93,17 @@ class HomeViewModel(private val repository: OutfitRepository, private val taste:
                 val (updated, preference) = repository.feedback(outfit.id, newValue, taste.load())
                 taste.save(preference)
                 replace(updated)
-                mutableState.value = mutableState.value.copy(acting = false, message = when (newValue) {
-                    "liked" -> "비슷한 코디를 더 자주 추천할게요."
-                    "disliked" -> "비슷한 코디는 덜 추천할게요."
-                    else -> null
-                })
-                if (newValue == "disliked") next()
+                // A dislike moves on in the same update, so nobody sees the disliked outfit as idle.
+                val state = mutableState.value
+                val moveOn = newValue == "disliked"
+                val hasNext = state.index + 1 < state.outfits.size
+                mutableState.value = state.copy(acting = false, index = if (moveOn && hasNext) state.index + 1 else state.index,
+                    message = when (newValue) {
+                        "liked" -> "비슷한 코디를 더 자주 추천할게요."
+                        "disliked" -> "비슷한 코디는 덜 추천할게요."
+                        else -> null
+                    })
+                if (moveOn && !hasNext) next()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: OutfitApiException) {
