@@ -106,6 +106,8 @@ swpp-2026-project-team-14/
 |   |       |-- worn_estimates.py                # 원본 착용 관찰·본인 체형·기존 여유량 규칙으로 참고 치수/범위 계산
 |   |       |-- worn_photo_views.py              # 소유 원본/후보 접근·멱등 초안 준비·승인한 여러 옷 원자적 저장
 |   |       |-- management/commands/prepare_worn_model.py # 고정 모델 다운로드·SHA-256 검증
+|   |       |-- dummy_wardrobe.py                # 임시(HE 11/4 전용): HE_DUMMY_WARDROBE 켜면 모든 계정에 공용 더미 옷 45벌 추가, HE 후 삭제
+|   |       |-- he_dummy/                        # 임시(HE 전용): 팀이 AI로 만든 더미 옷 사진·속성(items.json)
 |   |       |-- landmarks.py                     # HRNet 추론·좌표 복원·치수별 경로 계산
 |   |       |-- schema.py                        # 속성·선택지·details 검증·Gemini 복잡도 제한용 응답 형식 축소
 |   |       |-- editor.py                        # 치수 정의·측정값·저장 요청(추천 라벨 포함) 검증

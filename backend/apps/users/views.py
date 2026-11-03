@@ -78,6 +78,8 @@ def serialize(user):
 
 
 def _authenticated_response(user, status=200):
+    from apps.wardrobe.dummy_wardrobe import ensure_dummy_wardrobe  # temporary, HE only
+    ensure_dummy_wardrobe(user)
     token, raw = issue_token(user)
     return _json({'token': raw, 'expires_at': token.expires_at.isoformat(), 'user': serialize(user)}, status)
 

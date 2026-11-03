@@ -1,0 +1,859 @@
+{
+ "note": "Temporary HE (11/4) dummy wardrobe. AI-generated images made by the team. Remove after HE.",
+ "items": [
+  {
+   "file": "outerwear_jacket_01.jpg",
+   "attributes": {
+    "name": "가죽 재킷",
+    "category": "outerwear",
+    "colors": [
+     "#202020"
+    ],
+    "subcategory": "jacket",
+    "styles": [
+     "casual",
+     "street"
+    ],
+    "fit_type": null,
+    "leg_shape": null,
+    "rise_type": null,
+    "skirt_shape": null
+   }
+  },
+  {
+   "file": "top_knitwear_01.jpg",
+   "attributes": {
+    "name": "스퀘어넥 니트 티셔츠",
+    "category": "top",
+    "colors": [
+     "#202020"
+    ],
+    "subcategory": "knitwear",
+    "styles": [
+     "minimal",
+     "casual"
+    ],
+    "fit_type": null,
+    "leg_shape": null,
+    "rise_type": null,
+    "skirt_shape": null
+   }
+  },
+  {
+   "file": "bottom_skirt_01.jpg",
+   "attributes": {
+    "name": "블랙 미디 스커트",
+    "category": "bottom",
+    "colors": [
+     "#202020"
+    ],
+    "subcategory": "skirt",
+    "styles": [
+     "formal",
+     "minimal"
+    ],
+    "fit_type": null,
+    "leg_shape": null,
+    "rise_type": null,
+    "skirt_shape": null
+   }
+  },
+  {
+   "file": "bottom_slacks_01.jpg",
+   "attributes": {
+    "name": "블랙 슬랙스",
+    "category": "bottom",
+    "colors": [
+     "#202020"
+    ],
+    "subcategory": "slacks",
+    "styles": [
+     "minimal",
+     "formal"
+    ],
+    "fit_type": null,
+    "leg_shape": null,
+    "rise_type": null,
+    "skirt_shape": null
+   }
+  },
+  {
+   "file": "outerwear_jacket_02.jpg",
+   "attributes": {
+    "name": "글렌체크 테일러드 재킷",
+    "category": "outerwear",
+    "colors": [
+     "#795548"
+    ],
+    "subcategory": "jacket",
+    "styles": [
+     "classic",
+     "formal"
+    ],
+    "fit_type": null,
+    "leg_shape": null,
+    "rise_type": null,
+    "skirt_shape": null
+   }
+  },
+  {
+   "file": "top_shirt_01.jpg",
+   "attributes": {
+    "name": "노란색 셔츠",
+    "category": "top",
+    "colors": [
+     "#E8C547"
+    ],
+    "subcategory": "shirt",
+    "styles": [
+     "casual"
+    ],
+    "fit_type": null,
+    "leg_shape": null,
+    "rise_type": null,
+    "skirt_shape": null
+   }
+  },
+  {
+   "file": "top_knitwear_02.jpg",
+   "attributes": {
+    "name": "라운드넥 니트웨어",
+    "category": "top",
+    "colors": [
+     "#D6BE9A"
+    ],
+    "subcategory": "knitwear",
+    "styles": [
+     "minimal",
+     "casual"
+    ],
+    "fit_type": null,
+    "leg_shape": null,
+    "rise_type": null,
+    "skirt_shape": null
+   }
+  },
+  {
+   "file": "outerwear_jacket_03.jpg",
+   "attributes": {
+    "name": "아이보리 데님 재킷",
+    "category": "outerwear",
+    "colors": [
+     "#FFFFF0"
+    ],
+    "subcategory": "jacket",
+    "styles": [
+     "casual",
+     "minimal"
+    ],
+    "fit_type": null,
+    "leg_shape": null,
+    "rise_type": null,
+    "skirt_shape": null
+   }
+  },
+  {
+   "file": "bottom_slacks_02.jpg",
+   "attributes": {
+    "name": "아이보리 슬랙스",
+    "category": "bottom",
+    "colors": [
+     "#FFFFF0"
+    ],
+    "subcategory": "slacks",
+    "styles": [
+     "minimal",
+     "formal"
+    ],
+    "fit_type": null,
+    "leg_shape": null,
+    "rise_type": null,
+    "skirt_shape": null
+   }
+  },
+  {
+   "file": "outerwear_jacket_04.jpg",
+   "attributes": {
+    "name": "베이지 숏 재킷",
+    "category": "outerwear",
+    "colors": [
+     "#D6BE9A"
+    ],
+    "subcategory": "jacket",
+    "styles": [
+     "casual",
+     "classic"
+    ],
+    "fit_type": null,
+    "leg_shape": null,
+    "rise_type": null,
+    "skirt_shape": null
+   }
+  },
+  {
+   "file": "outerwear_puffer_01.jpg",
+   "attributes": {
+    "name": "아이보리 패딩",
+    "category": "outerwear",
+    "colors": [
+     "#FFFFF0"
+    ],
+    "subcategory": "puffer",
+    "styles": [
+     "casual",
+     "minimal"
+    ],
+    "fit_type": null,
+    "leg_shape": null,
+    "rise_type": null,
+    "skirt_shape": null
+   }
+  },
+  {
+   "file": "outerwear_vest_01.jpg",
+   "attributes": {
+    "name": "패딩 조끼",
+    "category": "outerwear",
+    "colors": [
+     "#202020"
+    ],
+    "subcategory": "vest",
+    "styles": [
+     "casual",
+     "minimal"
+    ],
+    "fit_type": null,
+    "leg_shape": null,
+    "rise_type": null,
+    "skirt_shape": null
+   }
+  },
+  {
+   "file": "bottom_pants_01.jpg",
+   "attributes": {
+    "name": "브라운 코듀로이 팬츠",
+    "category": "bottom",
+    "colors": [
+     "#795548"
+    ],
+    "subcategory": "pants",
+    "styles": [
+     "casual",
+     "minimal"
+    ],
+    "fit_type": null,
+    "leg_shape": null,
+    "rise_type": null,
+    "skirt_shape": null
+   }
+  },
+  {
+   "file": "top_tshirt_01.jpg",
+   "attributes": {
+    "name": "차콜 반팔 티셔츠",
+    "category": "top",
+    "colors": [
+     "#202020"
+    ],
+    "subcategory": "tshirt",
+    "styles": [
+     "casual",
+     "minimal"
+    ],
+    "fit_type": null,
+    "leg_shape": null,
+    "rise_type": null,
+    "skirt_shape": null
+   }
+  },
+  {
+   "file": "outerwear_coat_01.jpg",
+   "attributes": {
+    "name": "더블 버튼 코트",
+    "category": "outerwear",
+    "colors": [
+     "#808080"
+    ],
+    "subcategory": "coat",
+    "styles": [
+     "classic",
+     "formal"
+    ],
+    "fit_type": null,
+    "leg_shape": null,
+    "rise_type": null,
+    "skirt_shape": null
+   }
+  },
+  {
+   "file": "bottom_shorts_01.jpg",
+   "attributes": {
+    "name": "그레이 반바지",
+    "category": "bottom",
+    "colors": [
+     "#808080"
+    ],
+    "subcategory": "shorts",
+    "styles": [
+     "casual",
+     "formal"
+    ],
+    "fit_type": null,
+    "leg_shape": null,
+    "rise_type": null,
+    "skirt_shape": null
+   }
+  },
+  {
+   "file": "bottom_jeans_01.jpg",
+   "attributes": {
+    "name": "데님 청바지",
+    "category": "bottom",
+    "colors": [
+     "#24344B"
+    ],
+    "subcategory": "jeans",
+    "styles": [
+     "casual",
+     "minimal"
+    ],
+    "fit_type": null,
+    "leg_shape": null,
+    "rise_type": null,
+    "skirt_shape": null
+   }
+  },
+  {
+   "file": "outerwear_cardigan_01.jpg",
+   "attributes": {
+    "name": "네이비 카디건",
+    "category": "outerwear",
+    "colors": [
+     "#24344B"
+    ],
+    "subcategory": "cardigan",
+    "styles": [
+     "casual",
+     "classic"
+    ],
+    "fit_type": null,
+    "leg_shape": null,
+    "rise_type": null,
+    "skirt_shape": null
+   }
+  },
+  {
+   "file": "outerwear_jacket_05.jpg",
+   "attributes": {
+    "name": "네이비 배색 야구 재킷",
+    "category": "outerwear",
+    "colors": [
+     "#24344B"
+    ],
+    "subcategory": "jacket",
+    "styles": [
+     "casual",
+     "sporty"
+    ],
+    "fit_type": null,
+    "leg_shape": null,
+    "rise_type": null,
+    "skirt_shape": null
+   }
+  },
+  {
+   "file": "outerwear_jacket_06.jpg",
+   "attributes": {
+    "name": "브라운 스웨이드 재킷",
+    "category": "outerwear",
+    "colors": [
+     "#795548"
+    ],
+    "subcategory": "jacket",
+    "styles": [
+     "casual"
+    ],
+    "fit_type": null,
+    "leg_shape": null,
+    "rise_type": null,
+    "skirt_shape": null
+   }
+  },
+  {
+   "file": "top_knitwear_03.jpg",
+   "attributes": {
+    "name": "라운드 넥 니트웨어",
+    "category": "top",
+    "colors": [
+     "#E8A0B0"
+    ],
+    "subcategory": "knitwear",
+    "styles": [
+     "casual",
+     "minimal"
+    ],
+    "fit_type": null,
+    "leg_shape": null,
+    "rise_type": null,
+    "skirt_shape": null
+   }
+  },
+  {
+   "file": "bottom_slacks_03.jpg",
+   "attributes": {
+    "name": "아이보리 슬랙스",
+    "category": "bottom",
+    "colors": [
+     "#FFFFF0"
+    ],
+    "subcategory": "slacks",
+    "styles": [
+     "minimal",
+     "formal"
+    ],
+    "fit_type": null,
+    "leg_shape": null,
+    "rise_type": null,
+    "skirt_shape": null
+   }
+  },
+  {
+   "file": "bottom_skirt_02.jpg",
+   "attributes": {
+    "name": "회색 니트 스커트",
+    "category": "bottom",
+    "colors": [
+     "#808080"
+    ],
+    "subcategory": "skirt",
+    "styles": [
+     "minimal",
+     "casual"
+    ],
+    "fit_type": null,
+    "leg_shape": null,
+    "rise_type": null,
+    "skirt_shape": null
+   }
+  },
+  {
+   "file": "top_tshirt_02.jpg",
+   "attributes": {
+    "name": "아이보리 긴팔 티셔츠",
+    "category": "top",
+    "colors": [
+     "#FFFFF0"
+    ],
+    "subcategory": "tshirt",
+    "styles": [
+     "minimal",
+     "casual"
+    ],
+    "fit_type": null,
+    "leg_shape": null,
+    "rise_type": null,
+    "skirt_shape": null
+   }
+  },
+  {
+   "file": "bottom_jeans_02.jpg",
+   "attributes": {
+    "name": "연청 데님 팬츠",
+    "category": "bottom",
+    "colors": [
+     "#3975C6"
+    ],
+    "subcategory": "jeans",
+    "styles": [
+     "casual",
+     "minimal"
+    ],
+    "fit_type": null,
+    "leg_shape": null,
+    "rise_type": null,
+    "skirt_shape": null
+   }
+  },
+  {
+   "file": "outerwear_puffer_02.jpg",
+   "attributes": {
+    "name": "노란색 패딩 재킷",
+    "category": "outerwear",
+    "colors": [
+     "#E8C547"
+    ],
+    "subcategory": "puffer",
+    "styles": [
+     "casual",
+     "minimal"
+    ],
+    "fit_type": null,
+    "leg_shape": null,
+    "rise_type": null,
+    "skirt_shape": null
+   }
+  },
+  {
+   "file": "bottom_shorts_02.jpg",
+   "attributes": {
+    "name": "베이지 반바지",
+    "category": "bottom",
+    "colors": [
+     "#FFFFF0"
+    ],
+    "subcategory": "shorts",
+    "styles": [
+     "casual",
+     "minimal"
+    ],
+    "fit_type": null,
+    "leg_shape": null,
+    "rise_type": null,
+    "skirt_shape": null
+   }
+  },
+  {
+   "file": "top_sweatshirt_01.jpg",
+   "attributes": {
+    "name": "그레이 맨투맨",
+    "category": "top",
+    "colors": [
+     "#808080"
+    ],
+    "subcategory": "sweatshirt",
+    "styles": [
+     "casual",
+     "minimal"
+    ],
+    "fit_type": null,
+    "leg_shape": null,
+    "rise_type": null,
+    "skirt_shape": null
+   }
+  },
+  {
+   "file": "bottom_jeans_03.jpg",
+   "attributes": {
+    "name": "청바지",
+    "category": "bottom",
+    "colors": [
+     "#3975C6"
+    ],
+    "subcategory": "jeans",
+    "styles": [
+     "casual",
+     "minimal"
+    ],
+    "fit_type": null,
+    "leg_shape": null,
+    "rise_type": null,
+    "skirt_shape": null
+   }
+  },
+  {
+   "file": "top_tshirt_03.jpg",
+   "attributes": {
+    "name": "터틀넥 티셔츠",
+    "category": "top",
+    "colors": [
+     "#795548"
+    ],
+    "subcategory": "tshirt",
+    "styles": [
+     "minimal",
+     "casual"
+    ],
+    "fit_type": null,
+    "leg_shape": null,
+    "rise_type": null,
+    "skirt_shape": null
+   }
+  },
+  {
+   "file": "outerwear_jacket_07.jpg",
+   "attributes": {
+    "name": "스웨이드 재킷",
+    "category": "outerwear",
+    "colors": [
+     "#795548"
+    ],
+    "subcategory": "jacket",
+    "styles": [
+     "casual",
+     "classic"
+    ],
+    "fit_type": null,
+    "leg_shape": null,
+    "rise_type": null,
+    "skirt_shape": null
+   }
+  },
+  {
+   "file": "top_knitwear_04.jpg",
+   "attributes": {
+    "name": "케이블 니트 폴로 스웨터",
+    "category": "top",
+    "colors": [
+     "#24344B"
+    ],
+    "subcategory": "knitwear",
+    "styles": [
+     "casual",
+     "classic"
+    ],
+    "fit_type": null,
+    "leg_shape": null,
+    "rise_type": null,
+    "skirt_shape": null
+   }
+  },
+  {
+   "file": "outerwear_jacket_08.jpg",
+   "attributes": {
+    "name": "노카라 베이지 재킷",
+    "category": "outerwear",
+    "colors": [
+     "#D6BE9A"
+    ],
+    "subcategory": "jacket",
+    "styles": [
+     "minimal",
+     "classic"
+    ],
+    "fit_type": null,
+    "leg_shape": null,
+    "rise_type": null,
+    "skirt_shape": null
+   }
+  },
+  {
+   "file": "top_sweatshirt_02.jpg",
+   "attributes": {
+    "name": "하프집업 맨투맨",
+    "category": "top",
+    "colors": [
+     "#FFFFF0"
+    ],
+    "subcategory": "sweatshirt",
+    "styles": [
+     "casual",
+     "sporty"
+    ],
+    "fit_type": null,
+    "leg_shape": null,
+    "rise_type": null,
+    "skirt_shape": null
+   }
+  },
+  {
+   "file": "bottom_pants_02.jpg",
+   "attributes": {
+    "name": "카키 카고 바지",
+    "category": "bottom",
+    "colors": [
+     "#7B8052"
+    ],
+    "subcategory": "pants",
+    "styles": [
+     "casual",
+     "street"
+    ],
+    "fit_type": null,
+    "leg_shape": null,
+    "rise_type": null,
+    "skirt_shape": null
+   }
+  },
+  {
+   "file": "top_knitwear_05.jpg",
+   "attributes": {
+    "name": "스퀘어넥 반팔 니트",
+    "category": "top",
+    "colors": [
+     "#7B8052"
+    ],
+    "subcategory": "knitwear",
+    "styles": [
+     "minimal",
+     "casual"
+    ],
+    "fit_type": null,
+    "leg_shape": null,
+    "rise_type": null,
+    "skirt_shape": null
+   }
+  },
+  {
+   "file": "bottom_shorts_03.jpg",
+   "attributes": {
+    "name": "카키 반바지",
+    "category": "bottom",
+    "colors": [
+     "#7B8052"
+    ],
+    "subcategory": "shorts",
+    "styles": [
+     "casual",
+     "minimal"
+    ],
+    "fit_type": null,
+    "leg_shape": null,
+    "rise_type": null,
+    "skirt_shape": null
+   }
+  },
+  {
+   "file": "outerwear_jacket_09.jpg",
+   "attributes": {
+    "name": "그레이 재킷",
+    "category": "outerwear",
+    "colors": [
+     "#808080"
+    ],
+    "subcategory": "jacket",
+    "styles": [
+     "formal",
+     "classic"
+    ],
+    "fit_type": null,
+    "leg_shape": null,
+    "rise_type": null,
+    "skirt_shape": null
+   }
+  },
+  {
+   "file": "bottom_jeans_04.jpg",
+   "attributes": {
+    "name": "데님 청바지",
+    "category": "bottom",
+    "colors": [
+     "#24344B"
+    ],
+    "subcategory": "jeans",
+    "styles": [
+     "casual",
+     "minimal"
+    ],
+    "fit_type": null,
+    "leg_shape": null,
+    "rise_type": null,
+    "skirt_shape": null
+   }
+  },
+  {
+   "file": "outerwear_jacket_10.jpg",
+   "attributes": {
+    "name": "카키 재킷",
+    "category": "outerwear",
+    "colors": [
+     "#7B8052"
+    ],
+    "subcategory": "jacket",
+    "styles": [
+     "casual",
+     "sporty"
+    ],
+    "fit_type": null,
+    "leg_shape": null,
+    "rise_type": null,
+    "skirt_shape": null
+   }
+  },
+  {
+   "file": "top_tshirt_04.jpg",
+   "attributes": {
+    "name": "골지 반팔 티셔츠",
+    "category": "top",
+    "colors": [
+     "#FFFFFF"
+    ],
+    "subcategory": "tshirt",
+    "styles": [
+     "casual",
+     "minimal"
+    ],
+    "fit_type": null,
+    "leg_shape": null,
+    "rise_type": null,
+    "skirt_shape": null
+   }
+  },
+  {
+   "file": "top_shirt_02.jpg",
+   "attributes": {
+    "name": "스트라이프 셔츠",
+    "category": "top",
+    "colors": [
+     "#3975C6",
+     "#FFFFFF"
+    ],
+    "subcategory": "shirt",
+    "styles": [
+     "casual",
+     "classic"
+    ],
+    "fit_type": null,
+    "leg_shape": null,
+    "rise_type": null,
+    "skirt_shape": null
+   }
+  },
+  {
+   "file": "top_tshirt_05.jpg",
+   "attributes": {
+    "name": "카키 긴팔 티셔츠",
+    "category": "top",
+    "colors": [
+     "#7B8052"
+    ],
+    "subcategory": "tshirt",
+    "styles": [
+     "casual",
+     "minimal"
+    ],
+    "fit_type": null,
+    "leg_shape": null,
+    "rise_type": null,
+    "skirt_shape": null
+   }
+  },
+  {
+   "file": "bottom_skirt_03.jpg",
+   "attributes": {
+    "name": "플리츠 스커트",
+    "category": "bottom",
+    "colors": [
+     "#D6BE9A"
+    ],
+    "subcategory": "skirt",
+    "styles": [
+     "casual",
+     "classic"
+    ],
+    "fit_type": null,
+    "leg_shape": null,
+    "rise_type": null,
+    "skirt_shape": null
+   }
+  },
+  {
+   "file": "top_shirt_03.jpg",
+   "attributes": {
+    "name": "화이트 밴드칼라 셔츠",
+    "category": "top",
+    "colors": [
+     "#FFFFFF"
+    ],
+    "subcategory": "shirt",
+    "styles": [
+     "minimal",
+     "casual"
+    ],
+    "fit_type": null,
+    "leg_shape": null,
+    "rise_type": null,
+    "skirt_shape": null
+   }
+  }
+ ]
+}
