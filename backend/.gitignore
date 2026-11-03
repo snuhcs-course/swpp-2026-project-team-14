@@ -10,6 +10,7 @@ wardrobe/garment-landmarks/
 # coverage data and reports
 .coverage
 .coverage.*
+.coverage-*
 htmlcov/
 coverage.xml
 coverage.json

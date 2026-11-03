@@ -14,11 +14,13 @@ swpp-2026-project-team-14/
 |   |   |   |-- AuthRepository.kt                # 인증·프로필·세션·만료·응답 제한·계정 목록 분할 조회
 |   |   |   |-- GuestImportRepository.kt         # 가져오기 후보·충돌 조회·지문·계정별 재시도 처리
 |   |   |   |-- AuthSessionStore.kt              # Keystore AES-GCM 암호화 세션 보관·백업 제외
-|   |   |   |-- recommendation/                 # 계정 코디 API·계정별 취향 저장·서버 계산 요청
+|   |   |   |-- recommendation/                 # 계정 코디·외부 검색 API·계정별 취향 저장
 |   |   |   |-- RemoteBodyAnalyzer.kt            # 체형 분석 API 호출
 |   |   |   `-- wardrobe/
 |   |   |       |-- WardrobeRepository.kt         # 계정 서버 옷 조회·저장·캐시·인증 사진 요청
 |   |   |       |-- GarmentAnalysis.kt            # 계정 인증 사진 분석·서버 초안 생성
+|   |   |       |-- WornGenerationRepository.kt  # 인증된 생성·결과 조회·이미지 선택 요청, 자동 재생성 없음
+|   |   |       |-- WornPhotoRepository.kt       # 착용 원본 업로드·자동 후보·여러 초안 준비·일괄 저장 요청
 |   |   |       |-- GarmentLandmarks.kt           # 인증된 자동 측정점 요청·응답 검증
 |   |   |       |-- MeasurementGeometry.kt       # AR 광선·평면 교점과 실측 경로 계산
 |   |   |       |-- CaptureFiles.kt               # 옷 사진 임시 캐시·재개 중인 촬영 파일 보존
@@ -38,19 +40,34 @@ swpp-2026-project-team-14/
 |   |       |   |-- ReviewScreen.kt              # 체형 결과·치수 수정·온보딩 확인과 재분석 저장
 |   |       |   `-- MyProfileScreen.kt           # 핏·무드 즉시 저장·컬러 편집·계정 카드/로그아웃·기존 데이터 가져오기·체형 상세
 |   |       `-- wardrobe/
-|   |           |-- WardrobeScreen.kt            # 옷장 목록·온보딩 등록/재개·신발 촬영·사진/편집 연결
-|   |           |-- WardrobeViewModel.kt         # 계정 목록·서버 저장 상태
+|   |           |-- WardrobeScreen.kt            # 옷장 목록·등록 방식 선택 시트·옷 선택 메뉴·온보딩/사진/편집 연결
+|   |           |-- WardrobeViewModel.kt         # 계정 목록·서버 저장·외부 추천 요청 상태
+|   |           |-- ExternalRecommendationDialog.kt # 선택 옷 메뉴·추천 속성·무신사 바로가기 팝업
 |   |           |-- GarmentAnalysisViewModel.kt  # 분석 진행·실패·온보딩 분석 초안 복원
 |   |           |-- WardrobeColorField.kt       # 색상표·사진 좌표 변환·픽셀 색상 선택
 |   |           |-- GarmentEditor.kt             # 특징·실측·메모 편집·초안 복원·하단 고정 저장
+|   |           |-- GarmentEstimates.kt          # 실측과 분리한 읽기 전용 추정값·범위 표시·편집 후 무효화
+|   |           |-- WornBatchRegistration.kt     # 사진 업로드 영역·후보 선택·원본 분석/생성·기존 편집과 승인 저장 연결
+|   |           |-- WornBatchReviewScreen.kt     # 서비스/미리보기 공용 카드·전체 선택·원본 비교·접이식 치수·처리 스피너
+|   |           |-- WornBatchViewModel.kt        # 원본 분석 멱등성·선택한 옷별 순차 생성·부분 실패/제외·저장 상태
+|   |           |-- WornRegistration.kt          # 한 벌 직접 사각형 드래그·대상 분석 보관, 앱 진입 버튼 숨김
+|   |           |-- WornGenerationViewModel.kt   # 원본 분석·생성 요청 ID·상태 조회·승인 상태와 촬영 파일 수명
+|   |           |-- WornGenerationReview.kt      # 원본/생성 이미지 비교·승인/거절·명시적 크롭/유료 재생성 선택
 |   |           |-- GarmentLabels.kt             # 추천 라벨 확인·수정·실패 후 수동 확인·저장 가능 상태
 |   |           |-- FrontPhoto.kt                # 상의·아우터 앞면 사진 카드
 |   |           `-- capture/
 |   |               |-- MeasurementActivity.kt  # 세션 복원·인증 측정점·실측 촬영·확인·수정
 |   |               `-- MeasurementCamera.kt    # AR 카메라·촬영 프레임 고정
+|   |-- debug/
+|   |   |-- AndroidManifest.xml                  # 개발 빌드 전용 UI 미리보기 실행 항목
+|   |   `-- java/com/swpp/stylemate/ui/wardrobe/
+|   |       |-- WornPreviewActivity.kt            # 개인 앱 파일의 기존 이미지·예시 값으로 UI만 체험, 네트워크/저장 없음
+|   |       `-- WornPreviewReviewScreen.kt        # 서비스 공용 확인 화면에 로컬 이미지·예시 상태/설정만 제공
 |   |-- main/res/drawable-nodpi/                # 생성한 온보딩 환영·6종 무드 사진
 |   |-- test/java/com/swpp/stylemate/             # 인증·만료·계정 캐시·추천 요청·재시도 검사
 |   `-- androidTest/java/com/swpp/stylemate/      # 로그인 차단·로그아웃/만료·계정 온보딩·옷장·측정점 검사
+|       |-- wardrobe/WornRegistrationTest.kt      # 자동 후보 체크·슬라이더 없음·일괄 저장 조건·원본 크롭·기존 진입 검사
+|       `-- wardrobe/WornPreviewTest.kt           # 계정/서버 없이 선택·실패 이유·등록 모의 동작·확대 원본 비교 검사
 |-- backend/
 |   |-- config/
 |   |   |-- settings.py                          # 공통 API·사용자 모델·MySQL·사진·모델 설정
@@ -83,8 +100,14 @@ swpp-2026-project-team-14/
 |   |       |-- urls.py                          # 옷장 API 경로
 |   |       |-- views.py                         # 분석 초안·저장·수정·조회·추천 라벨 미리보기
 |   |       |-- analysis.py                      # 이미지 검증·Gemini 요청·응답 처리
+|   |       |-- worn.py                          # 고정 ONNX 의류 분할·OpenRouter Gemini 펼침 생성·오류 정규화
+|   |       |-- worn_views.py                    # 계정별 생성 상태·요청 멱등성·이미지 승인·비교 사진 접근
+|   |       |-- worn_detection.py                # 원본 Gemini 후보/특징 분석·한 사람/최대 세 분류 검증·실제 픽셀 크롭
+|   |       |-- worn_estimates.py                # 원본 착용 관찰·본인 체형·기존 여유량 규칙으로 참고 치수/범위 계산
+|   |       |-- worn_photo_views.py              # 소유 원본/후보 접근·멱등 초안 준비·승인한 여러 옷 원자적 저장
+|   |       |-- management/commands/prepare_worn_model.py # 고정 모델 다운로드·SHA-256 검증
 |   |       |-- landmarks.py                     # HRNet 추론·좌표 복원·치수별 경로 계산
-|   |       |-- schema.py                        # 속성 타입·한국어 선택지·Gemini 계약(추천용 details 포함)·입력 검증
+|   |       |-- schema.py                        # 속성·선택지·details 검증·Gemini 복잡도 제한용 응답 형식 축소
 |   |       |-- editor.py                        # 치수 정의·측정값·저장 요청(추천 라벨 포함) 검증
 |   |       |-- models.py                        # 소유 사용자·옷 정보 저장·코디에 사용 중인 분류 변경 검증
 |   |       |-- migrations/0001_initial.py        # 옷장 테이블 최초 생성
@@ -92,10 +115,20 @@ swpp-2026-project-team-14/
 |   |       |-- migrations/0003_garment_user.py   # 옷 소유 사용자 외래 키 추가
 |   |       |-- migrations/0004_alter_garment_user.py # 무소유 옷 정리·소유자 필수 전환
 |   |       |-- tests.py                         # AI 계약·DB 저장·재조회 검사
+|   |       |-- test_worn.py                     # 착용 사진 대상 분석·계정 초안 격리·NULL 치수·수동 라벨 저장 검사
+|   |       |-- test_generation.py               # 원본 분석 보존·생성 승인·거절·중복/실패/계정 격리 검사
+|   |       |-- test_worn_batch.py               # 겹친 옷 후보 계약·여러 사람 거절·일괄 저장 원자성/멱등성·사진 격리 검사
+|   |       |-- test_worn_estimates.py           # 체형/원본 단서 부족·추정/실측 격리·자동 라벨·계정 격리·변경 시 무효화 검사
+|   |       |-- migrations/0008_garment_estimated_dimensions.py # 실측 컬럼 보존·추정 치수 전용 컬럼 추가
+|   |       |-- migrations/0007_worngeneration_candidate_id_wornphoto_and_more.py # 원본 후보 모델·후보별 생성 초안 고유 제약
+|   |       |-- migrations/0006_worngeneration_garment_request_key_and_more.py # 생성 초안·출처·요청 ID 고유 제약
+|   |       |-- migrations/0005_garment_image_source.py # 기존 사진 보존·착용 사진 출처 구분
 |   |       `-- test_landmarks.py                # 원본 사진의 자동 측정점·좌표 변환 검사
-|   |-- recommendation/                          # 저장 라벨 → K-Fashion 입력, 계절·주색/서브색·모델 어휘 정규화
+|   |-- recommendation/                          # 저장 라벨 → 모델 입력, 계절·색·모델 어휘 정규화
+|   |   `-- external.py                          # 단일 옷의 상대 속성 예측·외부 검색 URL 생성
 |   |-- body_analysis/                           # MediaPipe 체형 분석
 |   |-- wardrobe/garment-landmarks/              # HRNet 가중치·메타데이터·라이선스
+|   |-- models/segformer_clothes.onnx            # 고정 SegFormer 의류 분할 가중치, Git 제외·이미지 빌드 시 포함
 |   |-- scripts/prepare_landmarks.py             # 빌드 시 HRNet 다운로드·검증·ONNX 변환
 |   `-- tests/                                   # 체형 분석·추천 모델 입력 계약·공통 API 회귀 검사
 `-- docs/wardrobe/                               # 옷장 설계·실행 안내
@@ -110,6 +143,7 @@ swpp-2026-project-team-14/
 - 분석: 상의·아우터는 앞면 사진, 하의는 측정 사진을 보낸다. Gemini는 이름·분류·색상을 생성하고 세부 종류·스타일을 제안한다. 응답은 `id`·`model`·`attributes`와 추천용 `details`(무늬·넥라인·옷깃·디테일·겉으로 분명한 소재, 저장하지 않음)다.
 - 추천 라벨: 저장 전 `POST labels/`가 치수와 체형으로 핏·기장·소매·계절 등을 계산하고, 사용자가 확인·수정한 값을 `labels`로 함께 저장한다. 설계는 [추천 문서](../recommendation/README.md)를 따른다.
 - 저장: Android는 인증된 계정 API와 계정별 캐시를 사용한다. 옷·코디·사진은 MySQL·서버 사진 저장소에 보관한다.
+- 착용 사진: 본인이 입은 사진이라는 전제로 상의·하의·아우터 각 한 벌을 제안한다. 원본에서 보이는 핏·기장을 자동 제안하고 서버 계정 체형으로 가능한 단면·총장을 대략 추정한다. 실측 `dimensions`는 NULL이고 추정값·범위·근거·규칙 버전은 `estimated_dimensions`에 따로 보관한다. 부족한 값은 NULL이며 수동 핏/기장을 강제하지 않는다. 후보 선택을 유지한 채 생성하고 마지막 등록이 이미지 승인·일괄 저장을 겸한다. 부가 수정·확대 비교와 명시적 원본 크롭 대체를 제공한다. 여러 사람·액세서리·같은 분류 여러 겹은 지원하지 않는다.
 - DB 의존성: 체형·측정점·라벨·날씨를 포함한 모든 서비스 API에 계정 DB 설정과 Bearer 인증이 필요하다.
 
 가입·로그인·로그아웃·프로필 API와 계정별 옷·코디 접근 제한, 로그인 필수 화면·만료·계정 전환이 구현되었다. 게스트 사용·미리보기 API는 제거했고, 기존 데이터 가져오기는 인증 후 기능으로 유지한다. 소유자 외래 키는 필수이며 전환 마이그레이션은 소유자 없는 기존 행만 정리한다. 8페이지 온보딩은 기존 체형 분석·옷 등록을 재사용하고 로컬 진행·편집 초안을 복원한다. S3·추천 치수 비교는 미구현이다. 저장 범위와 인증 계약은 [로그인 문서](../login/README.md)를 따른다.

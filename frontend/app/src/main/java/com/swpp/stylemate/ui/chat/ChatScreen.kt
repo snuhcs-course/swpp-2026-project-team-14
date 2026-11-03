@@ -12,6 +12,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -37,7 +39,7 @@ fun ChatRoute(model: ChatViewModel, modifier: Modifier = Modifier) {
     ChatScreen(state, onBack = model::close, onDraft = model::setDraft, onLock = model::toggleLock,
         onDirection = model::toggleDirection, onSend = model::send, onRetry = model::retry,
         onUnlock = model::unlockAndRetry, onRestore = model::restore, onUndo = model::undo,
-        onSave = model::save, modifier = modifier)
+        onSave = model::save, onFeedback = model::feedback, onLoadFeedback = model::loadFeedback, modifier = modifier)
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -55,6 +57,8 @@ fun ChatScreen(
     onUndo: () -> Unit,
     onSave: (Outfit) -> Unit,
     modifier: Modifier = Modifier,
+    onFeedback: (Outfit, String) -> Unit = { _, _ -> },
+    onLoadFeedback: (Outfit) -> Unit = {},
 ) {
     val outfit = state.current ?: return
     var expanded by rememberSaveable(state.source?.id) { mutableStateOf(true) }
@@ -192,7 +196,7 @@ fun ChatScreen(
                                 }
                                 result.outfit?.let { resultOutfit ->
                                     ResultCard(resultOutfit, result.changedIds, result.lockedIds, state,
-                                        onRestore, onSave)
+                                        onRestore, onSave, onFeedback, onLoadFeedback)
                                 }
                                 result.notes.forEach { note -> Text(note, style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant) }
@@ -264,7 +268,10 @@ private fun OutfitItems(
 
 @Composable
 private fun ResultCard(outfit: Outfit, changedIds: Set<String>, lockedIds: Set<String>, state: ChatState,
-                       onRestore: (Outfit) -> Unit, onSave: (Outfit) -> Unit) {
+                       onRestore: (Outfit) -> Unit, onSave: (Outfit) -> Unit,
+                       onFeedback: (Outfit, String) -> Unit = { _, _ -> },
+                       onLoadFeedback: (Outfit) -> Unit = {}) {
+    LaunchedEffect(outfit.key) { onLoadFeedback(outfit) }
     Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainer,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
         Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -272,6 +279,25 @@ private fun ResultCard(outfit: Outfit, changedIds: Set<String>, lockedIds: Set<S
                 style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
             OutfitItems(outfit, lockedIds, changedIds = changedIds)
             outfit.reasons.take(2).forEach { reason -> Text(reason.text, style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            // 만족도: 홈 코디와 같은 좋아요/별로예요 (DB 저장 + 취향 학습)
+            val feedback = state.feedbacks[outfit.key]
+            val loaded = outfit.key in state.feedbackLoaded
+            val loading = outfit.key in state.feedbackLoading
+            val pending = state.feedbackPending.isNotEmpty() || loading || !loaded
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                TextButton(onClick = { onFeedback(outfit, "liked") }, enabled = !pending) {
+                    Icon(if (feedback == "liked") Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                        contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.width(4.dp))
+                    Text(if (feedback == "liked") "좋아요 취소" else "좋아요")
+                }
+                TextButton(onClick = { onFeedback(outfit, "disliked") }, enabled = !pending) {
+                    Text(if (feedback == "disliked") "별로예요 취소" else "별로예요",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            state.feedbackMessages[outfit.key]?.let { Text(it, style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant) }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (state.current?.key != outfit.key) {
@@ -282,6 +308,9 @@ private fun ResultCard(outfit: Outfit, changedIds: Set<String>, lockedIds: Set<S
                     Text(when (outfit.key) { in state.savedKeys -> "저장됨"; in state.savingKeys -> "저장 중…";
                         in state.saveErrors -> "저장 다시 시도"; else -> "코디북에 저장" })
                 }
+            }
+            if (!loaded && !loading) {
+                TextButton(onClick = { onLoadFeedback(outfit) }) { Text("만족도 다시 불러오기") }
             }
             state.saveErrors[outfit.key]?.let { Text(it, style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.error) }

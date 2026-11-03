@@ -1,0 +1,885 @@
+{
+  "version": 1,
+  "description": "채팅 LLM 해석(chat_intent.parse) 고정 평가셋. RUBRIC.md 참고.",
+  "wardrobe": [
+    {
+      "id": "g-white-tee",
+      "slot": "top",
+      "name": "샘플 · 화이트 반팔 티셔츠",
+      "category": "티셔츠",
+      "color": "화이트"
+    },
+    {
+      "id": "g-black-tee",
+      "slot": "top",
+      "name": "샘플 · 블랙 반팔 티셔츠",
+      "category": "티셔츠",
+      "color": "블랙"
+    },
+    {
+      "id": "g-blue-shirt",
+      "slot": "top",
+      "name": "샘플 · 블루 셔츠",
+      "category": "셔츠",
+      "color": "블루"
+    },
+    {
+      "id": "g-ivory-shirt",
+      "slot": "top",
+      "name": "샘플 · 아이보리 셔츠",
+      "category": "셔츠",
+      "color": "화이트"
+    },
+    {
+      "id": "g-beige-knit",
+      "slot": "top",
+      "name": "샘플 · 베이지 니트",
+      "category": "니트웨어",
+      "color": "베이지"
+    },
+    {
+      "id": "g-pink-knit",
+      "slot": "top",
+      "name": "샘플 · 핑크 니트",
+      "category": "니트웨어",
+      "color": "핑크"
+    },
+    {
+      "id": "g-gray-hoodie",
+      "slot": "top",
+      "name": "샘플 · 그레이 후드티",
+      "category": "후드티",
+      "color": "그레이"
+    },
+    {
+      "id": "g-black-slacks",
+      "slot": "bottom",
+      "name": "샘플 · 블랙 슬랙스",
+      "category": "팬츠",
+      "color": "블랙"
+    },
+    {
+      "id": "g-blue-jeans",
+      "slot": "bottom",
+      "name": "샘플 · 블루 와이드 청바지",
+      "category": "청바지",
+      "color": "블루"
+    },
+    {
+      "id": "g-beige-pants",
+      "slot": "bottom",
+      "name": "샘플 · 베이지 면바지",
+      "category": "팬츠",
+      "color": "베이지"
+    },
+    {
+      "id": "g-navy-shorts",
+      "slot": "bottom",
+      "name": "샘플 · 네이비 반바지",
+      "category": "팬츠",
+      "color": "네이비"
+    },
+    {
+      "id": "g-navy-jacket",
+      "slot": "outerwear",
+      "name": "샘플 · 네이비 재킷",
+      "category": "재킷",
+      "color": "네이비"
+    },
+    {
+      "id": "g-brown-coat",
+      "slot": "outerwear",
+      "name": "샘플 · 브라운 코트",
+      "category": "코트",
+      "color": "브라운"
+    },
+    {
+      "id": "g-black-puffer",
+      "slot": "outerwear",
+      "name": "샘플 · 블랙 패딩",
+      "category": "패딩",
+      "color": "블랙"
+    }
+  ],
+  "cases": [
+    {
+      "id": "dir-01",
+      "category": "direction",
+      "request": "좀 더 밝게 바꿔줘",
+      "current": [
+        "g-white-tee",
+        "g-beige-pants"
+      ],
+      "locked": [],
+      "history": [],
+      "expect": {
+        "action": "edit",
+        "wants_include": [
+          {
+            "slot": null,
+            "want": "brighter"
+          }
+        ],
+        "wants_exclude": [
+          "darker"
+        ]
+      },
+      "critical": []
+    },
+    {
+      "id": "dir-02",
+      "category": "direction",
+      "request": "전체적으로 차분한 느낌으로 바꿔줘",
+      "current": [
+        "g-white-tee",
+        "g-beige-pants"
+      ],
+      "locked": [],
+      "history": [],
+      "expect": {
+        "action": "edit",
+        "wants_include": [
+          {
+            "slot": null,
+            "want": "darker"
+          }
+        ],
+        "wants_exclude": [
+          "brighter"
+        ]
+      },
+      "critical": []
+    },
+    {
+      "id": "dir-03",
+      "category": "direction",
+      "request": "오늘 추우니까 따뜻하게 입고 싶어",
+      "current": [
+        "g-white-tee",
+        "g-beige-pants",
+        "g-brown-coat"
+      ],
+      "locked": [],
+      "history": [],
+      "expect": {
+        "action": "edit",
+        "wants_include": [
+          {
+            "slot": null,
+            "want": "warmer"
+          }
+        ],
+        "wants_exclude": [
+          "cooler"
+        ]
+      },
+      "critical": []
+    },
+    {
+      "id": "dir-04",
+      "category": "direction",
+      "request": "더워서 시원하게 입고 싶어",
+      "current": [
+        "g-white-tee",
+        "g-beige-pants",
+        "g-brown-coat"
+      ],
+      "locked": [],
+      "history": [],
+      "expect": {
+        "action": "edit",
+        "wants_include": [
+          {
+            "slot": null,
+            "want": "cooler"
+          }
+        ],
+        "wants_exclude": [
+          "warmer"
+        ]
+      },
+      "critical": []
+    },
+    {
+      "id": "dir-05",
+      "category": "direction",
+      "request": "좀 더 단정하게 입고 싶어",
+      "current": [
+        "g-white-tee",
+        "g-beige-pants"
+      ],
+      "locked": [],
+      "history": [],
+      "expect": {
+        "action": "edit",
+        "wants_include": [
+          {
+            "slot": null,
+            "want": "formal"
+          }
+        ],
+        "wants_exclude": [
+          "casual"
+        ]
+      },
+      "critical": []
+    },
+    {
+      "id": "dir-06",
+      "category": "direction",
+      "request": "편하게 입을래",
+      "current": [
+        "g-blue-shirt",
+        "g-black-slacks"
+      ],
+      "locked": [],
+      "history": [],
+      "expect": {
+        "action": "edit",
+        "wants_include": [
+          {
+            "slot": null,
+            "want": "casual"
+          }
+        ],
+        "wants_exclude": [
+          "formal"
+        ]
+      },
+      "critical": []
+    },
+    {
+      "id": "dir-07",
+      "category": "direction",
+      "request": "넉넉한 핏으로 바꿔줘",
+      "current": [
+        "g-white-tee",
+        "g-beige-pants"
+      ],
+      "locked": [],
+      "history": [],
+      "expect": {
+        "action": "edit",
+        "wants_include": [
+          {
+            "slot": null,
+            "want": "looser"
+          }
+        ],
+        "wants_exclude": [
+          "fitted"
+        ]
+      },
+      "critical": []
+    },
+    {
+      "id": "dir-08",
+      "category": "direction",
+      "request": "몸에 딱 맞게 슬림한 느낌으로",
+      "current": [
+        "g-gray-hoodie",
+        "g-blue-jeans"
+      ],
+      "locked": [],
+      "history": [],
+      "expect": {
+        "action": "edit",
+        "wants_include": [
+          {
+            "slot": null,
+            "want": "fitted"
+          }
+        ],
+        "wants_exclude": [
+          "looser"
+        ]
+      },
+      "critical": []
+    },
+    {
+      "id": "slot-01",
+      "category": "slot",
+      "request": "상의만 밝게 해줘",
+      "current": [
+        "g-white-tee",
+        "g-beige-pants"
+      ],
+      "locked": [],
+      "history": [],
+      "expect": {
+        "action": "edit",
+        "change_slots_include": [
+          "top"
+        ],
+        "change_slots_exclude": [
+          "bottom"
+        ],
+        "wants_include": [
+          {
+            "slot": "top",
+            "want": "brighter"
+          }
+        ],
+        "wants_exclude": [
+          "darker"
+        ]
+      },
+      "critical": []
+    },
+    {
+      "id": "slot-02",
+      "category": "slot",
+      "request": "바지만 다른 걸로 바꿔줘",
+      "current": [
+        "g-white-tee",
+        "g-beige-pants"
+      ],
+      "locked": [],
+      "history": [],
+      "expect": {
+        "action": "edit",
+        "change_slots_include": [
+          "bottom"
+        ],
+        "change_slots_exclude": [
+          "top"
+        ]
+      },
+      "critical": []
+    },
+    {
+      "id": "slot-03",
+      "category": "slot",
+      "request": "아우터는 빼줘",
+      "current": [
+        "g-white-tee",
+        "g-beige-pants",
+        "g-brown-coat"
+      ],
+      "locked": [],
+      "history": [],
+      "expect": {
+        "action": "edit",
+        "remove_outerwear": true
+      },
+      "critical": []
+    },
+    {
+      "id": "slot-04",
+      "category": "slot",
+      "request": "겉옷만 바꿔줘",
+      "current": [
+        "g-white-tee",
+        "g-beige-pants",
+        "g-brown-coat"
+      ],
+      "locked": [],
+      "history": [],
+      "expect": {
+        "action": "edit",
+        "change_slots_include": [
+          "outerwear"
+        ],
+        "change_slots_exclude": [
+          "top",
+          "bottom"
+        ],
+        "remove_outerwear": false
+      },
+      "critical": []
+    },
+    {
+      "id": "slot-05",
+      "category": "slot",
+      "request": "상의랑 하의 둘 다 바꿔줘",
+      "current": [
+        "g-white-tee",
+        "g-beige-pants"
+      ],
+      "locked": [],
+      "history": [],
+      "expect": {
+        "action": "edit",
+        "change_slots_include": [
+          "top",
+          "bottom"
+        ]
+      },
+      "critical": []
+    },
+    {
+      "id": "keep-01",
+      "category": "keep",
+      "request": "바지는 그대로 두고 출근용으로 바꿔줘",
+      "current": [
+        "g-white-tee",
+        "g-beige-pants"
+      ],
+      "locked": [],
+      "history": [],
+      "expect": {
+        "action": "edit",
+        "keep_slots_include": [
+          "bottom"
+        ],
+        "change_slots_exclude": [
+          "bottom"
+        ],
+        "wants_include": [
+          {
+            "slot": null,
+            "want": "formal"
+          }
+        ]
+      },
+      "critical": [
+        "keep_slots_include"
+      ]
+    },
+    {
+      "id": "keep-02",
+      "category": "keep",
+      "request": "티셔츠는 유지하고 하의만 어둡게",
+      "current": [
+        "g-white-tee",
+        "g-beige-pants"
+      ],
+      "locked": [],
+      "history": [],
+      "expect": {
+        "action": "edit",
+        "keep_slots_include": [
+          "top"
+        ],
+        "change_slots_include": [
+          "bottom"
+        ],
+        "change_slots_exclude": [
+          "top"
+        ],
+        "wants_include": [
+          {
+            "slot": "bottom",
+            "want": "darker"
+          }
+        ]
+      },
+      "critical": [
+        "keep_slots_include"
+      ]
+    },
+    {
+      "id": "keep-03",
+      "category": "keep",
+      "request": "코트는 그대로 두고 나머지는 편하게",
+      "current": [
+        "g-white-tee",
+        "g-beige-pants",
+        "g-brown-coat"
+      ],
+      "locked": [],
+      "history": [],
+      "expect": {
+        "action": "edit",
+        "keep_slots_include": [
+          "outerwear"
+        ],
+        "change_slots_exclude": [
+          "outerwear"
+        ],
+        "wants_include": [
+          {
+            "slot": null,
+            "want": "casual"
+          }
+        ]
+      },
+      "critical": [
+        "keep_slots_include"
+      ]
+    },
+    {
+      "id": "neg-01",
+      "category": "negation",
+      "request": "검정은 싫어",
+      "current": [
+        "g-black-tee",
+        "g-beige-pants"
+      ],
+      "locked": [],
+      "history": [],
+      "expect": {
+        "action": "edit",
+        "avoid_colors_include": [
+          "블랙"
+        ],
+        "target_colors_exclude": [
+          "블랙"
+        ]
+      },
+      "critical": [
+        "target_colors_exclude"
+      ]
+    },
+    {
+      "id": "neg-02",
+      "category": "negation",
+      "request": "밝게 하지 마",
+      "current": [
+        "g-white-tee",
+        "g-beige-pants"
+      ],
+      "locked": [],
+      "history": [],
+      "expect": {
+        "wants_exclude": [
+          "brighter"
+        ]
+      },
+      "critical": [
+        "wants_exclude"
+      ]
+    },
+    {
+      "id": "neg-03",
+      "category": "negation",
+      "request": "상의를 흰색으로 바꿔줘",
+      "current": [
+        "g-black-tee",
+        "g-black-slacks"
+      ],
+      "locked": [],
+      "history": [],
+      "expect": {
+        "action": "edit",
+        "change_slots_include": [
+          "top"
+        ],
+        "target_colors_include": [
+          "화이트"
+        ]
+      },
+      "critical": []
+    },
+    {
+      "id": "neg-04",
+      "category": "negation",
+      "request": "빨간색이나 핑크는 빼줘",
+      "current": [
+        "g-pink-knit",
+        "g-beige-pants"
+      ],
+      "locked": [],
+      "history": [],
+      "expect": {
+        "action": "edit",
+        "avoid_colors_include": [
+          "레드",
+          "핑크"
+        ],
+        "target_colors_exclude": [
+          "레드",
+          "핑크"
+        ]
+      },
+      "critical": [
+        "target_colors_exclude"
+      ]
+    },
+    {
+      "id": "occ-01",
+      "category": "occasion",
+      "request": "내일 면접 보러 가",
+      "current": [
+        "g-white-tee",
+        "g-beige-pants"
+      ],
+      "locked": [],
+      "history": [],
+      "expect": {
+        "action": "edit",
+        "wants_include": [
+          {
+            "slot": null,
+            "want": "formal"
+          }
+        ],
+        "wants_exclude": [
+          "casual"
+        ]
+      },
+      "critical": []
+    },
+    {
+      "id": "occ-02",
+      "category": "occasion",
+      "request": "동네 마실 나갈 거라 편하게 입을래",
+      "current": [
+        "g-blue-shirt",
+        "g-black-slacks"
+      ],
+      "locked": [],
+      "history": [],
+      "expect": {
+        "action": "edit",
+        "wants_include": [
+          {
+            "slot": null,
+            "want": "casual"
+          }
+        ],
+        "wants_exclude": [
+          "formal"
+        ]
+      },
+      "critical": []
+    },
+    {
+      "id": "occ-03",
+      "category": "occasion",
+      "request": "친구 결혼식 하객룩으로 바꿔줘",
+      "current": [
+        "g-white-tee",
+        "g-beige-pants"
+      ],
+      "locked": [],
+      "history": [],
+      "expect": {
+        "action": "edit",
+        "wants_include": [
+          {
+            "slot": null,
+            "want": "formal"
+          }
+        ],
+        "wants_exclude": [
+          "casual"
+        ]
+      },
+      "critical": []
+    },
+    {
+      "id": "occ-04",
+      "category": "occasion",
+      "request": "회사 출근용 코디로 해줘",
+      "current": [
+        "g-gray-hoodie",
+        "g-blue-jeans"
+      ],
+      "locked": [],
+      "history": [],
+      "expect": {
+        "action": "edit",
+        "wants_include": [
+          {
+            "slot": null,
+            "want": "formal"
+          }
+        ],
+        "wants_exclude": [
+          "casual"
+        ]
+      },
+      "critical": []
+    },
+    {
+      "id": "undo-01",
+      "category": "undo",
+      "request": "아까 코디로 돌려줘",
+      "current": [
+        "g-white-tee",
+        "g-beige-pants"
+      ],
+      "locked": [],
+      "history": [
+        {
+          "role": "user",
+          "text": "좀 더 밝게"
+        },
+        {
+          "role": "assistant",
+          "text": "상의를 바꿨어요."
+        }
+      ],
+      "expect": {
+        "action": "undo"
+      },
+      "critical": []
+    },
+    {
+      "id": "undo-02",
+      "category": "undo",
+      "request": "방금 바꾼 거 말고 이전 걸로 돌아가자",
+      "current": [
+        "g-white-tee",
+        "g-beige-pants"
+      ],
+      "locked": [],
+      "history": [
+        {
+          "role": "user",
+          "text": "바지 바꿔줘"
+        },
+        {
+          "role": "assistant",
+          "text": "하의를 바꿨어요."
+        }
+      ],
+      "expect": {
+        "action": "undo"
+      },
+      "critical": []
+    },
+    {
+      "id": "item-01",
+      "category": "item",
+      "request": "청바지로 바꿔줘",
+      "current": [
+        "g-white-tee",
+        "g-beige-pants"
+      ],
+      "locked": [],
+      "history": [],
+      "expect": {
+        "action": "edit",
+        "target_garment_ids": [
+          "g-blue-jeans"
+        ]
+      },
+      "critical": []
+    },
+    {
+      "id": "item-02",
+      "category": "item",
+      "request": "니트 말고 블루 셔츠 입을래",
+      "current": [
+        "g-beige-knit",
+        "g-black-slacks"
+      ],
+      "locked": [],
+      "history": [],
+      "expect": {
+        "action": "edit",
+        "target_garment_ids": [
+          "g-blue-shirt"
+        ]
+      },
+      "critical": []
+    },
+    {
+      "id": "item-03",
+      "category": "item",
+      "request": "가죽 재킷으로 바꿔줘",
+      "current": [
+        "g-white-tee",
+        "g-beige-pants",
+        "g-brown-coat"
+      ],
+      "locked": [],
+      "history": [],
+      "expect": {
+        "action": "clarify",
+        "target_garment_ids": []
+      },
+      "critical": []
+    },
+    {
+      "id": "unsup-01",
+      "category": "unsupported",
+      "request": "신발도 골라줘",
+      "current": [
+        "g-white-tee",
+        "g-beige-pants"
+      ],
+      "locked": [],
+      "history": [],
+      "expect": {
+        "action": "clarify"
+      },
+      "critical": []
+    },
+    {
+      "id": "unsup-02",
+      "category": "unsupported",
+      "request": "밝으면서 어둡게 해줘",
+      "current": [
+        "g-white-tee",
+        "g-beige-pants"
+      ],
+      "locked": [],
+      "history": [],
+      "expect": {
+        "action": "clarify"
+      },
+      "critical": []
+    },
+    {
+      "id": "unsup-03",
+      "category": "unsupported",
+      "request": "이 옷 얼마야? 살 수 있는 곳 알려줘",
+      "current": [
+        "g-white-tee",
+        "g-beige-pants"
+      ],
+      "locked": [],
+      "history": [],
+      "expect": {
+        "action": "clarify"
+      },
+      "critical": []
+    },
+    {
+      "id": "lock-01",
+      "category": "lock",
+      "request": "바지도 바꿔줘",
+      "current": [
+        "g-white-tee",
+        "g-beige-pants"
+      ],
+      "locked": [
+        "g-beige-pants"
+      ],
+      "history": [],
+      "expect": {
+        "action": "edit",
+        "change_slots_include": [
+          "bottom"
+        ]
+      },
+      "critical": []
+    },
+    {
+      "id": "lock-02",
+      "category": "lock",
+      "request": "좀 더 밝게 해줘",
+      "current": [
+        "g-white-tee",
+        "g-beige-pants"
+      ],
+      "locked": [],
+      "history": [
+        {
+          "role": "user",
+          "text": "바지는 그대로 두고 상의만 바꿔줘"
+        },
+        {
+          "role": "assistant",
+          "text": "상의를 바꿨어요. 잠근 옷은 그대로 유지했어요."
+        }
+      ],
+      "expect": {
+        "action": "edit",
+        "keep_slots_exclude": [
+          "bottom"
+        ],
+        "wants_include": [
+          {
+            "slot": null,
+            "want": "brighter"
+          }
+        ]
+      },
+      "critical": []
+    }
+  ]
+}

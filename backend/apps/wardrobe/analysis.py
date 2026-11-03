@@ -1,5 +1,6 @@
 # AI-generated with Codex, 2026-09-29, reviewed by Hyeon U Jeong; recommendation labels added with Claude Code (Claude Opus 5.5), 2026-10-12, reviewed by Dongkun Moon
 import base64
+from copy import deepcopy
 from io import BytesIO
 import json
 import socket
@@ -8,7 +9,8 @@ from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 from PIL import Image, ImageOps, UnidentifiedImageError
 
-from .schema import COLOR_PALETTE, DETAIL_CHOICES, DETAIL_LISTS, ENUMS, SCHEMA, SUBCATEGORIES, validate_ai_attributes, validate_ai_details
+from .schema import COLOR_PALETTE, DETAIL_CHOICES, DETAIL_LISTS, ENUMS, SCHEMA, SUBCATEGORIES, provider_schema, validate_ai_attributes, validate_ai_details
+from .worn_estimates import WEARING_SCHEMA, WEARING_PROMPT, observation
 
 MODEL = 'gemini-3.5-flash-lite'
 MAX_IMAGE_BYTES = 5 * 1024 * 1024
@@ -92,20 +94,47 @@ def prepare_image(raw):
         raise AnalysisError('INVALID_IMAGE', 400) from error
 
 
-def analyze_image(raw, api_key, garment_type=None):
+def analyze_image(raw, api_key, garment_type=None, *, target_category=None, include_wearing=False):
     """(attributes, details): details are optional K-Fashion hints for the recommendation labels.
     garment_type: the kind the user picked when measuring (CAPTURE_HINTS), used as a hint."""
     image = prepare_image(raw)
     if not api_key:
         raise AnalysisError('AI_NOT_CONFIGURED', 503)
-    request = _build_request(image, api_key, CAPTURE_HINTS.get(garment_type))
+    include_wearing = bool(include_wearing and target_category)
+    request = _build_request(image, api_key, CAPTURE_HINTS.get(garment_type), target_category, include_wearing)
     body = _send_request(request)
-    return _parse_response(body)
+    result = _parse_response(body, include_wearing)
+    attributes = result[0]
+    if target_category and attributes['category'] != target_category:
+        raise AnalysisError('IMAGE_TARGET_UNCLEAR', 422)
+    return result
 
 
-def _build_request(image, api_key, hint=None):
+def _build_request(image, api_key, hint=None, target_category=None, include_wearing=False):
+    prompt = PROMPT
+    schema = SCHEMA
+    if target_category:
+        if target_category not in ('top', 'bottom', 'outerwear'):
+            raise AnalysisError('INVALID_TARGET', 400)
+        prompt = prompt.replace('Analyze only the single main garment in this image.',
+                                f'Analyze only the worn {target_category} garment in this user-selected crop.')
+        prompt = prompt.replace(
+            'If no garment, multiple separate garments, an unsupported garment (dress, jumpsuit,\n'
+            'accessory), or an unreadable image is present, set image_status accordingly and attributes=null.',
+            'Other garment categories and bags may remain in the crop: ignore their features completely. '
+            'single means exactly one identifiable target garment, not one garment in the entire image. '
+            'If multiple people or multiple plausible target garments are visible, use multiple. '
+            'If the target is absent, use no_garment. If occlusion, blur or overlapping layers prevent '
+            'reliably attributing colors and details to the target, use unclear. '
+            'In every rejected case attributes=null. Never reconstruct or infer hidden details.')
+    if include_wearing:
+        prompt = prompt.replace('body data or actual fit on a user.', 'body data in the attributes object.') + WEARING_PROMPT
+        schema = deepcopy(SCHEMA)
+        schema['properties']['wearing'] = WEARING_SCHEMA
+        schema['required'].append('wearing')
+        schema = provider_schema(schema)
     payload = {
-        'systemInstruction': {'parts': [{'text': PROMPT}]},
+        'systemInstruction': {'parts': [{'text': prompt}]},
         'contents': [
             {
                 'role': 'user',
@@ -124,7 +153,7 @@ def _build_request(image, api_key, hint=None):
         ],
         'generationConfig': {
             'responseMimeType': 'application/json',
-            'responseJsonSchema': SCHEMA,
+            'responseJsonSchema': schema,
             'maxOutputTokens': 4096,
         },
     }
@@ -146,6 +175,10 @@ def _send_request(request):
             raise AnalysisError('AI_RATE_LIMITED', 429) from None
         if error.code in (401, 403):
             raise AnalysisError('AI_AUTH_FAILED', 503) from None
+        if error.code == 400:
+            raise AnalysisError('AI_REQUEST_INVALID') from None
+        if error.code == 404:
+            raise AnalysisError('AI_MODEL_UNAVAILABLE', 503) from None
         raise AnalysisError('AI_PROVIDER_ERROR') from None
     except (TimeoutError, socket.timeout):
         raise AnalysisError('AI_TIMEOUT', 504) from None
@@ -156,7 +189,7 @@ def _send_request(request):
         raise AnalysisError('AI_UNAVAILABLE') from None
 
 
-def _parse_response(body):
+def _parse_response(body, include_wearing=False):
     try:
         if len(body) > MAX_RESPONSE_BYTES:
             raise ValueError('Response too large')
@@ -167,7 +200,8 @@ def _parse_response(body):
         parts = candidates[0]['content']['parts']
         text = ''.join(part.get('text', '') for part in parts if not part.get('thought', False))
         result = json.loads(text)
-        if not isinstance(result, dict) or set(result) - {'details'} != {'image_status', 'attributes'}:
+        optional = {'details', 'wearing'} if include_wearing else {'details'}
+        if not isinstance(result, dict) or set(result) - optional != {'image_status', 'attributes'}:
             raise ValueError('Invalid response fields')
         if result['image_status'] not in SCHEMA['properties']['image_status']['enum']:
             raise ValueError('Invalid image status')
@@ -176,6 +210,7 @@ def _parse_response(body):
                 raise ValueError('Unexpected attributes')
             raise AnalysisError('IMAGE_' + result['image_status'].upper(), 422)
         attributes = validate_ai_attributes(result['attributes'])
-        return attributes, validate_ai_details(result.get('details'), attributes['category'])
+        parsed = (attributes, validate_ai_details(result.get('details'), attributes['category']))
+        return (*parsed, observation(result.get('wearing'), attributes['category'])) if include_wearing else parsed
     except (ValueError, KeyError, TypeError, IndexError, AttributeError):
         raise AnalysisError('AI_INVALID_RESPONSE') from None

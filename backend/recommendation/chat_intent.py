@@ -88,19 +88,42 @@ def validate(value):
 
 
 class ChatModelError(Exception):
-    pass
+    def __init__(self, kind='infra', code='CHAT_MODEL_UNAVAILABLE'):
+        super().__init__(code)
+        self.kind = kind
+        self.code = code
+
+
+def model_config():
+    """Public runtime metadata shared by the service and evaluator; never includes API keys."""
+    provider = os.environ.get('CHAT_PROVIDER', 'auto').strip().lower()
+    router_key = os.environ.get('OPENROUTER_API_KEY', '').strip()
+    if provider == 'auto':
+        provider = 'openrouter' if router_key else 'gemini'
+    if provider == 'openrouter':
+        model = os.environ.get('OPENROUTER_CHAT_MODEL', 'google/gemini-3.1-flash-lite').strip()
+        configured = bool(router_key)
+    elif provider == 'gemini':
+        model = os.environ.get('GEMINI_TEXT_MODEL', gemini.TEXT_MODEL).strip()
+        configured = bool(gemini.api_key())
+    else:
+        raise ChatModelError('infra', 'INVALID_CHAT_PROVIDER')
+    if not model:
+        raise ChatModelError('infra', 'INVALID_CHAT_MODEL')
+    return {'provider': provider, 'model': model, 'configured': configured}
 
 
 def parse(text, context):
-    provider = os.environ.get('CHAT_PROVIDER', 'auto')
+    config = model_config()
+    provider, model = config['provider'], config['model']
+    if not config['configured']:
+        raise ChatModelError('infra', 'PROVIDER_NOT_CONFIGURED')
     router_key = os.environ.get('OPENROUTER_API_KEY', '').strip()
     google_key = gemini.api_key()
-    if provider == 'auto':
-        provider = 'openrouter' if router_key else 'gemini'
     user = json.dumps({'request': text, **context}, ensure_ascii=False)
     try:
         if provider == 'openrouter' and router_key:
-            payload = {'model': os.environ.get('OPENROUTER_CHAT_MODEL', 'google/gemini-3.1-flash-lite'),
+            payload = {'model': model,
                        'messages': [{'role': 'system', 'content': PROMPT}, {'role': 'user', 'content': user}],
                        'max_tokens': 700, 'temperature': 0,
                        'provider': {'require_parameters': True},
@@ -113,15 +136,28 @@ def parse(text, context):
                 raise ValueError('Response too large')
             result = json.loads(raw)['choices'][0]['message']['content']
         elif provider == 'gemini' and google_key:
-            candidate = gemini.generate(gemini.TEXT_MODEL, {
+            candidate = gemini.generate(model, {
                 'systemInstruction': {'parts': [{'text': PROMPT}]},
                 'contents': [{'role': 'user', 'parts': [{'text': user}]}],
                 'generationConfig': {'responseMimeType': 'application/json', 'responseJsonSchema': SCHEMA,
                                      'maxOutputTokens': 700, 'temperature': 0}}, google_key, timeout=15, max_bytes=65536)
             result = ''.join(p.get('text', '') for p in candidate['content']['parts'] if not p.get('thought'))
         else:
-            raise ValueError('Provider not configured')
+            raise ChatModelError('infra', 'PROVIDER_NOT_CONFIGURED')
         return validate(json.loads(result)), provider, None
-    except (gemini.GeminiError, HTTPError, URLError, OSError, ValueError, TypeError, KeyError, IndexError, AttributeError) as exc:
+    except gemini.GeminiError as exc:
+        kind = 'format' if exc.code == 'AI_INVALID_RESPONSE' else 'infra'
+        log.warning('Chat extraction unavailable (%s): %s', provider, exc.code)
+        raise ChatModelError(kind, exc.code) from None
+    except HTTPError as exc:
+        code = {429: 'AI_RATE_LIMITED', 401: 'AI_AUTH_FAILED', 403: 'AI_AUTH_FAILED',
+                404: 'AI_MODEL_NOT_FOUND'}.get(exc.code, 'AI_PROVIDER_ERROR')
+        exc.close()
+        log.warning('Chat extraction unavailable (%s): %s', provider, code)
+        raise ChatModelError('infra', code) from None
+    except (URLError, OSError) as exc:
         log.warning('Chat extraction unavailable (%s): %s', provider, type(exc).__name__)
-        raise ChatModelError() from None
+        raise ChatModelError('infra', type(exc).__name__) from None
+    except (ValueError, TypeError, KeyError, IndexError, AttributeError) as exc:
+        log.warning('Chat extraction invalid (%s): %s', provider, type(exc).__name__)
+        raise ChatModelError('format', type(exc).__name__) from None
