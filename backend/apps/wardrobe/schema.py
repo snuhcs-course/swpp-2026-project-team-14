@@ -172,6 +172,21 @@ ATTRIBUTE_FIELDS = frozenset(WardrobeAttributes.__annotations__)
 BOTTOM_FIELDS = ('leg_shape', 'rise_type', 'skirt_shape')
 PANTS_SUBCATEGORIES = ('jeans', 'slacks', 'pants', 'active_pants', 'shorts')
 
+def provider_schema(schema):
+    """Limit constrained-decoding complexity; application validators retain limits.
+
+    Nested array cardinalities and integer ranges can make Gemini reject an
+    otherwise valid response schema with HTTP 400, before looking at the photo.
+    Keep the object shape, required fields and vocabulary constraints intact.
+    """
+    if isinstance(schema, dict):
+        return {key: provider_schema(value) for key, value in schema.items()
+                if key not in ('minItems', 'maxItems', 'minimum', 'maximum')}
+    if isinstance(schema, list):
+        return [provider_schema(value) for value in schema]
+    return schema
+
+
 SCHEMA = {
     'type': 'object',
     'additionalProperties': False,

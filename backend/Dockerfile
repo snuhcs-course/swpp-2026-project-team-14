@@ -34,6 +34,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 ADD --checksum=sha256:64437af838a65d18e5ba7a0d39b465540069bc8aae8308de3e318aad31fcbc7b \
     https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_heavy/float16/latest/pose_landmarker_heavy.task \
     /app/models/pose_landmarker_heavy.task
+ADD --checksum=sha256:a93a8dac171b5c1fcc53632a8bfc180bfd9759ea69a3e207451bb07f76add54f \
+    https://huggingface.co/mattmdjaga/segformer_b2_clothes/resolve/584abc1e1d260e23c0fc627c5217a09b2b461046/onnx/model.onnx \
+    /app/models/segformer_clothes.onnx
+RUN chmod 644 /app/models/segformer_clothes.onnx
 RUN chmod 644 /app/models/pose_landmarker_heavy.task
 
 COPY manage.py .

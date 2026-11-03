@@ -68,3 +68,6 @@ DATA_UPLOAD_MAX_MEMORY_SIZE = 25 * 1024 * 1024
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "").strip()
 WARDROBE_MODEL_DIR = Path(os.environ.get("WARDROBE_MODEL_DIR", str(BASE_DIR / "wardrobe/garment-landmarks")))
 MEDIA_ROOT = Path(os.environ.get("WARDROBE_MEDIA_ROOT", str(BASE_DIR / "private/wardrobe-media")))
+OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "").strip()
+OPENROUTER_IMAGE_MODEL = os.environ.get("OPENROUTER_IMAGE_MODEL", "google/gemini-2.5-flash-image").strip()
+WORN_SEGMENTATION_MODEL = Path(os.environ.get("WORN_SEGMENTATION_MODEL", str(BASE_DIR / "models/segformer_clothes.onnx")))
