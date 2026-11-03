@@ -12,6 +12,7 @@ GET  /api/weather/?lat=&lon=          current weather (Open-Meteo)
 from __future__ import annotations
 
 import json
+import logging
 import math
 import uuid
 from functools import lru_cache
@@ -21,6 +22,7 @@ from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 from django.utils import timezone
+from onnxruntime.capi.onnxruntime_pybind11_state import Fail, InvalidGraph, InvalidProtobuf, NoSuchFile
 
 from apps.body_profiles.profile import body_from_request
 from apps.wardrobe.models import Garment
@@ -29,6 +31,7 @@ from apps.users.models import User
 from apps.users.pagination import account_page
 from recommendation import preference, season, weather
 from recommendation.catalog import Catalog
+from recommendation.external import ExternalModelUnavailable, matching_search
 from recommendation.labeling import label
 from recommendation.search import RecommendError, Request, recommend
 from recommendation.vocab import PROFILE_STYLES, WARDROBE_CATEGORY
@@ -41,6 +44,7 @@ PREF_FITS = ("slim", "regular", "loose")
 SLOT_CODE = {slot: code for code, slot in WARDROBE_CATEGORY.items()}  # 상의 -> top
 MAX_COUNT = 5
 MAX_SEEN = 100
+logger = logging.getLogger(__name__)
 
 
 SLOT_ORDER = ("outerwear", "top", "bottom")
@@ -212,6 +216,46 @@ def recommend_view(request):
                                    reasons=o["reasons"], context=context))
     return _json({"outfits": [serialize(o) for o in outfits], "notes": result["notes"], "band": result["band"],
                   "context": context})
+
+
+@require_POST
+@require_auth
+def match_external_view(request):
+    """Predict a matching item and link to a product search without requesting shopping-site data."""
+    try:
+        data = _read(request)
+        raw_id = data.get("garment_id")
+        if not isinstance(raw_id, str):
+            raise ValueError("Garment id required")
+        garment_id = uuid.UUID(raw_id)
+    except TooLarge:
+        return _error("BODY_TOO_LARGE", 413)
+    except NotJson:
+        return _error("JSON_REQUIRED", 415)
+    except (ValueError, TypeError, UnicodeDecodeError):
+        return _error("INVALID_EXTERNAL_REQUEST", 400, "추천할 옷을 다시 선택해 주세요.")
+
+    garment = Garment.objects.filter(pk=garment_id, user=request.user, saved=True).first()
+    if garment is None:
+        return _error("EXTERNAL_GARMENT_NOT_FOUND", 404, "옷을 찾을 수 없어요. 옷장을 다시 불러와 주세요.")
+    item = to_item({"id": str(garment.id), "attributes": garment.attributes,
+                    "dimensions": garment.dimensions, "labels": garment.labels})
+    if item is None:
+        return _error("UNSUPPORTED_EXTERNAL_CATEGORY", 422, "상의, 하의, 아우터에서 어울리는 옷을 찾아보세요.")
+    others = Garment.objects.filter(user=request.user, saved=True).exclude(pk=garment.id)
+    wardrobe = [candidate for g in others if (candidate := to_item({"id": str(g.id), "attributes": g.attributes,
+                "dimensions": g.dimensions, "labels": g.labels})) is not None]
+    try:
+        masked = models().masked
+    except (OSError, json.JSONDecodeError, Fail, InvalidGraph, InvalidProtobuf, NoSuchFile):
+        logger.exception("External matching model loading failed")
+        return _error("EXTERNAL_MODEL_UNAVAILABLE", 503, "추천을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.")
+    try:
+        result = matching_search(item, masked, request.user.preferred_styles, wardrobe)
+    except ExternalModelUnavailable:
+        logger.exception("External matching prediction unavailable")
+        return _error("EXTERNAL_MODEL_UNAVAILABLE", 503, "추천을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.")
+    return _json({"source_garment_id": str(garment.id), **result})
 
 
 @require_http_methods(["GET", "POST"])

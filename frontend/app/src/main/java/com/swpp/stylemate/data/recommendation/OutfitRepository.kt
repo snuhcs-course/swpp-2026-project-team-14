@@ -5,6 +5,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import com.swpp.stylemate.data.AccountAccess
 import com.swpp.stylemate.data.AuthException
+import java.net.URI
 
 data class Weather(val temp: Double, val apparent: Double, val label: String, val band: String,
                    val rain: Boolean, val snow: Boolean, val json: JSONObject)
@@ -27,6 +28,21 @@ data class Outfit(
 
 data class Recommendation(val outfits: List<Outfit>, val notes: List<String>, val band: String)
 
+data class ExternalAttributes(val category: String, val color: String, val fit: String)
+
+data class WardrobeMatch(val garmentId: String, val name: String)
+
+data class ExternalRecommendation(
+    val sourceGarmentId: String,
+    val targetSlot: String,
+    val title: String,
+    val headline: String,
+    val reason: String,
+    val attributes: ExternalAttributes,
+    val searchUrl: String,
+    val wardrobeMatches: List<WardrobeMatch> = emptyList(),
+)
+
 class OutfitApiException(val code: String, message: String) : Exception(message)
 
 /**
@@ -47,6 +63,37 @@ class OutfitRepository(private val account: AccountAccess) {
         anchorId?.let { request.put("anchor_id", it) }
         val result = call("POST", "/api/outfits/recommend/", request)
         return parseRecommendation(result)
+    }
+
+    suspend fun matchExternal(garmentId: String): ExternalRecommendation {
+        val result = call("POST", "/api/outfits/match-external/", JSONObject().put("garment_id", garmentId))
+        return try {
+            fun text(json: JSONObject, key: String): String =
+                (json.get(key) as? String)?.takeIf { it.isNotBlank() }
+                    ?: throw IllegalArgumentException("Missing $key")
+
+            val sourceId = text(result, "source_garment_id")
+            val targetSlot = text(result, "target_slot")
+            require(sourceId == garmentId && targetSlot in setOf("top", "bottom"))
+            val searchUrl = text(result, "search_url")
+            val uri = URI(searchUrl)
+            require(uri.scheme == "https" && uri.host == "www.musinsa.com" &&
+                uri.rawAuthority == "www.musinsa.com" && uri.rawPath == "/search/goods" &&
+                !uri.rawQuery.isNullOrBlank() && uri.rawFragment == null)
+            val attributes = result.getJSONObject("attributes")
+            // 옷장 매칭은 옷장에 맞는 옷이 없으면 빈 배열이고, 구버전 서버 응답엔 없을 수 있다
+            val matches = result.optJSONArray("wardrobe_matches") ?: JSONArray()
+            val wardrobeMatches = (0 until matches.length()).map { index ->
+                val match = matches.getJSONObject(index)
+                WardrobeMatch(text(match, "garment_id"), text(match, "name"))
+            }
+            ExternalRecommendation(sourceId, targetSlot, text(result, "title"), text(result, "headline"),
+                text(result, "reason"),
+                ExternalAttributes(text(attributes, "category"), text(attributes, "color"), text(attributes, "fit")),
+                searchUrl, wardrobeMatches)
+        } catch (_: Exception) {
+            throw OutfitApiException("INVALID_RESPONSE", "추천 결과를 읽지 못했어요. 다시 시도해 주세요.")
+        }
     }
 
     suspend fun saved(): List<Outfit> {

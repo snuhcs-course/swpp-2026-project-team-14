@@ -96,6 +96,24 @@
 
 Open-Meteo 현재 날씨(기본 서울): `{temp, apparent, precipitation, rain, snow, wind, label, source, band}`. 실패하면 502 `WEATHER_UNAVAILABLE`. 10분 캐시.
 
+## 외부 상품 검색 연결
+
+### POST /api/outfits/match-external/
+
+요청: {"garment_id": "저장된-내-옷-UUID"}. Bearer 인증이 필요하며 본인의 저장된 옷 한 벌만 사용한다. 전체 옷장의 상의·하의나 별도 체형 요청은 필요하지 않다.
+
+응답은 source_garment_id, target_slot, title, headline, reason, attributes, search_url, wardrobe_matches이다. headline은 "해당 옷과 가장 잘 어울리는 상의는 블랙 & 오버핏 속성이에요." 형식이고, reason은 허용 후보 안에서 정규화한 색상·핏 확률을 포함한 한 줄 근거다. wardrobe_matches는 선택한 옷을 제외한 본인의 저장된 옷 중 대상 슬롯의 옷을 같은 모델 예측(카테고리·색상·핏 평균 로그확률)으로 정렬한 상위 3개 [{"garment_id", "name"}]이며 없으면 빈 배열이다. target_slot은 top 또는 bottom이고 attributes의 category·color·fit은 한국어 모델 어휘다. 예를 들어 하의를 선택하면 title은 "블랙 오버핏 셔츠", attributes는 {"category": "셔츠", "color": "블랙", "fit": "오버사이즈"} 형식이다.
+
+상의 선택 시 하의, 하의·아우터 선택 시 상의를 추천한다. 기존 마스킹 모델의 대상 슬롯별 카테고리·핏 허용값으로 후보를 제한하고 색상·핏·종류를 예측한다. 계정 선호 스타일 중 기존 어휘로 변환되는 첫 값을 문맥으로 사용하며, 없으면 선택한 옷의 스타일을 사용한다.
+
+옷장 후보 점수는 카테고리·색상·핏 세 항목의 평균이다. 누락되거나 사전에 없는 속성, 유효 점수가 없는 속성값에는 해당 속성의 최저 유효 모델 점수에서 1을 뺀 값을 적용한다. 유효한 속성이 하나도 없는 옷은 제외한다. 따라서 속성 누락만으로 같은 옷의 점수가 높아지지 않는다.
+
+모델 파일 읽기·JSON 파싱·ONNX 로딩 오류와 명시적인 예측 불가 오류는 503 EXTERNAL_MODEL_UNAVAILABLE로 처리한다. ONNX 추론의 Fail·RuntimeException도 예측 불가 오류로 변환한다. 일반 코드 예외는 공통 서버 오류 처리로 전달한다.
+
+title(검색어)은 "색상 핏 [패턴] 종류" 순서다(예: "블랙 오버핏 스트라이프 셔츠"). 패턴은 모델의 프린트 예측이며 무지이거나 예측이 없으면 생략하고, attributes.pattern에는 "무지"로 담는다. search_url은 https://www.musinsa.com/search/goods 에 title을 URL 인코딩한 keyword만 붙인다. 무신사 필터 파라미터는 검색어마다 달라지는 내부 ID라 사용하지 않는다. 사용자가 바로가기를 누를 때 외부 검색 페이지를 연다. 서버는 해당 주소에 요청하거나 상품 정보를 수집하지 않고 DB도 변경하지 않는다. 실제 상품의 재고·가격·치수·검색 순위는 검증하지 않는다.
+
+오류: 400 INVALID_EXTERNAL_REQUEST, 401 AUTHENTICATION_REQUIRED, 404 EXTERNAL_GARMENT_NOT_FOUND(다른 계정·초안·없는 옷 포함), 413 BODY_TOO_LARGE, 415 JSON_REQUIRED, 422 UNSUPPORTED_EXTERNAL_CATEGORY(신발), 503 EXTERNAL_MODEL_UNAVAILABLE. 모델 파일·추론·유효 속성 예측 실패는 503과 재시도 안내를 반환한다.
+
 ## 채팅 코디 수정
 
 ### POST /api/outfits/chat/
