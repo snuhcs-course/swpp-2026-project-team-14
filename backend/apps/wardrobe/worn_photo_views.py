@@ -14,7 +14,7 @@ from django.views.decorators.http import require_GET, require_POST
 from apps.users.auth import require_auth
 from apps.users.models import User
 from recommendation.labeling import label
-from .analysis import AnalysisError, MAX_IMAGE_BYTES, MODEL, prepare_image
+from .analysis import AnalysisError, MAX_IMAGE_BYTES, model_name, prepare_image
 from .editor import validate_record
 from .models import Garment, WornGeneration, WornPhoto
 from . import worn_detection
@@ -31,7 +31,7 @@ def private_json(data, status=200):
 
 def photo_state(row):
     base = f'/api/wardrobe/worn-photos/{row.pk}/'
-    return {'id': str(row.pk), 'status': row.status, 'error': row.error or None, 'model': MODEL,
+    return {'id': str(row.pk), 'status': row.status, 'error': row.error or None, 'model': model_name(),
             'image_url': base + 'image/',
             'candidates': [dict(candidate, crop_url=base + f"candidates/{candidate['id']}/image/")
                            for candidate in row.candidates]}
@@ -89,7 +89,7 @@ def upload(request):
                 row.image.delete(save=False)
                 raise
         try:
-            row.candidates = worn_detection.detect(image, settings.GEMINI_API_KEY)
+            row.candidates = worn_detection.detect(image, settings.OPENROUTER_API_KEY)
             row.status = 'ready'
         except AnalysisError as error:
             row.status, row.error = 'failed', error.code

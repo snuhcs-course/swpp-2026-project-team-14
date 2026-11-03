@@ -3,16 +3,14 @@
 This is an analysis call, never an image generation call. All attributes describe
 the original photograph. Boxes are proposals, not masks or recovered garments.
 """
-import base64
 from copy import deepcopy
 from io import BytesIO
 import json
 import uuid
-from urllib.request import Request
 
 from PIL import Image
 
-from .analysis import AnalysisError, MODEL, MAX_RESPONSE_BYTES, _send_request, prepare_image
+from .analysis import AnalysisError, _build_vision_request, _response_json, _send_request, prepare_image
 from .schema import (COLOR_PALETTE, DETAIL_CHOICES, DETAIL_LISTS, ENUMS, SCHEMA,
                      SUBCATEGORIES, provider_schema, validate_ai_attributes, validate_ai_details)
 from .worn_estimates import WEARING_SCHEMA, WEARING_PROMPT, observation
@@ -66,28 +64,11 @@ or fiber content. Use only these codes and vocabularies:
 
 def detect(raw, api_key):
     image = prepare_image(raw)
-    if not api_key:
-        raise AnalysisError('AI_NOT_CONFIGURED', 503)
-    payload = {
-        'systemInstruction': {'parts': [{'text': PROMPT}]},
-        'contents': [{'role': 'user', 'parts': [{'inlineData': {
-            'mimeType': 'image/jpeg', 'data': base64.b64encode(image).decode('ascii')}},
-            {'text': 'Find the visible garment candidates in this original worn photograph.'}]}],
-        'generationConfig': {'responseMimeType': 'application/json', 'responseJsonSchema': provider_schema(DETECTION_SCHEMA),
-                             'maxOutputTokens': 4096},
-    }
-    body = _send_request(Request(
-        f'https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent',
-        data=json.dumps(payload).encode(), method='POST',
-        headers={'Content-Type': 'application/json', 'x-goog-api-key': api_key}))
+    request = _build_vision_request(image, api_key, PROMPT, provider_schema(DETECTION_SCHEMA),
+        'Find the visible garment candidates in this original worn photograph.', 'worn_garments')
+    body = _send_request(request)
     try:
-        if len(body) > MAX_RESPONSE_BYTES:
-            raise ValueError()
-        envelope = json.loads(body)
-        output = envelope['candidates'][0]
-        if output['finishReason'] != 'STOP':
-            raise ValueError()
-        result = json.loads(''.join(p.get('text', '') for p in output['content']['parts'] if not p.get('thought')))
+        result = _response_json(body)
         if not isinstance(result, dict) or set(result) != {'person_count', 'garments'}:
             raise ValueError()
         count = result['person_count']

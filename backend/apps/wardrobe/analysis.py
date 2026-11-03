@@ -8,11 +8,13 @@ from urllib.error import HTTPError, URLError
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 from PIL import Image, ImageOps, UnidentifiedImageError
+from django.conf import settings
 
 from .schema import COLOR_PALETTE, DETAIL_CHOICES, DETAIL_LISTS, ENUMS, SCHEMA, SUBCATEGORIES, provider_schema, validate_ai_attributes, validate_ai_details
 from .worn_estimates import WEARING_SCHEMA, WEARING_PROMPT, observation
 
-MODEL = 'gemini-3.5-flash-lite'
+MODEL = 'google/gemini-3.5-flash-lite'
+
 MAX_IMAGE_BYTES = 5 * 1024 * 1024
 MAX_IMAGE_PIXELS = 12_000_000
 MAX_RESPONSE_BYTES = 256 * 1024
@@ -58,6 +60,10 @@ CAPTURE_HINTS = {
     'short_sleeve_outerwear': 'short-sleeve outerwear', 'long_sleeve_outerwear': 'long-sleeve outerwear',
     'trousers': 'long trousers', 'shorts': 'shorts', 'skirt': 'a skirt',
 }
+
+def model_name():
+    return settings.OPENROUTER_VISION_MODEL
+
 
 class AnalysisError(Exception):
     def __init__(self, code, status=502):
@@ -133,36 +139,69 @@ def _build_request(image, api_key, hint=None, target_category=None, include_wear
         schema['properties']['wearing'] = WEARING_SCHEMA
         schema['required'].append('wearing')
         schema = provider_schema(schema)
+    user_text = 'Classify this garment.' + (
+        f' The user measured it as {hint}; keep category and subcategory consistent with that '
+        'unless the photo clearly shows otherwise.' if hint else '')
+    return _build_vision_request(image, api_key, prompt, schema, user_text, 'garment_analysis')
+
+
+def _build_vision_request(image, api_key, prompt, schema, user_text, name):
+    if not api_key:
+        raise AnalysisError('AI_NOT_CONFIGURED', 503)
+    if not model_name():
+        raise AnalysisError('AI_MODEL_UNAVAILABLE', 503)
     payload = {
-        'systemInstruction': {'parts': [{'text': prompt}]},
-        'contents': [
-            {
-                'role': 'user',
-                'parts': [
-                    {
-                        'inlineData': {
-                            'mimeType': 'image/jpeg',
-                            'data': base64.b64encode(image).decode('ascii'),
-                        },
-                    },
-                    {'text': 'Classify this garment.' + (
-                        f' The user measured it as {hint}; keep category and subcategory consistent with that '
-                        'unless the photo clearly shows otherwise.' if hint else '')},
-                ],
-            },
-        ],
-        'generationConfig': {
-            'responseMimeType': 'application/json',
-            'responseJsonSchema': schema,
-            'maxOutputTokens': 4096,
-        },
+        'model': model_name(),
+        'messages': [{'role': 'system', 'content': prompt}, {'role': 'user', 'content': [
+            {'type': 'image_url', 'image_url': {'url': 'data:image/jpeg;base64,' + base64.b64encode(image).decode('ascii')}},
+            {'type': 'text', 'text': user_text},
+        ]}],
+        'max_tokens': 4096,
+        'temperature': 0,
+        'provider': {'require_parameters': True, 'allow_fallbacks': False},
+        'response_format': {'type': 'json_schema', 'json_schema': {
+            'name': name, 'strict': True, 'schema': schema,
+        }},
     }
-    return Request(
-        f'https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent',
-        data=json.dumps(payload).encode('utf-8'),
-        method='POST',
-        headers={'Content-Type': 'application/json', 'x-goog-api-key': api_key},
-    )
+    return Request('https://openrouter.ai/api/v1/chat/completions',
+        data=json.dumps(payload).encode('utf-8'), method='POST',
+        headers={'Content-Type': 'application/json', 'Authorization': 'Bearer ' + api_key})
+
+
+def _provider_error(status):
+    code, http_status = {
+        400: ('AI_REQUEST_INVALID', 502),
+        401: ('AI_AUTH_FAILED', 503), 403: ('AI_AUTH_FAILED', 503),
+        402: ('AI_CREDITS_REQUIRED', 503), 404: ('AI_MODEL_UNAVAILABLE', 503),
+        408: ('AI_TIMEOUT', 504), 504: ('AI_TIMEOUT', 504),
+        429: ('AI_RATE_LIMITED', 429),
+    }.get(status, ('AI_PROVIDER_ERROR', 502))
+    return AnalysisError(code, http_status)
+
+
+def _response_json(body):
+    """Read only a complete JSON response; never expose provider messages or retry."""
+    try:
+        if len(body) > MAX_RESPONSE_BYTES:
+            raise ValueError('Response too large')
+        envelope = json.loads(body)
+        if not isinstance(envelope, dict):
+            raise ValueError('Invalid envelope')
+        if isinstance(envelope.get('error'), dict):
+            status = envelope['error'].get('code')
+            raise _provider_error(status if type(status) is int else 502)
+        choices = envelope['choices']
+        if not isinstance(choices, list) or len(choices) != 1:
+            raise ValueError('Expected one result')
+        output = choices[0]
+        message = output['message']
+        if output['finish_reason'] != 'stop' or message.get('refusal'):
+            raise ValueError('Blocked or incomplete output')
+        if not isinstance(message['content'], str):
+            raise ValueError('Expected text JSON')
+        return json.loads(message['content'])
+    except (ValueError, KeyError, TypeError, IndexError, AttributeError):
+        raise AnalysisError('AI_INVALID_RESPONSE') from None
 
 
 def _send_request(request):
@@ -171,15 +210,7 @@ def _send_request(request):
             return response.read(MAX_RESPONSE_BYTES + 1)
     except HTTPError as error:
         error.close()
-        if error.code == 429:
-            raise AnalysisError('AI_RATE_LIMITED', 429) from None
-        if error.code in (401, 403):
-            raise AnalysisError('AI_AUTH_FAILED', 503) from None
-        if error.code == 400:
-            raise AnalysisError('AI_REQUEST_INVALID') from None
-        if error.code == 404:
-            raise AnalysisError('AI_MODEL_UNAVAILABLE', 503) from None
-        raise AnalysisError('AI_PROVIDER_ERROR') from None
+        raise _provider_error(error.code) from None
     except (TimeoutError, socket.timeout):
         raise AnalysisError('AI_TIMEOUT', 504) from None
     except URLError as error:
@@ -191,15 +222,7 @@ def _send_request(request):
 
 def _parse_response(body, include_wearing=False):
     try:
-        if len(body) > MAX_RESPONSE_BYTES:
-            raise ValueError('Response too large')
-        envelope = json.loads(body)
-        candidates = envelope.get('candidates', [])
-        if not candidates or candidates[0].get('finishReason') != 'STOP':
-            raise ValueError('Blocked or incomplete output')
-        parts = candidates[0]['content']['parts']
-        text = ''.join(part.get('text', '') for part in parts if not part.get('thought', False))
-        result = json.loads(text)
+        result = _response_json(body)
         optional = {'details', 'wearing'} if include_wearing else {'details'}
         if not isinstance(result, dict) or set(result) - optional != {'image_status', 'attributes'}:
             raise ValueError('Invalid response fields')

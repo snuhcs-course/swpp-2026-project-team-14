@@ -49,13 +49,15 @@ class WornDetectionTests(SimpleTestCase):
         send.return_value = self.result()
         result = worn_detection.detect(source(), 'test-key')
         payload = json.loads(send.call_args.args[0].data)
-        self.assertIn(MODEL, send.call_args.args[0].full_url)
+        self.assertEqual(payload['model'], MODEL)
+        self.assertEqual(send.call_args.args[0].full_url, 'https://openrouter.ai/api/v1/chat/completions')
+        self.assertEqual(send.call_args.args[0].get_header('Authorization'), 'Bearer test-key')
         self.assertEqual(len(result), 3)
         self.assertEqual([r['attributes']['category'] for r in result], ['outerwear', 'top', 'bottom'])
         self.assertEqual([r['bounds'] for r in result], [r['bounds'] for r in candidates()])
-        self.assertIn('never copy', payload['systemInstruction']['parts'][0]['text'])
+        self.assertIn('never copy', payload['messages'][0]['content'])
         self.assertNotIn('dimensions', result[0]['attributes'])
-        schema = payload['generationConfig']['responseJsonSchema']
+        schema = payload['response_format']['json_schema']['schema']
         # Numeric bounds and nested array limits caused real provider HTTP 400s;
         # the server still rejects invalid boxes/counts in the following test.
         self.assertNotIn('maxItems', schema['properties']['garments'])
@@ -91,7 +93,7 @@ class WornDetectionTests(SimpleTestCase):
         self.assertLess(sum(abs(a - b) for a, b in zip(output.getpixel((60, 120)), (85, 51, 34))), 8)
 
 
-@override_settings(GEMINI_API_KEY='test-key')
+@override_settings(OPENROUTER_API_KEY='test-key')
 class WornBatchFlowTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user('batch_owner', 'test-password')
