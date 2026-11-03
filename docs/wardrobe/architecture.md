@@ -41,7 +41,7 @@ swpp-2026-project-team-14/
 |   |       |   `-- MyProfileScreen.kt           # 핏·무드 즉시 저장·컬러 편집·계정 카드/로그아웃·기존 데이터 가져오기·체형 상세
 |   |       `-- wardrobe/
 |   |           |-- WardrobeScreen.kt            # 옷장 목록·등록 방식 선택 시트·옷 선택 메뉴·온보딩/사진/편집 연결
-|   |           |-- WardrobeViewModel.kt         # 계정 목록·서버 저장·외부 추천 요청 상태
+|   |           |-- WardrobeViewModel.kt         # 계정 목록·저장·삭제/중복 방지·외부 추천 상태
 |   |           |-- ExternalRecommendationDialog.kt # 선택 옷 메뉴·추천 속성·무신사 바로가기 팝업
 |   |           |-- GarmentAnalysisViewModel.kt  # 분석 진행·실패·온보딩 분석 초안 복원
 |   |           |-- WardrobeColorField.kt       # 색상표·사진 좌표 변환·픽셀 색상 선택
@@ -63,6 +63,7 @@ swpp-2026-project-team-14/
 |   |   `-- java/com/swpp/stylemate/ui/wardrobe/
 |   |       |-- WornPreviewActivity.kt            # 개인 앱 파일의 기존 이미지·예시 값으로 UI만 체험, 네트워크/저장 없음
 |   |       `-- WornPreviewReviewScreen.kt        # 서비스 공용 확인 화면에 로컬 이미지·예시 상태/설정만 제공
+|   |-- main/res/drawable/ic_remove_garment.xml # 카드 우상단 의상 삭제 아이콘
 |   |-- main/res/drawable-nodpi/                # 생성한 온보딩 환영·6종 무드 사진
 |   |-- test/java/com/swpp/stylemate/             # 인증·만료·계정 캐시·추천 요청·재시도 검사
 |   `-- androidTest/java/com/swpp/stylemate/      # 로그인 차단·로그아웃/만료·계정 온보딩·옷장·측정점 검사
@@ -98,7 +99,7 @@ swpp-2026-project-team-14/
 |   |   |   `-- migrations/0003_alter_outfit_user.py # 무소유 코디 정리·소유자 필수 전환
 |   |   `-- wardrobe/
 |   |       |-- urls.py                          # 옷장 API 경로
-|   |       |-- views.py                         # 분석 초안·저장·수정·조회·추천 라벨 미리보기
+|   |       |-- views.py                         # 분석·저장·조회·의상/관련 코디 원자적 삭제·라벨
 |   |       |-- analysis.py                      # 이미지 검증·OpenRouter 원본 분석·공통 비전 요청/응답·오류 정규화
 |   |       |-- worn.py                          # 고정 ONNX 의류 분할·OpenRouter Gemini 펼침 생성·오류 정규화
 |   |       |-- worn_views.py                    # 계정별 생성 상태·요청 멱등성·이미지 승인·비교 사진 접근
@@ -114,6 +115,7 @@ swpp-2026-project-team-14/
 |   |       |-- migrations/0002_garment_labels.py # 추천 라벨 컬럼 추가
 |   |       |-- migrations/0003_garment_user.py   # 옷 소유 사용자 외래 키 추가
 |   |       |-- migrations/0004_alter_garment_user.py # 무소유 옷 정리·소유자 필수 전환
+|   |       |-- test_delete.py                   # 의상/관련 코디 삭제·권한·롤백 검사
 |   |       |-- tests.py                         # AI 계약·DB 저장·재조회 검사
 |   |       |-- test_worn.py                     # 착용 사진 대상 분석·계정 초안 격리·NULL 치수·수동 라벨 저장 검사
 |   |       |-- test_generation.py               # 원본 분석 보존·생성 승인·거절·중복/실패/계정 격리 검사
@@ -149,3 +151,5 @@ swpp-2026-project-team-14/
 가입·로그인·로그아웃·프로필 API와 계정별 옷·코디 접근 제한, 로그인 필수 화면·만료·계정 전환이 구현되었다. 게스트 사용·미리보기 API는 제거했고, 기존 데이터 가져오기는 인증 후 기능으로 유지한다. 소유자 외래 키는 필수이며 전환 마이그레이션은 소유자 없는 기존 행만 정리한다. 8페이지 온보딩은 기존 체형 분석·옷 등록을 재사용하고 로컬 진행·편집 초안을 복원한다. S3·추천 치수 비교는 미구현이다. 저장 범위와 인증 계약은 [로그인 문서](../login/README.md)를 따른다.
 
 화면 기준은 [디자인](design.md), 데이터·API 규칙은 [명세](wardrobe-spec.md), 등록 과정은 [데이터 흐름](wardrobe-flow.md), 실행·배포는 [실행 안내](local-development.md)를 따른다.
+
+의상 삭제는 기존 계정 API와 저장소를 사용한다. `WardrobeDeleteTest.kt`는 서버 실패·재시도·중복 차단·계정 캐시 제거를, `WardrobeScreenTest.kt`는 카드 아이콘·확인창·취소·실패 화면을 검사한다. `HomeRoute.kt`·`HomeViewModel.kt`는 삭제 후 홈 추천·코디북의 이전 상태를 비우고 갱신한다.

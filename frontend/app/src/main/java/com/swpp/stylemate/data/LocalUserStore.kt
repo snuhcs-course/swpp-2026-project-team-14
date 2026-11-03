@@ -102,6 +102,16 @@ class LocalUserStore(private val directory: File) {
     }
 
     fun cacheGarment(record: JSONObject) = upsert("garments", record)
+    fun removeGarment(id: String) = synchronized(lock) {
+        val data = read()
+        data.put("garments", JSONArray(list("garments").filter { it.optString("id") != id }))
+        data.put("outfits", JSONArray(list("outfits").filter { outfit ->
+            val items = outfit.optJSONArray("items") ?: JSONArray()
+            (0 until items.length()).none { items.getJSONObject(it).optString("garment_id") == id }
+        }))
+        write(snapshot, data.toString().toByteArray(Charsets.UTF_8))
+    }
+
     fun cacheGarments(rows: JSONArray) = synchronized(lock) {
         val data = read().put("garments", rows)
         write(snapshot, data.toString().toByteArray(Charsets.UTF_8))
