@@ -4,6 +4,8 @@ package com.swpp.stylemate.ui.wardrobe
 import com.swpp.stylemate.data.wardrobe.WardrobeRepository
 import com.swpp.stylemate.data.LocalUserStore
 import com.swpp.stylemate.data.AccountAccess
+import com.swpp.stylemate.data.recommendation.ExternalRecommendation
+import com.swpp.stylemate.data.recommendation.OutfitRepository
 
 import android.graphics.BitmapFactory
 import android.os.Build
@@ -15,6 +17,7 @@ import java.net.HttpURLConnection
 import java.net.URI
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -25,9 +28,15 @@ data class WardrobeState(val records: List<JSONObject> = emptyList(), val catalo
                          val loading: Boolean = false, val saving: Boolean = false,
                          val error: String? = null, val saveError: String? = null, val savedId: String? = null)
 
+data class ExternalMatchState(val garmentId: String? = null, val loading: Boolean = false,
+                              val result: ExternalRecommendation? = null, val error: String? = null)
+
 class WardrobeViewModel(private val store: LocalUserStore, private val account: AccountAccess) : ViewModel() {
     private val mutableState = MutableStateFlow(WardrobeState())
     val state = mutableState.asStateFlow()
+    private val mutableExternalMatch = MutableStateFlow(ExternalMatchState())
+    val externalMatch = mutableExternalMatch.asStateFlow()
+    private var externalMatchJob: Job? = null
     init { refresh() }
 
     fun refresh() {
@@ -66,5 +75,26 @@ class WardrobeViewModel(private val store: LocalUserStore, private val account: 
     }
 
     fun clearSaveState() { mutableState.value = mutableState.value.copy(savedId = null, saveError = null) }
+
+    fun matchExternal(garmentId: String) {
+        externalMatchJob?.cancel()
+        mutableExternalMatch.value = ExternalMatchState(garmentId = garmentId, loading = true)
+        externalMatchJob = viewModelScope.launch {
+            try {
+                val result = OutfitRepository(account).matchExternal(garmentId)
+                mutableExternalMatch.value = ExternalMatchState(garmentId = garmentId, result = result)
+            } catch (error: CancellationException) { throw error }
+            catch (error: Exception) {
+                mutableExternalMatch.value = ExternalMatchState(garmentId = garmentId,
+                    error = error.message ?: "어울리는 옷을 찾지 못했어요. 다시 시도해 주세요.")
+            }
+        }
+    }
+
+    fun closeExternalMatch() {
+        externalMatchJob?.cancel()
+        externalMatchJob = null
+        mutableExternalMatch.value = ExternalMatchState()
+    }
 
 }

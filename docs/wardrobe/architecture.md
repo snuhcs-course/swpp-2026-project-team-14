@@ -14,7 +14,7 @@ swpp-2026-project-team-14/
 |   |   |   |-- AuthRepository.kt                # 인증·프로필·세션·만료·응답 제한·계정 목록 분할 조회
 |   |   |   |-- GuestImportRepository.kt         # 가져오기 후보·충돌 조회·지문·계정별 재시도 처리
 |   |   |   |-- AuthSessionStore.kt              # Keystore AES-GCM 암호화 세션 보관·백업 제외
-|   |   |   |-- recommendation/                 # 계정 코디 API·계정별 취향 저장·서버 계산 요청
+|   |   |   |-- recommendation/                 # 계정 코디·외부 검색 API·계정별 취향 저장
 |   |   |   |-- RemoteBodyAnalyzer.kt            # 체형 분석 API 호출
 |   |   |   `-- wardrobe/
 |   |   |       |-- WardrobeRepository.kt         # 계정 서버 옷 조회·저장·캐시·인증 사진 요청
@@ -40,8 +40,9 @@ swpp-2026-project-team-14/
 |   |       |   |-- ReviewScreen.kt              # 체형 결과·치수 수정·온보딩 확인과 재분석 저장
 |   |       |   `-- MyProfileScreen.kt           # 핏·무드 즉시 저장·컬러 편집·계정 카드/로그아웃·기존 데이터 가져오기·체형 상세
 |   |       `-- wardrobe/
-|   |           |-- WardrobeScreen.kt            # 옷장 목록·등록 방식 선택 시트·온보딩/신발 촬영·사진/편집 연결
-|   |           |-- WardrobeViewModel.kt         # 계정 목록·서버 저장 상태
+|   |           |-- WardrobeScreen.kt            # 옷장 목록·등록 방식 선택 시트·옷 선택 메뉴·온보딩/사진/편집 연결
+|   |           |-- WardrobeViewModel.kt         # 계정 목록·서버 저장·외부 추천 요청 상태
+|   |           |-- ExternalRecommendationDialog.kt # 선택 옷 메뉴·추천 속성·무신사 바로가기 팝업
 |   |           |-- GarmentAnalysisViewModel.kt  # 분석 진행·실패·온보딩 분석 초안 복원
 |   |           |-- WardrobeColorField.kt       # 색상표·사진 좌표 변환·픽셀 색상 선택
 |   |           |-- GarmentEditor.kt             # 특징·실측·메모 편집·초안 복원·하단 고정 저장
@@ -123,7 +124,8 @@ swpp-2026-project-team-14/
 |   |       |-- migrations/0006_worngeneration_garment_request_key_and_more.py # 생성 초안·출처·요청 ID 고유 제약
 |   |       |-- migrations/0005_garment_image_source.py # 기존 사진 보존·착용 사진 출처 구분
 |   |       `-- test_landmarks.py                # 원본 사진의 자동 측정점·좌표 변환 검사
-|   |-- recommendation/                          # 저장 라벨 → K-Fashion 입력, 계절·주색/서브색·모델 어휘 정규화
+|   |-- recommendation/                          # 저장 라벨 → 모델 입력, 계절·색·모델 어휘 정규화
+|   |   `-- external.py                          # 단일 옷의 상대 속성 예측·외부 검색 URL 생성
 |   |-- body_analysis/                           # MediaPipe 체형 분석
 |   |-- wardrobe/garment-landmarks/              # HRNet 가중치·메타데이터·라이선스
 |   |-- models/segformer_clothes.onnx            # 고정 SegFormer 의류 분할 가중치, Git 제외·이미지 빌드 시 포함

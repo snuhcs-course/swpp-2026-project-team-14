@@ -55,7 +55,9 @@ sequenceDiagram
     App->>App: 응답으로 목록 갱신·임시 촬영 파일 정리
 ```
 
-앱 진입 시 GET options와 GET items로 편집 기준·저장 목록을 읽는다. 목록은 saved=true만 포함하고, 카드 선택 시 해당 데이터로 편집한다. 저장된 옷도 동일 PUT으로 수정한다. 사진은 GET items/id/image로 읽는다.
+앱 진입 시 GET options와 GET items로 편집 기준·저장 목록을 읽는다. 목록은 saved=true만 포함하고, 카드 선택 시 정보 수정·어울리는 옷 찾기 메뉴를 표시한다. 정보 수정은 기존 편집 화면으로 연결하며 동일 PUT으로 저장한다. 사진은 GET items/id/image로 읽는다.
+
+어울리는 옷 찾기는 선택한 옷 ID로 POST /api/outfits/match-external/을 호출한다. 서버가 기존 모델로 상대 옷의 속성과 검색 URL을 반환하면 팝업에 추천명·근거·바로가기를 표시한다. 외부 페이지는 사용자가 바로가기를 누를 때만 열며, 요청 실패 시 재시도할 수 있다. 상세 계약은 [추천 API](../recommendation/api.md#외부-상품-검색-연결)를 따른다.
 
 ## 3. 촬영·측정
 

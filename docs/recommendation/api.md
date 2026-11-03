@@ -96,6 +96,24 @@
 
 Open-Meteo 현재 날씨(기본 서울): `{temp, apparent, precipitation, rain, snow, wind, label, source, band}`. 실패하면 502 `WEATHER_UNAVAILABLE`. 10분 캐시.
 
+## 외부 상품 검색 연결
+
+### POST /api/outfits/match-external/
+
+요청: {"garment_id": "저장된-내-옷-UUID"}. Bearer 인증이 필요하며 본인의 저장된 옷 한 벌만 사용한다. 전체 옷장의 상의·하의나 별도 체형 요청은 필요하지 않다.
+
+응답은 source_garment_id, target_slot, title, headline, reason, attributes, search_url, wardrobe_matches이다. headline은 "해당 옷과 가장 잘 어울리는 상의는 블랙 & 오버핏 속성이에요." 형식이고, reason은 허용 후보 안에서 정규화한 색상·핏 확률을 포함한 한 줄 근거다. wardrobe_matches는 선택한 옷을 제외한 본인의 저장된 옷 중 대상 슬롯의 옷을 같은 모델 예측(카테고리·색상·핏 평균 로그확률)으로 정렬한 상위 3개 [{"garment_id", "name"}]이며 없으면 빈 배열이다. target_slot은 top 또는 bottom이고 attributes의 category·color·fit은 한국어 모델 어휘다. 예를 들어 하의를 선택하면 title은 "블랙 오버핏 셔츠", attributes는 {"category": "셔츠", "color": "블랙", "fit": "오버사이즈"} 형식이다.
+
+상의 선택 시 하의, 하의·아우터 선택 시 상의를 추천한다. 기존 마스킹 모델의 대상 슬롯별 카테고리·핏 허용값으로 후보를 제한하고 색상·핏·종류를 예측한다. 계정 선호 스타일 중 기존 어휘로 변환되는 첫 값을 문맥으로 사용하며, 없으면 선택한 옷의 스타일을 사용한다.
+
+옷장 후보 점수는 카테고리·색상·핏 세 항목의 평균이다. 누락되거나 사전에 없는 속성, 유효 점수가 없는 속성값에는 해당 속성의 최저 유효 모델 점수에서 1을 뺀 값을 적용한다. 유효한 속성이 하나도 없는 옷은 제외한다. 따라서 속성 누락만으로 같은 옷의 점수가 높아지지 않는다.
+
+모델 파일 읽기·JSON 파싱·ONNX 로딩 오류와 명시적인 예측 불가 오류는 503 EXTERNAL_MODEL_UNAVAILABLE로 처리한다. ONNX 추론의 Fail·RuntimeException도 예측 불가 오류로 변환한다. 일반 코드 예외는 공통 서버 오류 처리로 전달한다.
+
+title(검색어)은 "색상 핏 [패턴] 종류" 순서다(예: "블랙 오버핏 스트라이프 셔츠"). 패턴은 모델의 프린트 예측이며 무지이거나 예측이 없으면 생략하고, attributes.pattern에는 "무지"로 담는다. search_url은 https://www.musinsa.com/search/goods 에 title을 URL 인코딩한 keyword만 붙인다. 무신사 필터 파라미터는 검색어마다 달라지는 내부 ID라 사용하지 않는다. 사용자가 바로가기를 누를 때 외부 검색 페이지를 연다. 서버는 해당 주소에 요청하거나 상품 정보를 수집하지 않고 DB도 변경하지 않는다. 실제 상품의 재고·가격·치수·검색 순위는 검증하지 않는다.
+
+오류: 400 INVALID_EXTERNAL_REQUEST, 401 AUTHENTICATION_REQUIRED, 404 EXTERNAL_GARMENT_NOT_FOUND(다른 계정·초안·없는 옷 포함), 413 BODY_TOO_LARGE, 415 JSON_REQUIRED, 422 UNSUPPORTED_EXTERNAL_CATEGORY(신발), 503 EXTERNAL_MODEL_UNAVAILABLE. 모델 파일·추론·유효 속성 예측 실패는 503과 재시도 안내를 반환한다.
+
 ## 채팅 코디 수정
 
 ### POST /api/outfits/chat/
@@ -140,3 +158,20 @@ Open-Meteo 현재 날씨(기본 서울): `{temp, apparent, precipitation, rain, 
 저장은 기존 `POST /api/outfits/`에 `{garment_ids, source: "chat", name?, context: {chat_save_id: "클라이언트 UUID"}}`로 요청한다. 같은 `chat_save_id`의 재요청은 기존 코디를 반환하여 응답 유실 후 재시도로 인한 중복 저장을 방지한다. `chat_save_id`는 최대 64자다.
 
 앱 대화는 홈 코디별로 메모리에 유지되며 뒤로 가기·재진입·화면 회전에 보존된다. 앱 프로세스 종료 후 대화 복원은 지원하지 않는다.
+
+### POST /api/outfits/chat/feedback/
+
+채팅 추천 결과의 만족도(좋아요/별로예요)를 저장한다. 요청: {"garment_ids": [...], "feedback": "liked" | "disliked" | null, "preference": 기기에 저장된 취향 프로필 | null}. Bearer 인증이 필요하고 garment_ids는 본인의 저장된 옷으로 상의 1·하의 1(+아우터 1)이어야 한다.
+
+채팅 코디는 같은 사용자·옷 조합(key)의 source=chat 코디를 재사용하고, 없으면 saved=False로 만든다. 코디북에 저장할 때 이 행을 saved=True로 전환하고 저장 재시도 토큰을 유지한다. 채팅 만족도는 FeedbackRecord의 channel=chat으로 사용자·옷 조합별 한 건을 저장하며 코디북 평가(channel=outfit)와 구분한다. 기존 중복 코디 행이 있어도 채팅 만족도는 한 건이다.
+
+첫 평가 요청의 기기 취향을 FeedbackTaste.baseline으로 보관하고, 이후 평가의 옷 속성 스냅샷을 순서대로 기존 취향 알고리즘에 적용한다. 채팅 평가를 바꾸면 기존 평가를 교체하고, null(취소)이면 해당 평가를 제외하고 재계산하므로 이후 다른 코디의 평가를 유지한다. 같은 값의 재요청은 평가를 추가하거나 시각을 변경하지 않고 서버 취향을 반환한다. 코디북 평가는 기존의 값 변경 시 학습하는 규칙을 유지한다. 응답: {"outfit": 코디, "preference": 갱신된 취향 프로필}. 앱은 응답의 preference를 계정별 기기 저장소에 저장한다.
+
+오류: 400 INVALID_FEEDBACK(잘못된 값·옷 구성), 401, 404 CHAT_FEEDBACK_NOT_FOUND(남긴 적 없는 만족도 취소), 413, 415.
+
+### 채팅 만족도 평가
+
+`POST /api/outfits/chat/feedback/state/`에 `{garment_ids: [...]}`를 보내면 본인 코디의 채팅 평가 `{key, feedback}`를 조회한다. 평가가 없으면 feedback은 null이며 조회는 DB를 변경하지 않는다. 앱의 채팅 결과 카드는 평가 조회 후 버튼을 활성화하고, 조회 실패 시 다시 불러오기를 제공한다. 앱 재실행 후 같은 옷 조합이 표시되면 서버의 평가 상태를 복원한다. 대화 내용의 프로세스 종료 후 복원 범위는 기존과 같다.
+
+채팅 만족도 집계의 기간·참여 계정·표본 수·통과 기준은 [chat-satisfaction.md](chat-satisfaction.md)를 따른다. 구현 배포 전 공용 Outfit.feedback에 있던 평가는 입력 화면을 구분할 수 없으므로 새 채팅 평가 기록부터 집계한다.
+

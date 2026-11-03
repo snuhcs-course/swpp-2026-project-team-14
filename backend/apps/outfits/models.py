@@ -52,3 +52,24 @@ class OutfitItem(models.Model):
 
     class Meta:
         constraints = [models.UniqueConstraint(fields=["outfit", "slot"], name="one_garment_per_slot")]
+
+
+class FeedbackTaste(models.Model):
+    """Device taste at the start of the feedback journal; later feedback is replayable."""
+
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    baseline = models.JSONField(default=dict)
+
+
+class FeedbackRecord(models.Model):
+    """One current chat rating per user/key, plus append-only non-chat taste events."""
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    channel = models.CharField(max_length=8, choices=[("chat", "chat"), ("outfit", "outfit")])
+    key = models.CharField(max_length=200)
+    feedback = models.CharField(max_length=16, choices=Outfit.Feedback.choices, null=True)
+    garments = models.JSONField(default=dict)
+    rated_at = models.DateTimeField()
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["user", "channel", "key"], name="one_feedback_per_channel_key")]

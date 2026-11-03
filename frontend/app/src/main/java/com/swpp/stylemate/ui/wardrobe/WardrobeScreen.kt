@@ -106,6 +106,8 @@ fun WardrobeRoute(
         initializer { WardrobeViewModel(store, account) }
     })
     val wardrobe by wardrobeModel.state.collectAsStateWithLifecycle()
+    val externalMatch by wardrobeModel.externalMatch.collectAsStateWithLifecycle()
+    var actionItemId by rememberSaveable { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) { wardrobeModel.refresh() }
     val labelsModel: GarmentLabelsViewModel = viewModel(factory = viewModelFactory {
         initializer { GarmentLabelsViewModel(OutfitRepository(account)) }
@@ -114,6 +116,32 @@ fun WardrobeRoute(
     // The body profile kept on the device (recommendation labels are computed on this body).
     val body = remember(store) { LocalBodyProfileStore(store).load()?.let { JSONObject(BodyProfileJson.encode(it)) } }
     var editingId by rememberSaveable { mutableStateOf(initialDraft?.optString("editing_id")?.takeIf { it.isNotBlank() }) }
+    val actionRecord = wardrobe.records.firstOrNull { it.optString("id") == actionItemId }
+    actionRecord?.let { record ->
+        val attributes = record.getJSONObject("attributes")
+        WardrobeItemActionsDialog(
+            item = WardrobeItem(record.getString("id"), attributes.getString("name"), attributes.getString("category")),
+            onEdit = { wardrobeModel.clearSaveState(); editingId = actionItemId; actionItemId = null },
+            onRecommend = {
+                actionItemId?.let(wardrobeModel::matchExternal)
+                actionItemId = null
+            },
+            onDismiss = { actionItemId = null },
+        )
+    }
+    if (externalMatch.garmentId != null) {
+        ExternalRecommendationDialog(externalMatch,
+            onRetry = { externalMatch.garmentId?.let(wardrobeModel::matchExternal) },
+            onOpenLink = { url ->
+                try { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
+                catch (_: ActivityNotFoundException) {
+                    wardrobeModel.closeExternalMatch()
+                    message = "검색 페이지를 열 수 있는 앱이 없어요."
+                }
+            },
+            onDismiss = wardrobeModel::closeExternalMatch,
+        )
+    }
     var savedPhoto by remember(editingId) { mutableStateOf<ImageBitmap?>(null) }
     LaunchedEffect(analysisPhoto) { analysisModel.select(analysisPhoto,
         initialDraft?.optJSONObject("result")?.takeIf { initialDraft.optString("analysis_photo") == analysisPhoto }) }
@@ -311,7 +339,7 @@ fun WardrobeRoute(
         WardrobeScreen(items = items, message = message ?: wardrobe.error, cameraBusy = measurementBusy,
             onWornPhoto = { wornRegistration = true },
             onCapture = { wardrobeModel.clearSaveState(); takePhoto() },
-            onItemClick = { wardrobeModel.clearSaveState(); editingId = it.id },
+            onItemClick = { actionItemId = it.id },
             loading = wardrobe.loading,
             onRetry = if (wardrobe.error != null) ({ wardrobeModel.refresh() }) else null)
       }
