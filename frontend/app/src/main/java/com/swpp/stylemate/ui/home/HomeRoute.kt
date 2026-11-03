@@ -22,7 +22,7 @@ import org.json.JSONObject
 
 @Composable
 fun HomeRoute(profile: BodyProfile?, onSetupProfile: () -> Unit, onOpenWardrobe: () -> Unit, modifier: Modifier = Modifier,
-              onChat: (Outfit, Weather?) -> Unit) {
+              onChat: (Outfit, Weather?) -> Unit, wardrobeRevision: Int = 0) {
     val context = LocalContext.current.applicationContext
     val account = checkNotNull(LocalAccountAccess.current)
     val model: HomeViewModel = viewModel(factory = viewModelFactory {
@@ -30,7 +30,7 @@ fun HomeRoute(profile: BodyProfile?, onSetupProfile: () -> Unit, onOpenWardrobe:
     })
     val state by model.state.collectAsStateWithLifecycle()
     val body = remember(profile) { profile?.let { JSONObject(BodyProfileJson.encode(it)) } }
-    LaunchedEffect(body?.toString()) { model.ensureLoaded(body) }
+    LaunchedEffect(body?.toString(), wardrobeRevision) { model.ensureLoaded(body, wardrobeRevision) }
     HomeScreen(
         state = state,
         onRefresh = { model.load(body) },
@@ -47,13 +47,13 @@ fun HomeRoute(profile: BodyProfile?, onSetupProfile: () -> Unit, onOpenWardrobe:
 }
 
 @Composable
-fun CodiBookRoute(modifier: Modifier = Modifier) {
+fun CodiBookRoute(modifier: Modifier = Modifier, wardrobeRevision: Int = 0) {
     val context = LocalContext.current.applicationContext
     val account = checkNotNull(LocalAccountAccess.current)
     val model: CodiBookViewModel = viewModel(factory = viewModelFactory {
         initializer { CodiBookViewModel(OutfitRepository(account)) }
     })
     val state by model.state.collectAsStateWithLifecycle()
-    LaunchedEffect(Unit) { model.load() }
+    LaunchedEffect(wardrobeRevision) { model.invalidateWardrobe(wardrobeRevision); model.load() }
     CodiBookScreen(state, onRemove = model::remove, onRetry = model::load, modifier = modifier)
 }

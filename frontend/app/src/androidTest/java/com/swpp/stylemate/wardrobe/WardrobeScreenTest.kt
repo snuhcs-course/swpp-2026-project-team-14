@@ -7,12 +7,69 @@ import com.swpp.stylemate.ui.wardrobe.*
 import com.swpp.stylemate.ui.theme.StyleMateTheme
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.runtime.mutableStateOf
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 
 class WardrobeScreenTest {
     @get:Rule val compose = createComposeRule()
+
+    @Test fun deleteIconOpensConfirmationAndNoKeepsTheGarment() {
+        var opened = 0
+        var deleted = 0
+        compose.setContent { StyleMateTheme {
+            WardrobeScreen(listOf(WardrobeItem("one", "내 셔츠", "top")), null, false, {},
+                onItemClick = { opened++ }, onDelete = { deleted++ })
+        } }
+        compose.onNodeWithContentDescription("내 셔츠 삭제").performClick()
+        compose.onNodeWithText("해당 의상을 삭제하시겠습니까?").assertIsDisplayed()
+        compose.onNodeWithText("이 의상이 포함된 코디도 함께 삭제됩니다.").assertIsDisplayed()
+        compose.onNodeWithText("아니요").performClick()
+        compose.onNodeWithText("해당 의상을 삭제하시겠습니까?").assertDoesNotExist()
+        compose.onNodeWithText("내 셔츠").assertIsDisplayed()
+        compose.runOnIdle { assertEquals(0, opened); assertEquals(0, deleted) }
+    }
+
+    @Test fun yesDeletesTheChosenCardAndUpdatesTheCountAndEmptyState() {
+        val items = mutableStateOf(listOf(WardrobeItem("one", "내 셔츠", "top")))
+        compose.setContent { StyleMateTheme {
+            WardrobeScreen(items.value, null, false, {}, onDelete = { selected ->
+                items.value = items.value.filter { it.id != selected.id }
+            })
+        } }
+        compose.onNodeWithContentDescription("내 셔츠 삭제").performClick()
+        compose.onNodeWithText("예").performClick()
+        compose.onNodeWithText("해당 의상을 삭제하시겠습니까?").assertDoesNotExist()
+        compose.onNodeWithText("총 0벌").assertIsDisplayed()
+        compose.onNodeWithText("아직 등록된 옷이 없습니다").assertIsDisplayed()
+    }
+
+    @Test fun busyDeleteDisablesOtherDeleteIcons() {
+        compose.setContent { StyleMateTheme {
+            WardrobeScreen(listOf(WardrobeItem("one", "내 셔츠", "top")), null, false, {},
+                onDelete = {}, deletingId = "one", deleteError = "삭제 오류")
+        } }
+        compose.onNodeWithContentDescription("내 셔츠 삭제").assertIsNotEnabled()
+    }
+
+    @Test fun failedDeleteKeepsTheConfirmationAndCanRetry() {
+        val busy = mutableStateOf<String?>(null)
+        val error = mutableStateOf<String?>(null)
+        var requests = 0
+        compose.setContent { StyleMateTheme {
+            WardrobeScreen(listOf(WardrobeItem("one", "내 셔츠", "top")), null, false, {},
+                onDelete = { requests++; busy.value = it.id }, deletingId = busy.value, deleteError = error.value)
+        } }
+        compose.onNodeWithContentDescription("내 셔츠 삭제").performClick()
+        compose.onNodeWithText("예").performClick()
+        compose.onNodeWithText("예").assertIsNotEnabled()
+        compose.onNodeWithText("아니요").assertIsNotEnabled()
+        compose.runOnIdle { busy.value = null; error.value = "서버에 연결하지 못했어요." }
+        compose.onNodeWithText("서버에 연결하지 못했어요.").assertIsDisplayed()
+        compose.onNodeWithText("예").assertIsEnabled().performClick()
+        compose.runOnIdle { assertEquals(2, requests) }
+    }
 
     @Test fun emptyWardrobeCanStartCapture() {
         var captures = 0
