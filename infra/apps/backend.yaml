@@ -21,6 +21,7 @@ spec:
         app: backend
     spec:
       automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 60
       securityContext:
         runAsNonRoot: true
         runAsUser: 10001
@@ -33,7 +34,7 @@ spec:
         # Runs before the new server starts. Kubernetes retries if MySQL is still starting.
         # The release workflow updates BOTH occurrences of this image.
         - name: migrate
-          image: ghcr.io/snuhcs-course/swpp-2026-project-team-14-backend:sha-7e905fa71f969d504ca541a74324554e628fdd67
+          image: ghcr.io/snuhcs-course/swpp-2026-project-team-14-backend:sha-7793a434c7a72c6f10e80973526a3466147b15bf
           command: ["python", "manage.py", "migrate", "--noinput"]
           envFrom:
             - configMapRef:
@@ -53,7 +54,7 @@ spec:
               drop: [ALL]
       containers:
         - name: backend
-          image: ghcr.io/snuhcs-course/swpp-2026-project-team-14-backend:sha-7e905fa71f969d504ca541a74324554e628fdd67
+          image: ghcr.io/snuhcs-course/swpp-2026-project-team-14-backend:sha-7793a434c7a72c6f10e80973526a3466147b15bf
           envFrom:
             - configMapRef:
                 name: backend-config
@@ -62,6 +63,10 @@ spec:
           ports:
             - name: http
               containerPort: 8000
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh", "-c", "sleep 10"]
           resources:
             # Initial budget, not a measured concurrent-load guarantee.
             requests:

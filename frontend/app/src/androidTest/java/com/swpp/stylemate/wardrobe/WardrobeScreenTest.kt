@@ -19,7 +19,8 @@ class WardrobeScreenTest {
         compose.setContent { StyleMateTheme { WardrobeScreen(emptyList(), null, false, { captures++ }) } }
         compose.onNodeWithText("총 0벌").assertIsDisplayed()
         compose.onNodeWithText("아직 등록된 옷이 없습니다").assertIsDisplayed()
-        compose.onNodeWithText("촬영하기").performClick()
+        compose.onNodeWithText("등록하기").performClick()
+        compose.onNodeWithText("직접 촬영하기").performClick()
         compose.runOnIdle { assertEquals(1, captures) }
     }
 

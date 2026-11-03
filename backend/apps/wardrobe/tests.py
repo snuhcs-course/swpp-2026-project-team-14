@@ -301,7 +301,8 @@ class GeminiTests(SimpleTestCase):
 
     @patch('apps.wardrobe.analysis.build_opener')
     def test_provider_failures_are_sanitized_and_not_retried(self, opener):
-        for status, code in ((429, 'AI_RATE_LIMITED'), (403, 'AI_AUTH_FAILED'), (500, 'AI_PROVIDER_ERROR')):
+        for status, code in ((400, 'AI_REQUEST_INVALID'), (404, 'AI_MODEL_UNAVAILABLE'),
+                             (429, 'AI_RATE_LIMITED'), (403, 'AI_AUTH_FAILED'), (500, 'AI_PROVIDER_ERROR')):
             opener.reset_mock()
             opener.return_value.open.side_effect = HTTPError('https://provider', status, 'private error', {}, BytesIO(b'private detail'))
             with self.assertRaises(AnalysisError) as error:

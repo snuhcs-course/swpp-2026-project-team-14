@@ -65,7 +65,10 @@ fun GarmentEditor(id: String, initialAttributes: JSONObject, initialDimensions: 
                   labels: @Composable (attributes: JSONObject, dimensions: JSONObject?) -> Unit = { _, _ -> },
                   topBar: (@Composable () -> Unit)? = null,
                   draft: JSONObject? = null,
-                  onDraftChange: ((JSONObject) -> Unit)? = null) {
+                  onDraftChange: ((JSONObject) -> Unit)? = null,
+                  measurementsEnabled: Boolean = true,
+                  saveLabel: String? = null,
+                  estimatedDimensions: JSONObject? = null) {
     var attributesText by rememberSaveable(id) { mutableStateOf((draft?.optJSONObject("attributes") ?: initialAttributes).toString()) }
     var notes by rememberSaveable(id) { mutableStateOf(draft?.optString("notes") ?: initialNotes) }
     var dimensionText by rememberSaveable(id) {
@@ -82,7 +85,7 @@ fun GarmentEditor(id: String, initialAttributes: JSONObject, initialDimensions: 
         onDraftChange?.invoke(JSONObject().put("attributes", JSONObject(attributesText)).put("notes", notes)
             .put("dimension_inputs", JSONObject(dimensionText)))
     }
-    val dimensions = dimensionChoices(attributes, catalog)
+    val dimensions = if (measurementsEnabled) dimensionChoices(attributes, catalog) else JSONObject()
     val numberPattern = Regex("[0-9]+(?:\\.[0-9]{0,2})?")
     fun validNumber(text: String): Boolean = text.isBlank() ||
         (numberPattern.matches(text) && text.toBigDecimalOrNull()?.let { it > BigDecimal.ZERO } == true)
@@ -138,7 +141,8 @@ fun GarmentEditor(id: String, initialAttributes: JSONObject, initialDimensions: 
     val detailFields = catalog.getJSONObject("enums").keysList()
         .filter { it !in primary && it !in LABEL_OWNED_FIELDS && attributeChoices(attributes, catalog, it).length() > 0 }
     @Composable fun attribute(field: String) {
-        val choices = attributeChoices(attributes, catalog, field)
+        val choices = JSONObject(attributeChoices(attributes, catalog, field).toString())
+        if (!measurementsEnabled && field == "category") choices.remove("shoes")
         if (choices.length() > 0) ChoiceField(catalog.getJSONObject("labels").getString(field), choices,
             attributes.opt(field), catalog.getJSONObject("array_limits").optInt(field, 0), !busy,
             nullable = field != "category", onChange = { updateAttribute(field, it) })
@@ -146,7 +150,7 @@ fun GarmentEditor(id: String, initialAttributes: JSONObject, initialDimensions: 
 
     ScreenScaffold(
         title = if (saved) "옷 정보" else "분석 결과",
-        primaryLabel = if (busy) "저장 중" else if (saved) "저장하기" else "옷장에 추가",
+        primaryLabel = if (busy) "저장 중" else saveLabel ?: if (saved) "저장하기" else "옷장에 추가",
         primaryEnabled = valid && !busy && canSaveLabels(attributes, currentDimensions()),
         onPrimary = ::save,
         onBack = onBack,
@@ -191,6 +195,7 @@ fun GarmentEditor(id: String, initialAttributes: JSONObject, initialDimensions: 
                     }
                 }
             }
+            GarmentEstimates(estimatedDimensions, attributes, catalog, currentDimensions())
             labels(attributes, currentDimensions())
             Spacer(Modifier.height(20.dp))
             OutlinedTextField(value = notes, onValueChange = { if (it.length <= 2000) notes = it },

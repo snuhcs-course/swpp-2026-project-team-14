@@ -47,6 +47,8 @@ MySQL에 사용할 DB와 계정을 준비한 뒤 `.env`를 입력하고 다음 �
 
 ## 4. 모델 준비
 
+착용 사진 등록의 펼침 생성은 `OPENROUTER_API_KEY`, `OPENROUTER_IMAGE_MODEL`(기본 `google/gemini-2.5-flash-image`)을 서버 `.env`에 설정한다. 기존 `GEMINI_API_KEY`는 원본 옷 정보 분석에 계속 사용한다. 로컬 의류 분할 가중치는 `python manage.py prepare_worn_model`로 다운로드·검증한다. 기본 위치는 `backend/models/segformer_clothes.onnx`이고 `WORN_SEGMENTATION_MODEL` 절대 경로로 변경할 수 있다. Docker는 동일 고정 버전·체크섬 파일을 이미지에 포함한다. 임시 실험 경로와 별도 PyTorch 설치는 필요 없다.
+
 체형 모델은 [백엔드 안내](../../backend/README.md)에 따라 `backend/models/pose_landmarker_heavy.task`에 준비한다.
 
 옷장 자동 측정점은 원본 사진에 GarmentIQ HRNet을 적용한다. 서버에서는 ONNX Runtime으로 CPU 추론하며 PyTorch는 최초 변환에만 필요하다.
@@ -99,6 +101,20 @@ USB 연결 후 실행한다. USB를 다시 연결하면 재설정한다.
 앱 ID는 `com.swpp.stylemate`다. 옷장 탭의 `촬영하기 → 점 확인 → 촬영 → 점 수정 → 확인 → 분석하기 → 옷장에 추가` 순서로 확인한다. DB 미설정 상태에서는 자동 측정점·AR 촬영까지 사용할 수 있다.
 
 ## 7. 검증
+
+### 생성 비용 없는 UI 확인
+
+개발 빌드 앱 목록의 `StyleMate UI 미리보기`는 기존 로컬 이미지와 예시 정보로 실제 서비스와 같은 `WornBatchReviewScreen`을 렌더링한다. 전체 선택·압축 카드·사진 안 원본 비교·접이식 추정 치수·수정·하단 등록 버튼을 제공한다. 상태 예시는 상단 `미리보기 설정` 메뉴에서 바꾼다. 미리보기에는 API 클라이언트·계정·생성 ViewModel을 연결하지 않으며 변경은 메모리 안에서만 유지한다. 실제 분석·생성·라벨 API 및 DB 저장은 호출하지 않는다. 일반 서비스의 로그인 경로에는 영향을 주지 않으며 release 빌드에 이 Activity·실행 항목이 포함되지 않는다. 검증되지 않은 신뢰도 퍼센트·소재 혼용률은 표시하지 않는다.
+
+미리보기의 기본 정보는 기존 `attributes`, 핏·기장·소재 등은 기존 `labels`를 사용한다. 소재 표시는 분석 중간값인 `details.materials` 대신 저장 대상인 `labels.materials`를 읽는다. 수정 화면도 기존 `GarmentEditor`·라벨 선택지·`GarmentLabels.merge`를 재사용하며 데이터 필드·허용값을 새로 만들지 않는다. 단, 라벨 API 호출은 로컬 편집으로 대체하고 실제 저장은 하지 않는다.
+
+생성 결과 확인 화면은 선택·수정·등록에 집중하며 사진 추가 진입점을 제공하지 않는다. 카드 사진은 정사각형 영역을 채우고, 확대 비교에서는 사진 전체가 보이도록 표시한다.
+
+미리보기 자료는 앱 내부 `files/worn-ui-preview/fixture.json`과 같은 폴더의 JPG/PNG다. JSON은 `items`(직렬화된 옷 초안과 `generation`), `catalog`(편집 선택지), `images`(사진 API 경로를 로컬 파일명으로 대응)를 포함한다. 사진은 직접 넣은 기존 테스트 파일만 사용한다. 사용자 사진과 fixture는 Git·APK에 넣지 않는다. 앱 데이터 삭제 시 다시 준비해야 하며, 파일이 없으면 안내만 표시하고 서버로 대체 조회하지 않는다. 핏·기장·치수 예시는 화면 확인용이며 실제 분석 결과로 취급하지 않는다.
+
+```sh
+adb shell am start -n com.swpp.stylemate/.ui.wardrobe.WornPreviewActivity
+```
 
 `backend/`에서 실행한다. 실제 DB·Gemini 호출 없이 체형 분석과 옷장 계약·저장·조회 동작을 검사한다.
 

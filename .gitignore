@@ -1,5 +1,6 @@
 # Python environments and server credentials
 .venv/
+backend/models/segformer_clothes.onnx
 # Gemini and other server credentials (all directories)
 .env
 .env.*

@@ -126,7 +126,8 @@ class GarmentLabelsViewModel(private val repository: OutfitRepository) : ViewMod
     }
 
     fun compute(garmentId: String, attributes: JSONObject, dimensions: JSONObject?, body: JSONObject?,
-                details: JSONObject?, garmentType: String?, inputKey: String, force: Boolean = false) {
+                details: JSONObject?, garmentType: String?, inputKey: String, force: Boolean = false,
+                manualFit: Boolean = false, photoSuggestions: JSONObject? = null) {
         val current = mutableState.value
         if (current.garmentId != garmentId || (!force && current.inputKey == inputKey && current.suggested != null && !current.loading && current.error == null)) return
         job?.cancel()
@@ -135,6 +136,9 @@ class GarmentLabelsViewModel(private val repository: OutfitRepository) : ViewMod
             try {
                 val labels = repository.labels(attributes, dimensions, body, details, garmentType)
                     ?: throw OutfitApiException("EMPTY_LABELS", "Empty labels")
+                if (manualFit) listOf("fit", "length", "fit_basis", "length_basis").forEach {
+                    labels.put(it, photoSuggestions?.opt(it) ?: JSONObject.NULL)
+                }
                 mutableState.value = mutableState.value.copy(suggested = labels, inputKey = inputKey, loading = false)
             } catch (error: CancellationException) {
                 throw error
@@ -152,7 +156,9 @@ class GarmentLabelsViewModel(private val repository: OutfitRepository) : ViewMod
     }
 
     fun edit(key: String, value: Any?) {
-        mutableState.value = mutableState.value.copy(edits = mutableState.value.edits + (key to value))
+        val edits = mutableState.value.edits + (key to value)
+        mutableState.value = mutableState.value.copy(edits = if (key in setOf("fit", "length", "sleeve"))
+            edits + ("${key}_basis" to null) else edits)
     }
 
     fun merged(category: String, options: JSONObject?): JSONObject? =
@@ -163,7 +169,7 @@ class GarmentLabelsViewModel(private val repository: OutfitRepository) : ViewMod
 @Composable
 fun GarmentLabelSection(model: GarmentLabelsViewModel, garmentId: String, attributes: JSONObject, dimensions: JSONObject?,
                         body: JSONObject?, details: JSONObject?, stored: JSONObject?, options: JSONObject?, enabled: Boolean,
-                        garmentType: String? = null) {
+                        garmentType: String? = null, manualFit: Boolean = false) {
     val category = attributes.optString("category")
     val allowed = options?.optJSONObject(category) ?: return  // shoes: not used by the recommender
     val state by model.state.collectAsStateWithLifecycle()
@@ -171,19 +177,21 @@ fun GarmentLabelSection(model: GarmentLabelsViewModel, garmentId: String, attrib
     LaunchedEffect(garmentId) { model.start(garmentId, stored, key) }
     LaunchedEffect(garmentId, key, body?.toString()) {
         delay(500) // wait until the user stops typing a dimension
-        model.compute(garmentId, attributes, dimensions, body, details, garmentType, key)
+        model.compute(garmentId, attributes, dimensions, body, details, garmentType, key, manualFit = manualFit, photoSuggestions = stored)
     }
     SectionTitle("내 몸 기준 라벨", "추천에 쓰여요")
     Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            if (body == null) {
+            if (manualFit) {
+                Text("본인 착용 사진에서 보이는 핏·기장을 제안해요. 틀리면 수정하고, 모르는 항목은 비워둬도 돼요.")
+            } else if (body == null) {
                 Text("마이프로필에서 체형 분석을 하면 핏과 기장을 치수로 계산해 드려요. 지금은 직접 골라 주세요.",
                     style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             if (state.loading) LinearProgressIndicator(Modifier.fillMaxWidth())
             state.error?.let { message ->
                 Text(message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
-                TextButton(onClick = { model.compute(garmentId, attributes, dimensions, body, details, garmentType, key, force = true) },
+                TextButton(onClick = { model.compute(garmentId, attributes, dimensions, body, details, garmentType, key, force = true, manualFit = manualFit, photoSuggestions = stored) },
                     enabled = enabled) { Text("다시 계산") }
             }
             val labels = GarmentLabels.merge(state.suggested ?: JSONObject(), state.edits, category, options) ?: return@Column
@@ -213,7 +221,7 @@ fun GarmentLabelSection(model: GarmentLabelsViewModel, garmentId: String, attrib
                 Text("직접 입력한 라벨을 확인한 뒤 완료를 눌러 주세요.", style = MaterialTheme.typography.bodySmall)
                 TextButton(onClick = { model.confirmManual(key) }, enabled = editable) { Text("수동 입력 완료") }
             }
-            Text("치수와 사진으로 계산한 값이에요. 실제와 다르면 눌러서 고쳐 주세요.",
+            Text(if (manualFit) "사진에서 보이는 특징만 확인해 주세요. 가려진 부분은 알 수 없어요." else "치수와 사진으로 계산한 값이에요. 실제와 다르면 눌러서 고쳐 주세요.",
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
@@ -221,7 +229,7 @@ fun GarmentLabelSection(model: GarmentLabelsViewModel, garmentId: String, attrib
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun LabelChips(label: String, choices: List<String>, selected: String?, basis: String?, enabled: Boolean,
+internal fun LabelChips(label: String, choices: List<String>, selected: String?, basis: String?, enabled: Boolean,
                        onChange: (String?) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
@@ -241,7 +249,7 @@ private fun LabelChips(label: String, choices: List<String>, selected: String?, 
 
 /** Long lists (무늬, 소재, 넥라인, 옷깃) as a menu; `multiple` = 0 for a single value. */
 @Composable
-private fun LabelMenu(label: String, choices: List<String>, selected: List<String>, multiple: Int, enabled: Boolean,
+internal fun LabelMenu(label: String, choices: List<String>, selected: List<String>, multiple: Int, enabled: Boolean,
                       onChange: (List<String>) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     Box(Modifier.fillMaxWidth()) {
