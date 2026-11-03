@@ -280,12 +280,12 @@ Gemini는 아래 색상표에서 대표색 1~2개를 반환해야 한다. 사용
 
 본문은 JPEG·PNG·WebP 이미지 바이트이며 해당 Content-Type을 지정한다. 최대 5 MiB·1,200만 픽셀·단일 프레임만 허용한다. EXIF 방향 적용 후 긴 변 최대 1536px의 JPEG로 정규화하고 메타데이터를 제외한다.
 
-서버는 Gemini gemini-3.1-flash-lite를 호출한다. 성공 시 사진을 파일 저장소에 기록하고 Garment를 saved=false로 생성한다. AR 치수는 이 요청으로 전송하지 않는다. 선택 쿼리 `garment`(측정 화면의 종류: short_sleeve_top·long_sleeve_top·short_sleeve_outerwear·long_sleeve_outerwear·trousers·shorts·skirt)는 AI에 힌트로만 전달한다. 상의·아우터는 앞면 사진을 보낸다. 응답은 id·model·attributes·details 네 필드다. attributes의 subcategory·styles는 AI 제안이다. details는 추천 라벨용 무늬(print)·넥라인·옷깃·디테일(design_details, 최대 3)·소재(materials, 겉으로 분명할 때만 최대 2) 제안(K-Fashion 값, 하의는 넥라인·옷깃 없음, 신발·불명확하면 null)이며 attributes와 DB에는 넣지 않는다. 한국어 표시명은 options 응답을 사용한다.
+서버는 OpenRouter Chat Completions API로 `OPENROUTER_VISION_MODEL`(기본 `google/gemini-3.5-flash-lite`)을 호출한다. 원본 이미지와 JSON Schema를 전송하며 서버의 OpenRouter 키만 사용한다. 무료 Gemini API로 자동 우회하지 않는다. 성공 시 사진을 파일 저장소에 기록하고 Garment를 saved=false로 생성한다. AR 치수는 이 요청으로 전송하지 않는다. 선택 쿼리 `garment`(측정 화면의 종류: short_sleeve_top·long_sleeve_top·short_sleeve_outerwear·long_sleeve_outerwear·trousers·shorts·skirt)는 AI에 힌트로만 전달한다. 상의·아우터는 앞면 사진을 보낸다. 응답은 id·model·attributes·details 네 필드다. attributes의 subcategory·styles는 AI 제안이다. details는 추천 라벨용 무늬(print)·넥라인·옷깃·디테일(design_details, 최대 3)·소재(materials, 겉으로 분명할 때만 최대 2) 제안(K-Fashion 값, 하의는 넥라인·옷깃 없음, 신발·불명확하면 null)이며 attributes와 DB에는 넣지 않는다. 한국어 표시명은 options 응답을 사용한다.
 
 ```json
 {
   "id": "11111111-1111-4111-8111-111111111111",
-  "model": "gemini-3.1-flash-lite",
+  "model": "google/gemini-3.5-flash-lite",
   "attributes": {
     "category": "top",
     "subcategory": null,
@@ -410,13 +410,13 @@ PUT 요청 예시:
 | 415 | IMAGE_REQUIRED, JSON_REQUIRED |
 | 422 | IMAGE_NO_GARMENT, IMAGE_MULTIPLE, IMAGE_UNSUPPORTED, IMAGE_UNCLEAR |
 | 429 | AI_BUSY, AI_RATE_LIMITED |
-| 502 | AI_PROVIDER_ERROR, AI_UNAVAILABLE, AI_INVALID_RESPONSE |
-| 503 | DATABASE_NOT_CONFIGURED, AI_NOT_CONFIGURED, AI_AUTH_FAILED, LANDMARK_NOT_CONFIGURED, LANDMARK_FAILED |
+| 502 | AI_PROVIDER_ERROR, AI_UNAVAILABLE, AI_INVALID_RESPONSE, AI_REQUEST_INVALID |
+| 503 | DATABASE_NOT_CONFIGURED, AI_NOT_CONFIGURED, AI_AUTH_FAILED, AI_CREDITS_REQUIRED, AI_MODEL_UNAVAILABLE, LANDMARK_NOT_CONFIGURED, LANDMARK_FAILED |
 | 504 | AI_TIMEOUT |
 
 DB 미설정이면 분석·목록·조회·수정·사진 조회를 차단한다. options와 landmarks는 DB 없이 실행한다. DB 미설정 검사는 연결 장애나 모든 DB 예외를 처리하는 기능은 아니다.
 
-Gemini 분석과 HRNet 탐지는 같은 프로세스의 세마포어 한 개를 공유한다. 처리 중인 요청이 있으면 대기열에 쌓지 않고 429를 반환한다. Gemini 소켓 timeout은 30초, Android 분석 연결·읽기 timeout은 5초·45초다. 분산 잠금이나 자동 재분석은 없다.
+일반 분석·착용 후보 분석은 프로세스별 외부 분석 세마포어를 공유하며 기본 두 건까지 처리한다(`WARDROBE_ANALYSIS_CONCURRENCY`, 1~4). HRNet 탐지는 별도 세마포어로 한 건만 처리한다. 각 제한을 넘으면 대기열에 쌓지 않고 429 AI_BUSY를 반환한다. OpenRouter 402·429는 잔액 부족과 제공자 한도 오류로 구분하며 자동 재요청·제공자 대체 호출은 없다. OpenRouter 분석 소켓 timeout은 30초, Android 분석 연결·읽기 timeout은 5초·45초다. 분산 잠금이나 자동 재분석은 없다.
 
 분석 성공 후 사진 저장·DB 저장을 시도하며 DB 저장 실패 시 해당 사진 삭제를 시도한다. 외부 API 오류 원문과 키를 클라이언트에 반환하지 않는다. 분석 실패 전용 DB 상태·분석 응답 유실 복구·초안 만료는 구현하지 않았다.
 

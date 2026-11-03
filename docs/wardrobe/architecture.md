@@ -99,10 +99,10 @@ swpp-2026-project-team-14/
 |   |   `-- wardrobe/
 |   |       |-- urls.py                          # 옷장 API 경로
 |   |       |-- views.py                         # 분석 초안·저장·수정·조회·추천 라벨 미리보기
-|   |       |-- analysis.py                      # 이미지 검증·Gemini 요청·응답 처리
+|   |       |-- analysis.py                      # 이미지 검증·OpenRouter 원본 분석·공통 비전 요청/응답·오류 정규화
 |   |       |-- worn.py                          # 고정 ONNX 의류 분할·OpenRouter Gemini 펼침 생성·오류 정규화
 |   |       |-- worn_views.py                    # 계정별 생성 상태·요청 멱등성·이미지 승인·비교 사진 접근
-|   |       |-- worn_detection.py                # 원본 Gemini 후보/특징 분석·한 사람/최대 세 분류 검증·실제 픽셀 크롭
+|   |       |-- worn_detection.py                # OpenRouter 원본 후보/특징 분석·한 사람/최대 세 분류 검증·실제 픽셀 크롭
 |   |       |-- worn_estimates.py                # 원본 착용 관찰·본인 체형·기존 여유량 규칙으로 참고 치수/범위 계산
 |   |       |-- worn_photo_views.py              # 소유 원본/후보 접근·멱등 초안 준비·승인한 여러 옷 원자적 저장
 |   |       |-- management/commands/prepare_worn_model.py # 고정 모델 다운로드·SHA-256 검증
