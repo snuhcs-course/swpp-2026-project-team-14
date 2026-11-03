@@ -15,6 +15,16 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
 object WardrobeRepository {
+    suspend fun delete(id: String, store: LocalUserStore, account: AccountAccess) = withContext(Dispatchers.IO) {
+        try {
+            account.json("DELETE", "/api/wardrobe/items/$id/")
+        } catch (error: com.swpp.stylemate.data.AuthException) {
+            // A retry after a lost success response also clears the stale local record.
+            if (error.code != "GARMENT_NOT_FOUND") throw error
+        }
+        store.removeGarment(id)
+    }
+
     private suspend fun request(path: String, account: AccountAccess): ByteArray = withContext(Dispatchers.IO) {
         require(path.startsWith("/api/wardrobe/"))
         val connection = URI("${BuildConfig.API_BASE_URL.trimEnd('/')}$path").toURL().openConnection() as HttpURLConnection

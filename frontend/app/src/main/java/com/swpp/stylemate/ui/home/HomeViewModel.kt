@@ -40,6 +40,7 @@ class HomeViewModel(private val repository: OutfitRepository, private val taste:
     private val seen = mutableListOf<String>()
     private var body: JSONObject? = null
     private var job: Job? = null
+    private var wardrobeRevision = 0
 
     /** First load, or the refresh button: new weather and new outfits. */
     fun load(body: JSONObject?, refreshWeather: Boolean = true) {
@@ -68,7 +69,15 @@ class HomeViewModel(private val repository: OutfitRepository, private val taste:
     }
 
     /** Opening the tab: load the first time, after the body profile changed, or after an error. */
-    fun ensureLoaded(body: JSONObject?) {
+    fun ensureLoaded(body: JSONObject?, wardrobeRevision: Int = 0) {
+        if (this.wardrobeRevision != wardrobeRevision) {
+            this.wardrobeRevision = wardrobeRevision
+            seen.clear()
+            job?.cancel()
+            mutableState.value = HomeState()
+            load(body)
+            return
+        }
         val state = mutableState.value
         if (state.loading) return
         if (body?.toString() != this.body?.toString() || state.outfits.isEmpty() || state.errorCode != null) load(body)
@@ -146,10 +155,20 @@ data class CodiBookState(val loading: Boolean = false, val outfits: List<Outfit>
 class CodiBookViewModel(private val repository: OutfitRepository) : ViewModel() {
     private val mutableState = MutableStateFlow(CodiBookState())
     val state = mutableState.asStateFlow()
+    private var loadJob: Job? = null
+    private var wardrobeRevision = 0
+
+    fun invalidateWardrobe(revision: Int) {
+        if (wardrobeRevision == revision) return
+        wardrobeRevision = revision
+        loadJob?.cancel()
+        mutableState.value = CodiBookState()
+    }
 
     fun load() {
+        loadJob?.cancel()
         mutableState.value = mutableState.value.copy(loading = true, error = null)
-        viewModelScope.launch {
+        loadJob = viewModelScope.launch {
             try {
                 mutableState.value = CodiBookState(outfits = repository.saved())
             } catch (e: CancellationException) {

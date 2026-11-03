@@ -66,6 +66,17 @@ class HomeViewModelTest {
 
     private fun idle(): HomeState = viewModel.state.await { !it.acting }
 
+    @Test fun garmentDeletionInvalidatesOldRecommendationsOnlyOncePerRevision() {
+        loadTwoOutfits()
+        server.on("GET /api/weather/", json(weather))
+        server.on("POST /api/outfits/recommend/", recommendation(second))
+        viewModel.ensureLoaded(body, wardrobeRevision = 1)
+        assertEquals(listOf("o2"), loaded().outfits.map { it.id })
+        assertEquals(2, server.requests("POST /api/outfits/recommend/").size)
+        viewModel.ensureLoaded(body, wardrobeRevision = 1)
+        assertEquals(2, server.requests("POST /api/outfits/recommend/").size)
+    }
+
     @Test fun missingBodyProfileAsksForProfileWithoutCallingTheServer() {
         viewModel.load(null)
         assertEquals(HomeState.NO_PROFILE, viewModel.state.value.errorCode)
@@ -244,6 +255,19 @@ class CodiBookViewModelTest {
 
     private fun page(vararg outfits: JSONObject) =
         json(JSONObject().put("outfits", JSONArray(outfits.toList())).put("next", JSONObject.NULL).toString())
+
+    @Test fun garmentDeletionClearsOldOutfitsEvenIfTheFollowingReloadFails() {
+        server.on("GET /api/outfits/", page(outfitJson("o1", "a", "b", saved = true)))
+        viewModel.load()
+        assertEquals(1, viewModel.state.await { !it.loading }.outfits.size)
+        viewModel.invalidateWardrobe(1)
+        assertTrue(viewModel.state.value.outfits.isEmpty())
+        server.on("GET /api/outfits/", failure(500, "SERVER_ERROR"))
+        viewModel.load()
+        val state = viewModel.state.await { !it.loading }
+        assertTrue(state.outfits.isEmpty())
+        assertEquals(true, state.error?.isNotBlank())
+    }
 
     @Test fun loadListsSavedOutfits() {
         server.on("GET /api/outfits/", page(outfitJson("o1", "a", "b", saved = true), outfitJson("o2", "c", "d", saved = true)))
