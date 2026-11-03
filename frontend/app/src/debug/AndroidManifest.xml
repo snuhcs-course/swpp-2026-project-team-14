@@ -2,5 +2,14 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <!-- Debug only: the local Django dev server has no HTTPS. Release builds keep cleartext disabled. -->
-    <application android:usesCleartextTraffic="true" />
+    <application android:usesCleartextTraffic="true">
+        <!-- Local UI fixtures only. This entry and its implementation do not exist in release. -->
+        <activity android:name=".ui.wardrobe.WornPreviewActivity" android:exported="true"
+            android:label="StyleMate UI 미리보기">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
 </manifest>

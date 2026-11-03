@@ -14,9 +14,11 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
 /** [garmentType]: the kind picked for AR measurement (a landmark type), sent as a hint for the AI. */
-internal suspend fun requestAnalysis(context: Context, photo: String, garmentType: String? = null, account: AccountAccess): JSONObject = withContext(Dispatchers.IO) {
-    val hint = garmentType?.takeIf { it in landmarkTypes }?.let { "?garment=$it" }.orEmpty()
-    val endpoint = "analyze"
+internal suspend fun requestAnalysis(context: Context, photo: String, garmentType: String? = null, account: AccountAccess, targetCategory: String? = null, requestId: String? = null): JSONObject = withContext(Dispatchers.IO) {
+    require(targetCategory == null || targetCategory in setOf("top", "bottom", "outerwear"))
+    val hint = targetCategory?.let { "?category=$it" + (requestId?.let { id -> "&request_id=$id" } ?: "") }
+        ?: garmentType?.takeIf { it in landmarkTypes }?.let { "?garment=$it" }.orEmpty()
+    val endpoint = if (targetCategory == null) "analyze" else "analyze-worn"
     val connection = URI("${BuildConfig.API_BASE_URL.trimEnd('/')}/api/wardrobe/$endpoint/$hint").toURL().openConnection() as HttpURLConnection
     try {
         val bytes = context.contentResolver.openInputStream(CaptureFiles(context).uri(photo))!!.use { input ->
@@ -61,6 +63,7 @@ internal suspend fun requestAnalysis(context: Context, photo: String, garmentTyp
             "AI_RATE_LIMITED", "AI_BUSY" -> "잠시 후 다시 분석해 주세요."
             "AI_TIMEOUT" -> "분석 시간이 초과됐습니다. 다시 시도해 주세요."
             "IMAGE_MULTIPLE" -> "옷 한 벌만 촬영해 주세요."
+            "IMAGE_TARGET_UNCLEAR" -> "선택한 옷을 구분하지 못했습니다. 영역과 옷 종류를 다시 골라 주세요."
             "IMAGE_NO_GARMENT", "IMAGE_UNCLEAR", "INVALID_IMAGE" -> "옷이 잘 보이도록 다시 촬영해 주세요."
             "IMAGE_UNSUPPORTED" -> "지원하지 않는 옷 종류입니다."
             "IMAGE_TOO_LARGE" -> "사진 용량이 너무 큽니다."
