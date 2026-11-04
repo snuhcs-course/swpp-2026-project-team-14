@@ -180,6 +180,15 @@ class OutfitApiTests(TestCase):
         self.assertEqual(Outfit.objects.filter(user=self.user).count(), 3)
         self.assertEqual(response["Cache-Control"], "no-store")
 
+    def test_each_request_gets_its_own_random_pick(self):
+        from . import views
+        with patch.object(views, "recommend", wraps=views.recommend) as spy:
+            self.assertEqual(self.recommend().status_code, 200)
+            self.assertEqual(self.recommend().status_code, 200)
+        first, second = (c.args[1] for c in spy.call_args_list)
+        self.assertEqual(first.jitter, views.PICK_JITTER)
+        self.assertNotEqual(first.seed, second.seed)
+
     def test_labels_drive_the_fit_note_and_seen_outfits_rotate(self):
         labels = {"fit": "오버사이즈", "fit_basis": "직접 수정", "kf_category": "니트웨어", "kf_colors": ["베이지"],
                   "sleeve": "긴팔", "materials": ["니트"], "too_small": False, "confirmed": True}
