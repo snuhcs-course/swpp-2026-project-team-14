@@ -29,7 +29,6 @@ from django.utils import timezone
 from onnxruntime.capi.onnxruntime_pybind11_state import Fail, InvalidGraph, InvalidProtobuf, NoSuchFile
 
 from apps.body_profiles.profile import body_from_request
-from apps.wardrobe.dummy_wardrobe import ensure_dummy_wardrobe
 from apps.wardrobe.models import Garment
 from apps.users.auth import require_auth
 from apps.users.models import User
@@ -211,7 +210,6 @@ def _calculate(data, garments):
 def recommend_view(request):
     try:
         data = _read(request)
-        ensure_dummy_wardrobe(request.user)  # temporary, HE only
         garments = {str(g.id): g for g in Garment.objects.filter(user=request.user, saved=True)}
         result, context = _calculate(data, garments)
     except TooLarge:
