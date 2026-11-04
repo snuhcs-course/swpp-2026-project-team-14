@@ -34,7 +34,7 @@ spec:
         # Runs before the new server starts. Kubernetes retries if MySQL is still starting.
         # The release workflow updates BOTH occurrences of this image.
         - name: migrate
-          image: ghcr.io/snuhcs-course/swpp-2026-project-team-14-backend:sha-02e88c3d452937db8bab0206c3d1785d517d4e1a
+          image: ghcr.io/snuhcs-course/swpp-2026-project-team-14-backend:sha-90af9697bc572d9ee2662e8c9c9d220567b6d8b2
           command: ["python", "manage.py", "migrate", "--noinput"]
           envFrom:
             - configMapRef:
@@ -54,7 +54,7 @@ spec:
               drop: [ALL]
       containers:
         - name: backend
-          image: ghcr.io/snuhcs-course/swpp-2026-project-team-14-backend:sha-02e88c3d452937db8bab0206c3d1785d517d4e1a
+          image: ghcr.io/snuhcs-course/swpp-2026-project-team-14-backend:sha-90af9697bc572d9ee2662e8c9c9d220567b6d8b2
           envFrom:
             - configMapRef:
                 name: backend-config
