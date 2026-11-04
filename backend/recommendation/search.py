@@ -64,6 +64,7 @@ class Request:
     seen_outfits: list[str] = field(default_factory=list)  # outfit keys already shown ("id+id")
     count: int = 3
     seed: int = 0
+    jitter: float = 0.0  # random spread on the pick order (app refreshes vary); 0 keeps results deterministic
     fixed: dict[str, str] = field(default_factory=dict)  # chat: slot -> garment that must remain
     directions: dict[str, list[str]] = field(default_factory=dict)  # chat: requested changes by slot
 
@@ -203,6 +204,7 @@ def recommend(catalog: Catalog, req: Request) -> dict:
         o["key"] = outfit_key([c.item for c in o["cands"]])
         o["seen"] = o["key"] in seen_outfits
         o["total"] = o["prelim"] + WEIGHTS["color"] * (col.score - 0.75) - SEEN_OUTFIT_PENALTY * o["seen"]
+        o["rank"] = o["total"] + (rng.uniform(0, req.jitter) if req.jitter else 0.0)  # total itself stays unchanged
         finals.append(o)
     picked = _mmr(finals, req.count)
     has_feedback = bool(req.preference.get("weights"))
@@ -304,10 +306,10 @@ def _similarity(a: dict, b: dict) -> float:
 
 
 def _mmr(outfits: list[dict], count: int) -> list[dict]:
-    pool = sorted(outfits, key=lambda o: -o["total"])
+    pool = sorted(outfits, key=lambda o: -o.get("rank", o["total"]))
     picked: list[dict] = []
     while pool and len(picked) < count:
-        best = max(pool, key=lambda o: o["total"] - MMR_LAMBDA * max((_similarity(o, p) for p in picked), default=0.0))
+        best = max(pool, key=lambda o: o.get("rank", o["total"]) - MMR_LAMBDA * max((_similarity(o, p) for p in picked), default=0.0))
         picked.append(best)
         pool.remove(best)
     return picked

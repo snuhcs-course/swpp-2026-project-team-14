@@ -16,6 +16,7 @@ import hashlib
 import json
 import logging
 import math
+import secrets
 import uuid
 from functools import lru_cache
 
@@ -49,6 +50,7 @@ PREF_FITS = ("slim", "regular", "loose")
 SLOT_CODE = {slot: code for code, slot in WARDROBE_CATEGORY.items()}  # 상의 -> top
 MAX_COUNT = 5
 MAX_SEEN = 100
+PICK_JITTER = 0.05  # small random spread so refreshes and accounts see different near-best outfits
 logger = logging.getLogger(__name__)
 
 
@@ -197,7 +199,7 @@ def _calculate(data, garments):
     items = [i for i in (_garment_item(g, body) for g in garments.values()) if i]
     req = Request(body=body, pref_fit=pref_fit, styles=styles, temp=temp, wet=wet, mode="wardrobe",
                   anchor=f"w:{anchor}" if anchor else None, wardrobe=items, preference=taste,
-                  seen_outfits=seen_keys, count=count)
+                  seen_outfits=seen_keys, count=count, seed=secrets.randbits(32), jitter=PICK_JITTER)
     result = recommend(models(), req)
     context = {**weather_context, "band": result["band"]["label"], "pref_fit": pref_fit, "styles": styles,
                **({"occasion": occasion} if occasion else {})}
