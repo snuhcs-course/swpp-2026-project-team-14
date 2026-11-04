@@ -19,7 +19,6 @@ from apps.users.pagination import account_page
 from recommendation.labeling import label
 
 from .analysis import AnalysisError, MAX_IMAGE_BYTES, model_name, analyze_image, prepare_image
-from .dummy_wardrobe import ensure_dummy_wardrobe
 from .editor import catalog, validate_record
 from .schema import validate_ai_details, validate_attributes
 from .models import Garment, CategoryInUse, WornGeneration
@@ -170,7 +169,6 @@ def labels(request):
 @require_GET
 @require_auth
 def items(request):
-    ensure_dummy_wardrobe(request.user)  # temporary, HE only
     response = account_page(request, Garment.objects.filter(user=request.user, saved=True), serialize, 'items')
     response['Cache-Control'] = 'no-store'
     return response

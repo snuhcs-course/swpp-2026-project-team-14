@@ -11,5 +11,3 @@ data:
   MYSQL_DATABASE: "stylemate"
   MYSQL_USER: "stylemate"
   WARDROBE_MEDIA_ROOT: "/app/private/wardrobe-media"
-  # Temporary, HE (11/4) only: every account gets the shared AI dummy wardrobe. Remove after HE.
-  HE_DUMMY_WARDROBE: "1"
