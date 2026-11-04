@@ -132,6 +132,17 @@ def test_shown_outfits_are_not_repeated_first(catalog, female):
     assert second["key"] != first["key"] and not second["seen"]
 
 
+def test_jitter_varies_the_pick_but_never_repeats_shown_outfits(catalog, female):
+    req = dict(body=female, pref_fit="loose", temp=17, mode="wardrobe", wardrobe=WARDROBE, count=1)
+    plain = {recommend(catalog, Request(**req, seed=s))["outfits"][0]["key"] for s in range(10)}
+    assert len(plain) == 1  # no jitter: the seed alone changes nothing, results stay reproducible
+    varied = [recommend(catalog, Request(**req, seed=s, jitter=1.0))["outfits"][0] for s in range(10)]
+    assert len({o["key"] for o in varied}) > 1
+    first = varied[0]
+    again = recommend(catalog, Request(**req, seed=1, jitter=0.05, seen_outfits=[first["key"]]))["outfits"][0]
+    assert again["key"] != first["key"]
+
+
 def test_wardrobe_needs_a_top_and_a_bottom_that_fit(catalog, female):
     with pytest.raises(RecommendError) as error:
         recommend(catalog, Request(body=female, temp=17, mode="wardrobe", wardrobe=[WARDROBE[2], WARDROBE[3]]))
