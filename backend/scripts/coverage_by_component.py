@@ -16,6 +16,7 @@ import sys
 COMPONENTS = {
     "Authentication, profile and import (apps/users)": ("apps/users/",),
     "Wardrobe and outfit APIs (apps/wardrobe, apps/outfits)": ("apps/wardrobe/", "apps/outfits/"),
+    "Virtual fitting API and jobs (apps/fittings)": ("apps/fittings/",),
     "Recommendation logic (recommendation)": ("recommendation/",),
     "Body analysis (body_analysis, apps/body_profiles)": ("body_analysis/", "apps/body_profiles/"),
 }

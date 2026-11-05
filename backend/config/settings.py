@@ -23,7 +23,7 @@ ALLOWED_HOSTS = os.environ.get("DJANGO_ALLOWED_HOSTS", "*").split(",")
 
 INSTALLED_APPS = [
     "django.contrib.contenttypes", "django.contrib.auth",
-    "apps.users", "apps.body_profiles", "apps.wardrobe", "apps.outfits",
+    "apps.users", "apps.body_profiles", "apps.wardrobe", "apps.outfits", "apps.fittings",
 ]
 AUTH_USER_MODEL = "users.User"
 AUTH_TOKEN_TTL_DAYS = 30
@@ -75,3 +75,4 @@ WORN_SEGMENTATION_MODEL = Path(os.environ.get("WORN_SEGMENTATION_MODEL", str(BAS
 # Original-photo understanding uses a paid vision model through OpenRouter.
 OPENROUTER_VISION_MODEL = os.environ.get("OPENROUTER_VISION_MODEL", "google/gemini-3.5-flash-lite").strip()
 WARDROBE_ANALYSIS_CONCURRENCY = max(1, min(4, int(os.environ.get("WARDROBE_ANALYSIS_CONCURRENCY", "2"))))
+FITTING_CONCURRENCY = max(1, min(4, int(os.environ.get("FITTING_CONCURRENCY", "2"))))

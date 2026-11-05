@@ -52,7 +52,7 @@ jobs:
 
       - name: Run Django tests with coverage
         if: ${{ !cancelled() && steps.deps.outcome == 'success' }}
-        run: python -m coverage run --append manage.py test apps.users apps.wardrobe apps.outfits --settings=config.test_settings --noinput
+        run: python -m coverage run --append manage.py test apps.users apps.wardrobe apps.outfits apps.fittings --settings=config.test_settings --noinput
 
       - name: Generate coverage report
         if: ${{ !cancelled() && steps.deps.outcome == 'success' }}
