@@ -15,6 +15,10 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
 object WardrobeRepository {
+    /** Fitting uses the registered photo without the UI thumbnail downsampling. */
+    suspend fun fittingImage(path: String, account: AccountAccess,
+                             baseUrl: String = BuildConfig.API_BASE_URL): ByteArray =
+        withContext(Dispatchers.IO) { request(path, account, baseUrl) }
     suspend fun delete(id: String, store: LocalUserStore, account: AccountAccess) = withContext(Dispatchers.IO) {
         try {
             account.json("DELETE", "/api/wardrobe/items/$id/")
@@ -25,9 +29,10 @@ object WardrobeRepository {
         store.removeGarment(id)
     }
 
-    private suspend fun request(path: String, account: AccountAccess): ByteArray = withContext(Dispatchers.IO) {
+    private suspend fun request(path: String, account: AccountAccess,
+                                baseUrl: String = BuildConfig.API_BASE_URL): ByteArray = withContext(Dispatchers.IO) {
         require(path.startsWith("/api/wardrobe/"))
-        val connection = URI("${BuildConfig.API_BASE_URL.trimEnd('/')}$path").toURL().openConnection() as HttpURLConnection
+        val connection = URI("${baseUrl.trimEnd('/')}$path").toURL().openConnection() as HttpURLConnection
         try {
             connection.connectTimeout = 5_000
             connection.readTimeout = 15_000

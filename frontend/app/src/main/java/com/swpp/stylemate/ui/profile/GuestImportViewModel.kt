@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.swpp.stylemate.data.AuthException
 import com.swpp.stylemate.data.GuestImportPlan
 import com.swpp.stylemate.data.GuestImportRepository
+import com.swpp.stylemate.data.GuestImportRecord
 import com.swpp.stylemate.data.GuestImportSnapshot
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -21,7 +22,15 @@ data class GuestImportState(val stage: GuestImportStage = GuestImportStage.HIDDE
     val busy get() = stage == GuestImportStage.CHECKING || stage == GuestImportStage.RUNNING
 }
 
-class GuestImportViewModel(private val repository: GuestImportRepository) : ViewModel() {
+class GuestImportViewModel internal constructor(
+    private val readSnapshot: suspend (Boolean) -> GuestImportSnapshot,
+    private val previewImport: suspend (GuestImportSnapshot) -> GuestImportPlan,
+    private val importRecord: suspend (GuestImportRecord, GuestImportPlan, Boolean) -> String,
+    private val refreshAccount: suspend () -> Unit,
+) : ViewModel() {
+    constructor(repository: GuestImportRepository) : this(
+        repository::snapshot, repository::preview, repository::importRecord, repository::refreshAccount,
+    )
     private val mutableState = MutableStateFlow(GuestImportState())
     val state = mutableState.asStateFlow()
     private var loading: Job? = null
@@ -31,7 +40,7 @@ class GuestImportViewModel(private val repository: GuestImportRepository) : View
         mutableState.value = GuestImportState(stage = GuestImportStage.LOADING)
         loading = viewModelScope.launch {
             try {
-                val snapshot = repository.snapshot(includeKept = true)
+                val snapshot = readSnapshot(true)
                 val stage = if (snapshot.records.isEmpty()) GuestImportStage.RESULT else GuestImportStage.CONSENT
                 mutableState.value = GuestImportState(stage, snapshot, message = if (snapshot.records.isEmpty()) "가져올 새로운 데이터가 없어요." else null)
             } catch (error: CancellationException) { throw error }
@@ -53,7 +62,7 @@ class GuestImportViewModel(private val repository: GuestImportRepository) : View
         mutableState.value = previous.copy(stage = GuestImportStage.CHECKING)
         viewModelScope.launch {
             try {
-                repository.refreshAccount()
+                refreshAccount()
                 mutableState.value = previous.copy(errors = emptyList(), refreshFailed = false, message = "가져오기를 완료했어요.")
             } catch (error: CancellationException) { throw error }
             catch (error: Exception) { mutableState.value = previous.copy(errors = listOf(error.message ?: "계정 정보를 새로고침하지 못했어요.")) }
@@ -66,7 +75,7 @@ class GuestImportViewModel(private val repository: GuestImportRepository) : View
         mutableState.value = state.value.copy(stage = GuestImportStage.CHECKING, errors = emptyList(), message = null)
         viewModelScope.launch {
             try {
-                val plan = repository.preview(snapshot)
+                val plan = previewImport(snapshot)
                 if (plan.conflicts.isNotEmpty()) mutableState.value = state.value.copy(stage = GuestImportStage.CONFLICT, plan = plan)
                 else execute(plan, emptySet())
             } catch (error: CancellationException) { throw error }
@@ -97,7 +106,7 @@ class GuestImportViewModel(private val repository: GuestImportRepository) : View
                     val items = record.value.getJSONArray("items")
                     check((0 until items.length()).none { items.getJSONObject(it).getString("garment_id") in failedGarments }) { "연결된 옷을 먼저 가져와야 해요." }
                 }
-                if (repository.importRecord(record, plan, record.key in replace) == "kept") kept++ else imported++
+                if (importRecord(record, plan, record.key in replace) == "kept") kept++ else imported++
             } catch (error: CancellationException) { throw error }
             catch (error: Exception) {
                 if (error is AuthException && error.code in setOf("AUTHENTICATION_REQUIRED", "SESSION_CHANGED")) throw CancellationException(error.message)
@@ -109,7 +118,7 @@ class GuestImportViewModel(private val repository: GuestImportRepository) : View
             if (networkFailed) break
         }
         if (!networkFailed) {
-            try { repository.refreshAccount() }
+            try { refreshAccount() }
             catch (error: CancellationException) { throw error }
             catch (error: Exception) { refreshFailed = true; errors += "계정 정보 새로고침: ${error.message ?: "잠시 후 다시 확인해 주세요."}" }
         }

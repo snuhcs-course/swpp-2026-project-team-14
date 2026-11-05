@@ -8,7 +8,10 @@ import com.swpp.stylemate.data.wardrobe.WornGenerationRepository
 import com.swpp.stylemate.data.wardrobe.WornPhotoRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -64,7 +67,16 @@ internal fun detectionErrorMessage(code: String): String = when (code) {
     else -> "옷 분석을 완료하지 못했어요. 잠시 후 다시 시도해 주세요."
 }
 
-class WornBatchViewModel(private val account: AccountAccess) : ViewModel() {
+class WornBatchViewModel internal constructor(
+    private val uploadPhoto: suspend (ByteArray, String) -> JSONObject,
+    private val requestPhoto: suspend (String, String, JSONObject?) -> JSONObject,
+    private val requestGeneration: suspend (String, String, JSONObject?) -> JSONObject,
+) : ViewModel() {
+    constructor(account: AccountAccess) : this(
+        { bytes, id -> WornPhotoRepository.upload(account, bytes, id) },
+        { id, action, body -> WornPhotoRepository.request(account, id, action, body) },
+        { id, action, body -> WornGenerationRepository.request(account, id, action, body) },
+    )
     private val mutable = MutableStateFlow(WornBatchState())
     val state = mutable.asStateFlow()
     private var uploadId = UUID.randomUUID().toString()
@@ -77,21 +89,32 @@ class WornBatchViewModel(private val account: AccountAccess) : ViewModel() {
         job = viewModelScope.launch {
             try { action() }
             catch (cancelled: CancellationException) { throw cancelled }
-            catch (error: Exception) { mutable.value = mutable.value.copy(error = error.message ?: "요청을 처리하지 못했어요.") }
-            finally { mutable.value = mutable.value.copy(busy = false) }
+            catch (error: Exception) {
+                currentCoroutineContext().ensureActive()
+                mutable.value = mutable.value.copy(error = error.message ?: "요청을 처리하지 못했어요.")
+            }
+            finally {
+                if (currentCoroutineContext().isActive) mutable.value = mutable.value.copy(busy = false)
+            }
         }
     }
 
     fun detect(bitmap: Bitmap) {
+        detect(bitmap) {
+            withContext(Dispatchers.IO) { ByteArrayOutputStream().also {
+                check(bitmap.compress(Bitmap.CompressFormat.JPEG, 90, it))
+            }.toByteArray() }
+        }
+    }
+
+    internal fun detect(original: Bitmap? = null, encode: suspend () -> ByteArray) {
         if (mutable.value.busy) return
         uploadId = UUID.randomUUID().toString()
         upload = null
-        mutable.value = WornBatchState(original = bitmap)
+        mutable.value = WornBatchState(original = original)
         run {
             mutable.value = mutable.value.copy(progress = "사진 속 옷을 찾고 있어요")
-            upload = withContext(Dispatchers.IO) { ByteArrayOutputStream().also {
-                check(bitmap.compress(Bitmap.CompressFormat.JPEG, 90, it))
-            }.toByteArray() }
+            upload = encode()
             uploadAndPoll()
         }
     }
@@ -100,18 +123,18 @@ class WornBatchViewModel(private val account: AccountAccess) : ViewModel() {
     fun refreshPhoto() = run {
         if (mutable.value.photo == null) uploadAndPoll()
         else {
-            val result = WornPhotoRepository.request(account, mutable.value.photo!!.getString("id"))
+            val result = requestPhoto(mutable.value.photo!!.getString("id"), "", null)
             acceptPhoto(result)
         }
     }
 
     private suspend fun uploadAndPoll() {
-        var result = WornPhotoRepository.upload(account, checkNotNull(upload), uploadId)
+        var result = uploadPhoto(checkNotNull(upload), uploadId)
         acceptPhoto(result)
         repeat(35) {
             if (result.optString("status") != "detecting") return
             delay(1200)
-            result = WornPhotoRepository.request(account, result.getString("id"))
+            result = requestPhoto(result.getString("id"), "", null)
             acceptPhoto(result)
         }
     }
@@ -132,7 +155,7 @@ class WornBatchViewModel(private val account: AccountAccess) : ViewModel() {
         val state = mutable.value
         check(state.selected.isNotEmpty())
         mutable.value = state.copy(busy = true, progress = "선택한 옷을 준비하고 있어요", error = null)
-        val result = WornPhotoRepository.request(account, state.photo!!.getString("id"), "prepare",
+        val result = requestPhoto(state.photo!!.getString("id"), "prepare",
             JSONObject().put("candidate_ids", JSONArray(state.selected.toList())))
         val records = result.getJSONArray("items")
         mutable.value = mutable.value.copy(items = (0 until records.length()).map { index ->
@@ -166,19 +189,19 @@ class WornBatchViewModel(private val account: AccountAccess) : ViewModel() {
 
     private suspend fun generateOne(id: String, requestId: String) {
         update(id) { it.copy(imageChoice = null, error = null, requestId = requestId) }
-        var result = WornGenerationRepository.request(account, id, "generation", JSONObject().put("request_id", requestId))
+        var result = requestGeneration(id, "generation", JSONObject().put("request_id", requestId))
         update(id) { it.copy(generation = result, imageChoice = if (result.optString("status") == "ready") "generated" else null) }
         repeat(40) {
             if (result.optString("status") != "running") return
             delay(1200)
-            result = WornGenerationRepository.request(account, id, "generation")
+            result = requestGeneration(id, "generation", null)
             update(id) { it.copy(generation = result, imageChoice = if (result.optString("status") == "ready") "generated" else null) }
         }
     }
 
     fun refresh(id: String) = run {
         mutable.value = mutable.value.copy(progress = "생성 결과 확인 중")
-        val result = WornGenerationRepository.request(account, id, "generation")
+        val result = requestGeneration(id, "generation", null)
         update(id) { it.copy(generation = result, error = null,
             imageChoice = it.imageChoice ?: if (result.optString("status") == "ready") "generated" else null) }
     }
@@ -208,7 +231,7 @@ class WornBatchViewModel(private val account: AccountAccess) : ViewModel() {
             .put("id", item.id).put("image_choice", item.imageChoice).apply {
                 getJSONObject("labels").put("confirmed", true)
             } }
-        val result = WornPhotoRepository.request(account, state.photo!!.getString("id"), "save",
+        val result = requestPhoto(state.photo!!.getString("id"), "save",
             JSONObject().put("items", JSONArray(rows)))
         mutable.value = mutable.value.copy(savedCount = result.getJSONArray("items").length())
     }

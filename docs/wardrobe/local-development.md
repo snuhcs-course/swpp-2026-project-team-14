@@ -152,4 +152,4 @@ adb shell am start -n com.swpp.stylemate/.ui.wardrobe.WornPreviewActivity
 
 최초 빌드에는 원본 다운로드와 ONNX 변환 시간이 추가되며 GitHub·Hugging Face·패키지 저장소 접속이 필요하다. 다운로드·체크섬 검증·변환에 실패하면 이미지 빌드도 실패한다. Backend CI는 이미지 내부에서 HRNet의 체크섬·입출력 크기와 실제 추론을 확인한다.
 
-현재 배포의 1Gi 메모리 제한은 체형 모델 기준이다. 체형 모델과 HRNet 동시 로드 시 사용량을 다시 측정해야 한다. 사용자 구분·Bearer 인증과 체형 프로필 계정 저장은 구현되어 있다. 모든 서비스 API는 로그인 후 호출한다. S3, 옷 삭제·초안 정리는 이번 범위 밖이다. 최신 인증 계약은 docs/login/README.md를 따른다.
+현재 배포의 1Gi 메모리 제한은 체형 모델 기준이다. 체형 모델과 HRNet 동시 로드 시 사용량을 다시 측정해야 한다. 사용자 구분·Bearer 인증과 체형 프로필 계정 저장은 구현되어 있다. 모든 서비스 API는 로그인 후 호출한다. 의상 삭제 시 미사용 사진은 DB 커밋 후 정리한다. S3와 삭제하지 않은 초안의 자동 만료는 구현하지 않았다. 최신 인증 계약은 docs/login/README.md를 따른다.

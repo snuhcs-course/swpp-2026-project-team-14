@@ -22,6 +22,7 @@ from .analysis import AnalysisError, MAX_IMAGE_BYTES, model_name, analyze_image,
 from .editor import catalog, validate_record
 from .schema import validate_ai_details, validate_attributes
 from .models import Garment, CategoryInUse, WornGeneration
+from .media import delete_garment_with_media
 from .worn_estimates import suggestions, estimate_matches
 from .landmarks import GARMENTS, MAX_FRAME_BYTES, detect
 
@@ -187,7 +188,7 @@ def item(request, item_id):
             if garment is None:
                 return JsonResponse({'error': 'GARMENT_NOT_FOUND'}, status=404)
             Outfit.objects.filter(user=request.user, items__garment=garment).delete()
-            garment.delete()
+            delete_garment_with_media(garment)
         response = JsonResponse({'deleted_id': str(item_id)})
         response['Cache-Control'] = 'no-store'
         return response
