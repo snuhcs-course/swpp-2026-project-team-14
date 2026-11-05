@@ -88,6 +88,7 @@
 
 ## 검증
 
+- ViewModel 기대 동작·재시도·취소·커버리지 검증은 [로그인·가져오기 테스트 명세](viewmodel-testing.md)를 따른다.
 - backend: manage.py test apps.users apps.wardrobe apps.outfits --settings=config.test_settings --noinput
 - backend: python -m pytest
 - frontend: testDebugUnitTest, assembleDebug, lintDebug 및 관련 Android UI 테스트
