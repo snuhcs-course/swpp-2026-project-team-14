@@ -1,0 +1,1106 @@
+{
+ "executed_at": "2026-11-05T14:14:34+00:00",
+ "model": "google/gemini-3.5-flash-lite",
+ "cases_version": 1,
+ "official": true,
+ "thresholds": {
+  "category": 0.95,
+  "subcategory": 0.85,
+  "format_errors": 0
+ },
+ "scored_cases": 45,
+ "category_accuracy": 1.0,
+ "subcategory_accuracy": 1.0,
+ "format_errors": 0,
+ "unresolved_infra_errors": 0,
+ "verdict": "PASS",
+ "median_seconds": 1.84,
+ "failures": [],
+ "cases": [
+  {
+   "id": "g01",
+   "file": "images/bottom_jeans_01.jpg",
+   "expect": {
+    "category": "bottom",
+    "subcategory": [
+     "jeans"
+    ]
+   },
+   "status": "ok",
+   "output": {
+    "name": "데님 청바지",
+    "category": "bottom",
+    "subcategory": "jeans",
+    "colors": [
+     "#24344B"
+    ]
+   },
+   "correct": {
+    "category": true,
+    "subcategory": true
+   },
+   "seconds": 2.09
+  },
+  {
+   "id": "g02",
+   "file": "images/bottom_jeans_02.jpg",
+   "expect": {
+    "category": "bottom",
+    "subcategory": [
+     "jeans"
+    ]
+   },
+   "status": "ok",
+   "output": {
+    "name": "연청바지",
+    "category": "bottom",
+    "subcategory": "jeans",
+    "colors": [
+     "#3975C6"
+    ]
+   },
+   "correct": {
+    "category": true,
+    "subcategory": true
+   },
+   "seconds": 1.84
+  },
+  {
+   "id": "g03",
+   "file": "images/bottom_jeans_03.jpg",
+   "expect": {
+    "category": "bottom",
+    "subcategory": [
+     "jeans"
+    ]
+   },
+   "status": "ok",
+   "output": {
+    "name": "청바지",
+    "category": "bottom",
+    "subcategory": "jeans",
+    "colors": [
+     "#3975C6"
+    ]
+   },
+   "correct": {
+    "category": true,
+    "subcategory": true
+   },
+   "seconds": 1.8
+  },
+  {
+   "id": "g04",
+   "file": "images/bottom_jeans_04.jpg",
+   "expect": {
+    "category": "bottom",
+    "subcategory": [
+     "jeans"
+    ]
+   },
+   "status": "ok",
+   "output": {
+    "name": "다크 데님 팬츠",
+    "category": "bottom",
+    "subcategory": "jeans",
+    "colors": [
+     "#24344B"
+    ]
+   },
+   "correct": {
+    "category": true,
+    "subcategory": true
+   },
+   "seconds": 2.17
+  },
+  {
+   "id": "g05",
+   "file": "images/bottom_pants_01.jpg",
+   "expect": {
+    "category": "bottom",
+    "subcategory": [
+     "pants"
+    ]
+   },
+   "status": "ok",
+   "output": {
+    "name": "브라운 코듀로이 팬츠",
+    "category": "bottom",
+    "subcategory": "pants",
+    "colors": [
+     "#795548"
+    ]
+   },
+   "correct": {
+    "category": true,
+    "subcategory": true
+   },
+   "seconds": 2.02
+  },
+  {
+   "id": "g06",
+   "file": "images/bottom_pants_02.jpg",
+   "expect": {
+    "category": "bottom",
+    "subcategory": [
+     "pants"
+    ]
+   },
+   "status": "ok",
+   "output": {
+    "name": "카키 캐주얼 바지",
+    "category": "bottom",
+    "subcategory": "pants",
+    "colors": [
+     "#7B8052"
+    ]
+   },
+   "correct": {
+    "category": true,
+    "subcategory": true
+   },
+   "seconds": 2.22
+  },
+  {
+   "id": "g07",
+   "file": "images/bottom_shorts_01.jpg",
+   "expect": {
+    "category": "bottom",
+    "subcategory": [
+     "shorts"
+    ]
+   },
+   "status": "ok",
+   "output": {
+    "name": "핀턱 반바지",
+    "category": "bottom",
+    "subcategory": "shorts",
+    "colors": [
+     "#808080"
+    ]
+   },
+   "correct": {
+    "category": true,
+    "subcategory": true
+   },
+   "seconds": 1.91
+  },
+  {
+   "id": "g08",
+   "file": "images/bottom_shorts_02.jpg",
+   "expect": {
+    "category": "bottom",
+    "subcategory": [
+     "shorts"
+    ]
+   },
+   "status": "ok",
+   "output": {
+    "name": "베이지 숏팬츠",
+    "category": "bottom",
+    "subcategory": "shorts",
+    "colors": [
+     "#D6BE9A"
+    ]
+   },
+   "correct": {
+    "category": true,
+    "subcategory": true
+   },
+   "seconds": 2.0
+  },
+  {
+   "id": "g09",
+   "file": "images/bottom_shorts_03.jpg",
+   "expect": {
+    "category": "bottom",
+    "subcategory": [
+     "shorts"
+    ]
+   },
+   "status": "ok",
+   "output": {
+    "name": "카키 반바지",
+    "category": "bottom",
+    "subcategory": "shorts",
+    "colors": [
+     "#7B8052"
+    ]
+   },
+   "correct": {
+    "category": true,
+    "subcategory": true
+   },
+   "seconds": 2.56
+  },
+  {
+   "id": "g10",
+   "file": "images/bottom_skirt_01.jpg",
+   "expect": {
+    "category": "bottom",
+    "subcategory": [
+     "skirt"
+    ]
+   },
+   "status": "ok",
+   "output": {
+    "name": "블랙 미디 스커트",
+    "category": "bottom",
+    "subcategory": "skirt",
+    "colors": [
+     "#202020"
+    ]
+   },
+   "correct": {
+    "category": true,
+    "subcategory": true
+   },
+   "seconds": 1.83
+  },
+  {
+   "id": "g11",
+   "file": "images/bottom_skirt_02.jpg",
+   "expect": {
+    "category": "bottom",
+    "subcategory": [
+     "skirt"
+    ]
+   },
+   "status": "ok",
+   "output": {
+    "name": "그레이 니트 스커트",
+    "category": "bottom",
+    "subcategory": "skirt",
+    "colors": [
+     "#808080"
+    ]
+   },
+   "correct": {
+    "category": true,
+    "subcategory": true
+   },
+   "seconds": 1.88
+  },
+  {
+   "id": "g12",
+   "file": "images/bottom_skirt_03.jpg",
+   "expect": {
+    "category": "bottom",
+    "subcategory": [
+     "skirt"
+    ]
+   },
+   "status": "ok",
+   "output": {
+    "name": "플리츠 스커트",
+    "category": "bottom",
+    "subcategory": "skirt",
+    "colors": [
+     "#D6BE9A"
+    ]
+   },
+   "correct": {
+    "category": true,
+    "subcategory": true
+   },
+   "seconds": 1.84
+  },
+  {
+   "id": "g13",
+   "file": "images/bottom_slacks_01.jpg",
+   "expect": {
+    "category": "bottom",
+    "subcategory": [
+     "slacks"
+    ]
+   },
+   "status": "ok",
+   "output": {
+    "name": "블랙 슬랙스",
+    "category": "bottom",
+    "subcategory": "slacks",
+    "colors": [
+     "#202020"
+    ]
+   },
+   "correct": {
+    "category": true,
+    "subcategory": true
+   },
+   "seconds": 1.81
+  },
+  {
+   "id": "g14",
+   "file": "images/bottom_slacks_02.jpg",
+   "expect": {
+    "category": "bottom",
+    "subcategory": [
+     "slacks"
+    ]
+   },
+   "status": "ok",
+   "output": {
+    "name": "아이보리 슬랙스",
+    "category": "bottom",
+    "subcategory": "slacks",
+    "colors": [
+     "#FFFFF0"
+    ]
+   },
+   "correct": {
+    "category": true,
+    "subcategory": true
+   },
+   "seconds": 1.58
+  },
+  {
+   "id": "g15",
+   "file": "images/bottom_slacks_03.jpg",
+   "expect": {
+    "category": "bottom",
+    "subcategory": [
+     "slacks"
+    ]
+   },
+   "status": "ok",
+   "output": {
+    "name": "아이보리 슬랙스",
+    "category": "bottom",
+    "subcategory": "slacks",
+    "colors": [
+     "#FFFFF0"
+    ]
+   },
+   "correct": {
+    "category": true,
+    "subcategory": true
+   },
+   "seconds": 1.94
+  },
+  {
+   "id": "g16",
+   "file": "images/outerwear_cardigan_01.jpg",
+   "expect": {
+    "category": "outerwear",
+    "subcategory": [
+     "cardigan"
+    ]
+   },
+   "status": "ok",
+   "output": {
+    "name": "금장 단추 네이비 카디건",
+    "category": "outerwear",
+    "subcategory": "cardigan",
+    "colors": [
+     "#24344B"
+    ]
+   },
+   "correct": {
+    "category": true,
+    "subcategory": true
+   },
+   "seconds": 1.91
+  },
+  {
+   "id": "g17",
+   "file": "images/outerwear_coat_01.jpg",
+   "expect": {
+    "category": "outerwear",
+    "subcategory": [
+     "coat"
+    ]
+   },
+   "status": "ok",
+   "output": {
+    "name": "차콜 더블 코트",
+    "category": "outerwear",
+    "subcategory": "coat",
+    "colors": [
+     "#808080"
+    ]
+   },
+   "correct": {
+    "category": true,
+    "subcategory": true
+   },
+   "seconds": 1.84
+  },
+  {
+   "id": "g18",
+   "file": "images/outerwear_jacket_01.jpg",
+   "expect": {
+    "category": "outerwear",
+    "subcategory": [
+     "jacket"
+    ]
+   },
+   "status": "ok",
+   "output": {
+    "name": "가죽 재킷",
+    "category": "outerwear",
+    "subcategory": "jacket",
+    "colors": [
+     "#202020"
+    ]
+   },
+   "correct": {
+    "category": true,
+    "subcategory": true
+   },
+   "seconds": 2.16
+  },
+  {
+   "id": "g19",
+   "file": "images/outerwear_jacket_02.jpg",
+   "expect": {
+    "category": "outerwear",
+    "subcategory": [
+     "jacket"
+    ]
+   },
+   "status": "ok",
+   "output": {
+    "name": "체크 패턴 재킷",
+    "category": "outerwear",
+    "subcategory": "jacket",
+    "colors": [
+     "#795548",
+     "#24344B"
+    ]
+   },
+   "correct": {
+    "category": true,
+    "subcategory": true
+   },
+   "seconds": 1.91
+  },
+  {
+   "id": "g20",
+   "file": "images/outerwear_jacket_03.jpg",
+   "expect": {
+    "category": "outerwear",
+    "subcategory": [
+     "jacket"
+    ]
+   },
+   "status": "ok",
+   "output": {
+    "name": "아이보리 데님 재킷",
+    "category": "outerwear",
+    "subcategory": "jacket",
+    "colors": [
+     "#FFFFF0"
+    ]
+   },
+   "correct": {
+    "category": true,
+    "subcategory": true
+   },
+   "seconds": 2.08
+  },
+  {
+   "id": "g21",
+   "file": "images/outerwear_jacket_04.jpg",
+   "expect": {
+    "category": "outerwear",
+    "subcategory": [
+     "jacket"
+    ]
+   },
+   "status": "ok",
+   "output": {
+    "name": "베이지 숏 재킷",
+    "category": "outerwear",
+    "subcategory": "jacket",
+    "colors": [
+     "#D6BE9A"
+    ]
+   },
+   "correct": {
+    "category": true,
+    "subcategory": true
+   },
+   "seconds": 1.94
+  },
+  {
+   "id": "g22",
+   "file": "images/outerwear_jacket_05.jpg",
+   "expect": {
+    "category": "outerwear",
+    "subcategory": [
+     "jacket"
+    ]
+   },
+   "status": "ok",
+   "output": {
+    "name": "네이비 스타디움 재킷",
+    "category": "outerwear",
+    "subcategory": "jacket",
+    "colors": [
+     "#24344B"
+    ]
+   },
+   "correct": {
+    "category": true,
+    "subcategory": true
+   },
+   "seconds": 1.95
+  },
+  {
+   "id": "g23",
+   "file": "images/outerwear_jacket_06.jpg",
+   "expect": {
+    "category": "outerwear",
+    "subcategory": [
+     "jacket"
+    ]
+   },
+   "status": "ok",
+   "output": {
+    "name": "스웨이드 블루종 재킷",
+    "category": "outerwear",
+    "subcategory": "jacket",
+    "colors": [
+     "#795548"
+    ]
+   },
+   "correct": {
+    "category": true,
+    "subcategory": true
+   },
+   "seconds": 1.75
+  },
+  {
+   "id": "g24",
+   "file": "images/outerwear_jacket_07.jpg",
+   "expect": {
+    "category": "outerwear",
+    "subcategory": [
+     "jacket"
+    ]
+   },
+   "status": "ok",
+   "output": {
+    "name": "브라운 스웨이드 재킷",
+    "category": "outerwear",
+    "subcategory": "jacket",
+    "colors": [
+     "#795548"
+    ]
+   },
+   "correct": {
+    "category": true,
+    "subcategory": true
+   },
+   "seconds": 1.83
+  },
+  {
+   "id": "g25",
+   "file": "images/outerwear_jacket_08.jpg",
+   "expect": {
+    "category": "outerwear",
+    "subcategory": [
+     "jacket"
+    ]
+   },
+   "status": "ok",
+   "output": {
+    "name": "베이지 노카라 재킷",
+    "category": "outerwear",
+    "subcategory": "jacket",
+    "colors": [
+     "#D6BE9A"
+    ]
+   },
+   "correct": {
+    "category": true,
+    "subcategory": true
+   },
+   "seconds": 2.05
+  },
+  {
+   "id": "g26",
+   "file": "images/outerwear_jacket_09.jpg",
+   "expect": {
+    "category": "outerwear",
+    "subcategory": [
+     "jacket"
+    ]
+   },
+   "status": "ok",
+   "output": {
+    "name": "회색 재킷",
+    "category": "outerwear",
+    "subcategory": "jacket",
+    "colors": [
+     "#808080"
+    ]
+   },
+   "correct": {
+    "category": true,
+    "subcategory": true
+   },
+   "seconds": 2.05
+  },
+  {
+   "id": "g27",
+   "file": "images/outerwear_jacket_10.jpg",
+   "expect": {
+    "category": "outerwear",
+    "subcategory": [
+     "jacket"
+    ]
+   },
+   "status": "ok",
+   "output": {
+    "name": "카키 재킷",
+    "category": "outerwear",
+    "subcategory": "jacket",
+    "colors": [
+     "#7B8052"
+    ]
+   },
+   "correct": {
+    "category": true,
+    "subcategory": true
+   },
+   "seconds": 1.84
+  },
+  {
+   "id": "g28",
+   "file": "images/outerwear_puffer_01.jpg",
+   "expect": {
+    "category": "outerwear",
+    "subcategory": [
+     "puffer"
+    ]
+   },
+   "status": "ok",
+   "output": {
+    "name": "패딩",
+    "category": "outerwear",
+    "subcategory": "puffer",
+    "colors": [
+     "#FFFFF0"
+    ]
+   },
+   "correct": {
+    "category": true,
+    "subcategory": true
+   },
+   "seconds": 1.67
+  },
+  {
+   "id": "g29",
+   "file": "images/outerwear_puffer_02.jpg",
+   "expect": {
+    "category": "outerwear",
+    "subcategory": [
+     "puffer"
+    ]
+   },
+   "status": "ok",
+   "output": {
+    "name": "노란색 퀼팅 패딩 재킷",
+    "category": "outerwear",
+    "subcategory": "puffer",
+    "colors": [
+     "#E8C547"
+    ]
+   },
+   "correct": {
+    "category": true,
+    "subcategory": true
+   },
+   "seconds": 1.98
+  },
+  {
+   "id": "g30",
+   "file": "images/outerwear_vest_01.jpg",
+   "expect": {
+    "category": "outerwear",
+    "subcategory": [
+     "vest"
+    ]
+   },
+   "status": "ok",
+   "output": {
+    "name": "패딩 조끼",
+    "category": "outerwear",
+    "subcategory": "vest",
+    "colors": [
+     "#202020"
+    ]
+   },
+   "correct": {
+    "category": true,
+    "subcategory": true
+   },
+   "seconds": 1.84
+  },
+  {
+   "id": "g31",
+   "file": "images/top_knitwear_01.jpg",
+   "expect": {
+    "category": "top",
+    "subcategory": [
+     "knitwear"
+    ]
+   },
+   "status": "ok",
+   "output": {
+    "name": "스퀘어넥 니트웨어",
+    "category": "top",
+    "subcategory": "knitwear",
+    "colors": [
+     "#202020"
+    ]
+   },
+   "correct": {
+    "category": true,
+    "subcategory": true
+   },
+   "seconds": 1.95
+  },
+  {
+   "id": "g32",
+   "file": "images/top_knitwear_02.jpg",
+   "expect": {
+    "category": "top",
+    "subcategory": [
+     "knitwear"
+    ]
+   },
+   "status": "ok",
+   "output": {
+    "name": "라운드넥 니트웨어",
+    "category": "top",
+    "subcategory": "knitwear",
+    "colors": [
+     "#D6BE9A"
+    ]
+   },
+   "correct": {
+    "category": true,
+    "subcategory": true
+   },
+   "seconds": 1.77
+  },
+  {
+   "id": "g33",
+   "file": "images/top_knitwear_03.jpg",
+   "expect": {
+    "category": "top",
+    "subcategory": [
+     "knitwear"
+    ]
+   },
+   "status": "ok",
+   "output": {
+    "name": "라운드넥 니트웨어",
+    "category": "top",
+    "subcategory": "knitwear",
+    "colors": [
+     "#E8A0B0"
+    ]
+   },
+   "correct": {
+    "category": true,
+    "subcategory": true
+   },
+   "seconds": 1.81
+  },
+  {
+   "id": "g34",
+   "file": "images/top_knitwear_04.jpg",
+   "expect": {
+    "category": "top",
+    "subcategory": [
+     "knitwear"
+    ]
+   },
+   "status": "ok",
+   "output": {
+    "name": "네이비 폴로 꽈배기 니트",
+    "category": "top",
+    "subcategory": "knitwear",
+    "colors": [
+     "#24344B"
+    ]
+   },
+   "correct": {
+    "category": true,
+    "subcategory": true
+   },
+   "seconds": 1.84
+  },
+  {
+   "id": "g35",
+   "file": "images/top_knitwear_05.jpg",
+   "expect": {
+    "category": "top",
+    "subcategory": [
+     "knitwear"
+    ]
+   },
+   "status": "ok",
+   "output": {
+    "name": "스퀘어넥 반팔 니트",
+    "category": "top",
+    "subcategory": "knitwear",
+    "colors": [
+     "#7B8052"
+    ]
+   },
+   "correct": {
+    "category": true,
+    "subcategory": true
+   },
+   "seconds": 1.92
+  },
+  {
+   "id": "g36",
+   "file": "images/top_shirt_01.jpg",
+   "expect": {
+    "category": "top",
+    "subcategory": [
+     "shirt",
+     "blouse"
+    ]
+   },
+   "status": "ok",
+   "output": {
+    "name": "노란색 셔츠",
+    "category": "top",
+    "subcategory": "shirt",
+    "colors": [
+     "#E8C547"
+    ]
+   },
+   "correct": {
+    "category": true,
+    "subcategory": true
+   },
+   "seconds": 1.84
+  },
+  {
+   "id": "g37",
+   "file": "images/top_shirt_02.jpg",
+   "expect": {
+    "category": "top",
+    "subcategory": [
+     "shirt",
+     "blouse"
+    ]
+   },
+   "status": "ok",
+   "output": {
+    "name": "스트라이프 셔츠",
+    "category": "top",
+    "subcategory": "shirt",
+    "colors": [
+     "#3975C6",
+     "#FFFFFF"
+    ]
+   },
+   "correct": {
+    "category": true,
+    "subcategory": true
+   },
+   "seconds": 1.73
+  },
+  {
+   "id": "g38",
+   "file": "images/top_shirt_03.jpg",
+   "expect": {
+    "category": "top",
+    "subcategory": [
+     "shirt",
+     "blouse"
+    ]
+   },
+   "status": "ok",
+   "output": {
+    "name": "화이트 밴드칼라 셔츠",
+    "category": "top",
+    "subcategory": "shirt",
+    "colors": [
+     "#FFFFFF"
+    ]
+   },
+   "correct": {
+    "category": true,
+    "subcategory": true
+   },
+   "seconds": 1.84
+  },
+  {
+   "id": "g39",
+   "file": "images/top_sweatshirt_01.jpg",
+   "expect": {
+    "category": "top",
+    "subcategory": [
+     "sweatshirt"
+    ]
+   },
+   "status": "ok",
+   "output": {
+    "name": "회색 맨투맨",
+    "category": "top",
+    "subcategory": "sweatshirt",
+    "colors": [
+     "#808080"
+    ]
+   },
+   "correct": {
+    "category": true,
+    "subcategory": true
+   },
+   "seconds": 1.62
+  },
+  {
+   "id": "g40",
+   "file": "images/top_sweatshirt_02.jpg",
+   "expect": {
+    "category": "top",
+    "subcategory": [
+     "sweatshirt"
+    ]
+   },
+   "status": "ok",
+   "output": {
+    "name": "하프집업 맨투맨",
+    "category": "top",
+    "subcategory": "sweatshirt",
+    "colors": [
+     "#D6BE9A"
+    ]
+   },
+   "correct": {
+    "category": true,
+    "subcategory": true
+   },
+   "seconds": 1.86
+  },
+  {
+   "id": "g41",
+   "file": "images/top_tshirt_01.jpg",
+   "expect": {
+    "category": "top",
+    "subcategory": [
+     "tshirt"
+    ]
+   },
+   "status": "ok",
+   "output": {
+    "name": "차콜 반팔 티셔츠",
+    "category": "top",
+    "subcategory": "tshirt",
+    "colors": [
+     "#202020"
+    ]
+   },
+   "correct": {
+    "category": true,
+    "subcategory": true
+   },
+   "seconds": 1.75
+  },
+  {
+   "id": "g42",
+   "file": "images/top_tshirt_02.jpg",
+   "expect": {
+    "category": "top",
+    "subcategory": [
+     "tshirt"
+    ]
+   },
+   "status": "ok",
+   "output": {
+    "name": "아이보리 긴팔 티셔츠",
+    "category": "top",
+    "subcategory": "tshirt",
+    "colors": [
+     "#FFFFF0"
+    ]
+   },
+   "correct": {
+    "category": true,
+    "subcategory": true
+   },
+   "seconds": 1.75
+  },
+  {
+   "id": "g43",
+   "file": "images/top_tshirt_03.jpg",
+   "expect": {
+    "category": "top",
+    "subcategory": [
+     "tshirt"
+    ]
+   },
+   "status": "ok",
+   "output": {
+    "name": "터틀넥 티셔츠",
+    "category": "top",
+    "subcategory": "tshirt",
+    "colors": [
+     "#795548"
+    ]
+   },
+   "correct": {
+    "category": true,
+    "subcategory": true
+   },
+   "seconds": 1.83
+  },
+  {
+   "id": "g44",
+   "file": "images/top_tshirt_04.jpg",
+   "expect": {
+    "category": "top",
+    "subcategory": [
+     "tshirt"
+    ]
+   },
+   "status": "ok",
+   "output": {
+    "name": "화이트 골지 반팔 티셔츠",
+    "category": "top",
+    "subcategory": "tshirt",
+    "colors": [
+     "#FFFFFF"
+    ]
+   },
+   "correct": {
+    "category": true,
+    "subcategory": true
+   },
+   "seconds": 1.84
+  },
+  {
+   "id": "g45",
+   "file": "images/top_tshirt_05.jpg",
+   "expect": {
+    "category": "top",
+    "subcategory": [
+     "tshirt"
+    ]
+   },
+   "status": "ok",
+   "output": {
+    "name": "카키색 긴팔 티셔츠",
+    "category": "top",
+    "subcategory": "tshirt",
+    "colors": [
+     "#7B8052"
+    ]
+   },
+   "correct": {
+    "category": true,
+    "subcategory": true
+   },
+   "seconds": 1.72
+  }
+ ]
+}
