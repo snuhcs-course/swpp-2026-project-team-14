@@ -3,6 +3,7 @@ package com.swpp.stylemate.profile
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelStore
+import androidx.lifecycle.viewModelScope
 import com.swpp.stylemate.data.AuthSessionStore
 import com.swpp.stylemate.data.GuestImportPlan
 import com.swpp.stylemate.data.GuestImportRecord
@@ -12,9 +13,12 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.test.TestDispatcher
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import okhttp3.mockwebserver.Dispatcher
 import okhttp3.mockwebserver.MockResponse
@@ -22,16 +26,24 @@ import okhttp3.mockwebserver.RecordedRequest
 import org.junit.Assert.assertTrue
 import org.junit.rules.TestWatcher
 import org.junit.runner.Description
+import kotlin.time.Duration.Companion.seconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
 internal class ProfileDispatcherRule(val dispatcher: TestDispatcher = UnconfinedTestDispatcher()) : TestWatcher() {
     private val models = ViewModelStore()
+    private val scopes = mutableListOf<Job>()
     private var next = 0
-    fun <T : ViewModel> own(model: T): T = model.also { models.put("profile-${next++}", it) }
+    fun <T : ViewModel> own(model: T): T = model.also {
+        models.put("profile-${next++}", it)
+        scopes += it.viewModelScope.coroutineContext[Job]!!
+    }
     fun clear() { models.clear(); dispatcher.scheduler.runCurrent() }
     override fun starting(description: Description) { Dispatchers.setMain(dispatcher) }
     override fun finished(description: Description) {
-        try { clear() } finally { Dispatchers.resetMain() }
+        try {
+            clear()
+            runTest(dispatcher, timeout = 5.seconds) { scopes.joinAll() }
+        } finally { Dispatchers.resetMain() }
     }
 }
 

@@ -10,6 +10,7 @@ urlpatterns = [
     path("healthz/", views.health),
     path("api/body-profile/", include("apps.body_profiles.urls")),
     path("api/wardrobe/", include("apps.wardrobe.urls")),
+    path("api/fittings/", include("apps.fittings.urls")),
     path("api/outfits/", include("apps.outfits.urls")),
     path("api/weather/", weather_view),
 ]
