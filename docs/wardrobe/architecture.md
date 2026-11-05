@@ -100,6 +100,7 @@ swpp-2026-project-team-14/
 |   |   `-- wardrobe/
 |   |       |-- urls.py                          # 옷장 API 경로
 |   |       |-- views.py                         # 분석·저장·조회·의상/관련 코디 원자적 삭제·라벨
+|   |       |-- media.py                         # 삭제 커밋 후 전체 계정의 파일 참조 확인·미사용 사진 정리
 |   |       |-- analysis.py                      # 이미지 검증·OpenRouter 원본 분석·공통 비전 요청/응답·오류 정규화
 |   |       |-- worn.py                          # 고정 ONNX 의류 분할·OpenRouter Gemini 펼침 생성·오류 정규화
 |   |       |-- worn_views.py                    # 계정별 생성 상태·요청 멱등성·이미지 승인·비교 사진 접근
@@ -115,7 +116,7 @@ swpp-2026-project-team-14/
 |   |       |-- migrations/0002_garment_labels.py # 추천 라벨 컬럼 추가
 |   |       |-- migrations/0003_garment_user.py   # 옷 소유 사용자 외래 키 추가
 |   |       |-- migrations/0004_alter_garment_user.py # 무소유 옷 정리·소유자 필수 전환
-|   |       |-- test_delete.py                   # 의상/관련 코디 삭제·권한·롤백 검사
+|   |       |-- test_delete.py                   # 의상/코디 삭제·권한·커밋/롤백·공유 사진 보존·저장소 오류 검사
 |   |       |-- tests.py                         # AI 계약·DB 저장·재조회 검사
 |   |       |-- test_worn.py                     # 착용 사진 대상 분석·계정 초안 격리·NULL 치수·수동 라벨 저장 검사
 |   |       |-- test_generation.py               # 원본 분석 보존·생성 승인·거절·중복/실패/계정 격리 검사
