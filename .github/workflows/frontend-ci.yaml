@@ -52,7 +52,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: android-unit-coverage
-          path: frontend/app/build/reports/coverage/test/debug
+          path: |
+            frontend/app/build/reports/coverage/test/debug
+            frontend/app/build/reports/tests/testDebugUnitTest
+            frontend/app/build/test-results/testDebugUnitTest
 
       - name: Build debug APK
         run: ./gradlew --no-daemon assembleDebug
