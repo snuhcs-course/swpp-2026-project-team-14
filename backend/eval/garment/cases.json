@@ -1,0 +1,459 @@
+{
+ "version": 1,
+ "note": "팀이 AI로 생성한 옷 사진 45장(이전 HE 옷장). 정답은 각 사진을 생성할 때 지정한 옷 종류(파일 이름)이다.",
+ "cases": [
+  {
+   "id": "g01",
+   "file": "images/bottom_jeans_01.jpg",
+   "expect": {
+    "category": "bottom",
+    "subcategory": [
+     "jeans"
+    ]
+   }
+  },
+  {
+   "id": "g02",
+   "file": "images/bottom_jeans_02.jpg",
+   "expect": {
+    "category": "bottom",
+    "subcategory": [
+     "jeans"
+    ]
+   }
+  },
+  {
+   "id": "g03",
+   "file": "images/bottom_jeans_03.jpg",
+   "expect": {
+    "category": "bottom",
+    "subcategory": [
+     "jeans"
+    ]
+   }
+  },
+  {
+   "id": "g04",
+   "file": "images/bottom_jeans_04.jpg",
+   "expect": {
+    "category": "bottom",
+    "subcategory": [
+     "jeans"
+    ]
+   }
+  },
+  {
+   "id": "g05",
+   "file": "images/bottom_pants_01.jpg",
+   "expect": {
+    "category": "bottom",
+    "subcategory": [
+     "pants"
+    ]
+   }
+  },
+  {
+   "id": "g06",
+   "file": "images/bottom_pants_02.jpg",
+   "expect": {
+    "category": "bottom",
+    "subcategory": [
+     "pants"
+    ]
+   }
+  },
+  {
+   "id": "g07",
+   "file": "images/bottom_shorts_01.jpg",
+   "expect": {
+    "category": "bottom",
+    "subcategory": [
+     "shorts"
+    ]
+   }
+  },
+  {
+   "id": "g08",
+   "file": "images/bottom_shorts_02.jpg",
+   "expect": {
+    "category": "bottom",
+    "subcategory": [
+     "shorts"
+    ]
+   }
+  },
+  {
+   "id": "g09",
+   "file": "images/bottom_shorts_03.jpg",
+   "expect": {
+    "category": "bottom",
+    "subcategory": [
+     "shorts"
+    ]
+   }
+  },
+  {
+   "id": "g10",
+   "file": "images/bottom_skirt_01.jpg",
+   "expect": {
+    "category": "bottom",
+    "subcategory": [
+     "skirt"
+    ]
+   }
+  },
+  {
+   "id": "g11",
+   "file": "images/bottom_skirt_02.jpg",
+   "expect": {
+    "category": "bottom",
+    "subcategory": [
+     "skirt"
+    ]
+   }
+  },
+  {
+   "id": "g12",
+   "file": "images/bottom_skirt_03.jpg",
+   "expect": {
+    "category": "bottom",
+    "subcategory": [
+     "skirt"
+    ]
+   }
+  },
+  {
+   "id": "g13",
+   "file": "images/bottom_slacks_01.jpg",
+   "expect": {
+    "category": "bottom",
+    "subcategory": [
+     "slacks"
+    ]
+   }
+  },
+  {
+   "id": "g14",
+   "file": "images/bottom_slacks_02.jpg",
+   "expect": {
+    "category": "bottom",
+    "subcategory": [
+     "slacks"
+    ]
+   }
+  },
+  {
+   "id": "g15",
+   "file": "images/bottom_slacks_03.jpg",
+   "expect": {
+    "category": "bottom",
+    "subcategory": [
+     "slacks"
+    ]
+   }
+  },
+  {
+   "id": "g16",
+   "file": "images/outerwear_cardigan_01.jpg",
+   "expect": {
+    "category": "outerwear",
+    "subcategory": [
+     "cardigan"
+    ]
+   }
+  },
+  {
+   "id": "g17",
+   "file": "images/outerwear_coat_01.jpg",
+   "expect": {
+    "category": "outerwear",
+    "subcategory": [
+     "coat"
+    ]
+   }
+  },
+  {
+   "id": "g18",
+   "file": "images/outerwear_jacket_01.jpg",
+   "expect": {
+    "category": "outerwear",
+    "subcategory": [
+     "jacket"
+    ]
+   }
+  },
+  {
+   "id": "g19",
+   "file": "images/outerwear_jacket_02.jpg",
+   "expect": {
+    "category": "outerwear",
+    "subcategory": [
+     "jacket"
+    ]
+   }
+  },
+  {
+   "id": "g20",
+   "file": "images/outerwear_jacket_03.jpg",
+   "expect": {
+    "category": "outerwear",
+    "subcategory": [
+     "jacket"
+    ]
+   }
+  },
+  {
+   "id": "g21",
+   "file": "images/outerwear_jacket_04.jpg",
+   "expect": {
+    "category": "outerwear",
+    "subcategory": [
+     "jacket"
+    ]
+   }
+  },
+  {
+   "id": "g22",
+   "file": "images/outerwear_jacket_05.jpg",
+   "expect": {
+    "category": "outerwear",
+    "subcategory": [
+     "jacket"
+    ]
+   }
+  },
+  {
+   "id": "g23",
+   "file": "images/outerwear_jacket_06.jpg",
+   "expect": {
+    "category": "outerwear",
+    "subcategory": [
+     "jacket"
+    ]
+   }
+  },
+  {
+   "id": "g24",
+   "file": "images/outerwear_jacket_07.jpg",
+   "expect": {
+    "category": "outerwear",
+    "subcategory": [
+     "jacket"
+    ]
+   }
+  },
+  {
+   "id": "g25",
+   "file": "images/outerwear_jacket_08.jpg",
+   "expect": {
+    "category": "outerwear",
+    "subcategory": [
+     "jacket"
+    ]
+   }
+  },
+  {
+   "id": "g26",
+   "file": "images/outerwear_jacket_09.jpg",
+   "expect": {
+    "category": "outerwear",
+    "subcategory": [
+     "jacket"
+    ]
+   }
+  },
+  {
+   "id": "g27",
+   "file": "images/outerwear_jacket_10.jpg",
+   "expect": {
+    "category": "outerwear",
+    "subcategory": [
+     "jacket"
+    ]
+   }
+  },
+  {
+   "id": "g28",
+   "file": "images/outerwear_puffer_01.jpg",
+   "expect": {
+    "category": "outerwear",
+    "subcategory": [
+     "puffer"
+    ]
+   }
+  },
+  {
+   "id": "g29",
+   "file": "images/outerwear_puffer_02.jpg",
+   "expect": {
+    "category": "outerwear",
+    "subcategory": [
+     "puffer"
+    ]
+   }
+  },
+  {
+   "id": "g30",
+   "file": "images/outerwear_vest_01.jpg",
+   "expect": {
+    "category": "outerwear",
+    "subcategory": [
+     "vest"
+    ]
+   }
+  },
+  {
+   "id": "g31",
+   "file": "images/top_knitwear_01.jpg",
+   "expect": {
+    "category": "top",
+    "subcategory": [
+     "knitwear"
+    ]
+   }
+  },
+  {
+   "id": "g32",
+   "file": "images/top_knitwear_02.jpg",
+   "expect": {
+    "category": "top",
+    "subcategory": [
+     "knitwear"
+    ]
+   }
+  },
+  {
+   "id": "g33",
+   "file": "images/top_knitwear_03.jpg",
+   "expect": {
+    "category": "top",
+    "subcategory": [
+     "knitwear"
+    ]
+   }
+  },
+  {
+   "id": "g34",
+   "file": "images/top_knitwear_04.jpg",
+   "expect": {
+    "category": "top",
+    "subcategory": [
+     "knitwear"
+    ]
+   }
+  },
+  {
+   "id": "g35",
+   "file": "images/top_knitwear_05.jpg",
+   "expect": {
+    "category": "top",
+    "subcategory": [
+     "knitwear"
+    ]
+   }
+  },
+  {
+   "id": "g36",
+   "file": "images/top_shirt_01.jpg",
+   "expect": {
+    "category": "top",
+    "subcategory": [
+     "shirt",
+     "blouse"
+    ]
+   }
+  },
+  {
+   "id": "g37",
+   "file": "images/top_shirt_02.jpg",
+   "expect": {
+    "category": "top",
+    "subcategory": [
+     "shirt",
+     "blouse"
+    ]
+   }
+  },
+  {
+   "id": "g38",
+   "file": "images/top_shirt_03.jpg",
+   "expect": {
+    "category": "top",
+    "subcategory": [
+     "shirt",
+     "blouse"
+    ]
+   }
+  },
+  {
+   "id": "g39",
+   "file": "images/top_sweatshirt_01.jpg",
+   "expect": {
+    "category": "top",
+    "subcategory": [
+     "sweatshirt"
+    ]
+   }
+  },
+  {
+   "id": "g40",
+   "file": "images/top_sweatshirt_02.jpg",
+   "expect": {
+    "category": "top",
+    "subcategory": [
+     "sweatshirt"
+    ]
+   }
+  },
+  {
+   "id": "g41",
+   "file": "images/top_tshirt_01.jpg",
+   "expect": {
+    "category": "top",
+    "subcategory": [
+     "tshirt"
+    ]
+   }
+  },
+  {
+   "id": "g42",
+   "file": "images/top_tshirt_02.jpg",
+   "expect": {
+    "category": "top",
+    "subcategory": [
+     "tshirt"
+    ]
+   }
+  },
+  {
+   "id": "g43",
+   "file": "images/top_tshirt_03.jpg",
+   "expect": {
+    "category": "top",
+    "subcategory": [
+     "tshirt"
+    ]
+   }
+  },
+  {
+   "id": "g44",
+   "file": "images/top_tshirt_04.jpg",
+   "expect": {
+    "category": "top",
+    "subcategory": [
+     "tshirt"
+    ]
+   }
+  },
+  {
+   "id": "g45",
+   "file": "images/top_tshirt_05.jpg",
+   "expect": {
+    "category": "top",
+    "subcategory": [
+     "tshirt"
+    ]
+   }
+  }
+ ]
+}
