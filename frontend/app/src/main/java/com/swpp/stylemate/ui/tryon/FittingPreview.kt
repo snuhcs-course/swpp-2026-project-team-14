@@ -92,7 +92,7 @@ fun FittingDialog(
 }
 
 @Composable
-private fun PhotoFitting(outfit: Outfit, repository: FittingRepository, account: AccountAccess,
+internal fun PhotoFitting(outfit: Outfit, repository: FittingRepository, account: AccountAccess,
                          profile: BodyProfile?, onClose: () -> Unit, initialSource: String?) {
     val context = LocalContext.current.applicationContext
     val scope = rememberCoroutineScope()
@@ -109,6 +109,7 @@ private fun PhotoFitting(outfit: Outfit, repository: FittingRepository, account:
     var pending by remember { mutableStateOf(false) }
     var notificationSettings by remember { mutableStateOf(FittingNotificationSettings()) }
     var changingNotification by remember { mutableStateOf(false) }
+    var requestingNotificationPermission by remember { mutableStateOf(false) }
     val notificationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         scope.launch {
             try {
@@ -117,11 +118,14 @@ private fun PhotoFitting(outfit: Outfit, repository: FittingRepository, account:
                 notificationSettings = selected
             } catch (error: CancellationException) { throw error }
             catch (_: Exception) { failure = "알림 설정을 저장하지 못했어요. 다시 시도해 주세요." }
+            finally { requestingNotificationPermission = false }
         }
     }
     fun requestNotificationPermission() {
         if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(context,
                 Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            if (requestingNotificationPermission) return
+            requestingNotificationPermission = true
             notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
         } else {
             if (!FittingNotifications.allowed(context)) Toast.makeText(context,
@@ -193,7 +197,7 @@ private fun PhotoFitting(outfit: Outfit, repository: FittingRepository, account:
         }
     }
     fun openSource(source: String, onMissing: () -> Unit) {
-        if (busy || restoring || changingNotification) return
+        if (busy || restoring || changingNotification || requestingNotificationPermission) return
         restoring = true
         failure = null
         scope.launch(Dispatchers.Main.immediate) {
@@ -222,6 +226,10 @@ private fun PhotoFitting(outfit: Outfit, repository: FittingRepository, account:
         restoring = true
         try {
             notificationSettings = repository.notificationSettings()
+            if (notificationSettings.enabled && Build.VERSION.SDK_INT >= 33 &&
+                ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                requestNotificationPermission()
+            }
             do {
                 val task = work.state(repository.taskKey(outfit))
                 pending = task?.optString("state") in listOf("queued", "running")
@@ -246,7 +254,7 @@ private fun PhotoFitting(outfit: Outfit, repository: FittingRepository, account:
                 fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
             FittingNotificationToggle(notificationSettings.enabled && FittingNotifications.allowed(context),
                 onCheckedChange = ::saveNotificationChoice,
-                enabled = !restoring && !changingNotification, modifier = Modifier.width(64.dp))
+                enabled = !restoring && !changingNotification && !requestingNotificationPermission, modifier = Modifier.width(64.dp))
         }
         when {
             restoring -> Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {

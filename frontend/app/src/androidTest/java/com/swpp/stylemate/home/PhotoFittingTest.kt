@@ -4,6 +4,10 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.app.NotificationManager
+import android.Manifest
+import android.content.Context
+import android.content.ContextWrapper
+import android.content.pm.PackageManager
 import android.provider.MediaStore
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Button
@@ -12,6 +16,15 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.key
+import androidx.compose.ui.platform.LocalContext
+import androidx.activity.compose.LocalActivityResultRegistryOwner
+import androidx.activity.result.ActivityResultRegistry
+import androidx.activity.result.ActivityResultRegistryOwner
+import androidx.activity.result.contract.ActivityResultContract
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.app.ActivityOptionsCompat
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.test.assertIsDisplayed
@@ -40,6 +53,7 @@ import com.swpp.stylemate.ui.home.CodiBookScreen
 import com.swpp.stylemate.ui.home.CodiBookState
 import com.swpp.stylemate.ui.theme.StyleMateTheme
 import com.swpp.stylemate.ui.tryon.PhotoFittingContent
+import com.swpp.stylemate.ui.tryon.PhotoFitting
 import com.swpp.stylemate.ui.tryon.FittingDialog
 import com.swpp.stylemate.ui.tryon.FittingNotificationToggle
 import com.swpp.stylemate.ui.tryon.saveFittingImage
@@ -55,6 +69,8 @@ import org.junit.Test
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 
 class PhotoFittingTest {
     private val account = checkNotNull(authenticatedRepository().account())
@@ -65,7 +81,7 @@ class PhotoFittingTest {
         compose.setContent { StyleMateTheme {
             PhotoFittingContent(false, null, null, { selections++ }, {}, {}, {}, modifier = Modifier.fillMaxSize())
         } }
-        compose.onNodeWithText("서버의 원본 사진은 처리 후 바로 삭제됩니다.", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("사진을 선택하면 피팅을 위해 OpenRouter·Google로 전송하는 데 동의합니다.", substring = true).assertIsDisplayed()
         compose.onNodeWithText("생성한 결과가 있으면 바로 보여드려요.").assertDoesNotExist()
         assertEquals(0, selections)
         compose.onNodeWithText("내 갤러리에서\n사진 고르기").performClick()
@@ -106,23 +122,23 @@ class PhotoFittingTest {
             compose.onNodeWithText("첫 코디 피팅").performClick()
             compose.onNodeWithText("내 갤러리에서\n사진 고르기").assertIsDisplayed()
             val bell = compose.onNodeWithContentDescription("피팅 완료 알림")
-            bell.assertIsOff().performClick()
-            compose.waitUntil(5_000) {
-                runBlocking { FittingRepository(LocalUserStore.inDirectory(directory, ACCOUNT_ID), account).notificationSettings().enabled }
-            }
-            bell.assertIsOn()
-            compose.onNodeWithText("닫기").performClick()
-            compose.onNodeWithText("다른 코디 피팅").performClick()
-            compose.onNodeWithText("내 갤러리에서\n사진 고르기").assertIsDisplayed()
             bell.assertIsOn().performClick()
             compose.waitUntil(5_000) {
                 !runBlocking { FittingRepository(LocalUserStore.inDirectory(directory, ACCOUNT_ID), account).notificationSettings().enabled }
             }
             bell.assertIsOff()
             compose.onNodeWithText("닫기").performClick()
+            compose.onNodeWithText("다른 코디 피팅").performClick()
+            compose.onNodeWithText("내 갤러리에서\n사진 고르기").assertIsDisplayed()
+            bell.assertIsOff().performClick()
+            compose.waitUntil(5_000) {
+                runBlocking { FittingRepository(LocalUserStore.inDirectory(directory, ACCOUNT_ID), account).notificationSettings().enabled }
+            }
+            bell.assertIsOn()
+            compose.onNodeWithText("닫기").performClick()
             compose.onNodeWithText("첫 코디 피팅").performClick()
             compose.onNodeWithText("내 갤러리에서\n사진 고르기").assertIsDisplayed()
-            bell.assertIsOff()
+            bell.assertIsOn()
             compose.onNodeWithText("피팅 생성 완료 시 알림을 받을까요?").assertDoesNotExist()
             compose.onNodeWithText("다음부터 이 팝업창을 보이지 않습니다").assertDoesNotExist()
         } finally { directory.deleteRecursively() }
@@ -144,6 +160,113 @@ class PhotoFittingTest {
             store.put(FittingNotificationSettings.storageKey(owner), FittingNotificationSettings(false).json())
             FittingNotifications.finished(context, key, owner)
             android.os.SystemClock.sleep(200)
+            assertFalse(manager.activeNotifications.any { it.id == key.hashCode() })
+        } finally {
+            manager.cancel(key.hashCode())
+            File(context.filesDir, "local-users/$owner").deleteRecursively()
+        }
+    }
+
+    @Test fun completionNotificationIsEnabledWhenNoChoiceHasBeenSaved() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        assumeTrue(FittingNotifications.allowed(context))
+        val owner = UUID.randomUUID().toString()
+        val key = UUID.randomUUID().toString().replace("-", "").repeat(2)
+        val manager = context.getSystemService(NotificationManager::class.java)
+        try {
+            FittingNotifications.finished(context, key, owner)
+            compose.waitUntil(5_000) { manager.activeNotifications.any { it.id == key.hashCode() } }
+        } finally {
+            manager.cancel(key.hashCode())
+            File(context.filesDir, "local-users/$owner").deleteRecursively()
+        }
+    }
+
+    @Test @SdkSuppress(minSdkVersion = 33)
+    fun firstFittingRequestsPermissionAndKeepsNotificationsOnAfterGrant() = permissionChoiceSurvivesReopening(true)
+
+    @Test @SdkSuppress(minSdkVersion = 33)
+    fun deniedPermissionIsSavedAsOffWithoutAnotherPromptForOtherOutfits() = permissionChoiceSurvivesReopening(false)
+
+    private fun permissionChoiceSurvivesReopening(grant: Boolean) {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        assumeTrue(FittingNotifications.allowed(context))
+        val directory = File(context.cacheDir, "fitting-permission-${UUID.randomUUID()}")
+        val store = LocalUserStore.inDirectory(directory, ACCOUNT_ID)
+        val repository = FittingRepository(store, account)
+        val granted = AtomicBoolean(false)
+        val requests = AtomicInteger()
+        val registry = object : ActivityResultRegistry() {
+            override fun <I, O> onLaunch(requestCode: Int, contract: ActivityResultContract<I, O>, input: I,
+                                         options: ActivityOptionsCompat?) {
+                check(contract is ActivityResultContracts.RequestPermission)
+                assertEquals(Manifest.permission.POST_NOTIFICATIONS, input)
+                requests.incrementAndGet()
+                granted.set(grant)
+                dispatchResult(requestCode, grant)
+            }
+        }
+        val owner = object : ActivityResultRegistryOwner { override val activityResultRegistry = registry }
+        val first = Outfit("permission-first", "first", null, emptyList(), emptyList(), true, "", null, "")
+        try {
+            compose.setContent { StyleMateTheme {
+                var selected by remember { mutableStateOf<Outfit?>(null) }
+                val base = LocalContext.current
+                val permissionContext = remember(base) {
+                    object : ContextWrapper(base) {
+                        override fun getApplicationContext(): Context = this
+                        override fun checkPermission(permission: String, pid: Int, uid: Int): Int =
+                            if (permission == Manifest.permission.POST_NOTIFICATIONS && !granted.get()) PackageManager.PERMISSION_DENIED
+                            else super.checkPermission(permission, pid, uid)
+                        override fun checkSelfPermission(permission: String): Int =
+                            if (permission == Manifest.permission.POST_NOTIFICATIONS && !granted.get()) PackageManager.PERMISSION_DENIED
+                            else super.checkSelfPermission(permission)
+                    }
+                }
+                androidx.compose.foundation.layout.Column {
+                    Button(onClick = { selected = first }) { Text("첫 피팅 권한 확인") }
+                    Button(onClick = { selected = first.copy(id = "permission-second") }) { Text("다른 피팅 권한 확인") }
+                }
+                CompositionLocalProvider(LocalContext provides permissionContext, LocalActivityResultRegistryOwner provides owner) {
+                    selected?.let { outfit -> key(outfit.id) {
+                        PhotoFitting(outfit, repository, account, profile = null,
+                            onClose = { selected = null }, initialSource = null)
+                    } }
+                }
+            } }
+            compose.onNodeWithText("첫 피팅 권한 확인").performClick()
+            compose.waitUntil(5_000) {
+                requests.get() == 1 && store.get(FittingNotificationSettings.storageKey(ACCOUNT_ID))?.optBoolean("enabled") == grant
+            }
+            val bell = compose.onNodeWithContentDescription("피팅 완료 알림")
+            if (grant) bell.assertIsOn() else bell.assertIsOff()
+            compose.onNodeWithText("닫기").performClick()
+            compose.onNodeWithText("다른 피팅 권한 확인").performClick()
+            compose.onNodeWithText("내 갤러리에서\n사진 고르기").assertIsDisplayed()
+            if (grant) bell.assertIsOn() else bell.assertIsOff()
+            assertEquals(1, requests.get())
+        } finally { directory.deleteRecursively() }
+    }
+
+    @Test @SdkSuppress(minSdkVersion = 33)
+    fun deniedNotificationPermissionPreventsPostingEvenWhenTheBellPreferenceIsOn() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val denied = object : ContextWrapper(context) {
+            override fun checkPermission(permission: String, pid: Int, uid: Int): Int =
+                if (permission == Manifest.permission.POST_NOTIFICATIONS) PackageManager.PERMISSION_DENIED
+                else super.checkPermission(permission, pid, uid)
+            override fun checkSelfPermission(permission: String): Int =
+                if (permission == Manifest.permission.POST_NOTIFICATIONS) PackageManager.PERMISSION_DENIED
+                else super.checkSelfPermission(permission)
+        }
+        val owner = UUID.randomUUID().toString()
+        val key = UUID.randomUUID().toString().replace("-", "").repeat(2)
+        val manager = context.getSystemService(NotificationManager::class.java)
+        try {
+            LocalUserStore.forContext(context, owner).put(FittingNotificationSettings.storageKey(owner),
+                FittingNotificationSettings(true).json())
+            assertFalse(FittingNotifications.allowed(denied))
+            FittingNotifications.finished(denied, key, owner)
             assertFalse(manager.activeNotifications.any { it.id == key.hashCode() })
         } finally {
             manager.cancel(key.hashCode())
@@ -178,6 +301,25 @@ class PhotoFittingTest {
         compose.runOnIdle { assertEquals(1, closed) }
     }
 
+    @Test fun pendingWorkWithNotificationsOffExplainsWhereToFindTheResult() {
+        compose.setContent { StyleMateTheme {
+            PhotoFittingContent(false, null, null, {}, {}, {}, {}, pending = true,
+                notificationsEnabled = false, modifier = Modifier.fillMaxSize())
+        } }
+        compose.onNodeWithText("완료 후 코디에서 결과를 확인해 주세요.").assertIsDisplayed()
+        compose.onNodeWithText("완료되면 알림을 보내드립니다.").assertDoesNotExist()
+    }
+
+    @Test fun failureNotificationHasAnActionableMessageWithoutAnOngoingFlag() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val notification = FittingNotifications.notification(context, "synthetic-failure", false, failed = true)
+        assertEquals("가상 피팅을 생성하지 못했어요", notification.extras.getString(android.app.Notification.EXTRA_TITLE))
+        assertEquals("코디에서 다시 시도해 주세요.", notification.extras.getString(android.app.Notification.EXTRA_TEXT))
+        assertTrue(notification.flags and android.app.Notification.FLAG_AUTO_CANCEL != 0)
+        assertFalse(notification.flags and android.app.Notification.FLAG_ONGOING_EVENT != 0)
+        assertTrue(notification.contentIntent != null)
+    }
+
     @Test fun completionShowsTheImageWithoutAnotherGenerateButton() {
         val image = Bitmap.createBitmap(32, 48, Bitmap.Config.ARGB_8888)
         var saves = 0
@@ -208,6 +350,15 @@ class PhotoFittingTest {
         } }
         compose.onNodeWithText("저장").assertIsNotEnabled()
         compose.onNodeWithText("확인").assertIsDisplayed()
+    }
+
+    @Test fun savingTheImageDisablesBothFooterActions() {
+        val image = Bitmap.createBitmap(32, 48, Bitmap.Config.ARGB_8888)
+        compose.setContent { StyleMateTheme {
+            PhotoFittingContent(false, image, null, {}, {}, {}, {}, saving = true, modifier = Modifier.fillMaxSize())
+        } }
+        compose.onNodeWithText("저장 중…").assertIsNotEnabled()
+        compose.onNodeWithText("확인").assertIsNotEnabled()
     }
 
     @Test @SdkSuppress(minSdkVersion = 29)

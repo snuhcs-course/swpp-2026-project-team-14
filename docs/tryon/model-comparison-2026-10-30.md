@@ -1,104 +1,94 @@
-# 가상 피팅 모델 비교와 품질 우선 전환
+# Virtual Try-On Model Comparison and the Shift Toward Quality
 
-최종 정리: 2026년 11월 5일.
+Last updated: 2026-11-05.
 
-**학교 GPU와 무료 API에서 속도·품질의 균형을 찾던 방향에서, 대기시간 제약을 완화하고 품질을 우선하는 방향으로 전환했다.** FASHN을 50스텝으로 높여도 남는 아우터 합성 문제는 유료 이미지 편집 API를 도입한 테스트에서 개선했다. Nano Banana 2.1과 GPT Image 2.6 Sunburst는 검증한 사례에서 기존 코트 제거·새 아우터 교체를 모두 처리했다.
+**The project moved from balancing speed and quality on the school GPU and free APIs to prioritizing quality with a relaxed latency target.** Increasing FASHN to 50 steps did not resolve its outerwear compositing issues. Paid image-editing APIs improved the tested cases: Nano Banana 2.1 and GPT Image 2.6 Sunburst both removed existing coats and applied replacement outerwear.
 
-**develop 기반 피팅 작업본은 Nano Banana 2.1(OpenRouter, 2K)로 전환했다.** FASHN GPU 엔진·별도 워커·프록시·마스크 합성을 제거하고 Django가 직접 호출한다. 아래 FASHN 수치는 교체 전 기록이며, Nano Banana의 앱 연동 API 검증은 별도 항목에 정리했다.
+**The develop-based fitting implementation now uses Nano Banana 2.1 through OpenRouter at 2K.** Django calls the API directly; the FASHN GPU engine, separate worker, proxy and mask compositing have been removed. FASHN measurements below describe the previous implementation. Nano Banana integration measurements are reported separately below.
 
-## 검토 방향의 변화
+## Model Comparison
 
-1. **학교 GPU·무료 API로 대기시간과 품질을 함께 조절했다.** 제공받은 학교 A100 GPU에서 FASHN·CatVTON 등 자체 추론 모델을 비교하고, 저해상도·저스텝·배치 처리와 Cloudflare 무료 API를 시험했다. 빠른 모델에서는 얼굴·체형·무늬가 바뀌거나 의류 적용이 누락됐고, 학교 GPU는 할당 대기로 즉시 사용이 어려운 경우도 있었다.
-2. **짧은 대기시간보다 품질을 우선했다.** 10초 이내 목표를 필수 제약에서 제외하고 FASHN을 BF16, 576 × 864, 의류별 50스텝으로 높였다. 앱은 생성 중 다른 기능을 사용하고 완료 알림으로 결과를 확인하는 비동기 흐름으로 바꿨다. 그러나 스텝 증가만으로 아우터의 팔·어깨·앞섶이 잘리는 마스크 합성 오류는 해결되지 않았다.
-3. **아우터 문제를 해결하기 위해 유료 모델을 도입해 검증했다.** OpenRouter를 통해 인물·상의·하의·아우터 사진을 한 요청에 전달했다. Nano Banana와 GPT는 재킷·가디건 착장뿐 아니라 코트를 입고 앉아 있는 인물의 기존 코트 제거·새 가디건 교체도 성공했다. 이 사례들에서는 FASHN의 잘린 아우터 경계가 개선됐다. 다만 얼굴·무늬의 일부 재생성과 제공사 필터 차단은 남아 있어, 모든 입력에서 해결됐다는 의미는 아니다.
+Times are observations from **direct API calls made by scripts until the final image was received**, excluding app interaction, WorkManager scheduling and notification delays. Models were already loaded; FASHN GPU allocation, installation and initial loading are excluded. API times include transmission, provider processing and result download.
 
-## 직접 실행시간·품질 비교
+Candidates from the earlier comparison are included in this table. Earlier measurements used different settings, inputs and hardware; they are historical results, not new measurements under a common benchmark. The two FASHN rows retain their separate settings. These values do not establish a speed ranking under identical conditions.
 
-시간은 **앱 버튼·WorkManager·알림 대기시간을 제외하고, 스크립트에서 직접 API를 호출해 최종 이미지를 받기까지**의 관측값이다. 모델 적재가 끝난 상태를 기준으로 하며, FASHN의 GPU 할당·설치·초기 적재는 제외했다. API 시간에는 전송·제공사 처리·결과 수신이 포함된다. 입력 사례·해상도가 달라 같은 조건의 속도 순위를 뜻하지 않는다.
-
-| 모델 | 실행시간 | 피크 VRAM (GiB) | 퀄리티 부족점 | 10개 동시 요청 | 아우터 기능 |
+| Model | Generation time | Peak VRAM (GiB) | Quality limitations | 10 simultaneous requests | Outerwear support |
 | --- | --- | --- | --- | --- | --- |
-| **[FASHN VTON 1.5](https://huggingface.co/fashn-ai/fashn-vton-1.5)** | 상하의 **23.3초**, 아우터 포함 **34.7~35.9초** | 10.39 | 팔·어깨·앞섶의 잘림, 합성 경계 오류 | 서버 처리 **217.9초** | 의류별 순차 추론·마스크 합성, 오류 잔존 |
-| [Cloudflare FLUX.2 Klein 4B](https://developers.cloudflare.com/workers-ai/models/flux-2-klein-4b/) | 상하의 **4.3초**, 아우터 포함 **9.6초** | API 미제공 | 그래픽 글자 변형, 인물·체형 일부 변화 | 미측정 | 2회 편집으로 성공, 1회 생성 시도 2건은 필터 차단 |
-| **[Nano Banana 2.1](https://openrouter.ai/google/gemini-nano-banana-2.1)** | 상하의 **46.4초**, 아우터 포함 **23.3~37.8초** | API 미제공 | 얼굴·핏·청바지 무늬 등 일부 재해석 | **105.3초** · Django에서 2개씩 호출 | 기존 코트 제거·교체 포함 **4/4건 성공** |
-| **[GPT Image 2.6 Sunburst](https://openrouter.ai/openai/gpt-image-2.6-sunburst)** | 상하의 **42.1초**, 아우터 포함 **37.2~41.3초** | API 미제공 | 얼굴·구도·의류 세부가 원본과 완전히 같지는 않음 | 미측정 | 기존 코트 제거·교체 포함 **4/4건 성공** |
-| [Seedream 5.0 Pro](https://openrouter.ai/bytedance-seed/seedream-5-0-pro) | 상하의 **39.9초**, 아우터 포함 **43.8~45.1초** | API 미제공 | 세부 무늬 변형, 일부 입력의 생성 차단 | 미측정 | **3/4건 성공**, 코트→가디건 교체 1건은 필터 차단 |
+| **[Nano Banana 2.1](https://openrouter.ai/google/gemini-nano-banana-2.1)** | Top + bottom **46.4 s**; with outerwear **23.3–37.8 s** | Not disclosed by API | Some reinterpretation of faces, fit and denim patterns | **105.3 s**; Django sends 2 requests at a time | **4/4 cases succeeded**, including existing-coat removal and replacement |
+| **[GPT Image 2.6 Sunburst](https://openrouter.ai/openai/gpt-image-2.6-sunburst)** | Top + bottom **42.1 s**; with outerwear **37.2–41.3 s** | Not disclosed by API | Faces, framing and garment details are not perfectly preserved | Not measured | **4/4 cases succeeded**, including existing-coat removal and replacement |
+| [Seedream 5.0 Pro](https://openrouter.ai/bytedance-seed/seedream-5-0-pro) | Top + bottom **39.9 s**; with outerwear **43.8–45.1 s** | Not disclosed by API | Fine-pattern changes; some inputs blocked by provider filters | Not measured | **3/4 cases succeeded**; 1 coat-to-cardigan replacement was blocked |
+| **[FASHN VTON 1.5](https://huggingface.co/fashn-ai/fashn-vton-1.5)** | Top + bottom **23.3 s**; with outerwear **34.7–35.9 s** | 10.39 | Clipped sleeves, shoulders and front panels; compositing boundary errors | Server processing **217.9 s** | Sequential garment inference and mask compositing; errors remain |
+| FASHN VTON 1.5, earlier 30-step run | Top + bottom 16.4 s; with outerwear 21.4 s | 7.32 | Occlusion artifacts and compositing boundary errors | Not measured | Supported through additional compositing |
+| [Cloudflare FLUX.2 Klein 4B](https://developers.cloudflare.com/workers-ai/models/flux-2-klein-4b/) | Top + bottom **4.3 s**; with outerwear **9.6 s** | Not disclosed by API | Distorted graphic lettering; some changes to identity and body proportions | Not measured | 2 edits succeeded; 2 attempts using 1 edit were blocked by provider filters |
+| [CatVTON](https://github.com/Zheng-Chong/CatVTON) | Top + bottom 5.3 s; with outerwear not measured | 11.67 | Denim noise and loss of skin texture | Not measured | Layering not verified |
+| [Qwen-Image 2.1 Turbo](https://huggingface.co/Qwen/Qwen-Image-2.1-Turbo) | Top + bottom 3.5 s; with outerwear 3.8 s | 41.24 | Changes to fit, small patterns and logos | 28.3 s | Supported |
+| [FLUX.2 Klein 4B](https://huggingface.co/black-forest-labs/FLUX.2-klein-4B) | Top + bottom 1.4 s; with outerwear 1.4 s | 7.52 | Limited fidelity to actual product patterns and logos | 11.2 s | Attribute JSON provides the clothing description |
+| [FastFit](https://github.com/Zheng-Chong/FastFit) | Top + bottom 2.8 s; with outerwear 5.3 s | 6.53 | Distorted hands and shoes; mixed inner and outer layers; lost details | Not measured | Experimental and unstable |
+| [DreamLite-mobile](https://github.com/ByteVisionLab/DreamLite) | Top + bottom 0.78 s; with outerwear 0.78 s | 7.03 | Changes to faces, poses and shoes | 7.9 s | Unstable |
+| [Mobile-VTON](https://github.com/tmllab/2026_CVPR_Mobile-VTON) | Top + bottom 5.4 s; with outerwear 8.0 s | 6.61 | Incorrect bottom application and missing inner layers | 54.3 s | Unstable |
+| [VIBE-DistilledCFG](https://github.com/ai-forever/VIBE) | Top + bottom 0.89 s; with outerwear 0.88 s | 10.24 | Changes to faces, hats, shoes and inner-layer colors | 8.9 s | Unstable |
+| [Google Vertex AI Virtual Try-On](https://docs.cloud.google.com/vertex-ai/generative-ai/docs/image/generate-virtual-try-on-images) | Not measured | — | Not evaluated | Not measured | Deferred because paid usage was excluded at that stage |
 
-- **FASHN 시간 검증:** Python 직접 호출 기록의 상하의 `23.26초`, 재킷 `35.86초`, 가디건 `34.70초`를 사용했다. GPU 서버의 추론 구간은 각각 `22.42초`, `34.62초`, `33.85초`다. 후자는 전처리·의류별 추론·아우터 합성을 포함하는 서버 처리 구간으로, API 전체 응답시간과 구분한다. 앱에서 측정했던 약 24초는 이 표에 사용하지 않았다.
-- **FASHN 자원·10건 처리:** A100 40GB, BF16, 576 × 864, 50스텝이다. VRAM은 10건 시험을 포함한 CUDA 예약 메모리 최대값이며 실제 할당 최대값은 `5.63 GiB`다. 10건은 `2→4→4` 배치로 처리했고 서버 로그의 첫 배치 시작부터 마지막 완료까지 `217.94초`였다. 요청은 Android 클라이언트 10개로 발생시켰지만 표의 시간은 서버 로그만 사용했다. 아우터 포함 10건은 미측정이다.
-- **무료 API:** Cloudflare 무료 플랜의 아우터 `9.609초`는 상하의 생성 `4.263초`와 아우터 추가 `5.346초`를 합한 값이다. 연속된 앱 작업을 한 타이머로 측정한 값은 아니다. 입력 사진은 축소 전처리됐고 출력은 576 × 864, 4스텝이다.
-- **유료 API:** Nano Banana는 2K 요청·1696 × 2528 출력, GPT는 high·1024 × 1536, Seedream은 2K·1366 × 2048이다. 상하의 시간은 **기존 코트를 제거하는 앉은 인물 조건**의 각 1회 값이며, 아우터 범위는 서 있는 인물 2건과 앉은 인물 1건의 성공값이다. 아우터가 더 빠르게 나온 값을 일반적인 속도 관계로 해석하지 않는다. Seedream 차단 응답 `40.8초`는 생성시간에서 제외했다.
-- 외부 API는 학교 GPU를 사용하지 않으며 제공사의 GPU·VRAM은 이번 응답에서 확인하지 못했다. 로컬 GPU를 쓰지 않는다는 이유로 모델 VRAM을 0으로 기재하지 않는다.
+### Measurement Conditions
 
-### 기존 아우터가 있는 인물 사진의 추가 검증
+- **FASHN timing verification:** Direct Python API calls took `23.26 s` for top + bottom, `35.86 s` with a jacket and `34.70 s` with a cardigan. The corresponding GPU-server generation intervals were `22.42 s`, `34.62 s` and `33.85 s`. These intervals include preprocessing, per-garment inference and outerwear compositing, and are distinct from total API response time. The approximately 24-second app measurement was not used in the table.
+- **FASHN resources and concurrent requests:** The later run used an A100 40GB GPU, BF16, 576 × 864 output and 50 steps per garment. Peak VRAM is the maximum CUDA reserved memory, including the 10-request test; peak allocated memory was `5.63 GiB`. The 10 requests ran in batches of `2→4→4`. Server logs show `217.94 s` from the first batch starting to the last batch finishing. Requests originated from 10 Android clients, but the table uses server timings only. Ten concurrent requests with outerwear were not measured.
+- **Free API:** Cloudflare's free-plan outerwear time of `9.609 s` is the sum of `4.263 s` for top + bottom and `5.346 s` for adding outerwear. It was not measured as one continuous app operation. Inputs were downscaled; output was 576 × 864 with 4 steps.
+- **Paid APIs:** Nano Banana used a 2K request and produced 1696 × 2528 images; GPT used high quality at 1024 × 1536; Seedream used 2K and produced 1366 × 2048 images. Each top + bottom value is a single run with **a seated person whose existing coat had to be removed**. Outerwear ranges cover successful runs with two standing-person cases and one seated-person case. Faster observed outerwear runs do not establish that adding outerwear is generally faster. Seedream's blocked response at `40.8 s` is excluded from generation times.
+- **Earlier candidates:** DreamLite, Mobile-VTON and VIBE were called directly on an A100 40GB GPU; the other earlier candidates used the A100 80GB API environment available at the time. FLUX, DreamLite and VIBE used clothing attributes instead of garment photos. Ten-request values indicate the last completion time, with different input configurations. Historical VRAM values are maxima across loading, inference and concurrent requests, not minimum hardware requirements.
+- External APIs do not use the school GPU. The responses did not disclose provider GPU or VRAM usage, so these values are not reported as zero.
 
-같은 코트 착용·앉은 자세 사진과 네이비 그래픽 티셔츠·청바지를 사용했다. 아우터 조건에서는 회색 스누피 가디건을 추가했다. 두 조건 모두 원본 사진에서 시작하며 **결과 한 장당 API 1회 호출**이다.
+## How the Evaluation Direction Changed
 
-| 모델 | 기존 코트 제거 → 상하의만 | 기존 코트 → 새 가디건으로 교체 |
+1. **Balance latency and quality using the school GPU and free APIs.** Self-hosted models including FASHN and CatVTON were compared on the provided school A100 GPU. Lower resolutions, fewer steps, batching and Cloudflare's free API were explored. Faster models sometimes changed faces, body proportions or patterns, or failed to apply garments. School GPU allocation queues also prevented immediate access in some cases.
+2. **Prioritize quality over short waits.** The 10-second target was relaxed, and FASHN was increased to BF16, 576 × 864 and 50 steps per garment. The app moved to background generation with completion notifications so users could use other features while waiting. More steps alone did not fix mask-compositing errors that clipped outerwear sleeves, shoulders and front panels.
+3. **Evaluate paid models to address outerwear failures.** Person, top, bottom and outerwear photos were sent together through OpenRouter. Nano Banana and GPT handled jacket and cardigan outfits, removed an existing coat from a seated person and applied a replacement cardigan. The clipped outerwear boundaries seen with FASHN improved in these cases. Some face and pattern regeneration and provider-filter blocks remained; the tests do not establish success for every input.
+
+### Additional Tests with Existing Outerwear
+
+The tests used the same seated-person photo with an existing coat, together with reference photos of a navy graphic T-shirt and jeans. A gray Snoopy cardigan was added for the outerwear condition. Both conditions started from the original person photo, with **one API call per output image**.
+
+| Model | Remove existing coat; apply top + bottom | Replace existing coat with new cardigan |
 | --- | --- | --- |
-| Nano Banana 2.1 | 46.4초 · 성공 | 29.0초 · 성공 |
-| GPT Image 2.6 Sunburst | 42.1초 · 성공 | 39.5초 · 성공 |
-| Seedream 5.0 Pro | 39.9초 · 성공 | 40.8초 후 제공사 필터 차단 · 이미지 없음 |
+| Nano Banana 2.1 | 46.4 s; succeeded | 29.0 s; succeeded |
+| GPT Image 2.6 Sunburst | 42.1 s; succeeded | 39.5 s; succeeded |
+| Seedream 5.0 Pro | 39.9 s; succeeded | Blocked by provider filter after 40.8 s; no image |
 
-초기 유료 모델 비교 실험 12건 중 11건에서 이미지가 반환됐고, 보고된 요청별 비용 합계는 **$0.8253**이다. 제한된 입력의 탐색 결과이며 일반적인 성공률이나 10명 동시 사용 성능을 입증한 값은 아니다.
+The initial paid-model comparison returned images for 11 of 12 attempts, with a total reported cost of **$0.8253**. These were exploratory tests on limited inputs, not evidence of a general success rate or performance with 10 simultaneous users.
 
-## 모델 선택과 앱 연동 상태
+## Model Selection and App Integration
 
-- **품질 우선 후속 후보:** Nano Banana 2.1과 GPT Image 2.6 Sunburst. 이번 사례에서는 둘 다 아우터 문제를 개선했고, GPT는 세부 표현, Nano Banana는 일부 조건의 응답시간에서 유리해 보였다. 정량 품질 점수나 보편적인 우열은 확정하지 않았다.
-- **현재 구현·빌드:** 오늘의 코디·코디북에서 Nano Banana 2.1을 비동기로 호출한다. GPU·별도 피팅 서버 없이 기존 Django CPU 서버에서 처리하며, 인물과 모든 의류 사진을 한 요청에 넣는다. 계정별 결과 저장·완료 알림·결과 팝업은 유지한다. 폰 재설치는 별도다.
-- **유료 API 경로:** 인물·상의·하의·아우터 사진을 함께 넣어 한 번에 생성한다. 상하의 결과에 아우터를 다시 씌우는 2회 호출 방식은 이번 유료 테스트에 사용하지 않았다. Cloudflare의 성공 사례는 2회 호출 방식이다.
+- **Quality-focused candidates:** Nano Banana 2.1 and GPT Image 2.6 Sunburst. Both improved outerwear in the tested cases. GPT appeared stronger in some fine details, while Nano Banana was faster in some conditions. No quantitative quality score or universal ranking was established.
+- **Current implementation and build:** Today's Outfit and the Codi Book call Nano Banana 2.1 asynchronously. The existing Django CPU backend sends the person and all garment photos in one request, without a GPU or separate fitting server. Per-account result storage, completion notifications and the result dialog are retained. APK installation is a separate step.
+- **Paid API pipeline:** Person, top, bottom and outerwear photos are supplied together for one generation. These paid-model tests did not first generate top + bottom and then add outerwear in a second call. The successful Cloudflare example used two calls.
 
-## Nano Banana 앱 연동 API 검증
+## Nano Banana App API Validation
 
-새 DB·새 계정으로 Django API를 실행했으며 이전 DB·결과를 이관하지 않았다. 인물·상의·하의 원본과 선택적 가디건을 사용하고, GPU 서버는 사용하지 않았다.
+The Django API was run with a new database and new accounts; previous databases and results were not migrated. Original person, top and bottom photos were supplied, with an optional cardigan. No GPU server was used.
 
-| 조건 | 직접 API 호출 → 결과 수신 | 서버 생성 구간 |
+| Condition | Direct API call to result receipt | Server generation interval |
 | --- | --- | --- |
-| 상하의 1건 | 24.3초 | 24.0초 |
-| 아우터 포함 1건 | 22.3초 | 21.9초 |
-| 상하의 10건 동시 접수 | 첫 결과 19.8초 · 전체 105.3초 | 외부 API 2개씩 처리 |
+| One top + bottom request | 24.3 s | 24.0 s |
+| One request with outerwear | 22.3 s | 21.9 s |
+| 10 simultaneous top + bottom submissions | First result 19.8 s; all results 105.3 s | 2 external API calls at a time |
 
-12건 모두 1696 × 2528 JPEG를 반환했다. 10건은 백엔드 큐에 동시에 접수한 시험이며 10대 폰 시험은 아니다. 계정 간 결과 조회·삭제 차단, 처리 후 StyleMate 서버 입력 삭제, 결과 수신 후 서버 작업 삭제를 검증했다. 자동 생성 재시도·GPU 대체 경로·DB 호환 코드는 없다. 이번 통합 검증 비용은 $0.7007이며 초기 비교까지 누적 $1.5260으로 $3 한도 내다.
+All 12 requests returned 1696 × 2528 JPEG images. The concurrent test submitted 10 jobs to the backend queue, not from 10 phones. Checks covered cross-account access and deletion denial, input deletion from the StyleMate server after processing, and server-job deletion after result receipt. There are no automatic generation retries, GPU fallback or database compatibility layers. This integration test cost $0.7007; the cumulative cost including the initial comparison was $1.5260, within the $3 budget.
 
-## 이전 후보 검토 기록
+Other researched candidates were DeCo-VTON, Leffa, LongCat Edit Turbo, FireRed Image Edit, FLUX 3 Klein, SD-Turbo, SDXS, SDXL-Turbo and DreamShaper LCM. No corresponding execution measurements were available, so no values were added to the comparison table.
 
-<details>
-<summary>속도·메모리 최적화 단계에서 비교했던 모델</summary>
+## 3D Approaches and Feature Scope
 
-아래는 이전 설정의 관측값이다. 현재 50스텝 FASHN 및 유료 API와 설정·입력·하드웨어가 다르며 재측정한 값으로 해석하지 않는다.
+Hunyuan3D and TripoSR were excluded from the current scope because generating a rotatable shape still required additional garment replacement, body alignment and overlap handling. The app focuses on **2D outfit previews** using person and garment photos. Clothing JSON supports outfit recommendations and photo selection; generated images do not guarantee accurate measurements or physical fit.
 
-| 모델 | 실행시간 | 피크 VRAM (GiB) | 퀄리티 부족점 | 10개 동시 요청 | 아우터 기능 |
-| --- | --- | --- | --- | --- | --- |
-| FASHN VTON 1.5 · 과거 30스텝 | 상하의 16.4초, 아우터 포함 21.4초 | 7.32 | 겹침·가림 영역 및 합성 경계 오류 | 미측정 | 추가 합성으로 지원 |
-| [CatVTON](https://github.com/Zheng-Chong/CatVTON) | 상하의 5.3초, 아우터 포함 미측정 | 11.67 | 데님 표면 잡음, 피부 질감 손실 | 미측정 | 레이어링 미검증 |
-| [Qwen-Image 2.1 Turbo](https://huggingface.co/Qwen/Qwen-Image-2.1-Turbo) | 상하의 3.5초, 아우터 포함 3.8초 | 41.24 | 핏·작은 무늬·로고 변형 | 28.3초 | 지원 |
-| [FLUX.2 Klein 4B](https://huggingface.co/black-forest-labs/FLUX.2-klein-4B) | 상하의 1.4초, 아우터 포함 1.4초 | 7.52 | 실제 제품 무늬·로고 재현 한계 | 11.2초 | JSON 기반 표현 |
-| [FastFit](https://github.com/Zheng-Chong/FastFit) | 상하의 2.8초, 아우터 포함 5.3초 | 6.53 | 손·신발 변형, 이너·아우터 혼합 및 디테일 유실 | 미측정 | 실험적·불안정 |
-| [DreamLite-mobile](https://github.com/ByteVisionLab/DreamLite) | 상하의 0.78초, 아우터 포함 0.78초 | 7.03 | 얼굴·자세·신발 변형 | 7.9초 | 불안정 |
-| [Mobile-VTON](https://github.com/tmllab/2026_CVPR_Mobile-VTON) | 상하의 5.4초, 아우터 포함 8.0초 | 6.61 | 하의 적용 오류, 이너 소실 | 54.3초 | 불안정 |
-| [VIBE-DistilledCFG](https://github.com/ai-forever/VIBE) | 상하의 0.89초, 아우터 포함 0.88초 | 10.24 | 얼굴·모자·신발·이너 색상 변형 | 8.9초 | 불안정 |
-| [Google Vertex AI Virtual Try-On](https://docs.cloud.google.com/vertex-ai/generative-ai/docs/image/generate-virtual-try-on-images) | 미측정 | — | 미평가 | 미측정 | 당시 유료 사용을 제외해 보류 |
+The app's photo-selection notice states that photos are sent to OpenRouter and Google and that external providers' retention policies apply. StyleMate server inputs are deleted when a job ends, and server results are deleted after the app receives them. These tests did not verify immediate deletion of input photos by external providers. Keys, source photos, generated results, model weights and raw K-Fashion data are not included in the document or committed to Git.
 
-DreamLite·Mobile-VTON·VIBE는 A100 40GB 직접 호출, 나머지는 당시 A100 80GB API 기준이다. FLUX·DreamLite·VIBE는 의류 사진 대신 속성을 사용했다. 10건 값은 마지막 완료시간이며 입력 구성이 다르다. 과거 VRAM은 적재·추론·동시 요청 중 최대값으로 필요한 최소 용량은 아니다.
+## Measurement Records
 
-추가 조사 후보는 DeCo-VTON, Leffa, LongCat Edit Turbo, FireRed Image Edit, FLUX 3 Klein, SD-Turbo·SDXS·SDXL-Turbo·DreamShaper LCM이다. 비교표에 대응하는 실행값은 없어 수치를 추가하지 않았다.
+The following local records are referenced relative to the repository root. Figures were checked against these reports, scripts and server logs; the raw records are excluded from Git. FASHN figures were verified from existing direct-execution logs without allocating another GPU. Separate live API integration tests were run after the Nano Banana migration.
 
-</details>
-
-## 3D 방식과 제공 범위
-
-Hunyuan3D·TripoSR 등은 회전 가능한 형상 생성 외에 의류 교체·체형 정합·겹침 처리가 더 필요해 현재 범위에서 제외했다. 앱은 인물 사진과 의류 사진을 활용하는 **2D 착장 미리보기**에 집중한다. 의상 JSON은 추천 코디 구성과 사진 선택에 활용하며 생성 결과는 실제 치수나 착용감의 정확성을 보장하지 않는다.
-
-현재 앱의 사진 선택 안내에 OpenRouter·Google 전송 동의와 외부 제공사 보관 정책 적용을 명시했다. StyleMate 서버 입력은 작업 종료 시 삭제하고 결과는 앱에 수신한 뒤 서버에서 지운다. 이번 테스트가 외부 제공사의 입력 사진 즉시 삭제까지 검증한 것은 아니다. 키·원본 사진·생성 결과·가중치·K-Fashion 원본 데이터는 문서에 포함하거나 커밋하지 않는다.
-
-## 수치 확인 자료
-
-저장소 루트 기준의 로컬 기록이다. 본문 수치는 아래 보고서·실행 스크립트·서버 로그를 대조했으며 원본 자료는 Git에서 제외돼 있다. FASHN 수치는 기존 직접 실행 로그를 검증한 값이며 새 GPU를 할당하지 않았다. Nano Banana 전환 후에는 실제 API로 별도 통합 검증을 수행했다.
-
-- **FASHN 직접 실행:** `backend/private/tryon2d/develop-app-20261104/`의 `smoke.py`, `smoke-report.json`, `generate_outer.py`, `outer-50step-example/report.json`, `generate_cardigan.py`, `outer-cardigan-50step-example/report.json`.
-- **FASHN 서버 10건·VRAM:** 같은 폴더의 `latency-1-vs-10/metrics-after.jsonl`, `summary.json`. 앱 완료시간 대신 서버 배치 구간을 사용했다.
-- **Cloudflare 무료 API:** `backend/private/tryon2d/cloudflare-free-20261101/summary.json`, `report.json`.
-- **유료 API:** `backend/private/openrouter-outer-20261105/test-plan.json`, `results.json`, `run_comparison.py`, `seated-followup-summary.json`.
-- **이전 비교:** `backend/private/tryon2d/comparison/summary.json` 및 `backend/private/tryon2d/stability/`의 `fashn-four-20261031T021327Z/results.json`, `fashn-30step-20261031T001850Z/results/results.json`, `photo-attributes-20261030T122326Z/api-resident/report.json`, `final-model-search-20261031T025042Z/`, `candidate-check-20261030T143136Z/summary.json`.
-
-- **Nano Banana 통합 검증:** 기존 작업 폴더의 `backend/private/develop-tryon/source/backend/private/nanobanana-app-20261105/live-plan.json`, `live-results.json`.
+- **FASHN direct execution:** `smoke.py`, `smoke-report.json`, `generate_outer.py`, `outer-50step-example/report.json`, `generate_cardigan.py` and `outer-cardigan-50step-example/report.json` under `backend/private/tryon2d/develop-app-20261104/`.
+- **FASHN 10-request server timings and VRAM:** `latency-1-vs-10/metrics-after.jsonl` and `summary.json` in the same directory. Server batch intervals were used instead of app completion times.
+- **Cloudflare free API:** `backend/private/tryon2d/cloudflare-free-20261101/summary.json` and `report.json`.
+- **Paid APIs:** `backend/private/openrouter-outer-20261105/test-plan.json`, `results.json`, `run_comparison.py` and `seated-followup-summary.json`.
+- **Earlier comparisons:** `backend/private/tryon2d/comparison/summary.json` and the following records under `backend/private/tryon2d/stability/`: `fashn-four-20261031T021327Z/results.json`, `fashn-30step-20261031T001850Z/results/results.json`, `photo-attributes-20261030T122326Z/api-resident/report.json`, `final-model-search-20261031T025042Z/` and `candidate-check-20261030T143136Z/summary.json`.
+- **Nano Banana integration validation:** `backend/private/develop-tryon/source/backend/private/nanobanana-app-20261105/live-plan.json` and `live-results.json` in the original working directory.

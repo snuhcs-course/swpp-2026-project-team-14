@@ -42,7 +42,10 @@ jobs:
         run: ./gradlew --no-daemon createDebugUnitTestCoverageReport
 
       - name: Coverage by layer
-        run: python3 scripts/coverage_by_layer.py app/build/reports/coverage/test/debug/report.xml >> "$GITHUB_STEP_SUMMARY"
+        run: |
+          python3 scripts/coverage_by_layer.py app/build/reports/coverage/test/debug/report.xml >> "$GITHUB_STEP_SUMMARY"
+          echo '### Virtual fitting: JVM tests only' >> "$GITHUB_STEP_SUMMARY"
+          python3 scripts/coverage_by_layer.py app/build/reports/coverage/test/debug/report.xml --package-prefix com/swpp/stylemate/data/tryon --package-prefix com/swpp/stylemate/ui/tryon >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload coverage report
         if: always()
@@ -59,3 +62,58 @@ jobs:
         with:
           name: stylemate-debug-apk
           path: frontend/app/build/outputs/apk/debug/app-debug.apk
+
+  fitting-device-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up JDK
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Enable emulator acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Fitting UI and background tests with coverage
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          working-directory: frontend
+          disable-animations: true
+          script: |
+            ./gradlew --no-daemon -PandroidTestCoverage assembleDebug assembleDebugAndroidTest
+            adb install -r app/build/outputs/apk/debug/app-debug.apk
+            adb shell pm grant com.swpp.stylemate android.permission.POST_NOTIFICATIONS
+            ./gradlew --no-daemon -PandroidTestCoverage -Pandroid.testInstrumentationRunnerArguments.class=com.swpp.stylemate.home.PhotoFittingTest,com.swpp.stylemate.data.tryon.FittingWorkerTest,com.swpp.stylemate.data.tryon.FittingFlowTest createDebugAndroidTestCoverageReport createAggregatedCoverageReport
+
+      - name: Fitting coverage summary
+        run: |
+          echo '### Virtual fitting: combined JVM and device tests' >> "$GITHUB_STEP_SUMMARY"
+          python3 scripts/coverage_by_layer.py app/build/intermediates/aggregated_code_coverage_data/global/collectDebugAggregatedCoverage/debugAppAggregatedXmlReport.xml --package-prefix com/swpp/stylemate/data/tryon --package-prefix com/swpp/stylemate/ui/tryon >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload fitting test and coverage reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fitting-device-test-coverage
+          path: |
+            frontend/app/build/reports/androidTests/connected/debug
+            frontend/app/build/reports/coverage
+            frontend/app/build/outputs/androidTest-results/connected/debug
+            frontend/app/build/intermediates/aggregated_code_coverage_data/global/collectDebugAggregatedCoverage/debugAppAggregatedXmlReport.xml

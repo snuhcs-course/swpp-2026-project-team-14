@@ -38,6 +38,8 @@ class VirtualFittingModelsTest {
         assertNull(VirtualFittingModels.closest(AnalysisInput(170, null, Gender.MALE)))
         assertNull(VirtualFittingModels.closest(AnalysisInput(170, 70, Gender.UNSPECIFIED)))
         assertNull(VirtualFittingModels.closest(AnalysisInput(0, 70, Gender.MALE)))
+        assertNull(VirtualFittingModels.closest(AnalysisInput(221, 70, Gender.MALE)))
+        assertNull(VirtualFittingModels.closest(AnalysisInput(170, 201, Gender.FEMALE)))
         assertNull(VirtualFittingModels.closest(AnalysisInput(170, -1, Gender.MALE)))
     }
 }

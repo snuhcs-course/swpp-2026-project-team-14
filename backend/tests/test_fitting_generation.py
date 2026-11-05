@@ -2,12 +2,15 @@ import base64
 import io
 import json
 import urllib.error
+import urllib.request
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import threading
 from unittest.mock import Mock, patch
 
 import pytest
 from PIL import Image
 
-from apps.fittings.generation import GeneratedImage, GenerationError, MODEL, NanoBanana, outfit_prompt
+from apps.fittings.generation import GeneratedImage, GenerationError, MODEL, NanoBanana, NoRedirect, outfit_prompt
 
 
 def image_bytes():
@@ -97,3 +100,60 @@ def test_missing_key_makes_no_paid_request():
         with pytest.raises(GenerationError, match="FITTING_NOT_CONFIGURED"):
             NanoBanana("")(image_bytes(), garments())
         opener.assert_not_called()
+
+
+def test_redirects_never_forward_credentials_to_another_endpoint():
+    paths = []
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            paths.append(self.path)
+            self.send_response(302)
+            self.send_header("Location", "/unexpected")
+            self.end_headers()
+        def log_message(self, *args):
+            pass
+    with ThreadingHTTPServer(("127.0.0.1", 0), Handler) as server:
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            request = urllib.request.Request(f"http://127.0.0.1:{server.server_port}/original",
+                                             headers={"Authorization": "Bearer synthetic-only"})
+            with pytest.raises(urllib.error.HTTPError) as error:
+                urllib.request.build_opener(NoRedirect()).open(request, timeout=2)
+            assert error.value.code == 302
+            error.value.close()
+            assert paths == ["/original"]
+        finally:
+            server.shutdown()
+            thread.join(2)
+
+
+@pytest.mark.parametrize("error", [urllib.error.URLError("connection refused"), ConnectionResetError()])
+def test_network_failures_are_sanitized_without_paid_retries(error):
+    opened = Mock(side_effect=error)
+    with patch("apps.fittings.generation.urllib.request.build_opener", return_value=Mock(open=opened)):
+        with pytest.raises(GenerationError, match="FITTING_PROVIDER_UNAVAILABLE"):
+            NanoBanana("secret")(image_bytes(), garments())
+    assert opened.call_count == 1
+
+
+@pytest.mark.parametrize("limit,value", [("MAX_RESPONSE_BYTES", 16), ("MAX_OUTPUT_BYTES", 16),
+                                         ("MAX_OUTPUT_BYTES", 500)])
+def test_oversized_provider_payloads_and_encoded_results_are_rejected(limit, value):
+    opened = Mock(return_value=response())
+    with patch("apps.fittings.generation." + limit, value), patch(
+            "apps.fittings.generation.urllib.request.build_opener", return_value=Mock(open=opened)):
+        with pytest.raises(GenerationError, match="FITTING_INVALID_RESULT"):
+            NanoBanana("secret")(image_bytes(), garments())
+    assert opened.call_count == 1
+
+
+@pytest.mark.parametrize("format,size", [("BMP", (20, 30)), ("PNG", (4001, 4000))])
+def test_unsupported_formats_and_excessive_image_dimensions_are_rejected(format, size):
+    output = io.BytesIO()
+    with Image.new("L", size) as image:
+        image.save(output, format)
+    data = {"data": [{"b64_json": base64.b64encode(output.getvalue()).decode()}]}
+    with patch("apps.fittings.generation.urllib.request.build_opener", return_value=Mock(open=Mock(return_value=response(data)))):
+        with pytest.raises(GenerationError, match="FITTING_INVALID_RESULT"):
+            NanoBanana("secret")(image_bytes(), garments())

@@ -41,11 +41,20 @@ class FittingRepositoryTest {
     private fun repository() = FittingRepository(store, account)
 
     @Test fun notificationChoicePersistsAcrossOutfitsAndReopening() = runBlocking {
-        assertFalse(repository().notificationSettings().enabled)
+        assertTrue(repository().notificationSettings().enabled)
         repository().saveNotificationSettings(FittingNotificationSettings(true))
         assertTrue(repository().notificationSettings().enabled)
         repository().saveNotificationSettings(FittingNotificationSettings(false))
         assertFalse(repository().notificationSettings().enabled)
+        assertEquals(0, server.requestCount)
+    }
+    @Test fun missingNotificationChoiceDefaultsOnWhileExplicitOffSurvivesReopening() = runBlocking {
+        assertTrue(FittingNotificationSettings().enabled)
+        assertTrue(FittingNotificationSettings.decode(null).enabled)
+        assertTrue(FittingNotificationSettings.decode(JSONObject()).enabled)
+        repository().saveNotificationSettings(FittingNotificationSettings(false))
+        val reopened = FittingRepository(LocalUserStore.inDirectory(temporary.root, account.userId), account)
+        assertFalse(reopened.notificationSettings().enabled)
         assertEquals(0, server.requestCount)
     }
     @Test fun validationUsesAuthenticatedFreshRecordInsteadOfCache() = runBlocking {
@@ -120,11 +129,11 @@ class FittingRepositoryTest {
         signIn(account.userId)
         val first = FittingRepository(store, checkNotNull(auth.account()))
         first.saveResult(outfit(), byteArrayOf(1))
-        first.saveNotificationSettings(FittingNotificationSettings(true))
+        first.saveNotificationSettings(FittingNotificationSettings(false))
         signIn(UUID.randomUUID().toString())
         val second = FittingRepository(store, checkNotNull(auth.account()))
         assertNull(second.result(outfit()))
-        assertFalse(second.notificationSettings().enabled)
+        assertTrue(second.notificationSettings().enabled)
         try { first.result(outfit()); fail() }
         catch (error: AuthException) { assertEquals("SESSION_CHANGED", error.code) }
         try { first.saveResult(outfit(), byteArrayOf(2)); fail() }

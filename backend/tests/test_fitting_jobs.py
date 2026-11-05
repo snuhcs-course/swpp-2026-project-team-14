@@ -143,3 +143,41 @@ def test_thirty_sequential_jobs_release_memory_and_remain_usable():
         assert job.state == "completed" and jobs.status(job)["inputs_deleted"]
         jobs.delete(job)
         assert not jobs.jobs and job.output is None
+
+
+def test_background_expiry_removes_abandoned_results_without_a_client_request():
+    jobs = Jobs(lambda *args: GeneratedImage(b"unclaimed"), ttl=0.03)
+    try:
+        job = submit(jobs)
+        deadline = time.monotonic() + 3
+        while job.id in jobs.jobs and time.monotonic() < deadline:
+            time.sleep(0.01)
+        assert job.id not in jobs.jobs
+        assert job.person is None and not job.garments and job.output is None
+    finally:
+        jobs.close()
+
+
+def test_expired_queued_photos_never_reach_the_provider_and_close_rejects_new_jobs():
+    started, release = threading.Event(), threading.Event()
+    calls = []
+    def run(person, garments):
+        calls.append(person)
+        started.set()
+        assert release.wait(3)
+        return GeneratedImage(b"late")
+    jobs = Jobs(run, concurrency=1, ttl=0.05)
+    try:
+        first = submit(jobs)
+        assert started.wait(1)
+        queued = jobs.submit(b"queued-private-photo", [("tops", b"shirt", "flat-lay", True)], "alice")
+        deadline = time.monotonic() + 2
+        while jobs.jobs and time.monotonic() < deadline:
+            time.sleep(0.01)
+        assert not jobs.jobs and queued.person is None and not queued.garments
+        assert calls == [b"person"]
+    finally:
+        jobs.close()
+        release.set()
+    with pytest.raises(QueueFull):
+        submit(jobs)

@@ -51,7 +51,9 @@ class FittingWork(private val context: Context) {
     companion object { private val enqueueLock = Mutex() }
 }
 
-class FittingWorker(context: Context, parameters: WorkerParameters) : CoroutineWorker(context, parameters) {
+class FittingWorker internal constructor(context: Context, parameters: WorkerParameters,
+    private val apiBaseUrl: String, private val accountProvider: (suspend () -> AccountAccess?)?) : CoroutineWorker(context, parameters) {
+    constructor(context: Context, parameters: WorkerParameters) : this(context, parameters, BuildConfig.API_BASE_URL, null)
     override suspend fun getForegroundInfo(): ForegroundInfo {
         val key = inputData.getString("key").orEmpty()
         return ForegroundInfo(key.hashCode() xor Int.MIN_VALUE, FittingNotifications.notification(applicationContext, key, false))
@@ -84,14 +86,14 @@ class FittingWorker(context: Context, parameters: WorkerParameters) : CoroutineW
                 for (slot in slots) {
                     val item = outfit.items.firstOrNull { it.slot == slot } ?: continue
                     val record = records.getValue(item.garmentId)
-                    val image = WardrobeRepository.fittingImage(record.getString("image_url"), account)
+                    val image = WardrobeRepository.fittingImage(record.getString("image_url"), account, apiBaseUrl)
                     clothes.add(TryOnGarment(
                         when (slot) { "top" -> "tops"; "bottom" -> "bottoms"; else -> "outerwear" },
                         image, if (record.optString("image_source") == "worn_crop") "model" else "flat-lay",
                     ))
                 }
             }
-            TryOnClient(account).fit(person, clothes, true, resumeJob = resumed,
+            TryOnClient(account, apiBaseUrl).fit(person, clothes, true, resumeJob = resumed,
                 onSubmitted = { tasks.submitted(key, it) }, keepForResume = true,
                 onResult = { image ->
                     val bitmap = BitmapFactory.decodeByteArray(image, 0, image.size) ?: error("피팅 결과를 읽지 못했어요.")
@@ -116,6 +118,7 @@ class FittingWorker(context: Context, parameters: WorkerParameters) : CoroutineW
         }
     }
     private suspend fun currentAccount(): AccountAccess? {
+        if (accountProvider != null) return accountProvider.invoke()
         val saved = KeystoreSessionStore(applicationContext)
         // A stale background request must not clear a newer foreground login.
         val readOnly = object : AuthSessionStore {

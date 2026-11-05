@@ -16,7 +16,7 @@ Generated classes (BuildConfig, R, ComposableSingletons) are left out.
 
 from __future__ import annotations
 
-import sys
+import argparse
 import xml.etree.ElementTree as ET
 
 ROOT = "com/swpp/stylemate/"
@@ -43,7 +43,38 @@ def pct(covered: int, total: int) -> str:
 
 
 def main() -> None:
-    tree = ET.parse(sys.argv[1])
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("report")
+    parser.add_argument("--package-prefix", action="append", default=[],
+                        help="Report source-file counters for matching packages instead of all layers.")
+    args = parser.parse_args()
+    tree = ET.parse(args.report)
+    if args.package_prefix:
+        print("| Source file | Lines (C0) | Branches (C1) |")
+        print("| --- | --- | --- |")
+        totals = {"LINE": [0, 0], "BRANCH": [0, 0]}
+        matched = False
+        for package in tree.getroot().findall("package"):
+            if not any(package.get("name", "").startswith(prefix) for prefix in args.package_prefix):
+                continue
+            for source in package.findall("sourcefile"):
+                matched = True
+                counters = {kind: [0, 0] for kind in totals}
+                for counter in source.findall("counter"):
+                    kind = counter.get("type")
+                    if kind in counters:
+                        covered = int(counter.get("covered"))
+                        total = covered + int(counter.get("missed"))
+                        counters[kind] = [covered, total]
+                        totals[kind][0] += covered
+                        totals[kind][1] += total
+                (lc, lt), (bc, bt) = counters["LINE"], counters["BRANCH"]
+                print(f"| {source.get('name')} | {pct(lc, lt)} ({lc}/{lt}) | {pct(bc, bt)} ({bc}/{bt}) |")
+        if not matched:
+            parser.error("No source files matched the requested package prefixes")
+        (lc, lt), (bc, bt) = totals["LINE"], totals["BRANCH"]
+        print(f"| **Total** | **{pct(lc, lt)} ({lc}/{lt})** | **{pct(bc, bt)} ({bc}/{bt})** |")
+        return
     sums = {name: {"LINE": [0, 0], "BRANCH": [0, 0]} for name in ("data", "ViewModel", "UI")}
     for cls in tree.getroot().iter("class"):
         name = layer(cls.get("name", ""))

@@ -2,14 +2,16 @@ import base64
 import io
 import json
 import uuid
-from unittest.mock import patch
+from unittest.mock import Mock, patch
+from concurrent.futures import ThreadPoolExecutor
 
-from django.test import TestCase, override_settings
+from django.test import SimpleTestCase, TestCase, override_settings
 from PIL import Image
 from apps.users.auth import issue_token
 from apps.users.models import User
 from .generation import GeneratedImage, MODEL
 from .jobs import Jobs
+from .views import get_jobs
 
 
 @override_settings(OPENROUTER_API_KEY="test-only", PASSWORD_HASHERS=["django.contrib.auth.hashers.MD5PasswordHasher"])
@@ -127,3 +129,64 @@ class FittingAccountTests(TestCase):
         self.assertEqual(result.status_code, 429)
         self.assertEqual(result["Retry-After"], "5")
         self.assertEqual(len(self.jobs.jobs), 1)
+
+    def test_all_supported_outfits_preserve_original_photos_and_outerwear_metadata(self):
+        received = []
+        def run(person, garments):
+            received.append((person, list(garments)))
+            return GeneratedImage(self.photo)
+        self.jobs.runner = run
+        for categories in (("tops",), ("bottoms",), ("tops", "bottoms"), ("tops", "bottoms", "outerwear")):
+            with self.subTest(categories=categories):
+                garments = [{"category": category, "image": self.payload["person"],
+                             "photo_type": "model", "open_front": False} for category in categories]
+                uploaded = self.upload({**self.payload, "garments": garments})
+                self.assertEqual(uploaded.status_code, 202)
+                self.jobs.run_next()
+                self.assertEqual(received[-1], (self.photo, [(category, self.photo, "model", False) for category in categories]))
+
+    def test_invalid_body_and_image_boundaries_never_enqueue_paid_work(self):
+        bad_photos = [None, 10, "x" * (4 * 1024 * 1024 * 4 // 3 + 9)]
+        output = io.BytesIO()
+        Image.new("RGB", (2, 2)).save(output, "BMP")
+        bad_photos.append(base64.b64encode(output.getvalue()).decode())
+        for photo in bad_photos:
+            self.assertEqual(self.upload({**self.payload, "person": photo}).status_code, 400)
+        for garments in ([], {}, [None], [{"category": "tops", "image": self.payload["person"], "unexpected": True}],
+                         [{"category": "tops", "image": self.payload["person"], "open_front": "true"}]):
+            self.assertEqual(self.upload({**self.payload, "garments": garments}).status_code, 400)
+        self.assertEqual(self.client.post("/api/fittings/jobs/", b"image", content_type="image/jpeg",
+                        HTTP_AUTHORIZATION="Bearer " + self.token).status_code, 415)
+        with patch("apps.fittings.views.MAX_REQUEST_BYTES", 8):
+            self.assertEqual(self.upload().status_code, 413)
+        self.assertFalse(self.jobs.jobs)
+
+    def test_deleted_or_expired_jobs_are_not_retrievable_and_queued_deletion_prevents_generation(self):
+        runner = self.jobs.runner = Mock(return_value=GeneratedImage(self.photo))
+        for expired in (False, True):
+            uploaded = self.upload().json()
+            path = f'/api/fittings/jobs/{uploaded["id"]}/'
+            headers = {"HTTP_AUTHORIZATION": "Bearer " + self.token, "HTTP_X_FITTING_TOKEN": uploaded["token"]}
+            if expired:
+                self.jobs.jobs[uploaded["id"]].created -= 1000
+            else:
+                self.assertEqual(self.client.delete(path, **headers).status_code, 204)
+            for operation, suffix in ((self.client.get, ""), (self.client.get, "image/"), (self.client.delete, "")):
+                self.assertEqual(operation(path + suffix, **headers).status_code, 404)
+        self.assertFalse(self.jobs.run_next())
+        runner.assert_not_called()
+
+
+@override_settings(OPENROUTER_API_KEY="synthetic-only", FITTING_CONCURRENCY=2)
+class FittingQueueInitializationTests(SimpleTestCase):
+    def test_concurrent_requests_share_the_same_bounded_queue(self):
+        with patch("apps.fittings.views._jobs", None), patch("apps.fittings.views.NanoBanana") as provider:
+            provider.return_value = lambda *args: GeneratedImage(b"synthetic-result")
+            with ThreadPoolExecutor(max_workers=10) as pool:
+                queues = list(pool.map(lambda _: get_jobs(), range(10)))
+            try:
+                self.assertTrue(all(queue is queues[0] for queue in queues))
+                provider.assert_called_once_with("synthetic-only")
+                self.assertEqual(queues[0].concurrency, 2)
+            finally:
+                queues[0].close()

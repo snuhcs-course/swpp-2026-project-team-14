@@ -3,6 +3,7 @@ package com.swpp.stylemate.data.tryon
 import kotlinx.coroutines.runBlocking
 import com.swpp.stylemate.data.testAccount
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.test.runTest
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import org.json.JSONObject
@@ -221,5 +222,106 @@ class TryOnClientTest {
         val data = JSONObject(server.takeRequest().body.readUtf8())
         assertFalse(data.has("mode"))
         assertFalse(data.getJSONArray("garments").getJSONObject(2).getBoolean("open_front"))
+    }
+
+    @Test fun queuedAndRunningStatesReachCompletionWithoutAnotherSubmission() = runTest {
+        server.enqueue(accepted())
+        server.enqueue(MockResponse().setBody("""{"status":"queued","queue_position":3}"""))
+        server.enqueue(MockResponse().setBody("""{"status":"running","elapsed_seconds":9}"""))
+        server.enqueue(MockResponse().setBody("""{"status":"completed","inputs_deleted":true}"""))
+        server.enqueue(MockResponse().setBody("result"))
+        server.enqueue(MockResponse().setResponseCode(204))
+        val states = mutableListOf<String>()
+        assertEquals("result", String(client.fit(byteArrayOf(1), garment(), true, onStatus = { states.add(it) })))
+        assertTrue(states.any { it.contains("앞선 요청 3개") })
+        assertTrue(states.any { it.contains("9초 경과") })
+        assertEquals("POST", server.takeRequest().method)
+        repeat(4) { assertEquals("GET", server.takeRequest().method) }
+        assertEquals("DELETE", server.takeRequest().method)
+    }
+
+    @Test fun providerFailureCodesProduceActionableErrorsAndDeleteJobs() = runBlocking {
+        val cases = mapOf("FITTING_CREDITS_REQUIRED" to "이용 한도", "FITTING_RATE_LIMITED" to "요청이 많아요",
+            "FITTING_TIMEOUT" to "시간이 초과", "FITTING_PROVIDER_UNAVAILABLE" to "연결하지 못",
+            "FITTING_AUTH_FAILED" to "연결하지 못", "FITTING_NOT_CONFIGURED" to "연결하지 못")
+        for ((code, message) in cases) {
+            server.enqueue(accepted())
+            server.enqueue(MockResponse().setBody("""{"status":"failed","error":"$code"}"""))
+            server.enqueue(MockResponse().setResponseCode(204))
+            try { client.fit(byteArrayOf(1), garment(), true) {}; fail(code) }
+            catch (error: IllegalStateException) { assertTrue(error.message!!.contains(message)) }
+            assertEquals("POST", server.takeRequest().method)
+            assertEquals("GET", server.takeRequest().method)
+            assertEquals("DELETE", server.takeRequest().method)
+        }
+    }
+
+    @Test fun expiredJobsAreNotResubmittedAndBadInputsAreReportedBeforePolling() = runBlocking {
+        server.enqueue(MockResponse().setResponseCode(404))
+        server.enqueue(MockResponse().setResponseCode(404))
+        try { client.fit(byteArrayOf(), emptyList(), true, resumeJob = TryOnJob(id, "token")) {}; fail() }
+        catch (error: IllegalStateException) { assertTrue(error.message!!.contains("만료")) }
+        assertEquals("GET", server.takeRequest().method)
+        assertEquals("DELETE", server.takeRequest().method)
+        for (status in listOf(400, 413, 418)) {
+            server.enqueue(MockResponse().setResponseCode(status))
+            try { client.fit(byteArrayOf(1), garment(), true) {}; fail() }
+            catch (error: IllegalStateException) {
+                assertTrue(error.message!!.contains(if (status == 418) "처리하지 못" else "사진 형식"))
+            }
+            assertEquals("POST", server.takeRequest().method)
+        }
+    }
+
+    @Test fun invalidPhotosAndIncompleteOuterwearNeverReachTheServer() = runBlocking {
+        for ((photo, clothes) in listOf(byteArrayOf() to garment(), byteArrayOf(1) to emptyList(),
+            byteArrayOf(1) to listOf(TryOnGarment("outerwear", byteArrayOf(1))),
+            byteArrayOf(1) to listOf(TryOnGarment("tops", ByteArray(4 * 1024 * 1024 + 1))))) {
+            try { client.fit(photo, clothes, true) {}; fail() }
+            catch (_: IllegalArgumentException) {}
+        }
+        assertEquals(0, server.requestCount)
+    }
+
+    @Test fun cleanupFailureDoesNotDiscardAnAlreadyPersistedResult() = runBlocking {
+        server.enqueue(accepted())
+        server.enqueue(MockResponse().setBody("""{"status":"completed","inputs_deleted":true}"""))
+        server.enqueue(MockResponse().setBody("saved-result"))
+        server.enqueue(MockResponse().setResponseCode(503))
+        var persisted = false
+        assertEquals("saved-result", String(client.fit(byteArrayOf(1), garment(), true,
+            onResult = { persisted = true }) {}))
+        assertTrue(persisted)
+        assertEquals(4, server.requestCount)
+    }
+
+    @Test fun oversizedResultIsRejectedBeforeItCanBeStored() = runBlocking {
+        server.enqueue(accepted())
+        server.enqueue(MockResponse().setBody("""{"status":"completed","inputs_deleted":true}"""))
+        server.enqueue(MockResponse().setBody(okio.Buffer().write(ByteArray(16 * 1024 * 1024 + 1))))
+        server.enqueue(MockResponse().setResponseCode(204))
+        var stored = false
+        try { client.fit(byteArrayOf(1), garment(), true, onResult = { stored = true }) {}; fail() }
+        catch (error: IllegalStateException) { assertTrue(error.message!!.contains("너무 큽니다")) }
+        assertFalse(stored)
+        assertEquals(4, server.requestCount)
+    }
+
+    @Test fun pollingDeadlineEndsAnUnfinishedJobWithoutSubmittingAgain() = runTest {
+        val methods = java.util.Collections.synchronizedList(mutableListOf<String>())
+        server.dispatcher = object : okhttp3.mockwebserver.Dispatcher() {
+            override fun dispatch(request: okhttp3.mockwebserver.RecordedRequest): MockResponse {
+                methods.add(request.method!!)
+                return when (request.method) {
+                    "POST" -> accepted()
+                    "DELETE" -> MockResponse().setResponseCode(204)
+                    else -> MockResponse().setBody("""{"status":"queued","queue_position":1}""")
+                }
+            }
+        }
+        try { client.fit(byteArrayOf(1), garment(), true) {}; fail("Expected polling deadline") }
+        catch (error: IllegalStateException) { assertTrue(error.message!!.contains("대기 시간이 길어졌어요")) }
+        assertEquals(1, methods.count { it == "POST" })
+        assertEquals("DELETE", methods.last())
     }
 }

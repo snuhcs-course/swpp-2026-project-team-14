@@ -9,11 +9,11 @@ import org.json.JSONArray
 import java.security.MessageDigest
 import java.util.UUID
 
-data class FittingNotificationSettings(val enabled: Boolean = false) {
+data class FittingNotificationSettings(val enabled: Boolean = true) {
     fun json() = org.json.JSONObject().put("enabled", enabled)
     companion object {
         fun storageKey(owner: String) = "fitting-notifications:$owner"
-        fun decode(value: org.json.JSONObject?) = FittingNotificationSettings(value?.optBoolean("enabled", false) ?: false)
+        fun decode(value: org.json.JSONObject?) = FittingNotificationSettings(value?.optBoolean("enabled", true) ?: true)
     }
 }
 
