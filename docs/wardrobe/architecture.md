@@ -43,15 +43,15 @@ swpp-2026-project-team-14/
 |   |           |-- WardrobeScreen.kt            # 옷장 목록·등록 방식 선택 시트·옷 선택 메뉴·온보딩/사진/편집 연결
 |   |           |-- WardrobeViewModel.kt         # 계정 목록·저장·삭제/중복 방지·외부 추천 상태
 |   |           |-- ExternalRecommendationDialog.kt # 선택 옷 메뉴·추천 속성·무신사 바로가기 팝업
-|   |           |-- GarmentAnalysisViewModel.kt  # 분석 진행·실패·온보딩 분석 초안 복원
+|   |           |-- GarmentAnalysisViewModel.kt  # 분석 진행·실패·초안 복원·사진 변경 시 이전 분석 취소
 |   |           |-- WardrobeColorField.kt       # 색상표·사진 좌표 변환·픽셀 색상 선택
 |   |           |-- GarmentEditor.kt             # 특징·실측·메모 편집·초안 복원·하단 고정 저장
 |   |           |-- GarmentEstimates.kt          # 실측과 분리한 읽기 전용 추정값·범위 표시·편집 후 무효화
 |   |           |-- WornBatchRegistration.kt     # 사진 업로드 영역·후보 선택·원본 분석/생성·기존 편집과 승인 저장 연결
 |   |           |-- WornBatchReviewScreen.kt     # 서비스/미리보기 공용 카드·전체 선택·원본 비교·접이식 치수·처리 스피너
-|   |           |-- WornBatchViewModel.kt        # 원본 분석 멱등성·선택한 옷별 순차 생성·부분 실패/제외·저장 상태
+|   |           |-- WornBatchViewModel.kt        # 원본 분석 멱등성·순차 생성·부분 실패/제외·저장·취소 후 상태 보호
 |   |           |-- WornRegistration.kt          # 한 벌 직접 사각형 드래그·대상 분석 보관, 앱 진입 버튼 숨김
-|   |           |-- WornGenerationViewModel.kt   # 원본 분석·생성 요청 ID·상태 조회·승인 상태와 촬영 파일 수명
+|   |           |-- WornGenerationViewModel.kt   # 원본 분석·생성 요청 ID·상태 조회·승인·촬영 파일 수명·취소 상태 보호
 |   |           |-- WornGenerationReview.kt      # 원본/생성 이미지 비교·승인/거절·명시적 크롭/유료 재생성 선택
 |   |           |-- GarmentLabels.kt             # 추천 라벨 확인·수정·실패 후 수동 확인·저장 가능 상태
 |   |           |-- FrontPhoto.kt                # 상의·아우터 앞면 사진 카드
@@ -66,6 +66,16 @@ swpp-2026-project-team-14/
 |   |-- main/res/drawable/ic_remove_garment.xml # 카드 우상단 의상 삭제 아이콘
 |   |-- main/res/drawable-nodpi/                # 생성한 온보딩 환영·6종 무드 사진
 |   |-- test/java/com/swpp/stylemate/             # 인증·만료·계정 캐시·추천 요청·재시도 검사
+|   |   |-- profile/
+|   |   |   |-- AuthViewModelTest.kt              # 세션 복원·가입/로그인·제한시간·중복 차단·만료·로그아웃 검사
+|   |   |   |-- GuestImportViewModelTest.kt       # 동의·충돌 결정·부분 실패·중복 저장 방지·재시도·취소 검사
+|   |   |   `-- ProfileViewModelTestSupport.kt    # 제어 가능한 Main·메모리 세션·HTTP 응답 게이트·가져오기 대역
+|   |   `-- wardrobe/
+|   |       |-- WardrobeViewModelTest.kt          # 목록·저장 명세의 캐시/오류/재시도·빈 목록·중복 요청 차단 검사
+|   |       |-- GarmentAnalysisViewModelTest.kt   # 분석·초안 복원·재시도·사진 변경과 화면 종료 시 취소 검사
+|   |       |-- WornBatchViewModelTest.kt         # 후보 선택·순차 생성·부분 실패·비용 중복 방지·편집/저장·초기화 검사
+|   |       |-- WornGenerationViewModelTest.kt    # 생성 조회/재생성·이미지 승인/거절·작업 취소·임시 사진 수명 검사
+|   |       `-- WardrobeModelTestSupport.kt       # 가상 시간·ViewModel 정리·사진/생성 요청 대역
 |   `-- androidTest/java/com/swpp/stylemate/      # 로그인 차단·로그아웃/만료·계정 온보딩·옷장·측정점 검사
 |       |-- wardrobe/WornRegistrationTest.kt      # 자동 후보 체크·슬라이더 없음·일괄 저장 조건·원본 크롭·기존 진입 검사
 |       `-- wardrobe/WornPreviewTest.kt           # 계정/서버 없이 선택·실패 이유·등록 모의 동작·확대 원본 비교 검사
@@ -100,6 +110,7 @@ swpp-2026-project-team-14/
 |   |   `-- wardrobe/
 |   |       |-- urls.py                          # 옷장 API 경로
 |   |       |-- views.py                         # 분석·저장·조회·의상/관련 코디 원자적 삭제·라벨
+|   |       |-- media.py                         # 삭제 커밋 후 전체 계정의 파일 참조 확인·미사용 사진 정리
 |   |       |-- analysis.py                      # 이미지 검증·OpenRouter 원본 분석·공통 비전 요청/응답·오류 정규화
 |   |       |-- worn.py                          # 고정 ONNX 의류 분할·OpenRouter Gemini 펼침 생성·오류 정규화
 |   |       |-- worn_views.py                    # 계정별 생성 상태·요청 멱등성·이미지 승인·비교 사진 접근
@@ -115,7 +126,7 @@ swpp-2026-project-team-14/
 |   |       |-- migrations/0002_garment_labels.py # 추천 라벨 컬럼 추가
 |   |       |-- migrations/0003_garment_user.py   # 옷 소유 사용자 외래 키 추가
 |   |       |-- migrations/0004_alter_garment_user.py # 무소유 옷 정리·소유자 필수 전환
-|   |       |-- test_delete.py                   # 의상/관련 코디 삭제·권한·롤백 검사
+|   |       |-- test_delete.py                   # 의상/코디 삭제·권한·커밋/롤백·공유 사진 보존·저장소 오류 검사
 |   |       |-- tests.py                         # AI 계약·DB 저장·재조회 검사
 |   |       |-- test_worn.py                     # 착용 사진 대상 분석·계정 초안 격리·NULL 치수·수동 라벨 저장 검사
 |   |       |-- test_generation.py               # 원본 분석 보존·생성 승인·거절·중복/실패/계정 격리 검사
@@ -133,7 +144,10 @@ swpp-2026-project-team-14/
 |   |-- models/segformer_clothes.onnx            # 고정 SegFormer 의류 분할 가중치, Git 제외·이미지 빌드 시 포함
 |   |-- scripts/prepare_landmarks.py             # 빌드 시 HRNet 다운로드·검증·ONNX 변환
 |   `-- tests/                                   # 체형 분석·추천 모델 입력 계약·공통 API 회귀 검사
-`-- docs/wardrobe/                               # 옷장 설계·실행 안내
+`-- docs/
+    |-- login/viewmodel-testing.md              # 로그인·가져오기 ViewModel의 기대 동작·실행·커버리지
+    `-- wardrobe/                               # 옷장 설계·실행 안내
+        `-- wardrobe-viewmodel-spec.md          # 옷장 ViewModel별 테스트 명세·취소 회귀·변경 전후 커버리지
 ```
 
 촬영·저장 흐름은 다음과 같다.

@@ -38,12 +38,17 @@ class GarmentAnalysisViewModel(private val account: AccountAccess) : ViewModel()
 
     fun analyze(context: Context, photo: String, garmentType: String? = null) {
         if (mutableState.value.busy) return
+        val application = context.applicationContext
+        analyze(photo) { requestAnalysis(application, photo, garmentType, account) }
+    }
+
+    internal fun analyze(photo: String, request: suspend () -> JSONObject) {
+        if (mutableState.value.busy) return
         select(photo)
         mutableState.value = AnalysisState(photo, busy = true)
-        val application = context.applicationContext
         job = viewModelScope.launch {
             try {
-                val result = requestAnalysis(application, photo, garmentType, account)
+                val result = request()
                 mutableState.value = AnalysisState(photo, result = result)
             } catch (error: CancellationException) {
                 throw error
