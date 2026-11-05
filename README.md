@@ -7,7 +7,9 @@ Iteration 2 made it a login-required service with outfit recommendations, a 코�
 
 ## Demo video
 
-<!-- Demo video: add the GitHub attachment link here -->
+[▶ Watch the Iteration 3 demo (57 s)](demo/demo_video_iter3.mp4)
+
+The video walks through 홈 recommendations with reasons, editing an outfit in chat with a locked garment, finding a matching item and opening the Musinsa search, deleting a garment, and registering three garments from one worn-outfit photo. It is edited for length, so waiting times are shortened.
 
 ---
 
