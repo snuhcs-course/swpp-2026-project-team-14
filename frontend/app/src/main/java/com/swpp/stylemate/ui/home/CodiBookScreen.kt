@@ -41,6 +41,7 @@ fun CodiBookScreen(
     onRemove: (Outfit) -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
+    onTryOn: (Outfit) -> Unit = {},
     photo: @Composable (OutfitGarment, Modifier) -> Unit = { item, m -> GarmentThumbnail(item.imageUrl, item.name, m) },
 ) {
     Column(modifier.fillMaxSize().padding(horizontal = 20.dp)) {
@@ -78,6 +79,9 @@ fun CodiBookScreen(
                                 Icon(Icons.Filled.Star, contentDescription = "코디북에서 빼기", tint = MaterialTheme.colorScheme.primary)
                             }
                         }
+                        com.swpp.stylemate.ui.tryon.FittingPreview(
+                            onExpand = { onTryOn(outfit) }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                        )
                     }
                 }
             }

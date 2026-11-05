@@ -107,7 +107,8 @@ private fun defaultAuthViewModel(): AuthViewModel {
 }
 
 @Composable
-fun StyleMateApp(viewModel: BodyProfileViewModel? = null, authModel: AuthViewModel = defaultAuthViewModel()) {
+fun StyleMateApp(viewModel: BodyProfileViewModel? = null, authModel: AuthViewModel = defaultAuthViewModel(),
+                 fittingTask: String? = null, onFittingHandled: () -> Unit = {}) {
     val context = LocalContext.current.applicationContext
     val auth by authModel.state.collectAsStateWithLifecycle()
     val lifecycle = LocalLifecycleOwner.current.lifecycle
@@ -131,7 +132,8 @@ fun StyleMateApp(viewModel: BodyProfileViewModel? = null, authModel: AuthViewMod
         val scope = account.userId
         val owner = remember(scope) { object : ViewModelStoreOwner { override val viewModelStore = ViewModelStore() } }
         DisposableEffect(owner) { onDispose { owner.viewModelStore.clear() } }
-        CompositionLocalProvider(LocalViewModelStoreOwner provides owner, LocalAccountAccess provides account) {
+        CompositionLocalProvider(LocalViewModelStoreOwner provides owner, LocalAccountAccess provides account,
+            com.swpp.stylemate.ui.tryon.LocalFittingNotificationKey provides fittingTask) {
             key(scope) {
                 val profileModel = viewModel ?: defaultBodyProfileViewModel(account)
                 LaunchedEffect(auth.session?.user?.json()?.toString()) { profileModel.refreshAccountProfile() }
@@ -141,6 +143,7 @@ fun StyleMateApp(viewModel: BodyProfileViewModel? = null, authModel: AuthViewMod
                 AppContent(profileModel, authModel, importModel)
                 val importing by importModel.state.collectAsStateWithLifecycle()
                 GuestImportDialog(importing, importModel::confirm, importModel::decide, importModel::retry, importModel::close)
+                com.swpp.stylemate.ui.tryon.FittingNotificationResult(fittingTask, account, onFittingHandled)
             }
         }
     }
@@ -251,7 +254,8 @@ private fun MainTabs(viewModel: BodyProfileViewModel, authModel: AuthViewModel, 
                 onOpenWardrobe = { tab = Tab.WARDROBE }, modifier = Modifier.padding(padding).consumeWindowInsets(padding),
                 onChat = { outfit, weather -> chat.open(outfit, app.profile, weather) }, wardrobeRevision = wardrobeRevision)
             Tab.WARDROBE -> Box(Modifier.padding(padding).consumeWindowInsets(padding)) { WardrobeRoute(onDeleted = { wardrobeRevision++ }) }
-            Tab.CODIBOOK -> CodiBookRoute(Modifier.padding(padding).consumeWindowInsets(padding), wardrobeRevision = wardrobeRevision)
+            Tab.CODIBOOK -> CodiBookRoute(Modifier.padding(padding).consumeWindowInsets(padding),
+                wardrobeRevision = wardrobeRevision, profile = app.profile)
             Tab.PROFILE -> MyProfileScreen(
                 profile = app.profile,
                 style = app.style,

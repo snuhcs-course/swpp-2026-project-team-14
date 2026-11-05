@@ -78,6 +78,7 @@ fun HomeScreen(
     onMessageShown: () -> Unit,
     modifier: Modifier = Modifier,
     onChat: (() -> Unit)? = null,
+    fitting: (@Composable (Outfit, Modifier) -> Unit)? = null,
     photo: @Composable (OutfitGarment, Modifier) -> Unit = { item, m -> GarmentThumbnail(item.imageUrl, item.name, m) },
 ) {
     val snackbar = remember { SnackbarHostState() }
@@ -123,7 +124,10 @@ fun HomeScreen(
                 outfit == null && state.loading -> OutfitCard { CircularProgressIndicator(Modifier.padding(64.dp)) }
                 outfit == null -> EmptyState("코디를 불러오지 못했어요", state.error ?: OutfitRepository.SERVER_ERROR,
                     "다시 시도", onRefresh)
-                else -> OutfitDetails(state, outfit, onLike, onDislike, onSave, photo)
+                else -> {
+                    OutfitDetails(state, outfit, onLike, onDislike, onSave, photo)
+                    fitting?.invoke(outfit, Modifier.fillMaxWidth().padding(top = 12.dp))
+                }
             }
             Spacer(Modifier.height(24.dp))
         }

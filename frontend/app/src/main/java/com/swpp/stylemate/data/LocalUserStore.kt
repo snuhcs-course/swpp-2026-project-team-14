@@ -202,6 +202,18 @@ class LocalUserStore(private val directory: File) {
         imageFile(path.removePrefix("local:")).readBytes()
     }
 
+    private fun fittingFile(key: String): File {
+        require(key.matches(Regex("[a-f0-9]{64}")))
+        return File(File(directory, "fittings"), "$key.png")
+    }
+    fun fittingResult(key: String): ByteArray? = synchronized(lock) {
+        fittingFile(key).takeIf { it.isFile }?.readBytes()
+    }
+    fun saveFittingResult(key: String, image: ByteArray) = synchronized(lock) {
+        require(image.isNotEmpty())
+        write(fittingFile(key), image)
+    }
+
     fun outfits() = list("outfits").filter { it.optBoolean("saved") }
     fun outfit(id: String) = list("outfits").firstOrNull { it.getString("id") == id }
     fun rememberOutfits(rows: JSONArray) = synchronized(lock) {
