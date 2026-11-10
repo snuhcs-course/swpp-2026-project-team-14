@@ -44,6 +44,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.res.painterResource
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Delete
 import com.swpp.stylemate.R
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
@@ -146,6 +148,11 @@ fun WardrobeRoute(
                 }
             },
             onDismiss = wardrobeModel::closeExternalMatch,
+            wardrobe = wardrobe.records.map { record ->
+                val attrs = record.getJSONObject("attributes")
+                WardrobeItem(record.getString("id"), attrs.getString("name"), attrs.getString("category"),
+                    imageUrl = record.optString("image_url").ifBlank { null })
+            },
         )
     }
     var savedPhoto by remember(editingId) { mutableStateOf<ImageBitmap?>(null) }
@@ -498,17 +505,24 @@ fun WardrobeScreen(items: List<WardrobeItem>, message: String?, cameraBusy: Bool
         }
         AlertDialog(
             onDismissRequest = ::dismissDelete,
-            title = { Text("의상 삭제") },
+            icon = { Icon(Icons.Outlined.Delete, contentDescription = null) },
+            title = { Text("옷 삭제") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("해당 의상을 삭제하시겠습니까?")
-                    Text("이 의상이 포함된 코디도 함께 삭제됩니다.", style = MaterialTheme.typography.bodyMedium)
+                    Text("'${pendingDelete.name}'을(를) 옷장에서 삭제할까요?")
+                    Text("이 옷이 들어간 코디북 코디도 함께 삭제돼요.", style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
                     deleteError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                     if (deleting) LinearProgressIndicator(Modifier.fillMaxWidth())
                 }
             },
-            confirmButton = { TextButton(onClick = { onDelete(pendingDelete) }, enabled = !deleting) { Text("예") } },
-            dismissButton = { TextButton(onClick = ::dismissDelete, enabled = !deleting) { Text("아니요") } },
+            confirmButton = {
+                TextButton(onClick = { onDelete(pendingDelete) }, enabled = !deleting,
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) {
+                    Text(if (deleting) "삭제 중…" else "삭제")
+                }
+            },
+            dismissButton = { TextButton(onClick = ::dismissDelete, enabled = !deleting) { Text("취소") } },
         )
     }
     var choosingMethod by rememberSaveable { mutableStateOf(false) }
@@ -564,13 +578,16 @@ fun WardrobeScreen(items: List<WardrobeItem>, message: String?, cameraBusy: Bool
                                 if (garment.thumbnail != null) Image(garment.thumbnail, garment.name, Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
                                 else if (garment.imageUrl != null) GarmentPhoto(garment.imageUrl, garment.name)
                                 else Text("사진 없음", style = MaterialTheme.typography.labelSmall)
+                                // A trash can on a light badge: the earlier mark read as an edit pencil (HE).
                                 if (onDelete != null) IconButton(
                                     onClick = { onDeleteDismiss(); pendingDeleteId = garment.id },
-                                    modifier = Modifier.align(Alignment.TopEnd),
+                                    modifier = Modifier.align(Alignment.TopEnd).padding(4.dp).size(32.dp),
                                     enabled = !loading && deletingId == null,
+                                    colors = IconButtonDefaults.iconButtonColors(
+                                        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant),
                                 ) {
-                                    Icon(painterResource(R.drawable.ic_remove_garment), "${garment.name} 삭제",
-                                        Modifier.size(24.dp), tint = MaterialTheme.colorScheme.primary)
+                                    Icon(Icons.Outlined.Delete, "${garment.name} 삭제", Modifier.size(18.dp))
                                 }
                             }
                             Column(Modifier.fillMaxWidth().padding(12.dp).heightIn(min = cardTextHeight),
