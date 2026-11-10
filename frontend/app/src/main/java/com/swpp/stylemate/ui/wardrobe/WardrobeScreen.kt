@@ -33,6 +33,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -532,6 +533,9 @@ fun WardrobeScreen(items: List<WardrobeItem>, message: String?, cameraBusy: Bool
     var category by rememberSaveable { mutableStateOf("all") }
     val categories = listOf("all" to "전체", "top" to "상의", "bottom" to "하의", "outerwear" to "아우터", "shoes" to "신발")
     val visible = items.filter { category == "all" || it.category == category }
+    // Newest first: a garment just added (or a new category) starts from the top instead of keeping the old first card in view.
+    val grid = rememberLazyGridState()
+    LaunchedEffect(visible.firstOrNull()?.id) { grid.scrollToItem(0) }
     val configuration = LocalConfiguration.current
     val columns = if (configuration.screenWidthDp < 352 || configuration.fontScale > 1.3f) 2 else 3
     val nameStyle = MaterialTheme.typography.bodyMedium
@@ -568,7 +572,7 @@ fun WardrobeScreen(items: List<WardrobeItem>, message: String?, cameraBusy: Bool
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             } else {
-                LazyVerticalGrid(columns = GridCells.Fixed(columns), modifier = Modifier.weight(1f),
+                LazyVerticalGrid(columns = GridCells.Fixed(columns), modifier = Modifier.weight(1f), state = grid,
                     contentPadding = PaddingValues(bottom = 12.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     items(visible, key = { it.id }) { garment ->
