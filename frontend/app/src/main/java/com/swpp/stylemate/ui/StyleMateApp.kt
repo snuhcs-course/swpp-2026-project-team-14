@@ -75,6 +75,7 @@ import com.swpp.stylemate.ui.profile.AnalyzingScreen
 import com.swpp.stylemate.ui.profile.BodyProfileViewModel
 import com.swpp.stylemate.ui.profile.CaptureGuideScreen
 import com.swpp.stylemate.ui.profile.MyProfileScreen
+import com.swpp.stylemate.ui.profile.CalendarConnectionCard
 import com.swpp.stylemate.ui.profile.PhotoInputScreen
 import com.swpp.stylemate.ui.profile.ReviewScreen
 import com.swpp.stylemate.ui.profile.SetupStep
@@ -279,6 +280,10 @@ private fun MainTabs(viewModel: BodyProfileViewModel, authModel: AuthViewModel, 
                 onImport = importModel::open,
                 authBusy = auth.busy,
                 onDeleteRemote = viewModel::deleteAccountProfile,
+                connections = {
+                    val store = remember(account.userId) { LocalUserStore.forContext(context, account.userId) }
+                    CalendarConnectionCard(store)
+                },
             )
         }
     }

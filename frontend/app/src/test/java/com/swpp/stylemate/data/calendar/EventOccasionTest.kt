@@ -24,4 +24,10 @@ class EventOccasionTest {
     @Test fun theFirstEventWithAnOccasionWins() {
         assertEquals("데이트", EventOccasion.of(listOf(event("병원"), event("소개팅"), event("회의"))))
     }
+
+    @Test fun onlyEventsAboutWhatToWearReachTheHomeScreen() {
+        val events = listOf(event("약 먹기"), event("팀 회의"), event("택배 받기"), event("친구 생일 파티"))
+        assertEquals(listOf("팀 회의", "친구 생일 파티"), EventOccasion.relevant(events).map { it.title })
+        assertEquals(emptyList<CalendarEvent>(), EventOccasion.relevant(listOf(event("치과 예약"))))
+    }
 }

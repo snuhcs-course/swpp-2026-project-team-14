@@ -6,10 +6,12 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.provider.CalendarContract
 import androidx.core.content.ContextCompat
+import com.swpp.stylemate.data.LocalUserStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.time.Instant
 import java.time.ZoneId
+import org.json.JSONObject
 
 data class CalendarEvent(val title: String, val begin: Long, val end: Long, val location: String?, val allDay: Boolean)
 
@@ -68,4 +70,20 @@ object EventOccasion {
 
     /** The first event today that names an occasion. */
     fun of(events: List<CalendarEvent>): String? = events.firstNotNullOfOrNull { of(it.title) }
+
+    /** Only events that say something about what to wear; "약 먹기" or "택배" never reach the home screen. */
+    fun relevant(events: List<CalendarEvent>): List<CalendarEvent> = events.filter { of(it.title) != null }
+}
+
+/**
+ * Whether this account connected the phone calendar in My Profile. Kept per account on this device;
+ * Android's permission alone is not enough, since another account on the same phone may have allowed it.
+ */
+object CalendarConnection {
+    private const val KEY = "calendar"
+
+    fun enabled(context: Context, store: LocalUserStore): Boolean =
+        store.get(KEY)?.optBoolean("enabled") == true && DeviceCalendar.hasPermission(context)
+
+    fun set(store: LocalUserStore, enabled: Boolean) = store.put(KEY, JSONObject().put("enabled", enabled))
 }
