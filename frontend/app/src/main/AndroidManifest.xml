@@ -37,7 +37,7 @@
 
         <!-- Full-resolution camera photos go to a temporary cache file that is deleted right after decoding. -->
         <provider
-            android:name="androidx.core.content.FileProvider"
+            android:name=".data.PhotoFileProvider"
             android:authorities="${applicationId}.photos"
             android:exported="false"
             android:grantUriPermissions="true">
