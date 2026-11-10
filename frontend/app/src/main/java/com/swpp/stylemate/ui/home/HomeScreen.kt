@@ -22,6 +22,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
@@ -97,11 +98,14 @@ fun HomeScreen(
                     modifier = Modifier.weight(1f).heightIn(min = 56.dp)) {
                     Text(if (onChat != null) "대화로 수정하기" else "다른 코디 보기", fontWeight = FontWeight.Bold)
                 }
-                if (onChat != null) {
+                // "다음 코디" steps through the outfits already received; the header button asks for new ones.
+                if (onChat != null && state.outfits.size > 1) {
                     Spacer(Modifier.width(12.dp))
                     OutlinedButton(onClick = onNext, enabled = !state.loading, shape = RoundedCornerShape(16.dp),
-                        modifier = Modifier.size(56.dp), contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)) {
-                        Icon(Icons.Filled.Refresh, contentDescription = "다른 코디")
+                        modifier = Modifier.heightIn(min = 56.dp)) {
+                        Text("다음 코디", fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.width(4.dp))
+                        Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, Modifier.size(18.dp))
                     }
                 }
             }
@@ -110,8 +114,10 @@ fun HomeScreen(
         Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
             Row(Modifier.fillMaxWidth().padding(top = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("오늘의 코디", Modifier.weight(1f), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                IconButton(onClick = onRefresh, enabled = !state.loading && state.errorCode != HomeState.NO_PROFILE) {
-                    Icon(Icons.Filled.Refresh, contentDescription = "새로 고침")
+                TextButton(onClick = onRefresh, enabled = !state.loading && state.errorCode != HomeState.NO_PROFILE) {
+                    Icon(Icons.Filled.Refresh, contentDescription = null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("새로 추천")
                 }
             }
             Text(weatherLine(state), Modifier.padding(top = 4.dp, bottom = 16.dp),
