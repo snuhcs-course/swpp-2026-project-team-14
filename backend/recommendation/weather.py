@@ -6,6 +6,8 @@ from __future__ import annotations
 
 import json
 import socket
+import threading
+import time
 from dataclasses import asdict, dataclass
 from urllib.error import URLError
 from urllib.parse import urlencode
@@ -71,6 +73,51 @@ def current(lat: float = SEOUL[0], lon: float = SEOUL[1], timeout: int = 8) -> W
 
 class WeatherError(Exception):
     pass
+
+
+FRESH_SECONDS = 600   # weather changes slowly; Open-Meteo itself takes ~1.4 s (mostly the TLS handshake)
+STALE_SECONDS = 3600  # an older reading is still served at once while a refresh runs in the background
+_current_cache: dict[tuple, tuple[float, Weather]] = {}
+_refreshing: set[tuple] = set()
+_cache_lock = threading.Lock()
+
+
+def cached_current(lat: float = SEOUL[0], lon: float = SEOUL[1]) -> Weather:
+    """`current()` without making every home load wait for Open-Meteo: fresh for 10 minutes, then served stale
+    for up to an hour while one background refresh updates it. Only the very first call waits."""
+    key = (round(lat, 2), round(lon, 2))
+    now = time.monotonic()
+    with _cache_lock:
+        hit = _current_cache.get(key)
+    if hit and now - hit[0] < FRESH_SECONDS:
+        return hit[1]
+    if hit and now - hit[0] < STALE_SECONDS:
+        with _cache_lock:
+            start = key not in _refreshing
+            _refreshing.add(key)
+        if start:
+            threading.Thread(target=_refresh, args=(key, lat, lon), daemon=True).start()
+        return hit[1]
+    reading = current(lat, lon)
+    _store(key, reading)
+    return reading
+
+
+def _refresh(key: tuple, lat: float, lon: float) -> None:
+    try:
+        _store(key, current(lat, lon))
+    except WeatherError:
+        pass  # keep serving the older reading until it is an hour old
+    finally:
+        with _cache_lock:
+            _refreshing.discard(key)
+
+
+def _store(key: tuple, reading: Weather) -> None:
+    with _cache_lock:
+        if len(_current_cache) > 256:
+            _current_cache.clear()
+        _current_cache[key] = (time.monotonic(), reading)
 
 
 def manual(temp: float) -> Weather:

@@ -447,7 +447,7 @@ def weather_view(request):
     except ValueError:
         return _error("INVALID_LOCATION", 400)
     try:
-        current = weather.current(lat, lon)
+        current = weather.cached_current(lat, lon)
     except weather.WeatherError:
         return _error("WEATHER_UNAVAILABLE", 502)
     response = JsonResponse({**current.public(), "band": season.band(current.apparent).label},

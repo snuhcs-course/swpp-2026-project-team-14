@@ -261,6 +261,7 @@ class OutfitApiTests(TestCase):
 
 class WeatherTests(TestCase):
     def setUp(self):
+        weather._current_cache.clear()
         user = User.objects.create(username='weather_owner')
         _, token = issue_token(user)
         self.client.defaults['HTTP_AUTHORIZATION'] = f'Bearer {token}'
@@ -273,5 +274,6 @@ class WeatherTests(TestCase):
         self.assertEqual((response.json()["label"], response.json()["band"]), ("맑음", "가을 간절기"))
         current.assert_called_once_with(37.5, 127.0)
         current.side_effect = weather.WeatherError("down")
+        self.assertEqual(self.client.get("/api/weather/?lat=37.5&lon=127").status_code, 200)  # served from the cache
         self.assertEqual(self.client.get("/api/weather/").status_code, 502)
         self.assertEqual(self.client.get("/api/weather/?lat=abc").status_code, 400)
