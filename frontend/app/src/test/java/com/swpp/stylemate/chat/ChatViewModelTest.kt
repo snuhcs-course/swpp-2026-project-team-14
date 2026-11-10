@@ -280,4 +280,71 @@ class ChatViewModelTest {
         viewModel.save(start)
         assertEquals(1, server.requests("POST /api/outfits/").size)
     }
+
+    @Test fun cancellingTheLastRequestRestoresTheOutfitLocksAndText() {
+        server.on("POST /api/outfits/chat/", chat("updated", "상의를 바꿨어요.", edited, changed = listOf("c")))
+        viewModel.toggleLock("b")
+        send("상의를 화려하게")
+        settled()
+        viewModel.toggleLock("c")
+        assertEquals("chat-1", viewModel.state.value.current?.id)
+        viewModel.cancelLast()
+        val state = viewModel.state.value
+        assertEquals("o1", state.current?.id)
+        assertEquals(setOf("b"), state.lockedIds)
+        assertTrue(state.turns.isEmpty())
+        assertTrue(state.snapshots.isEmpty())
+        assertEquals("상의를 화려하게", state.draft)  // the request comes back so it can be rewritten
+        assertFalse(state.canCancelLast)
+    }
+
+    @Test fun aCancelledRequestIsNotSentAsHistoryAgain() {
+        server.on("POST /api/outfits/chat/", chat("updated", "바꿨어요.", edited), chat("updated", "바꿨어요.", edited))
+        send("빨간색으로")
+        settled()
+        viewModel.cancelLast()
+        send("밝게")
+        settled()
+        val history = server.requests("POST /api/outfits/chat/").last().getJSONArray("history")
+        assertEquals(0, history.length())
+    }
+
+    @Test fun cancellingARunningRequestIgnoresItsLateResult() {
+        server.on("POST /api/outfits/chat/", chat("updated", "늦게 온 결과", edited, delayMs = 400))
+        send("밝게")
+        assertTrue(viewModel.state.value.busy)
+        viewModel.cancelLast()
+        assertFalse(viewModel.state.value.busy)
+        Thread.sleep(700)
+        assertEquals("o1", viewModel.state.value.current?.id)
+        assertTrue(viewModel.state.value.turns.isEmpty())
+    }
+
+    @Test fun undoingASaveTakesTheOutfitOutOfTheCodiBookAndAllowsSavingAgain() {
+        server.on("POST /api/outfits/", json(outfitJson("saved-1", "a", "b", saved = true).toString()),
+            json(outfitJson("saved-1", "a", "b", saved = true).toString()))
+        server.on("PUT /api/outfits/saved-1/", json(outfitJson("saved-1", "a", "b").toString()))
+        viewModel.save(start)
+        val saved = viewModel.state.await { it.lastSaved != null }
+        assertEquals("saved-1", saved.lastSaved?.outfitId)
+        viewModel.undoSave()
+        val undone = viewModel.state.await { !it.undoingSave && start.key !in it.savedKeys }
+        assertNull(undone.lastSaved)
+        assertEquals(false, server.requests("PUT /api/outfits/saved-1/").single().getBoolean("saved"))
+        viewModel.save(start)
+        viewModel.state.await { start.key in it.savedKeys }
+        val tokens = server.requests("POST /api/outfits/").map { it.getJSONObject("context").getString("chat_save_id") }
+        assertTrue(tokens[0] != tokens[1])  // a new token, so the server saves the outfit again
+    }
+
+    @Test fun failedSaveUndoKeepsTheOutfitSaved() {
+        server.on("POST /api/outfits/", json(outfitJson("saved-1", "a", "b", saved = true).toString()))
+        server.on("PUT /api/outfits/saved-1/", failure(500, "SERVER_ERROR", "취소 서버 오류"))
+        viewModel.save(start)
+        viewModel.state.await { it.lastSaved != null }
+        viewModel.undoSave()
+        val state = viewModel.state.await { !it.undoingSave && it.saveErrors.isNotEmpty() }
+        assertTrue(start.key in state.savedKeys)
+        assertEquals("취소 서버 오류", state.saveErrors[start.key])
+    }
 }

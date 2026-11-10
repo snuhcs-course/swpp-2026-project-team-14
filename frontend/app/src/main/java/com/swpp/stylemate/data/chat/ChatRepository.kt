@@ -81,6 +81,11 @@ class ChatRepository(
         throw OutfitApiException("INVALID_RESPONSE", "저장 결과를 확인하지 못했어요. 다시 시도해 주세요.")
     }
 
+    /** Takes a chat outfit back out of the 코디북 (the outfit row stays, as for the 코디북 tab). */
+    suspend fun unsave(outfitId: String) {
+        request("PUT", "/api/outfits/$outfitId/", JSONObject().put("saved", false))
+    }
+
     /** Read the persisted chat rating, independently of the Codi Book rating. */
     suspend fun feedbackState(outfit: Outfit): String? {
         val json = post("/api/outfits/chat/feedback/state/", JSONObject()
@@ -108,12 +113,14 @@ class ChatRepository(
         }
     }
 
-    private suspend fun post(path: String, body: JSONObject): JSONObject = withContext(Dispatchers.IO) {
+    private suspend fun post(path: String, body: JSONObject): JSONObject = request("POST", path, body)
+
+    private suspend fun request(method: String, path: String, body: JSONObject): JSONObject = withContext(Dispatchers.IO) {
         val authorization = try { account.authorization() }
             catch (e: AuthException) { throw OutfitApiException(e.code, e.message.orEmpty()) }
         val request = Request.Builder().url(base + path)
             .header("Authorization", authorization)
-            .post(body.toString().toRequestBody("application/json".toMediaType())).build()
+            .method(method, body.toString().toRequestBody("application/json".toMediaType())).build()
         val (status, text) = try {
             client.newCall(request).execute().use { it.code to it.body?.string().orEmpty() }
         } catch (e: IOException) {

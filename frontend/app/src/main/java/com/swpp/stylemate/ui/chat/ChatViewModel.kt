@@ -25,13 +25,20 @@ val CHAT_DIRECTIONS = linkedMapOf(
 private val OPPOSITES = mapOf("brighter" to "darker", "darker" to "brighter", "warmer" to "cooler",
     "cooler" to "warmer", "formal" to "casual", "casual" to "formal")
 
+/** What the chat looked like just before a request, so a request the user regrets can be taken back. */
+data class ChatCheckpoint(val current: Outfit?, val lockedIds: Set<String>, val snapshots: List<Outfit>)
+
 data class ChatTurn(
     val id: String = UUID.randomUUID().toString(),
     val request: ChatRequest,
     val result: ChatResult? = null,
     val error: String? = null,
     val loading: Boolean = true,
+    val before: ChatCheckpoint? = null,
 )
+
+/** A save that can still be undone from the snackbar. */
+data class SavedOutfit(val key: String, val outfitId: String)
 
 data class ChatState(
     val source: Outfit? = null,
@@ -52,8 +59,11 @@ data class ChatState(
     val feedbackLoaded: Set<String> = emptySet(),
     val feedbackLoading: Set<String> = emptySet(),
     val notice: String? = null,
+    val lastSaved: SavedOutfit? = null,
+    val undoingSave: Boolean = false,
 ) {
     val busy get() = turns.any { it.loading }
+    val canCancelLast get() = turns.lastOrNull()?.before != null && !undoingSave
     val allLocked get() = current?.items?.all { it.garmentId in lockedIds } == true
     val canSend get() = !busy && !allLocked && (draft.isNotBlank() || directions.isNotEmpty())
 }
@@ -62,6 +72,7 @@ data class ChatState(
 class ChatViewModel(private val repository: ChatRepository, private val taste: TasteStore) : ViewModel() {
     private val sessions = mutableMapOf<String, ChatState>()
     private val saveIds = mutableMapOf<String, String>()
+    private val jobs = mutableMapOf<String, kotlinx.coroutines.Job>()
     private var activeId: String? = null
     private val mutableState = MutableStateFlow(ChatState())
     val state = mutableState.asStateFlow()
@@ -110,7 +121,7 @@ class ChatViewModel(private val repository: ChatRepository, private val taste: T
         }.takeLast(6)
         val request = ChatRequest(current, s.lockedIds, s.directions, s.draft.trim(), body, s.weather,
             taste.load(), history, (s.snapshots + current).map { it.key })
-        val turn = ChatTurn(request = request)
+        val turn = ChatTurn(request = request, before = ChatCheckpoint(current, s.lockedIds, s.snapshots))
         update { it.copy(turns = it.turns + turn, draft = "", directions = emptySet(), notice = null) }
         execute(activeId!!, turn)
     }
@@ -138,10 +149,11 @@ class ChatViewModel(private val repository: ChatRepository, private val taste: T
     }
 
     private fun execute(sessionId: String, turn: ChatTurn) {
-        viewModelScope.launch {
+        jobs[turn.id] = viewModelScope.launch {
             try {
                 val result = repository.edit(turn.request)
                 update(sessionId) { s ->
+                    if (s.turns.none { it.id == turn.id }) return@update s  // the user took this request back
                     val undo = result.status == "undo"
                     val current = if (undo) s.snapshots.lastOrNull() ?: s.current else result.outfit ?: s.current
                     s.copy(current = current,
@@ -157,8 +169,26 @@ class ChatViewModel(private val repository: ChatRepository, private val taste: T
             catch (e: OutfitApiException) {
                 update(sessionId) { s -> s.copy(turns = s.turns.map { t ->
                     if (t.id == turn.id) turn.copy(loading = false, error = e.message) else t }) }
+            } finally {
+                jobs.remove(turn.id)
             }
         }
+    }
+
+    /**
+     * Takes back the last request, even while it is still running: the outfit, the locks and the earlier
+     * outfits go back to how they were before it, the request leaves the conversation (so it is not sent
+     * as history again), and its text returns to the input box so it can be rewritten.
+     */
+    fun cancelLast() {
+        val s = mutableState.value
+        val last = s.turns.lastOrNull() ?: return
+        val before = last.before ?: return
+        if (s.undoingSave) return
+        jobs.remove(last.id)?.cancel()
+        update { state -> state.copy(current = before.current, lockedIds = before.lockedIds, snapshots = before.snapshots,
+            turns = state.turns.dropLast(1), draft = last.request.text, directions = last.request.directions,
+            notice = "보낸 요청을 취소하고 그 전 코디로 돌아왔어요.") }
     }
 
     fun restore(outfit: Outfit) {
@@ -180,12 +210,34 @@ class ChatViewModel(private val repository: ChatRepository, private val taste: T
         update { it.copy(savingKeys = it.savingKeys + outfit.key, saveErrors = it.saveErrors - outfit.key) }
         viewModelScope.launch {
             try {
-                repository.save(outfit, saveId)
-                update(sessionId) { it.copy(savingKeys = it.savingKeys - outfit.key, savedKeys = it.savedKeys + outfit.key) }
+                val saved = repository.save(outfit, saveId)
+                update(sessionId) { it.copy(savingKeys = it.savingKeys - outfit.key, savedKeys = it.savedKeys + outfit.key,
+                    lastSaved = SavedOutfit(outfit.key, saved.id)) }
             } catch (e: CancellationException) { throw e }
             catch (e: OutfitApiException) {
                 update(sessionId) { it.copy(savingKeys = it.savingKeys - outfit.key,
                     saveErrors = it.saveErrors + (outfit.key to (e.message ?: "저장하지 못했어요."))) }
+            }
+        }
+    }
+
+    fun saveNoticeShown() = update { it.copy(lastSaved = null) }
+
+    /** Undo from the save snackbar: the outfit leaves the 코디북 and can be saved again later. */
+    fun undoSave() {
+        val sessionId = activeId ?: return
+        val saved = mutableState.value.lastSaved ?: return
+        update { it.copy(undoingSave = true, lastSaved = null) }
+        viewModelScope.launch {
+            try {
+                repository.unsave(saved.outfitId)
+                saveIds.remove(saved.key)  // a new save id, or the server would return the unsaved row as it is
+                update(sessionId) { it.copy(undoingSave = false, savedKeys = it.savedKeys - saved.key,
+                    notice = "코디북 저장을 취소했어요.") }
+            } catch (e: CancellationException) { throw e }
+            catch (e: OutfitApiException) {
+                update(sessionId) { it.copy(undoingSave = false,
+                    saveErrors = it.saveErrors + (saved.key to (e.message ?: "저장을 취소하지 못했어요."))) }
             }
         }
     }

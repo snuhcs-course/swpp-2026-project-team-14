@@ -38,8 +38,9 @@ fun ChatRoute(model: ChatViewModel, modifier: Modifier = Modifier) {
     BackHandler { model.close() }
     ChatScreen(state, onBack = model::close, onDraft = model::setDraft, onLock = model::toggleLock,
         onDirection = model::toggleDirection, onSend = model::send, onRetry = model::retry,
-        onUnlock = model::unlockAndRetry, onRestore = model::restore, onUndo = model::undo,
-        onSave = model::save, onFeedback = model::feedback, onLoadFeedback = model::loadFeedback, modifier = modifier)
+        onUnlock = model::unlockAndRetry, onRestore = model::restore, onUndo = model::cancelLast,
+        onSave = model::save, onFeedback = model::feedback, onLoadFeedback = model::loadFeedback, modifier = modifier,
+        onUndoSave = model::undoSave, onSaveNoticeShown = model::saveNoticeShown)
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -59,8 +60,16 @@ fun ChatScreen(
     modifier: Modifier = Modifier,
     onFeedback: (Outfit, String) -> Unit = { _, _ -> },
     onLoadFeedback: (Outfit) -> Unit = {},
+    onUndoSave: () -> Unit = {},
+    onSaveNoticeShown: () -> Unit = {},
 ) {
     val outfit = state.current ?: return
+    val snackbar = remember { SnackbarHostState() }
+    LaunchedEffect(state.lastSaved) {
+        if (state.lastSaved == null) return@LaunchedEffect
+        val action = snackbar.showSnackbar("코디북에 저장했어요.", actionLabel = "실행 취소", duration = SnackbarDuration.Long)
+        if (action == SnackbarResult.ActionPerformed) onUndoSave() else onSaveNoticeShown()
+    }
     var expanded by rememberSaveable(state.source?.id) { mutableStateOf(true) }
     val list = rememberLazyListState()
     val scope = rememberCoroutineScope()
@@ -71,8 +80,9 @@ fun ChatScreen(
         if (list.isScrollInProgress) followLatest = atBottom
     }
     val scrollRevision = state.turns.map { Triple(it.id, it.loading, it.result?.status ?: it.error) }
-    LaunchedEffect(scrollRevision) {
-        if (followLatest) list.animateScrollToItem((list.layoutInfo.totalItemsCount - 1).coerceAtLeast(0))
+    LaunchedEffect(scrollRevision, state.notice) {
+        followLatest = true
+        list.animateScrollToItem((list.layoutInfo.totalItemsCount - 1).coerceAtLeast(0))
     }
     LaunchedEffect(state.turns.size) { if (state.turns.isNotEmpty()) expanded = false }
     fun send() {
@@ -85,6 +95,7 @@ fun ChatScreen(
         modifier = modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding(),
         containerColor = MaterialTheme.colorScheme.background,
         contentWindowInsets = WindowInsets(0),
+        snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
             Surface(color = MaterialTheme.colorScheme.background) {
                 Column {
@@ -97,7 +108,8 @@ fun ChatScreen(
                             Text("옷을 눌러 잠그고, 원하는 방향을 골라요", style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                        TextButton(onClick = onUndo, enabled = !state.busy && state.snapshots.isNotEmpty()) { Text("되돌리기") }
+                        // Takes back the last request as a whole (outfit, locks, and the message itself).
+                        TextButton(onClick = onUndo, enabled = state.canCancelLast) { Text("요청 취소") }
                     }
                     Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text("현재 코디", Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
