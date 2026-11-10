@@ -35,6 +35,10 @@ data class HomeState(
 
 /** 오늘의 코디: outfits from the user's own wardrobe for today's weather, liked/disliked/saved. */
 class HomeViewModel(private val repository: OutfitRepository, private val taste: TasteStore) : ViewModel() {
+    companion object {
+        const val CAROUSEL_SIZE = 3
+    }
+
     private val mutableState = MutableStateFlow(HomeState())
     val state = mutableState.asStateFlow()
     private val seen = mutableListOf<String>()
@@ -60,9 +64,11 @@ class HomeViewModel(private val repository: OutfitRepository, private val taste:
                 val weather = if (refreshWeather || mutableState.value.weather == null) {
                     try { repository.weather() } catch (e: OutfitApiException) { mutableState.value.weather }
                 } else mutableState.value.weather
-                val result = repository.recommend(body, weather, taste.load(), seen, occasion = occasion)
-                seen += result.outfits.map { it.key }
-                mutableState.value = mutableState.value.copy(loading = false, weather = weather, outfits = result.outfits,
+                val result = repository.recommend(body, weather, taste.load(), seen, count = CAROUSEL_SIZE, occasion = occasion)
+                // A small wardrobe cannot fill the carousel with distinct outfits: show the best one alone.
+                val outfits = if (result.outfits.size < CAROUSEL_SIZE) result.outfits.take(1) else result.outfits
+                seen += outfits.map { it.key }
+                mutableState.value = mutableState.value.copy(loading = false, weather = weather, outfits = outfits,
                     index = 0, notes = result.notes)
             } catch (e: CancellationException) {
                 throw e
@@ -87,7 +93,13 @@ class HomeViewModel(private val repository: OutfitRepository, private val taste:
         if (body?.toString() != this.body?.toString() || state.outfits.isEmpty() || state.errorCode != null) load(body)
     }
 
-    /** "다른 코디": the next of the current set, then a new set that avoids the outfits already shown. */
+    /** The outfit swiped into view; like, save, chat and fitting act on it. */
+    fun select(index: Int) {
+        val state = mutableState.value
+        if (index in state.outfits.indices && index != state.index) mutableState.value = state.copy(index = index)
+    }
+
+    /** After a dislike: the next of the current set, then a new set that avoids the outfits already shown. */
     fun next() {
         val state = mutableState.value
         if (state.loading) return

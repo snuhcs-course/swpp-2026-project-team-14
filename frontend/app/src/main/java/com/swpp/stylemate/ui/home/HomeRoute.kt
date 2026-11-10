@@ -1,16 +1,23 @@
 // AI-generated with Claude Code (Claude Opus 5.5), 2026-10-12, reviewed by Dongkun Moon
 package com.swpp.stylemate.ui.home
 
-import android.Manifest
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.ui.Alignment
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.swpp.stylemate.data.calendar.CalendarConnection
 import com.swpp.stylemate.data.calendar.CalendarEvent
 import com.swpp.stylemate.data.calendar.DeviceCalendar
 import com.swpp.stylemate.data.calendar.EventOccasion
@@ -56,22 +63,18 @@ fun HomeRoute(profile: BodyProfile?, onSetupProfile: () -> Unit, onOpenWardrobe:
     })
     val state by model.state.collectAsStateWithLifecycle()
     val body = remember(profile) { profile?.let { JSONObject(BodyProfileJson.encode(it)) } }
-    // Today's events from the phone's own calendars: one permission, no account sign-in.
-    var calendarAllowed by remember { mutableStateOf(DeviceCalendar.hasPermission(context)) }
+    // Today's outfit-related events from the phone's own calendars, once connected in My Profile.
+    val store = remember(account) { LocalUserStore.forContext(context, account.userId) }
     var events by remember { mutableStateOf<List<CalendarEvent>>(emptyList()) }
-    val calendarPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        calendarAllowed = granted
-    }
-    LaunchedEffect(calendarAllowed) {
-        if (!calendarAllowed) return@LaunchedEffect
-        events = DeviceCalendar.today(context)
+    LaunchedEffect(account.userId) {
+        events = if (CalendarConnection.enabled(context, store)) EventOccasion.relevant(DeviceCalendar.today(context)) else emptyList()
         model.setOccasion(EventOccasion.of(events))
     }
     LaunchedEffect(body?.toString(), wardrobeRevision) { model.ensureLoaded(body, wardrobeRevision) }
     HomeScreen(
         state = state,
         onRefresh = { model.load(body) },
-        onNext = model::next,
+        onSelect = model::select,
         onLike = { model.feedback("liked") },
         onDislike = { model.feedback("disliked") },
         onSave = model::toggleSaved,
@@ -83,31 +86,26 @@ fun HomeRoute(profile: BodyProfile?, onSetupProfile: () -> Unit, onOpenWardrobe:
         fitting = { outfit, previewModifier ->
             FittingPreview(onExpand = { selected = outfit }, modifier = previewModifier)
         },
-        todayPlan = {
-            TodayPlan(calendarAllowed, events, onConnect = { calendarPermission.launch(Manifest.permission.READ_CALENDAR) })
-        },
+        todayPlan = if (events.isEmpty()) null else {{ TodayPlan(events) }},
     )
     selected?.let { FittingDialog(it, fitting, account, onClose = { selected = null }, profile = profile) }
 }
 
-/** One line about today's schedule, or a button that asks for the calendar permission. */
+/** Today's next outfit-related event, e.g. "오늘 14:00 회사 면접 · 강남역". */
 @Composable
-internal fun TodayPlan(allowed: Boolean, events: List<CalendarEvent>, onConnect: () -> Unit) {
+internal fun TodayPlan(events: List<CalendarEvent>) {
     val time = remember { DateTimeFormatter.ofPattern("HH:mm") }
-    when {
-        !allowed -> TextButton(onClick = onConnect, contentPadding = PaddingValues(0.dp)) {
-            Text("캘린더 연결하고 오늘 일정에 맞춰 받기", style = MaterialTheme.typography.bodyMedium)
-        }
-        events.isEmpty() -> Text("오늘 남은 일정이 없어요", style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant)
-        else -> {
-            val first = events.first()
-            val start = if (first.allDay) "종일" else Instant.ofEpochMilli(first.begin).atZone(ZoneId.systemDefault()).format(time)
+    val first = events.first()
+    val start = if (first.allDay) "종일" else Instant.ofEpochMilli(first.begin).atZone(ZoneId.systemDefault()).format(time)
+    Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.secondaryContainer) {
+        Row(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Filled.DateRange, contentDescription = "오늘 일정", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.width(8.dp))
             // Event facts only: home scoring does not use the occasion yet, so the line does not promise it.
             Text(listOfNotNull("오늘 $start ${first.title}", first.location,
                 if (events.size > 1) "외 ${events.size - 1}개" else null).joinToString(" · "),
-                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary,
-                maxLines = 2, overflow = TextOverflow.Ellipsis)
+                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSecondaryContainer,
+                maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }

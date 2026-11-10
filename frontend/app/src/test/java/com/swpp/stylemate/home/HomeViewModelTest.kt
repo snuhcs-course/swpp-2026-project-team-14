@@ -42,6 +42,7 @@ class HomeViewModelTest {
 
     private val first = outfitJson("o1", "a", "b")
     private val second = outfitJson("o2", "c", "d")
+    private val third = outfitJson("o3", "e", "f")
 
     @Before fun setUp() {
         Dispatchers.setMain(UnconfinedTestDispatcher())
@@ -57,9 +58,9 @@ class HomeViewModelTest {
 
     private fun loaded(): HomeState = viewModel.state.await { !it.loading }
 
-    private fun loadTwoOutfits() {
+    private fun loadThreeOutfits() {
         server.on("GET /api/weather/", json(weather))
-        server.on("POST /api/outfits/recommend/", recommendation(first, second))
+        server.on("POST /api/outfits/recommend/", recommendation(first, second, third))
         viewModel.load(body)
         loaded()
     }
@@ -67,7 +68,7 @@ class HomeViewModelTest {
     private fun idle(): HomeState = viewModel.state.await { !it.acting }
 
     @Test fun garmentDeletionInvalidatesOldRecommendationsOnlyOncePerRevision() {
-        loadTwoOutfits()
+        loadThreeOutfits()
         server.on("GET /api/weather/", json(weather))
         server.on("POST /api/outfits/recommend/", recommendation(second))
         viewModel.ensureLoaded(body, wardrobeRevision = 1)
@@ -85,14 +86,15 @@ class HomeViewModelTest {
 
     @Test fun loadShowsFirstOutfitWithWeatherAndNotes() {
         server.on("GET /api/weather/", json(weather))
-        server.on("POST /api/outfits/recommend/", recommendation(first, second, notes = listOf("작은 셔츠는 작아요.")))
+        server.on("POST /api/outfits/recommend/", recommendation(first, second, third, notes = listOf("작은 셔츠는 작아요.")))
         viewModel.load(body)
         val state = loaded()
-        assertEquals(listOf("o1", "o2"), state.outfits.map { it.id })
+        assertEquals(listOf("o1", "o2", "o3"), state.outfits.map { it.id })
         assertEquals("o1", state.current?.id)
         assertEquals("맑음", state.weather?.label)
         assertEquals(listOf("작은 셔츠는 작아요."), state.notes)
         val sent = server.requests("POST /api/outfits/recommend/").single()
+        assertEquals(HomeViewModel.CAROUSEL_SIZE, sent.getInt("count"))
         assertEquals(0.1, sent.getJSONObject("preference").getJSONObject("weights").getDouble("색상:화이트"), 0.0)
         assertEquals(0, sent.getJSONArray("seen_keys").length())
     }
@@ -121,7 +123,7 @@ class HomeViewModelTest {
     }
 
     @Test fun ensureLoadedReloadsOnlyWhenTheBodyProfileChanges() {
-        loadTwoOutfits()
+        loadThreeOutfits()
         viewModel.ensureLoaded(JSONObject(body.toString()))
         assertEquals(1, server.requests("POST /api/outfits/recommend/").size)
         server.on("GET /api/weather/", json(weather))
@@ -131,21 +133,56 @@ class HomeViewModelTest {
         assertEquals(2, server.requests("POST /api/outfits/recommend/").size)
     }
 
-    @Test fun nextMovesThroughTheSetThenLoadsANewSetAvoidingShownOutfits() {
-        loadTwoOutfits()
-        viewModel.next()
-        assertEquals("o2", viewModel.state.value.current?.id)
-        server.on("POST /api/outfits/recommend/", recommendation(outfitJson("o3", "e", "f")))
-        viewModel.next()
-        val state = loaded()
-        assertEquals("o3", state.current?.id)
-        assertEquals(1, server.requests("GET /api/weather/").size) // 새 세트는 날씨를 다시 부르지 않음
+    @Test fun fewerThanThreeOutfitsShowOnlyTheBestOne() {
+        server.on("GET /api/weather/", json(weather))
+        server.on("POST /api/outfits/recommend/", recommendation(first, second))
+        viewModel.load(body)
+        assertEquals(listOf("o1"), loaded().outfits.map { it.id })
+        server.on("POST /api/outfits/recommend/", recommendation(third))
+        viewModel.load(body)
+        loaded()
+        // Only the outfit that was shown counts as seen.
         val seen = server.requests("POST /api/outfits/recommend/").last().getJSONArray("seen_keys")
-        assertEquals(listOf("w:a+w:b", "w:c+w:d"), (0 until seen.length()).map { seen.getString(it) })
+        assertEquals(listOf("w:a+w:b"), (0 until seen.length()).map { seen.getString(it) })
+    }
+
+    @Test fun swipingSelectsTheOutfitThatActionsUse() {
+        loadThreeOutfits()
+        viewModel.select(2)
+        assertEquals("o3", viewModel.state.value.current?.id)
+        viewModel.select(7)
+        assertEquals("o3", viewModel.state.value.current?.id)
+        server.on("PUT /api/outfits/o3/", json(outfitJson("o3", "e", "f", saved = true).toString()))
+        viewModel.toggleSaved()
+        assertTrue(idle().outfits[2].saved)
+    }
+
+    @Test fun refreshReplacesTheWholeSetAndStartsFromTheFirst() {
+        loadThreeOutfits()
+        viewModel.select(1)
+        server.on("GET /api/weather/", json(weather))
+        server.on("POST /api/outfits/recommend/", recommendation(outfitJson("o4", "g", "h"), outfitJson("o5", "i", "j"), outfitJson("o6", "k", "l")))
+        viewModel.load(body)
+        val state = loaded()
+        assertEquals(listOf("o4", "o5", "o6"), state.outfits.map { it.id })
+        assertEquals(0, state.index)
+        val seen = server.requests("POST /api/outfits/recommend/").last().getJSONArray("seen_keys")
+        assertEquals(listOf("w:a+w:b", "w:c+w:d", "w:e+w:f"), (0 until seen.length()).map { seen.getString(it) })
+    }
+
+    @Test fun dislikingTheLastOutfitLoadsANewSet() {
+        loadThreeOutfits()
+        viewModel.select(2)
+        server.on("POST /api/outfits/o3/feedback/", feedbackResult(outfitJson("o3", "e", "f", feedback = "disliked"), -0.1))
+        server.on("POST /api/outfits/recommend/", recommendation(outfitJson("o4", "g", "h"), outfitJson("o5", "i", "j"), outfitJson("o6", "k", "l")))
+        viewModel.feedback("disliked")
+        val state = viewModel.state.await { !it.loading && !it.acting && it.current?.id == "o4" }
+        assertEquals(1, server.requests("GET /api/weather/").size) // 새 세트는 날씨를 다시 부르지 않음
+        assertEquals(3, state.outfits.size)
     }
 
     @Test fun likeStoresFeedbackAndTheUpdatedTaste() {
-        loadTwoOutfits()
+        loadThreeOutfits()
         server.on("POST /api/outfits/o1/feedback/", feedbackResult(outfitJson("o1", "a", "b", feedback = "liked"), 0.3))
         viewModel.feedback("liked")
         val state = idle()
@@ -156,7 +193,7 @@ class HomeViewModelTest {
     }
 
     @Test fun tappingTheActiveFeedbackAgainCancelsIt() {
-        loadTwoOutfits()
+        loadThreeOutfits()
         server.on("POST /api/outfits/o1/feedback/",
             feedbackResult(outfitJson("o1", "a", "b", feedback = "liked"), 0.3),
             feedbackResult(outfitJson("o1", "a", "b"), 0.3))
@@ -170,7 +207,7 @@ class HomeViewModelTest {
     }
 
     @Test fun dislikeMovesOnToTheNextOutfit() {
-        loadTwoOutfits()
+        loadThreeOutfits()
         server.on("POST /api/outfits/o1/feedback/", feedbackResult(outfitJson("o1", "a", "b", feedback = "disliked"), -0.1))
         viewModel.feedback("disliked")
         val state = idle()
@@ -180,7 +217,7 @@ class HomeViewModelTest {
     }
 
     @Test fun feedbackFailureKeepsTheOutfitAndTasteAndShowsTheError() {
-        loadTwoOutfits()
+        loadThreeOutfits()
         server.on("POST /api/outfits/o1/feedback/", failure(400, "INVALID_FEEDBACK"))
         viewModel.feedback("liked")
         val state = idle()
@@ -191,7 +228,7 @@ class HomeViewModelTest {
     }
 
     @Test fun actionsAreIgnoredWhileAnotherIsRunning() {
-        loadTwoOutfits()
+        loadThreeOutfits()
         server.on("POST /api/outfits/o1/feedback/", feedbackResult(outfitJson("o1", "a", "b", feedback = "liked"), 0.3).setBodyDelay(300, java.util.concurrent.TimeUnit.MILLISECONDS))
         viewModel.feedback("liked")
         assertTrue(viewModel.state.value.acting)
@@ -203,7 +240,7 @@ class HomeViewModelTest {
     }
 
     @Test fun toggleSavedUpdatesTheOutfitAndShowsWhereItWent() {
-        loadTwoOutfits()
+        loadThreeOutfits()
         server.on("PUT /api/outfits/o1/", json(outfitJson("o1", "a", "b", saved = true).toString()),
             json(outfitJson("o1", "a", "b", saved = false).toString()))
         viewModel.toggleSaved()
@@ -218,7 +255,7 @@ class HomeViewModelTest {
     }
 
     @Test fun saveFailureShowsTheErrorAndKeepsTheOutfitUnsaved() {
-        loadTwoOutfits()
+        loadThreeOutfits()
         // error 코드 없는 5xx는 HTTP_500으로 분류되어 코디 공통 오류 문구가 나온다
         server.on("PUT /api/outfits/o1/", okhttp3.mockwebserver.MockResponse().setResponseCode(500).setBody("{}"))
         viewModel.toggleSaved()
@@ -228,7 +265,7 @@ class HomeViewModelTest {
     }
 
     @Test fun shownMessageIsCleared() {
-        loadTwoOutfits()
+        loadThreeOutfits()
         server.on("PUT /api/outfits/o1/", json(outfitJson("o1", "a", "b", saved = true).toString()))
         viewModel.toggleSaved()
         idle()
@@ -238,14 +275,14 @@ class HomeViewModelTest {
 
     @Test fun calendarOccasionIsSentWithTheRecommendationButNotTheEvent() {
         viewModel.setOccasion("데이트")
-        loadTwoOutfits()
+        loadThreeOutfits()
         val sent = server.requests("POST /api/outfits/recommend/").single()
         assertEquals("데이트", sent.getString("occasion"))
         assertEquals(false, sent.toString().contains("성수동"))
     }
 
     @Test fun noCalendarOccasionSendsNoOccasionField() {
-        loadTwoOutfits()
+        loadThreeOutfits()
         assertEquals(false, server.requests("POST /api/outfits/recommend/").single().has("occasion"))
     }
 }

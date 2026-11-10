@@ -5,7 +5,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.Text
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import com.swpp.stylemate.data.recommendation.Outfit
@@ -37,7 +40,7 @@ class HomeScreenTest {
     private fun show(state: HomeState, events: MutableList<String> = mutableListOf()) {
         compose.setContent {
             StyleMateTheme {
-                HomeScreen(state, onRefresh = { events += "refresh" }, onNext = { events += "next" },
+                HomeScreen(state, onRefresh = { events += "refresh" }, onSelect = { events += "select:$it" },
                     onLike = { events += "like" }, onDislike = { events += "dislike" }, onSave = { events += "save" },
                     onSetupProfile = { events += "setup" }, onOpenWardrobe = { events += "wardrobe" },
                     onMessageShown = {}, photo = { item, modifier -> Box(modifier) { Text("사진:${item.name}") } })
@@ -47,11 +50,11 @@ class HomeScreenTest {
 
     @Test fun outfitFromMyWardrobeWithWeatherReasonsAndActions() {
         val events = mutableListOf<String>()
-        show(HomeState(weather = weather, outfits = listOf(outfit, outfit.copy(id = "o2", key = "k2"))), events)
+        show(HomeState(weather = weather, outfits = listOf(outfit, outfit.copy(id = "o2", key = "k2"), outfit.copy(id = "o3", key = "k3"))), events)
         compose.onNodeWithText("오늘의 코디").assertIsDisplayed()
         compose.onNodeWithText("서울 18°C · 맑음 · 가을 간절기").assertIsDisplayed()
-        compose.onNodeWithText("사진:베이지 니트").assertIsDisplayed()
-        compose.onNodeWithText("1 / 2").assertIsDisplayed()
+        compose.onNodeWithContentDescription("코디 1 / 3").assertIsDisplayed()
+        compose.onNodeWithText("코디 1").assertIsDisplayed()
         compose.onNodeWithText("내 옷장에서 100% 구성").assertIsDisplayed()
         compose.onNodeWithText("어울림 78점").assertIsDisplayed()
         compose.onNodeWithText("베이지 · 블랙 뉴트럴 조합이라 차분해요.").performScrollTo().assertIsDisplayed()
@@ -59,8 +62,21 @@ class HomeScreenTest {
         compose.onNodeWithText("좋아요").performScrollTo().performClick()
         compose.onNodeWithText("별로예요").performClick()
         compose.onNodeWithText("코디북에 저장").performClick()
-        compose.onNodeWithText("다른 코디 보기").performClick()
-        compose.runOnIdle { assertEquals(listOf("like", "dislike", "save", "next"), events) }
+        compose.onNodeWithText("새로 추천").performClick()
+        compose.runOnIdle { assertEquals(listOf("select:0", "like", "dislike", "save", "refresh"), events) }
+    }
+
+    @Test fun swipingShowsTheNextOutfitOfTheSet() {
+        val events = mutableListOf<String>()
+        show(HomeState(weather = weather, outfits = listOf(outfit, outfit.copy(id = "o2", key = "k2"), outfit.copy(id = "o3", key = "k3"))), events)
+        compose.onNodeWithContentDescription("코디 1 / 3").performTouchInput { swipeLeft() }
+        compose.waitUntil(5_000) { "select:1" in events }
+    }
+
+    @Test fun aSingleOutfitHasNoPagesAndSuggestsAddingClothes() {
+        show(HomeState(weather = weather, outfits = listOf(outfit)))
+        compose.onNodeWithText("코디 1").assertDoesNotExist()
+        compose.onNodeWithText("옷을 더 등록하면 코디 3개를 나란히 비교할 수 있어요.").performScrollTo().assertIsDisplayed()
     }
 
     @Test fun emptyStatesLeadToTheProfileOrTheWardrobe() {
