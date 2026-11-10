@@ -53,7 +53,7 @@ class OutfitRepository(private val account: AccountAccess) {
     suspend fun weather(): Weather = parseWeather(call("GET", "/api/weather/"))
 
     suspend fun recommend(body: JSONObject, weather: Weather?, preference: JSONObject?, seenKeys: List<String>,
-                          count: Int = 3, anchorId: String? = null): Recommendation {
+                          count: Int = 3, anchorId: String? = null, occasion: String? = null): Recommendation {
         val request = JSONObject()
             .put("body", body)
             .put("count", count)
@@ -61,6 +61,7 @@ class OutfitRepository(private val account: AccountAccess) {
             .put("preference", preference ?: JSONObject.NULL)
         if (weather != null) request.put("weather", weather.json) else request.put("temp", DEFAULT_TEMP)
         anchorId?.let { request.put("anchor_id", it) }
+        occasion?.let { request.put("occasion", it) }  // only the occasion word, never the calendar event itself
         val result = call("POST", "/api/outfits/recommend/", request)
         return parseRecommendation(result)
     }

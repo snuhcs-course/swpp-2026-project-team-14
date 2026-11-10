@@ -235,6 +235,19 @@ class HomeViewModelTest {
         viewModel.messageShown()
         assertNull(viewModel.state.value.message)
     }
+
+    @Test fun calendarOccasionIsSentWithTheRecommendationButNotTheEvent() {
+        viewModel.setOccasion("데이트")
+        loadTwoOutfits()
+        val sent = server.requests("POST /api/outfits/recommend/").single()
+        assertEquals("데이트", sent.getString("occasion"))
+        assertEquals(false, sent.toString().contains("성수동"))
+    }
+
+    @Test fun noCalendarOccasionSendsNoOccasionField() {
+        loadTwoOutfits()
+        assertEquals(false, server.requests("POST /api/outfits/recommend/").single().has("occasion"))
+    }
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)

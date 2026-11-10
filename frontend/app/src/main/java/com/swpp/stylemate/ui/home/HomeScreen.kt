@@ -80,6 +80,7 @@ fun HomeScreen(
     modifier: Modifier = Modifier,
     onChat: (() -> Unit)? = null,
     fitting: (@Composable (Outfit, Modifier) -> Unit)? = null,
+    todayPlan: (@Composable () -> Unit)? = null,
     photo: @Composable (OutfitGarment, Modifier) -> Unit = { item, m -> GarmentThumbnail(item.imageUrl, item.name, m) },
 ) {
     val snackbar = remember { SnackbarHostState() }
@@ -120,8 +121,9 @@ fun HomeScreen(
                     Text("새로 추천")
                 }
             }
-            Text(weatherLine(state), Modifier.padding(top = 4.dp, bottom = 16.dp),
+            Text(weatherLine(state), Modifier.padding(top = 4.dp, bottom = if (todayPlan == null) 16.dp else 4.dp),
                 style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            todayPlan?.let { Box(Modifier.padding(bottom = 12.dp)) { it() } }
             when {
                 state.errorCode == HomeState.NO_PROFILE -> EmptyState("체형 정보가 필요해요",
                     "체형 분석을 하면 내 몸에 맞는 옷으로 코디를 골라 드려요.", "체형 분석하기", onSetupProfile)

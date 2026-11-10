@@ -41,6 +41,10 @@ class HomeViewModel(private val repository: OutfitRepository, private val taste:
     private var body: JSONObject? = null
     private var job: Job? = null
     private var wardrobeRevision = 0
+    private var occasion: String? = null
+
+    /** The occasion of today's calendar events (from the device), sent with the next recommendation. */
+    fun setOccasion(value: String?) { occasion = value }
 
     /** First load, or the refresh button: new weather and new outfits. */
     fun load(body: JSONObject?, refreshWeather: Boolean = true) {
@@ -56,7 +60,7 @@ class HomeViewModel(private val repository: OutfitRepository, private val taste:
                 val weather = if (refreshWeather || mutableState.value.weather == null) {
                     try { repository.weather() } catch (e: OutfitApiException) { mutableState.value.weather }
                 } else mutableState.value.weather
-                val result = repository.recommend(body, weather, taste.load(), seen)
+                val result = repository.recommend(body, weather, taste.load(), seen, occasion = occasion)
                 seen += result.outfits.map { it.key }
                 mutableState.value = mutableState.value.copy(loading = false, weather = weather, outfits = result.outfits,
                     index = 0, notes = result.notes)
