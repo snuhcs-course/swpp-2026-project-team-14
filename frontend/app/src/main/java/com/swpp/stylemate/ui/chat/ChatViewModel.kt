@@ -37,9 +37,6 @@ data class ChatTurn(
     val before: ChatCheckpoint? = null,
 )
 
-/** A save that can still be undone from the snackbar. */
-data class SavedOutfit(val key: String, val outfitId: String)
-
 data class ChatState(
     val source: Outfit? = null,
     val current: Outfit? = null,
@@ -59,11 +56,10 @@ data class ChatState(
     val feedbackLoaded: Set<String> = emptySet(),
     val feedbackLoading: Set<String> = emptySet(),
     val notice: String? = null,
-    val lastSaved: SavedOutfit? = null,
-    val undoingSave: Boolean = false,
+    val savedIds: Map<String, String> = emptyMap(),  // 코디 key -> saved outfit id, for taking a save back
 ) {
     val busy get() = turns.any { it.loading }
-    val canCancelLast get() = turns.lastOrNull()?.before != null && !undoingSave
+    val canCancelLast get() = turns.lastOrNull()?.before != null
     val allLocked get() = current?.items?.all { it.garmentId in lockedIds } == true
     val canSend get() = !busy && !allLocked && (draft.isNotBlank() || directions.isNotEmpty())
 }
@@ -85,7 +81,8 @@ class ChatViewModel(private val repository: ChatRepository, private val taste: T
         activeId = outfit.id
         val session = sessions[outfit.id]?.takeIf { it.body?.toString() == body.toString() }
             ?: ChatState(source = outfit, current = outfit, body = body, weather = weather,
-                savedKeys = if (outfit.saved) setOf(outfit.key) else emptySet())
+                savedKeys = if (outfit.saved) setOf(outfit.key) else emptySet(),
+                savedIds = if (outfit.saved) mapOf(outfit.key to outfit.id) else emptyMap())
         sessions[outfit.id] = session
         mutableState.value = session
         mutableVisible.value = true
@@ -184,7 +181,6 @@ class ChatViewModel(private val repository: ChatRepository, private val taste: T
         val s = mutableState.value
         val last = s.turns.lastOrNull() ?: return
         val before = last.before ?: return
-        if (s.undoingSave) return
         jobs.remove(last.id)?.cancel()
         update { state -> state.copy(current = before.current, lockedIds = before.lockedIds, snapshots = before.snapshots,
             turns = state.turns.dropLast(1), draft = last.request.text, directions = last.request.directions,
@@ -202,17 +198,22 @@ class ChatViewModel(private val repository: ChatRepository, private val taste: T
 
     fun undo() { mutableState.value.snapshots.lastOrNull()?.let(::restore) }
 
-    fun save(outfit: Outfit) {
+    /** One button: saves the outfit to the 코디북, or takes the save back when it is already there. */
+    fun toggleSave(outfit: Outfit) {
         val s = mutableState.value
+        if (outfit.key in s.savingKeys) return
+        if (outfit.key in s.savedKeys) unsave(outfit) else save(outfit)
+    }
+
+    private fun save(outfit: Outfit) {
         val sessionId = activeId ?: return
-        if (outfit.key in s.savedKeys || outfit.key in s.savingKeys) return
         val saveId = saveIds.getOrPut(outfit.key) { UUID.randomUUID().toString() }
         update { it.copy(savingKeys = it.savingKeys + outfit.key, saveErrors = it.saveErrors - outfit.key) }
         viewModelScope.launch {
             try {
                 val saved = repository.save(outfit, saveId)
                 update(sessionId) { it.copy(savingKeys = it.savingKeys - outfit.key, savedKeys = it.savedKeys + outfit.key,
-                    lastSaved = SavedOutfit(outfit.key, saved.id)) }
+                    savedIds = it.savedIds + (outfit.key to saved.id)) }
             } catch (e: CancellationException) { throw e }
             catch (e: OutfitApiException) {
                 update(sessionId) { it.copy(savingKeys = it.savingKeys - outfit.key,
@@ -221,23 +222,20 @@ class ChatViewModel(private val repository: ChatRepository, private val taste: T
         }
     }
 
-    fun saveNoticeShown() = update { it.copy(lastSaved = null) }
-
-    /** Undo from the save snackbar: the outfit leaves the 코디북 and can be saved again later. */
-    fun undoSave() {
+    private fun unsave(outfit: Outfit) {
         val sessionId = activeId ?: return
-        val saved = mutableState.value.lastSaved ?: return
-        update { it.copy(undoingSave = true, lastSaved = null) }
+        val id = mutableState.value.savedIds[outfit.key] ?: return
+        update { it.copy(savingKeys = it.savingKeys + outfit.key, saveErrors = it.saveErrors - outfit.key) }
         viewModelScope.launch {
             try {
-                repository.unsave(saved.outfitId)
-                saveIds.remove(saved.key)  // a new save id, or the server would return the unsaved row as it is
-                update(sessionId) { it.copy(undoingSave = false, savedKeys = it.savedKeys - saved.key,
-                    notice = "코디북 저장을 취소했어요.") }
+                repository.unsave(id)
+                saveIds.remove(outfit.key)  // a new save id, or the server would return the unsaved row as it is
+                update(sessionId) { it.copy(savingKeys = it.savingKeys - outfit.key, savedKeys = it.savedKeys - outfit.key,
+                    savedIds = it.savedIds - outfit.key) }
             } catch (e: CancellationException) { throw e }
             catch (e: OutfitApiException) {
-                update(sessionId) { it.copy(undoingSave = false,
-                    saveErrors = it.saveErrors + (saved.key to (e.message ?: "저장을 취소하지 못했어요."))) }
+                update(sessionId) { it.copy(savingKeys = it.savingKeys - outfit.key,
+                    saveErrors = it.saveErrors + (outfit.key to (e.message ?: "저장을 취소하지 못했어요."))) }
             }
         }
     }

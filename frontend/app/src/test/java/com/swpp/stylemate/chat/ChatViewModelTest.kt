@@ -250,7 +250,7 @@ class ChatViewModelTest {
 
     @Test fun savingMarksTheOutfitSaved() {
         server.on("POST /api/outfits/", json(outfitJson("saved-1", "a", "b", saved = true).toString()))
-        viewModel.save(start)
+        viewModel.toggleSave(start)
         val state = viewModel.state.await { start.key !in it.savingKeys }
         assertTrue(start.key in state.savedKeys)
         val sent = server.requests("POST /api/outfits/").single()
@@ -261,11 +261,11 @@ class ChatViewModelTest {
     @Test fun failedSaveShowsTheErrorAndRetryReusesTheSameToken() {
         server.on("POST /api/outfits/", failure(500, "SERVER_ERROR", "저장 서버 오류"),
             json(outfitJson("saved-1", "a", "b", saved = true).toString()))
-        viewModel.save(start)
+        viewModel.toggleSave(start)
         val failed = viewModel.state.await { start.key !in it.savingKeys }
         assertEquals("저장 서버 오류", failed.saveErrors[start.key])
         assertFalse(start.key in failed.savedKeys)
-        viewModel.save(start)
+        viewModel.toggleSave(start)
         val saved = viewModel.state.await { start.key in it.savedKeys }
         assertNull(saved.saveErrors[start.key])
         val tokens = server.requests("POST /api/outfits/").map { it.getJSONObject("context").getString("chat_save_id") }
@@ -275,9 +275,9 @@ class ChatViewModelTest {
 
     @Test fun savingAnAlreadySavedOutfitDoesNothing() {
         server.on("POST /api/outfits/", json(outfitJson("saved-1", "a", "b", saved = true).toString()))
-        viewModel.save(start)
+        viewModel.toggleSave(start)
         viewModel.state.await { start.key in it.savedKeys }
-        viewModel.save(start)
+        viewModel.toggleSave(start)
         assertEquals(1, server.requests("POST /api/outfits/").size)
     }
 
@@ -320,30 +320,30 @@ class ChatViewModelTest {
         assertTrue(viewModel.state.value.turns.isEmpty())
     }
 
-    @Test fun undoingASaveTakesTheOutfitOutOfTheCodiBookAndAllowsSavingAgain() {
+    @Test fun tappingSaveAgainTakesTheOutfitOutOfTheCodiBookAndAllowsSavingAgain() {
         server.on("POST /api/outfits/", json(outfitJson("saved-1", "a", "b", saved = true).toString()),
             json(outfitJson("saved-1", "a", "b", saved = true).toString()))
         server.on("PUT /api/outfits/saved-1/", json(outfitJson("saved-1", "a", "b").toString()))
-        viewModel.save(start)
-        val saved = viewModel.state.await { it.lastSaved != null }
-        assertEquals("saved-1", saved.lastSaved?.outfitId)
-        viewModel.undoSave()
-        val undone = viewModel.state.await { !it.undoingSave && start.key !in it.savedKeys }
-        assertNull(undone.lastSaved)
+        viewModel.toggleSave(start)
+        val saved = viewModel.state.await { start.key in it.savedKeys && start.key !in it.savingKeys }
+        assertEquals("saved-1", saved.savedIds[start.key])
+        viewModel.toggleSave(start)
+        val undone = viewModel.state.await { start.key !in it.savedKeys && start.key !in it.savingKeys }
+        assertNull(undone.savedIds[start.key])
         assertEquals(false, server.requests("PUT /api/outfits/saved-1/").single().getBoolean("saved"))
-        viewModel.save(start)
-        viewModel.state.await { start.key in it.savedKeys }
+        viewModel.toggleSave(start)
+        viewModel.state.await { start.key in it.savedKeys && start.key !in it.savingKeys }
         val tokens = server.requests("POST /api/outfits/").map { it.getJSONObject("context").getString("chat_save_id") }
         assertTrue(tokens[0] != tokens[1])  // a new token, so the server saves the outfit again
     }
 
-    @Test fun failedSaveUndoKeepsTheOutfitSaved() {
+    @Test fun failedUnsaveKeepsTheOutfitSaved() {
         server.on("POST /api/outfits/", json(outfitJson("saved-1", "a", "b", saved = true).toString()))
         server.on("PUT /api/outfits/saved-1/", failure(500, "SERVER_ERROR", "취소 서버 오류"))
-        viewModel.save(start)
-        viewModel.state.await { it.lastSaved != null }
-        viewModel.undoSave()
-        val state = viewModel.state.await { !it.undoingSave && it.saveErrors.isNotEmpty() }
+        viewModel.toggleSave(start)
+        viewModel.state.await { start.key in it.savedKeys && start.key !in it.savingKeys }
+        viewModel.toggleSave(start)
+        val state = viewModel.state.await { start.key !in it.savingKeys && it.saveErrors.isNotEmpty() }
         assertTrue(start.key in state.savedKeys)
         assertEquals("취소 서버 오류", state.saveErrors[start.key])
     }

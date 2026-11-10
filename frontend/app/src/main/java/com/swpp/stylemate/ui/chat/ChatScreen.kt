@@ -14,7 +14,9 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -39,8 +41,7 @@ fun ChatRoute(model: ChatViewModel, modifier: Modifier = Modifier) {
     ChatScreen(state, onBack = model::close, onDraft = model::setDraft, onLock = model::toggleLock,
         onDirection = model::toggleDirection, onSend = model::send, onRetry = model::retry,
         onUnlock = model::unlockAndRetry, onRestore = model::restore, onUndo = model::cancelLast,
-        onSave = model::save, onFeedback = model::feedback, onLoadFeedback = model::loadFeedback, modifier = modifier,
-        onUndoSave = model::undoSave, onSaveNoticeShown = model::saveNoticeShown)
+        onSave = model::toggleSave, onFeedback = model::feedback, onLoadFeedback = model::loadFeedback, modifier = modifier)
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -60,16 +61,8 @@ fun ChatScreen(
     modifier: Modifier = Modifier,
     onFeedback: (Outfit, String) -> Unit = { _, _ -> },
     onLoadFeedback: (Outfit) -> Unit = {},
-    onUndoSave: () -> Unit = {},
-    onSaveNoticeShown: () -> Unit = {},
 ) {
     val outfit = state.current ?: return
-    val snackbar = remember { SnackbarHostState() }
-    LaunchedEffect(state.lastSaved) {
-        if (state.lastSaved == null) return@LaunchedEffect
-        val action = snackbar.showSnackbar("코디북에 저장했어요.", actionLabel = "실행 취소", duration = SnackbarDuration.Long)
-        if (action == SnackbarResult.ActionPerformed) onUndoSave() else onSaveNoticeShown()
-    }
     var expanded by rememberSaveable(state.source?.id) { mutableStateOf(true) }
     val list = rememberLazyListState()
     val scope = rememberCoroutineScope()
@@ -84,6 +77,10 @@ fun ChatScreen(
         followLatest = true
         list.animateScrollToItem((list.layoutInfo.totalItemsCount - 1).coerceAtLeast(0))
     }
+    // Saving or rating grows the newest card; stay at the bottom unless the user scrolled up to read.
+    LaunchedEffect(state.savedKeys, state.savingKeys, state.saveErrors, state.feedbackMessages) {
+        if (followLatest) list.animateScrollToItem((list.layoutInfo.totalItemsCount - 1).coerceAtLeast(0))
+    }
     LaunchedEffect(state.turns.size) { if (state.turns.isNotEmpty()) expanded = false }
     fun send() {
         if (!state.canSend) return
@@ -95,11 +92,10 @@ fun ChatScreen(
         modifier = modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding(),
         containerColor = MaterialTheme.colorScheme.background,
         contentWindowInsets = WindowInsets(0),
-        snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
             Surface(color = MaterialTheme.colorScheme.background) {
                 Column {
-                    Row(Modifier.fillMaxWidth().padding(end = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Row(Modifier.fillMaxWidth().padding(end = 20.dp), verticalAlignment = Alignment.CenterVertically) {
                         IconButton(onClick = onBack) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "오늘의 코디로 돌아가기")
                         }
@@ -108,8 +104,6 @@ fun ChatScreen(
                             Text("옷을 눌러 잠그고, 원하는 방향을 골라요", style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                        // Takes back the last request as a whole (outfit, locks, and the message itself).
-                        TextButton(onClick = onUndo, enabled = state.canCancelLast) { Text("요청 취소") }
                     }
                     Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text("현재 코디", Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
@@ -187,7 +181,10 @@ fun ChatScreen(
                                 Row(Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp),
                                     verticalAlignment = Alignment.CenterVertically) {
                                     CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-                                    Text("잠근 옷을 유지하며 코디를 찾고 있어요", style = MaterialTheme.typography.bodySmall)
+                                    Text("잠근 옷을 유지하며 코디를 찾고 있어요", Modifier.weight(1f, fill = false),
+                                        style = MaterialTheme.typography.bodySmall)
+                                    if (state.canCancelLast && state.turns.lastOrNull()?.id == turn.id) TextButton(onClick = onUndo,
+                                        contentPadding = PaddingValues(horizontal = 8.dp)) { Text("취소") }
                                 }
                             }
                             turn.error != null -> {
@@ -212,6 +209,17 @@ fun ChatScreen(
                                 }
                                 result.notes.forEach { note -> Text(note, style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                            }
+                        }
+                        // Right under the newest answer, where the eye is when the result is not what was wanted.
+                        if (!turn.loading && state.canCancelLast && state.turns.lastOrNull()?.id == turn.id) {
+                            OutlinedButton(onClick = onUndo, modifier = Modifier.align(Alignment.End).heightIn(min = 40.dp),
+                                shape = RoundedCornerShape(50), contentPadding = PaddingValues(horizontal = 14.dp),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant)) {
+                                Icon(Icons.Filled.Close, contentDescription = null, Modifier.size(16.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text("이 요청 취소하고 이전 코디로", style = MaterialTheme.typography.labelLarge)
                             }
                         }
                     }
@@ -315,12 +323,11 @@ private fun ResultCard(outfit: Outfit, changedIds: Set<String>, lockedIds: Set<S
                 if (state.current?.key != outfit.key) {
                     TextButton(onClick = { onRestore(outfit) }, enabled = !state.busy, modifier = Modifier.weight(1f)) { Text("이 코디로 돌아가기") }
                 }
-                Button(onClick = { onSave(outfit) }, enabled = outfit.key !in state.savedKeys && outfit.key !in state.savingKeys,
-                    modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp)) {
-                    Text(when (outfit.key) { in state.savedKeys -> "저장됨"; in state.savingKeys -> "저장 중…";
-                        in state.saveErrors -> "저장 다시 시도"; else -> "코디북에 저장" })
-                }
+                SaveToggle(saved = outfit.key in state.savedKeys, pending = outfit.key in state.savingKeys,
+                    failed = outfit.key in state.saveErrors, onClick = { onSave(outfit) }, modifier = Modifier.weight(1f))
             }
+            if (outfit.key in state.savedKeys && outfit.key !in state.savingKeys) Text("코디북에 저장했어요. 다시 누르면 저장이 취소돼요.",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (!loaded && !loading) {
                 TextButton(onClick = { onLoadFeedback(outfit) }) { Text("만족도 다시 불러오기") }
             }
@@ -328,4 +335,28 @@ private fun ResultCard(outfit: Outfit, changedIds: Set<String>, lockedIds: Set<S
                 color = MaterialTheme.colorScheme.error) }
         }
     }
+}
+
+/** Saved: a quiet outlined star button that takes the save back. Not saved: the primary action. */
+@Composable
+private fun SaveToggle(saved: Boolean, pending: Boolean, failed: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val label = when {
+        pending && saved -> "저장 취소 중…"
+        pending -> "저장 중…"
+        saved -> "코디북에 저장됨"
+        failed -> "저장 다시 시도"
+        else -> "코디북에 저장"
+    }
+    val content: @Composable RowScope.() -> Unit = {
+        if (saved) {
+            Icon(Icons.Filled.Star, contentDescription = null, Modifier.size(18.dp))
+            Spacer(Modifier.width(6.dp))
+        }
+        Text(label)
+    }
+    val toggle = modifier.semantics { stateDescription = if (saved) "저장됨" else "저장 안 됨" }
+    if (saved) OutlinedButton(onClick = onClick, enabled = !pending, modifier = toggle, shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary), content = content)
+    else Button(onClick = onClick, enabled = !pending, modifier = toggle, shape = RoundedCornerShape(12.dp), content = content)
 }
