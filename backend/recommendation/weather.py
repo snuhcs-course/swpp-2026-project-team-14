@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import socket
+import time
 from dataclasses import asdict, dataclass
 from urllib.error import URLError
 from urllib.parse import urlencode
@@ -71,6 +72,73 @@ def current(lat: float = SEOUL[0], lon: float = SEOUL[1], timeout: int = 8) -> W
 
 class WeatherError(Exception):
     pass
+
+
+FORECAST_DAYS = 16  # Open-Meteo's daily forecast horizon
+_DAILY_CACHE: dict[tuple, tuple[float, "DayForecast"]] = {}
+
+
+@dataclass
+class DayForecast:
+    """One day's range at one place, for a planned outing ("내일 부산 여행")."""
+    day: str  # ISO date
+    temp_min: float
+    temp_max: float
+    apparent_min: float
+    apparent_max: float
+    rain_chance: int  # %, the day's maximum
+    rain: bool
+    snow: bool
+    label: str
+
+    @property
+    def apparent(self) -> float:
+        """The season band temperature: the middle of the day's felt range."""
+        return round((self.apparent_min + self.apparent_max) / 2, 1)
+
+    @property
+    def spread(self) -> float:
+        return self.temp_max - self.temp_min
+
+    def public(self) -> dict:
+        return {**asdict(self), "apparent": self.apparent}
+
+
+def parse_daily(data: dict) -> DayForecast:
+    d = data["daily"]
+    code = int(d["weather_code"][0])
+    chance = int(d.get("precipitation_probability_max", [0])[0] or 0)
+    t_min, t_max = float(d["temperature_2m_min"][0]), float(d["temperature_2m_max"][0])
+    snow = code in SNOW_CODES
+    return DayForecast(
+        day=d["time"][0], temp_min=t_min, temp_max=t_max,
+        apparent_min=float(d.get("apparent_temperature_min", [t_min])[0]),
+        apparent_max=float(d.get("apparent_temperature_max", [t_max])[0]),
+        rain_chance=chance, snow=snow, rain=not snow and (code in RAIN_CODES or chance >= 60),
+        label=label_of(code),
+    )
+
+
+def daily(lat: float, lon: float, day: str, timeout: int = 8) -> DayForecast:
+    """The forecast for `day` (ISO date) at a place, cached for 30 minutes."""
+    key = (round(lat, 2), round(lon, 2), day)
+    hit = _DAILY_CACHE.get(key)
+    if hit and time.monotonic() - hit[0] < 1800:
+        return hit[1]
+    query = urlencode({
+        "latitude": lat, "longitude": lon, "timezone": "auto", "start_date": day, "end_date": day,
+        "daily": "temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,"
+                 "precipitation_probability_max,weather_code",
+    })
+    try:
+        with urlopen(f"{URL}?{query}", timeout=timeout) as r:
+            forecast = parse_daily(json.loads(r.read(64 * 1024)))
+    except (URLError, socket.timeout, TimeoutError, KeyError, IndexError, TypeError, ValueError) as e:
+        raise WeatherError(str(e)) from None
+    if len(_DAILY_CACHE) > 256:
+        _DAILY_CACHE.clear()
+    _DAILY_CACHE[key] = (time.monotonic(), forecast)
+    return forecast
 
 
 def manual(temp: float) -> Weather:

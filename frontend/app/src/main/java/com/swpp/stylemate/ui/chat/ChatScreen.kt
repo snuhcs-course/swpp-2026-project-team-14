@@ -138,7 +138,7 @@ fun ChatScreen(
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
                     OutlinedTextField(value = state.draft, onValueChange = onDraft,
                         modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp),
-                        placeholder = { Text("더 원하는 게 있나요? (선택)") },
+                        placeholder = { Text("예: 내일 부산 여행 가는데 뭐 입지?") },
                         label = { Text("메시지") }, maxLines = 3,
                         trailingIcon = {
                             IconButton(onClick = ::send, enabled = state.canSend) {
