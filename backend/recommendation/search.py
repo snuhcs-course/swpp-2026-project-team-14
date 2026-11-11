@@ -47,6 +47,15 @@ WEATHER_RELAX_PENALTY = 0.25
 MASKED_SHARE = 0.5
 MMR_LAMBDA = 0.5
 
+# 어울림 점수 shown in the app (0-100, drawn as stars). Ranking keeps the raw total; this only rescales what
+# people read. C is a percentile against real K-Fashion outfits, so a perfectly ordinary real outfit already
+# sits at 0.5 and raw totals bunch in the 60s. Knots are quantiles of raw totals of recommended outfits
+# (2 x 1,500 outfits from 600 random wardrobes of saved garments x 4 bodies x 6 temperatures x 4 style choices,
+# two seeds; quantiles agreed within 0.01 while the extremes moved by 0.07): the 5th, 25th, 50th, 75th and 95th
+# percentiles go to 50, 70, 80, 86 and 93 (2.5 to 4.5 stars). Quantile knots ignore extreme outfits, the map is
+# monotone (the order never changes), and beyond the outer knots it runs linearly to 0 and 100.
+DISPLAY_KNOTS = ((0.0, 0.0), (0.474, 50.0), (0.559, 70.0), (0.624, 80.0), (0.683, 86.0), (0.759, 93.0), (1.0, 100.0))
+
 
 @dataclass
 class Request:
@@ -315,10 +324,24 @@ def _mmr(outfits: list[dict], count: int) -> list[dict]:
     return picked
 
 
+def display_score(raw: float) -> int:
+    """Raw total (0-1) to the 0-100 어울림 점수, piecewise linear through DISPLAY_KNOTS."""
+    xs, ys = zip(*DISPLAY_KNOTS)
+    return int(round(float(np.interp(max(0.0, min(1.0, raw)), xs, ys))))
+
+
+def _shown_total(components: dict, penalty: float, informative_taste: bool) -> float:
+    """The total people read. Taste with no feedback and no style choices is a flat 0.5 for every outfit:
+    it cannot tell outfits apart, so it is left out and the other weights are rescaled."""
+    keys = [k for k in WEIGHTS if k != "taste" or informative_taste]
+    weight = sum(WEIGHTS[k] for k in keys)
+    return sum(WEIGHTS[k] * components[k] for k in keys) / weight - penalty
+
+
 def _present(catalog: Catalog, req: Request, band: season.Band, o: dict, has_feedback: bool) -> dict:
     items = [c.item for c in o["cands"]]
     components = {"compat": o["compat"], "body": o["body"], "color": o["color"], "season": o["season"], "taste": o["taste"]}
-    total = sum(WEIGHTS[k] * v for k, v in components.items()) - o["penalty"]
+    raw = _shown_total(components, o["penalty"], has_feedback or bool(req.styles))
     reasons = [r for r in (
         explain.compat_reason(catalog, items),
         explain.body_reason(req.body, req.pref_fit, float(np.mean([c.fit for c in o["cands"]])),
@@ -341,7 +364,8 @@ def _present(catalog: Catalog, req: Request, band: season.Band, o: dict, has_fee
         "key": o["key"],
         "items": out_items,
         "template": "+".join(o["slots"]),
-        "total": round(100 * max(0.0, min(1.0, total))),
+        "total": display_score(raw),
+        "raw_total": round(raw, 4),
         "components": {k: round(100 * v) for k, v in components.items()},
         "reasons": reasons,
         "seen": o["seen"],
