@@ -64,6 +64,17 @@ fun ChatScreen(
 ) {
     val outfit = state.current ?: return
     var expanded by rememberSaveable(state.source?.id) { mutableStateOf(true) }
+    var confirmCancel by remember { mutableStateOf(false) }
+    val askCancel = { confirmCancel = true }
+    if (confirmCancel) AlertDialog(
+        onDismissRequest = { confirmCancel = false },
+        title = { Text("요청을 취소할까요?") },
+        text = { Text("이 요청을 보내기 전 코디와 잠금으로 돌아가요. 보낸 내용은 입력창에 다시 채워 둘게요.") },
+        confirmButton = {
+            TextButton(onClick = { confirmCancel = false; if (state.canCancelLast) onUndo() }) { Text("요청 취소") }
+        },
+        dismissButton = { TextButton(onClick = { confirmCancel = false }) { Text("계속 보기") } },
+    )
     val list = rememberLazyListState()
     val scope = rememberCoroutineScope()
     val keyboard = LocalSoftwareKeyboardController.current
@@ -183,7 +194,7 @@ fun ChatScreen(
                                     CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
                                     Text("잠근 옷을 유지하며 코디를 찾고 있어요", Modifier.weight(1f, fill = false),
                                         style = MaterialTheme.typography.bodySmall)
-                                    if (state.canCancelLast && state.turns.lastOrNull()?.id == turn.id) TextButton(onClick = onUndo,
+                                    if (state.canCancelLast && state.turns.lastOrNull()?.id == turn.id) TextButton(onClick = askCancel,
                                         contentPadding = PaddingValues(horizontal = 8.dp)) { Text("취소") }
                                 }
                             }
@@ -205,21 +216,20 @@ fun ChatScreen(
                                 }
                                 result.outfit?.let { resultOutfit ->
                                     ResultCard(resultOutfit, result.changedIds, result.lockedIds, state,
-                                        onRestore, onSave, onFeedback, onLoadFeedback)
+                                        onRestore, onSave, onFeedback, onLoadFeedback,
+                                        onCancel = if (state.canCancelLast && state.turns.lastOrNull()?.id == turn.id) askCancel else null)
                                 }
                                 result.notes.forEach { note -> Text(note, style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant) }
                             }
                         }
-                        // Right under the newest answer, where the eye is when the result is not what was wanted.
-                        if (!turn.loading && state.canCancelLast && state.turns.lastOrNull()?.id == turn.id) {
-                            OutlinedButton(onClick = onUndo, modifier = Modifier.align(Alignment.End).heightIn(min = 40.dp),
-                                shape = RoundedCornerShape(50), contentPadding = PaddingValues(horizontal = 14.dp),
-                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant)) {
-                                Icon(Icons.Filled.Close, contentDescription = null, Modifier.size(16.dp))
-                                Spacer(Modifier.width(6.dp))
-                                Text("이 요청 취소하고 이전 코디로", style = MaterialTheme.typography.labelLarge)
+                        // Answers without an outfit (a question back, an error) have no rating row to sit in.
+                        val noOutfit = turn.result?.outfit == null
+                        if (!turn.loading && noOutfit && state.canCancelLast && state.turns.lastOrNull()?.id == turn.id) {
+                            TextButton(onClick = askCancel, modifier = Modifier.align(Alignment.End),
+                                contentPadding = PaddingValues(horizontal = 8.dp)) {
+                                Text("요청 취소", style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                     }
@@ -290,7 +300,8 @@ private fun OutfitItems(
 private fun ResultCard(outfit: Outfit, changedIds: Set<String>, lockedIds: Set<String>, state: ChatState,
                        onRestore: (Outfit) -> Unit, onSave: (Outfit) -> Unit,
                        onFeedback: (Outfit, String) -> Unit = { _, _ -> },
-                       onLoadFeedback: (Outfit) -> Unit = {}) {
+                       onLoadFeedback: (Outfit) -> Unit = {},
+                       onCancel: (() -> Unit)? = null) {
     LaunchedEffect(outfit.key) { onLoadFeedback(outfit) }
     Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainer,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
@@ -305,7 +316,7 @@ private fun ResultCard(outfit: Outfit, changedIds: Set<String>, lockedIds: Set<S
             val loaded = outfit.key in state.feedbackLoaded
             val loading = outfit.key in state.feedbackLoading
             val pending = state.feedbackPending.isNotEmpty() || loading || !loaded
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
                 TextButton(onClick = { onFeedback(outfit, "liked") }, enabled = !pending) {
                     Icon(if (feedback == "liked") Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
                         contentDescription = null, tint = MaterialTheme.colorScheme.primary)
@@ -315,6 +326,14 @@ private fun ResultCard(outfit: Outfit, changedIds: Set<String>, lockedIds: Set<S
                 TextButton(onClick = { onFeedback(outfit, "disliked") }, enabled = !pending) {
                     Text(if (feedback == "disliked") "별로예요 취소" else "별로예요",
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                // Quiet on purpose: next to the rating, for when the answer missed; it asks before undoing.
+                if (onCancel != null) {
+                    Spacer(Modifier.weight(1f))
+                    TextButton(onClick = onCancel, contentPadding = PaddingValues(horizontal = 8.dp)) {
+                        Text("요청 취소", style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
             }
             state.feedbackMessages[outfit.key]?.let { Text(it, style = MaterialTheme.typography.bodySmall,
