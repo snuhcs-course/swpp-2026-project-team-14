@@ -69,6 +69,9 @@ import com.swpp.stylemate.data.recommendation.Outfit
 import com.swpp.stylemate.data.recommendation.OutfitRepository
 import com.swpp.stylemate.data.recommendation.OutfitGarment
 import com.swpp.stylemate.data.wardrobe.WardrobeRepository
+import com.swpp.stylemate.ui.components.StarRating
+import com.swpp.stylemate.ui.components.starsOf
+import com.swpp.stylemate.ui.components.starsText
 import kotlinx.coroutines.CancellationException
 import java.util.Locale
 
@@ -162,7 +165,8 @@ private fun OutfitCarousel(state: HomeState, onSelect: (Int) -> Unit, photo: @Co
     // A new recommendation is a new set of pages that starts from the first one.
     key(state.outfits.firstOrNull()?.id) {
         val pager = rememberPagerState(initialPage = state.index) { state.outfits.size }
-        LaunchedEffect(pager) { snapshotFlow { pager.settledPage }.collect(onSelect) }
+        // The details below follow the card as soon as it is more than halfway in, not only after it settles.
+        LaunchedEffect(pager) { snapshotFlow { pager.currentPage }.collect(onSelect) }
         LaunchedEffect(state.index) { if (pager.currentPage != state.index) pager.animateScrollToPage(state.index) }
         HorizontalPager(pager, Modifier.fillMaxWidth(),
             contentPadding = PaddingValues(horizontal = if (state.outfits.size > 1) 32.dp else 20.dp),
@@ -180,8 +184,19 @@ private fun OutfitCarousel(state: HomeState, onSelect: (Int) -> Unit, photo: @Co
                     Text("코디 ${page + 1}", Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                         style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
                 }
-                if (item.saved) Icon(Icons.Filled.Star, contentDescription = "코디북에 저장됨",
-                    Modifier.align(Alignment.TopEnd).padding(14.dp).size(20.dp), tint = MaterialTheme.colorScheme.primary)
+                // Each card carries its own rating, so swiping compares them at a glance.
+                item.score?.let { score ->
+                    Surface(Modifier.align(Alignment.TopEnd).padding(12.dp), shape = RoundedCornerShape(50),
+                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)) {
+                        Row(Modifier.padding(horizontal = 10.dp, vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text("어울림", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Spacer(Modifier.width(4.dp))
+                            StarRating(starsOf(score), size = 14.dp)
+                            Spacer(Modifier.width(4.dp))
+                            Text(starsText(starsOf(score)), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
                 if (state.loading) CircularProgressIndicator(Modifier.align(Alignment.Center))
             }
         }
@@ -212,7 +227,6 @@ private fun weatherLine(state: HomeState): String {
 private fun OutfitDetails(state: HomeState, outfit: Outfit, onLike: () -> Unit, onDislike: () -> Unit, onSave: () -> Unit) {
     Row(Modifier.fillMaxWidth().padding(top = 16.dp), horizontalArrangement = Arrangement.Center) {
         Pill(Icons.Filled.Check, "내 옷장에서 100% 구성")
-        outfit.score?.let { Spacer(Modifier.width(8.dp)); Pill(null, "어울림 ${it}점", muted = true) }
     }
     FlowRow(Modifier.fillMaxWidth().padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)) {

@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.Text
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performTouchInput
@@ -20,6 +21,7 @@ import com.swpp.stylemate.ui.home.HomeState
 import com.swpp.stylemate.ui.theme.StyleMateTheme
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -56,7 +58,8 @@ class HomeScreenTest {
         compose.onNodeWithContentDescription("코디 1 / 3").assertIsDisplayed()
         compose.onNodeWithText("코디 1").assertIsDisplayed()
         compose.onNodeWithText("내 옷장에서 100% 구성").assertIsDisplayed()
-        compose.onNodeWithText("어울림 78점").assertIsDisplayed()
+        // 78 -> 4.0 stars, on each card
+        assertTrue(compose.onAllNodesWithContentDescription("어울림 별점 4.0점 (5점 만점)").fetchSemanticsNodes().isNotEmpty())
         compose.onNodeWithText("베이지 · 블랙 뉴트럴 조합이라 차분해요.").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("베이지 니트: 내 몸 기준 루즈 (가슴 여유 16 cm)").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("좋아요").performScrollTo().performClick()
