@@ -9,9 +9,9 @@ def test_display_score_keeps_the_order_and_the_ends():
     assert search.display_score(-0.3) == 0 and search.display_score(1.7) == 100
 
 
-def test_typical_recommended_outfits_read_about_four_stars():
+def test_typical_recommended_outfits_read_four_and_a_half_stars():
     # knots: 5th/25th/50th/75th/95th percentile of recommended outfits
-    assert [search.display_score(x) for x, _ in search.DISPLAY_KNOTS[1:-1]] == [50, 70, 80, 86, 93]
+    assert [search.display_score(x) for x, _ in search.DISPLAY_KNOTS[1:-1]] == [70, 85, 90, 95, 98]
 
 
 def test_flat_taste_is_left_out_of_the_shown_total():

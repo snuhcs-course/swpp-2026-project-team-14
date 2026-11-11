@@ -52,9 +52,10 @@ MMR_LAMBDA = 0.5
 # sits at 0.5 and raw totals bunch in the 60s. Knots are quantiles of raw totals of recommended outfits
 # (2 x 1,500 outfits from 600 random wardrobes of saved garments x 4 bodies x 6 temperatures x 4 style choices,
 # two seeds; quantiles agreed within 0.01 while the extremes moved by 0.07): the 5th, 25th, 50th, 75th and 95th
-# percentiles go to 50, 70, 80, 86 and 93 (2.5 to 4.5 stars). Quantile knots ignore extreme outfits, the map is
+# percentiles go to 70, 85, 90, 95 and 98, so a typical pick reads 4.5 stars, the top quarter 5 and only
+# the weakest tenth 3.5 or less. Quantile knots ignore extreme outfits, the map is
 # monotone (the order never changes), and beyond the outer knots it runs linearly to 0 and 100.
-DISPLAY_KNOTS = ((0.0, 0.0), (0.474, 50.0), (0.559, 70.0), (0.624, 80.0), (0.683, 86.0), (0.759, 93.0), (1.0, 100.0))
+DISPLAY_KNOTS = ((0.0, 0.0), (0.474, 70.0), (0.559, 85.0), (0.624, 90.0), (0.683, 95.0), (0.759, 98.0), (1.0, 100.0))
 
 
 @dataclass
