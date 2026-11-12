@@ -5,6 +5,7 @@ wardrobe/
 .env
 .env.*
 tests/
+loadtest/
 scripts/*
 !scripts/prepare_landmarks.py
 **/__pycache__/
