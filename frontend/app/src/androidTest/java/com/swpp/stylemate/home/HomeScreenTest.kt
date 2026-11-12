@@ -16,6 +16,7 @@ import com.swpp.stylemate.data.recommendation.Outfit
 import com.swpp.stylemate.data.recommendation.OutfitGarment
 import com.swpp.stylemate.data.recommendation.Reason
 import com.swpp.stylemate.data.recommendation.Weather
+import com.swpp.stylemate.ui.home.BodyHint
 import com.swpp.stylemate.ui.home.HomeScreen
 import com.swpp.stylemate.ui.home.HomeState
 import com.swpp.stylemate.ui.theme.StyleMateTheme
@@ -54,7 +55,8 @@ class HomeScreenTest {
         val events = mutableListOf<String>()
         show(HomeState(weather = weather, outfits = listOf(outfit, outfit.copy(id = "o2", key = "k2"), outfit.copy(id = "o3", key = "k3"))), events)
         compose.onNodeWithText("오늘의 코디").assertIsDisplayed()
-        compose.onNodeWithText("서울 18°C · 맑음 · 가을 간절기").assertIsDisplayed()
+        compose.onNodeWithText("서울").assertIsDisplayed()
+        compose.onNodeWithText(" · 18°C · 맑음 · 가을 간절기").assertIsDisplayed()
         compose.onNodeWithContentDescription("코디 1 / 3").assertIsDisplayed()
         compose.onNodeWithText("코디 1").assertIsDisplayed()
         compose.onNodeWithText("내 옷장에서 100% 구성").assertIsDisplayed()
@@ -67,6 +69,24 @@ class HomeScreenTest {
         compose.onNodeWithText("코디북에 저장").performClick()
         compose.onNodeWithText("새로 추천").performClick()
         compose.runOnIdle { assertEquals(listOf("select:0", "like", "dislike", "save", "refresh"), events) }
+    }
+
+    @Test fun theRegionOpensAPickerAndTheBodyHintStartsTheAnalysis() {
+        val events = mutableListOf<String>()
+        compose.setContent {
+            StyleMateTheme {
+                HomeScreen(HomeState(weather = weather, outfits = listOf(outfit)), onRefresh = {}, onLike = {},
+                    onDislike = {}, onSave = {}, onSetupProfile = {}, onOpenWardrobe = {}, onMessageShown = {},
+                    hint = { BodyHint { events += "setup" } }, onRegion = { events += "region:$it" },
+                    photo = { item, modifier -> Box(modifier) { Text("사진:${item.name}") } })
+            }
+        }
+        compose.onNodeWithText("체형 분석을 하면 내 몸에 맞는 핏으로 골라 드려요").performClick()
+        compose.onNodeWithText("서울").performClick()
+        compose.onNodeWithText("날씨를 볼 지역").assertIsDisplayed()
+        compose.onNodeWithText("대구").performClick()
+        compose.onNodeWithText("날씨를 볼 지역").assertDoesNotExist()
+        assertEquals(listOf("setup", "region:대구"), events)
     }
 
     @Test fun swipingShowsTheNextOutfitOfTheSet() {

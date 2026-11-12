@@ -1,5 +1,6 @@
 package com.swpp.stylemate.home
 
+import okhttp3.mockwebserver.MockResponse
 import com.swpp.stylemate.data.RoutedServer
 import com.swpp.stylemate.data.await
 import com.swpp.stylemate.data.failure
@@ -82,6 +83,41 @@ class HomeViewModelTest {
         viewModel.load(null)
         assertEquals(HomeState.NO_PROFILE, viewModel.state.value.errorCode)
         assertTrue(server.requests("POST /api/outfits/recommend/").isEmpty())
+    }
+
+    @Test fun changingTheRegionFetchesItsWeatherAndNewOutfits() {
+        assertEquals("서울", viewModel.state.value.region)
+        loadThreeOutfits()
+        server.on("GET /api/weather/", json(weather))
+        server.on("POST /api/outfits/recommend/", recommendation(second, third, first))
+        viewModel.setRegion(com.swpp.stylemate.data.recommendation.HomeRegion.of("부산")!!)
+        val state = viewModel.state.await { !it.loading && it.weather != null }
+        assertEquals("부산", state.region)
+        assertEquals("o2", state.current?.id)
+        assertEquals(2, server.requests("GET /api/weather/").size)
+        assertEquals(2, server.requests("POST /api/outfits/recommend/").size)
+        // the same region again changes nothing
+        viewModel.setRegion(com.swpp.stylemate.data.recommendation.HomeRegion.of("부산")!!)
+        assertEquals(2, server.requests("GET /api/weather/").size)
+    }
+
+    @Test fun theSavedRegionIsUsedFromTheFirstLoadWithoutAnExtraCall() {
+        viewModel.setRegion(com.swpp.stylemate.data.recommendation.HomeRegion.of("제주")!!, reload = false)
+        assertTrue(server.requests("GET /api/weather/").isEmpty())
+        loadThreeOutfits()
+        assertEquals("제주", loaded().region)
+        assertEquals(1, server.requests("GET /api/weather/").size)
+    }
+
+    @Test fun aFailedRefreshKeepsTheOutfitsAndSaysWhy() {
+        loadThreeOutfits()
+        server.on("GET /api/weather/", json(weather))
+        server.on("POST /api/outfits/recommend/", MockResponse().setResponseCode(500).setBody("oops"))
+        viewModel.load(body)
+        val state = loaded()
+        assertEquals(listOf("o1", "o2", "o3"), state.outfits.map { it.id })
+        assertNull(state.errorCode)
+        assertEquals(com.swpp.stylemate.data.recommendation.ErrorMessages.SERVER, state.message)
     }
 
     @Test fun loadShowsFirstOutfitWithWeatherAndNotes() {

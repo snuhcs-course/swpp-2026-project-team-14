@@ -4,7 +4,9 @@ package com.swpp.stylemate.ui.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.swpp.stylemate.data.recommendation.Outfit
+import com.swpp.stylemate.data.recommendation.HomeRegion
 import com.swpp.stylemate.data.recommendation.OutfitApiException
+import com.swpp.stylemate.data.recommendation.Region
 import com.swpp.stylemate.data.recommendation.OutfitRepository
 import com.swpp.stylemate.data.recommendation.TasteStore
 import com.swpp.stylemate.data.recommendation.Weather
@@ -25,6 +27,7 @@ data class HomeState(
     val errorCode: String? = null,
     val acting: Boolean = false,
     val message: String? = null,
+    val region: String = HomeRegion.SEOUL.name,
 ) {
     val current: Outfit? get() = outfits.getOrNull(index)
 
@@ -46,6 +49,16 @@ class HomeViewModel(private val repository: OutfitRepository, private val taste:
     private var job: Job? = null
     private var wardrobeRevision = 0
     private var occasion: String? = null
+    private var region = HomeRegion.SEOUL
+
+    /** The region whose weather home uses. Changing it after the first load fetches its weather and new outfits. */
+    fun setRegion(value: Region, reload: Boolean = true) {
+        if (value == region) return
+        region = value
+        // The old region's weather must not stay on screen under the new name.
+        mutableState.value = mutableState.value.copy(region = value.name, weather = null)
+        if (reload && (mutableState.value.outfits.isNotEmpty() || mutableState.value.errorCode != null)) load(body)
+    }
 
     /** The occasion of today's calendar events (from the device), sent with the next recommendation. */
     fun setOccasion(value: String?) { occasion = value }
@@ -62,7 +75,7 @@ class HomeViewModel(private val repository: OutfitRepository, private val taste:
         job = viewModelScope.launch {
             try {
                 val weather = if (refreshWeather || mutableState.value.weather == null) {
-                    try { repository.weather() } catch (e: OutfitApiException) { mutableState.value.weather }
+                    try { repository.weather(region) } catch (e: OutfitApiException) { mutableState.value.weather }
                 } else mutableState.value.weather
                 val result = repository.recommend(body, weather, taste.load(), seen, count = CAROUSEL_SIZE, occasion = occasion)
                 // A small wardrobe cannot fill the carousel with distinct outfits: show the best one alone.
@@ -73,7 +86,12 @@ class HomeViewModel(private val repository: OutfitRepository, private val taste:
             } catch (e: CancellationException) {
                 throw e
             } catch (e: OutfitApiException) {
-                mutableState.value = mutableState.value.copy(loading = false, error = e.message, errorCode = e.code)
+                val shown = mutableState.value
+                // A failed refresh keeps the outfits on screen, so the reason goes to a snackbar instead of the
+                // empty-state card it would otherwise never reach.
+                mutableState.value = if (shown.outfits.isNotEmpty() && e.code != "WARDROBE_TOO_SMALL")
+                    shown.copy(loading = false, message = e.message)
+                else shown.copy(loading = false, error = e.message, errorCode = e.code)
             }
         }
     }

@@ -1,6 +1,16 @@
 // AI-generated with Claude Code (Claude Opus 5.5), 2026-10-12, reviewed by Dongkun Moon
 package com.swpp.stylemate.ui.home
 
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.ui.semantics.Role
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.AlertDialog
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.text.style.TextOverflow
+import com.swpp.stylemate.data.recommendation.HomeRegion
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -46,6 +56,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
@@ -97,11 +108,15 @@ fun HomeScreen(
     onChat: (() -> Unit)? = null,
     fitting: (@Composable (Outfit, Modifier) -> Unit)? = null,
     todayPlan: (@Composable () -> Unit)? = null,
+    hint: (@Composable () -> Unit)? = null,
+    onRegion: ((String) -> Unit)? = null,
     photo: @Composable (OutfitGarment, Modifier) -> Unit = { item, m -> GarmentThumbnail(item.imageUrl, item.name, m) },
 ) {
     val snackbar = remember { SnackbarHostState() }
     LaunchedEffect(state.message) {
-        state.message?.let { snackbar.showSnackbar(it); onMessageShown() }
+        // A reason plus what to do next takes longer to read than "저장했어요".
+        state.message?.let { snackbar.showSnackbar(it, duration = if (it.length > 25) SnackbarDuration.Long else SnackbarDuration.Short)
+            onMessageShown() }
     }
     val outfit = state.current
     val canRefresh = !state.loading && state.errorCode != HomeState.NO_PROFILE
@@ -134,9 +149,9 @@ fun HomeScreen(
             Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
                 val side = Modifier.padding(horizontal = 20.dp)
                 Text("오늘의 코디", side.padding(top = 16.dp), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                Text(weatherLine(state), side.padding(top = 4.dp, bottom = 12.dp),
-                    style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                WeatherLine(state, onRegion, side.padding(top = 4.dp, bottom = 12.dp))
                 todayPlan?.let { Box(side.padding(bottom = 12.dp)) { it() } }
+                hint?.let { Box(side.padding(bottom = 12.dp)) { it() } }
                 when {
                     state.errorCode == HomeState.NO_PROFILE -> Box(side) { EmptyState("체형 정보가 필요해요",
                         "체형 분석을 하면 내 몸에 맞는 옷으로 코디를 골라 드려요.", "체형 분석하기", onSetupProfile) }
@@ -211,13 +226,62 @@ private fun OutfitCarousel(state: HomeState, onSelect: (Int) -> Unit, photo: @Co
     }
 }
 
+/** "서울 ▾ · 7°C · 대체로 맑음 · 초겨울": the region opens a picker, so home is not stuck on Seoul. */
+@Composable
+private fun WeatherLine(state: HomeState, onRegion: ((String) -> Unit)?, modifier: Modifier) {
+    var picking by rememberSaveable { mutableStateOf(false) }
+    val muted = MaterialTheme.colorScheme.onSurfaceVariant
+    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+        val region = Modifier.clip(RoundedCornerShape(8.dp)).then(
+            if (onRegion != null) Modifier.clickable(onClickLabel = "날씨 지역 바꾸기") { picking = true } else Modifier)
+        Row(region.padding(end = 2.dp, top = 2.dp, bottom = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Filled.LocationOn, contentDescription = null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+            Text(state.region, Modifier.padding(start = 2.dp), style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+            if (onRegion != null) Icon(Icons.Filled.ArrowDropDown, contentDescription = null, Modifier.size(18.dp), tint = muted)
+        }
+        val rest = weatherLine(state)
+        if (rest.isNotBlank()) Text(" · $rest", style = MaterialTheme.typography.bodyMedium, color = muted,
+            maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+    if (picking && onRegion != null) RegionDialog(state.region, onPick = { picking = false; onRegion(it) },
+        onDismiss = { picking = false })
+}
+
+@Composable
+private fun RegionDialog(current: String, onPick: (String) -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("날씨를 볼 지역") },
+        text = {
+            Column {
+                Text("오늘의 코디를 이 지역 날씨로 골라요. 여행지는 대화에서 \"내일 부산\"처럼 말해 주세요.",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.height(8.dp))
+                Column(Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState())) {
+                    HomeRegion.OPTIONS.forEach { option ->
+                        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp))
+                            .selectable(option.name == current, role = Role.RadioButton) { onPick(option.name) }
+                            .padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                            RadioButton(selected = option.name == current, onClick = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text(option.name, style = MaterialTheme.typography.bodyLarge)
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("닫기") } },
+    )
+}
+
 private fun weatherLine(state: HomeState): String {
     val w = state.weather ?: return when {
         state.outfits.isNotEmpty() -> "날씨 정보 없이 18°C 기준으로 골랐어요"
-        state.loading -> "오늘 날씨를 확인하고 있어요"
+        state.loading -> "날씨를 확인하고 있어요"
         else -> "" // no profile or an error: the card below explains
     }
-    val parts = listOf("서울 ${String.format(Locale.KOREA, "%.0f", w.temp)}°C", w.label,
+    val parts = listOf("${String.format(Locale.KOREA, "%.0f", w.temp)}°C", w.label,
         if (kotlin.math.abs(w.apparent - w.temp) >= 2) "체감 ${String.format(Locale.KOREA, "%.0f", w.apparent)}°C" else null, w.band)
     return parts.filterNotNull().filter { it.isNotBlank() }.joinToString(" · ")
 }
