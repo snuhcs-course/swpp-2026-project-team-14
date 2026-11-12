@@ -114,6 +114,36 @@ title(검색어)은 "색상 핏 [패턴] 종류" 순서다(예: "블랙 오버�
 
 오류: 400 INVALID_EXTERNAL_REQUEST, 401 AUTHENTICATION_REQUIRED, 404 EXTERNAL_GARMENT_NOT_FOUND(다른 계정·초안·없는 옷 포함), 413 BODY_TOO_LARGE, 415 JSON_REQUIRED, 422 UNSUPPORTED_EXTERNAL_CATEGORY(신발), 503 EXTERNAL_MODEL_UNAVAILABLE. 모델 파일·추론·유효 속성 예측 실패는 503과 재시도 안내를 반환한다.
 
+### GET /api/outfits/wardrobe-gaps/
+
+옷장 분석. Bearer 인증이 필요하며 본인의 저장된 옷 전체를 본다. 요청 본문은 없다. 내 옷 여러 벌과 잘 어울리는데 옷장에 없는 옷을 최대 3개 추천하고 무신사 검색 링크를 붙인다. 서버는 쇼핑몰에 요청하지 않고 DB도 변경하지 않는다.
+
+방식(투표, `recommendation/gaps.py`): 상의·하의·아우터 각 옷에 match-external과 같은 모델 예측을 적용해(상의 → 하의, 하의·아우터 → 상의) 대상 슬롯 옷의 카테고리 상위 2개 × 색상 상위 3개 중 확률 상위 3개 조합에 한 표씩 던진다. (슬롯, 카테고리, 색상)으로 표를 모아 2표 이상이고 이미 가진 옷과 카테고리·색상이 같지 않은 후보를 표 수 → 평균 확률 순으로 고른다. 핏은 표를 던진 옷들의 핏 확률 합이 가장 큰 값이다. 원피스와 신발은 분석하지 않는다.
+
+```json
+{
+  "garment_count": 23,
+  "status": "ok",
+  "slot_counts": {"top": 9, "bottom": 8, "outerwear": 6},
+  "gaps": [{
+    "title": "그레이 루즈 니트",
+    "slot": "top",
+    "vote_count": 4,
+    "reason": "내 옷 4벌과 잘 어울리는데, 비슷한 옷이 옷장에 없어요.",
+    "attributes": {"category": "니트웨어", "color": "그레이", "fit": "루즈", "pattern": "무지"},
+    "matched_garments": [{"garment_id": "…", "name": "와인 플리츠 스커트", "image_url": "/api/wardrobe/items/…/image/"}],
+    "search_url": "https://www.musinsa.com/search/goods?keyword=%EA%B7%B8%EB%A0%88%EC%9D%B4+%EB%A3%A8%EC%A6%88+%EB%8B%88%ED%8A%B8"
+  }]
+}
+```
+
+- `status`: `ok`(추천 있음), `enough`(분석했지만 사야 할 옷이 없음), `too_few`(상의·하의가 한 벌 이상씩, 상의·하의·아우터 합계 4벌 미만이라 분석하지 않음. 모델을 불러오지 않는다).
+- `garment_count`는 신발을 포함한 저장된 옷 수, `slot_counts`는 분석에 쓴 옷 수다.
+- `vote_count`와 `matched_garments`는 실제로 그 후보를 예측한 내 옷(그 조합 확률이 높은 순)이다.
+- `title`·`search_url` 규칙은 match-external과 같다(`external.search_title`, `external.search_url`).
+
+오류: 401 AUTHENTICATION_REQUIRED, 405(GET 외), 503 WARDROBE_GAPS_UNAVAILABLE(모델 파일·추론·유효 속성 예측 실패, 재시도 안내).
+
 ## 채팅 코디 수정
 
 ### POST /api/outfits/chat/

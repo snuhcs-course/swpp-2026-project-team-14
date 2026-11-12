@@ -7,6 +7,7 @@ POST /api/outfits/                    save an outfit made from garment ids (user
 GET|PUT /api/outfits/<id>/            one outfit; PUT {saved, name}
 POST /api/outfits/<id>/feedback/      like / dislike; returns the updated taste profile
 POST /api/outfits/chat/feedback/      like / dislike on a chat recommendation (by garment ids)
+GET  /api/outfits/wardrobe-gaps/      garments missing from the whole wardrobe, with search links
 GET  /api/weather/?lat=&lon=          current weather (Open-Meteo)
 """
 
@@ -36,6 +37,7 @@ from apps.users.pagination import account_page
 from recommendation import preference, season, weather
 from recommendation.catalog import Catalog
 from recommendation.external import ExternalModelUnavailable, matching_search
+from recommendation.gaps import enough_garments, wardrobe_gaps
 from recommendation.labeling import label
 from recommendation.search import RecommendError, Request, recommend
 from recommendation.vocab import PROFILE_STYLES, WARDROBE_CATEGORY
@@ -273,6 +275,33 @@ def match_external_view(request):
         logger.exception("External matching prediction unavailable")
         return _error("EXTERNAL_MODEL_UNAVAILABLE", 503, "추천을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.")
     return _json({"source_garment_id": str(garment.id), **result})
+
+
+@require_GET
+@require_auth
+def wardrobe_gaps_view(request):
+    """옷장 분석: 내 옷 여러 벌과 어울리는데 옷장에 없는 옷과 검색 링크 (recommendation/gaps.py).
+
+    쇼핑몰에 요청하거나 DB를 바꾸지 않는다. 옷이 적으면 모델을 불러오지 않고 too_few를 돌려준다.
+    """
+    saved = list(Garment.objects.filter(user=request.user, saved=True).order_by("created_at", "id"))
+    wardrobe = [item for g in saved if (item := to_item({
+        "id": str(g.id), "attributes": g.attributes, "dimensions": g.dimensions, "labels": g.labels,
+        "image": f"/api/wardrobe/items/{g.id}/image/"})) is not None]
+    masked = None
+    try:
+        # 옷이 부족하면 모델을 불러오지 않는다 (wardrobe_gaps가 모델 없이 too_few를 돌려줌)
+        if enough_garments(wardrobe):
+            masked = models().masked
+    except (OSError, json.JSONDecodeError, Fail, InvalidGraph, InvalidProtobuf, NoSuchFile):
+        logger.exception("Wardrobe gap model loading failed")
+        return _error("WARDROBE_GAPS_UNAVAILABLE", 503, "옷장을 분석하지 못했어요. 잠시 후 다시 시도해 주세요.")
+    try:
+        result = wardrobe_gaps(wardrobe, masked, request.user.preferred_styles)
+    except ExternalModelUnavailable:
+        logger.exception("Wardrobe gap prediction unavailable")
+        return _error("WARDROBE_GAPS_UNAVAILABLE", 503, "옷장을 분석하지 못했어요. 잠시 후 다시 시도해 주세요.")
+    return _json({"garment_count": len(saved), **result})
 
 
 @require_http_methods(["GET", "POST"])
