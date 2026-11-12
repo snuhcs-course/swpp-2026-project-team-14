@@ -1,4 +1,5 @@
 import json
+from datetime import datetime, timedelta
 from unittest.mock import patch
 
 from django.test import TestCase
@@ -6,12 +7,12 @@ from django.test import TestCase
 from apps.users.auth import issue_token
 from apps.users.models import User
 from apps.wardrobe.models import Garment
-from recommendation import chat_intent
+from recommendation import chat_intent, trip, weather
 from .models import Outfit
 from .tests import BODY, garment
 
 
-class ChatApiTests(TestCase):
+class ChatFixture(TestCase):
     def setUp(self):
         self.user = User.objects.create_user('chat_owner', 'test-password')
         _, token = issue_token(self.user)
@@ -26,6 +27,9 @@ class ChatApiTests(TestCase):
     def post(self, **changes):
         payload = dict(body=BODY, temp=16, garment_ids=self.ids, locked_ids=[], directions=['brighter'])
         return self.client.post('/api/outfits/chat/', json.dumps(payload | changes), content_type='application/json')
+
+
+class ChatApiTests(ChatFixture):
 
     def test_button_locks_and_preview_do_not_save(self):
         with patch('recommendation.chat_intent.parse', side_effect=AssertionError('buttons must not call AI')):
@@ -159,3 +163,60 @@ class ChatApiTests(TestCase):
         self.assertEqual(following['status'], 'updated')
         self.assertEqual(following['locked_ids'], [str(self.outer.id)])
         self.assertIn(str(self.jeans.id), following['changed_ids'])
+
+
+class ChatTripTests(ChatFixture):
+    """Days, places and plans named in chat ("내일 부산 여행")."""
+
+    def forecast(self, day, **changes):
+        values = dict(day=day.isoformat(), temp_min=6.0, temp_max=17.0, apparent_min=3.0, apparent_max=15.0,
+                      rain_chance=70, rain=True, snow=False, label='흐림')
+        return weather.DayForecast(**(values | changes))
+
+    def ask(self, text, parsed=None, **daily):
+        parsed = parsed or chat_intent.empty()
+        with patch('recommendation.chat_intent.parse', return_value=(parsed, 'gemini', None)), \
+                patch('recommendation.weather.daily', **daily) as lookup:
+            return self.post(text=text, directions=[]).json(), lookup
+
+    def test_named_place_and_day_use_that_forecast(self):
+        tomorrow = datetime.now(trip.KST).date() + timedelta(days=1)
+        data, lookup = self.ask('내일 부산 여행 가는데 뭐 입지?', return_value=self.forecast(tomorrow))
+        lookup.assert_called_once_with(*trip.PLACES['부산'], tomorrow.isoformat(), timeout=5)
+        self.assertEqual(data['status'], 'updated')
+        self.assertTrue(any('부산 최저 6° · 최고 17° · 비 70%' in n for n in data['notes']))
+        self.assertTrue(any('일교차가 11°' in n for n in data['notes']))
+        context = data['outfit']['context']
+        self.assertEqual((context['place'], context['day'], context['temp'], context['wet'], context['occasion']),
+                         ('부산', tomorrow.isoformat(), 9.0, '비', '여행'))
+
+    def test_day_without_place_uses_seoul_and_today_alone_keeps_current_weather(self):
+        later = datetime.now(trip.KST).date() + timedelta(days=2)
+        data, lookup = self.ask('모레 출근할 때 입을 거', return_value=self.forecast(later, rain=False, rain_chance=10))
+        lookup.assert_called_once_with(*weather.SEOUL, later.isoformat(), timeout=5)
+        self.assertEqual(data['outfit']['context']['place'], '서울')
+        _, lookup = self.ask('오늘 상의만 밝게', chat_intent.empty() | {'wants': [{'slot': 'top', 'want': 'brighter'}]})
+        lookup.assert_not_called()
+
+    def test_unavailable_or_too_far_forecast_keeps_current_weather_with_a_note(self):
+        data, _ = self.ask('내일 제주 여행', side_effect=weather.WeatherError('down'))
+        self.assertEqual(data['status'], 'updated')
+        self.assertIn('제주 예보를 가져오지 못해 지금 날씨로 골랐어요.', data['notes'][0])
+        self.assertEqual(data['outfit']['context']['temp'], 16)
+        data, lookup = self.ask('30일 뒤 결혼식 하객룩')
+        lookup.assert_not_called()
+        self.assertIn('예보는 아직 없어 지금 날씨로 골랐어요.', data['notes'][0])
+
+    def test_occasion_adds_a_direction_unless_the_request_says_the_opposite(self):
+        tomorrow = datetime.now(trip.KST).date() + timedelta(days=1)
+        data, _ = self.ask('내일 면접 보러 가', return_value=self.forecast(tomorrow, rain=False))
+        self.assertEqual(data['status'], 'updated')
+        self.assertIn(str(self.bright.id), {i['garment_id'] for i in data['outfit']['items']})
+        casual = chat_intent.empty() | {'wants': [{'slot': None, 'want': 'casual'}]}
+        data, _ = self.ask('결혼식인데 편하게', casual)
+        self.assertNotEqual(data['status'], 'clarify')
+
+    def test_buttons_never_look_up_a_forecast(self):
+        with patch('recommendation.weather.daily') as lookup:
+            self.post()
+        lookup.assert_not_called()

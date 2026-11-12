@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 from threading import BoundedSemaphore
 
 from django.utils import timezone
@@ -10,7 +11,7 @@ from django.views.decorators.http import require_POST
 from apps.body_profiles.profile import body_or_unknown
 from apps.users.auth import require_auth
 from apps.wardrobe.models import Garment
-from recommendation import chat_intent, season
+from recommendation import chat_intent, intent, season, trip, weather
 from recommendation.search import RecommendError, Request, recommend
 from recommendation.stylist import _want_score
 from recommendation.vocab import WARDROBE_CATEGORY
@@ -58,6 +59,35 @@ def preview(garments, items, context, reasons=None, key=None):
                        'name': garments[i.id[2:]].attributes.get('name', ''),
                        'image_url': f'/api/wardrobe/items/{i.id[2:]}/image/',
                        'note': i.fit_note or ''} for i in sorted(items, key=lambda i: views.SLOT_ORDER.index(views.SLOT_CODE[i.slot]))]}
+
+
+def planned_weather(plan, temp, wet, context, notes, now=None):
+    """The named day's forecast at the named place (Seoul when only a day is named) in place of the
+    current weather. Without a place or a later day, or when the forecast is unavailable, the
+    current weather stays and a note says why."""
+    context = {**context, **({'occasion': plan.occasion} if plan.occasion else {})}
+    today = (now or datetime.now(trip.KST)).astimezone(trip.KST).date()
+    day = plan.day or today
+    if not plan.place and day == today:
+        return temp, wet, context
+    place = plan.place or '서울'
+    label = trip.day_label(day, today)
+    if (day - today).days >= weather.FORECAST_DAYS:
+        notes.append(f'{label} 예보는 아직 없어 지금 날씨로 골랐어요.')
+        return temp, wet, context
+    try:
+        forecast = weather.daily(*(plan.coords or weather.SEOUL), day.isoformat(), timeout=5)
+    except weather.WeatherError:
+        notes.append(f'{label} {place} 예보를 가져오지 못해 지금 날씨로 골랐어요.')
+        return temp, wet, context
+    wet = '눈' if forecast.snow else '비' if forecast.rain else None
+    sky = f'비 {forecast.rain_chance}%' if forecast.rain else '눈' if forecast.snow else forecast.label
+    notes.append(f'{label} {place} 최저 {forecast.temp_min:.0f}° · 최고 {forecast.temp_max:.0f}° · {sky} 날씨에 맞춰 골랐어요.')
+    if forecast.spread >= 10:
+        notes.append(f'일교차가 {forecast.spread:.0f}°예요. 겉옷을 챙기세요.')
+    temp = max(-40, min(50, forecast.apparent))
+    return temp, wet, {**context, 'temp': temp, 'label': sky[:20], 'wet': wet,
+                       'day': day.isoformat(), 'place': place}
 
 
 @require_POST
@@ -111,6 +141,13 @@ def process(garments, body, current_ids, locked, directions, text, history, pref
     wants_set = {w['want'] for w in extraction['wants']}
     if any(a in wants_set and b in wants_set for a, b in OPPOSITES):
         return response('clarify', '서로 반대인 수정 조건이 있어요. 원하는 방향을 하나만 골라 주세요.')
+    plan = trip.parse(text) if text else trip.Trip()
+    occasion_want = intent.OCCASION_WANTS.get(plan.occasion)
+    if occasion_want and occasion_want not in wants_set and not any(
+            {occasion_want, w} in ({a, b} for a, b in OPPOSITES) for w in wants_set):
+        extraction['wants'].append({'slot': None, 'want': occasion_want})
+        wants_set.add(occasion_want)
+    temp, wet, context = planned_weather(plan, temp, wet, context, notes)
     target_ids = extraction['target_garment_ids']
     if any(gid not in by_id for gid in target_ids):
         return response('clarify', '말씀하신 옷을 찾지 못했어요. 옷장에 등록한 이름으로 알려 주세요.')

@@ -55,6 +55,8 @@ When a specific garment or concrete type (셔츠, 청바지; not generic 상의/
 resolve matching IDs from the supplied wardrobe
 in target_garment_ids (one per slot). Never invent IDs. If none match, action=clarify.
 Map 출근/면접/하객 to formal, 편하게 to casual. Remove outerwear only when explicitly asked.
+Days, places and plans (내일 부산 여행, 토요일 데이트, 결혼식 하객) are supported: the server reads them and
+uses that day's forecast. Treat such a request as an edit of all unlocked slots unless slots are named.
 If unsupported (e.g. shoes, shopping), unclear or contradictory, action=clarify and ask one short Korean
 question. Do not discard unsupported constraints while pretending they were applied.
 All unused arrays are [], remove_outerwear=false, question="". Output JSON only.
