@@ -25,6 +25,22 @@ class ExternalModelUnavailable(Exception):
     """The existing model cannot produce a matching prediction."""
 
 
+def preferred_style(preferred_styles: list[str] | None) -> str | None:
+    """계정 선호 스타일 중 모델 어휘로 바꿀 수 있는 첫 번째 값. 없으면 None (옷 자체 스타일로 대체)."""
+    return next((mapped[0] for style in preferred_styles or []
+                 if (mapped := WARDROBE_STYLES.get(style) or PROFILE_STYLES.get(style))), None)
+
+
+def search_title(category: str, color: str, fit: str, pattern: str | None = None) -> str:
+    """검색어 = 색상 + 핏 + (패턴) + 종류. 어울리는 옷 찾기와 옷장 분석이 같은 규칙을 쓴다."""
+    fit_word = FIT_WORD.get(fit, "레귤러핏")
+    return " ".join(word for word in (color, fit_word, pattern, CATEGORY_WORD.get(category, category)) if word)
+
+
+def search_url(title: str) -> str:
+    return SEARCH_BASE + "?" + urlencode({"keyword": title})
+
+
 def _candidates(model, probabilities: dict, key: str, allowed) -> list[tuple[float, str]]:
     scores = probabilities.get(key)
     if scores is None:
@@ -100,8 +116,7 @@ def matching_search(item: Item, model, preferred_styles: list[str] | None = None
     target = TARGET_SLOTS.get(item.slot)
     if target is None:
         raise ValueError("Unsupported garment category")
-    profile_style = next((mapped[0] for style in preferred_styles or []
-                          if (mapped := WARDROBE_STYLES.get(style) or PROFILE_STYLES.get(style))), None)
+    profile_style = preferred_style(preferred_styles)
     try:
         probabilities = model.slot_logprobs({item.slot: item.attrs}, profile_style or item.style, target)
     except (Fail, RuntimeException) as error:
@@ -111,8 +126,7 @@ def matching_search(item: Item, model, preferred_styles: list[str] | None = None
     fit, fit_share = _best(_candidates(model, probabilities, "핏", BOTTOM_FITS if target == "하의" else UPPER_FITS))
     pattern = _pattern(model, probabilities)
     fit_word = FIT_WORD.get(fit, "레귤러핏")
-    # 검색어 = 색상 + 핏 + (패턴) + 종류
-    title = " ".join(word for word in (color, fit_word, pattern, CATEGORY_WORD.get(category, category)) if word)
+    title = search_title(category, color, fit, pattern)
     traits = " & ".join(word for word in (color, fit_word, pattern) if word)
     basis = "선택한 옷과 선호 스타일" if profile_style else "선택한 옷"
     return {
@@ -122,6 +136,6 @@ def matching_search(item: Item, model, preferred_styles: list[str] | None = None
         "reason": f"{basis}을 기준으로 {color}·{fit_word} 조합의 어울림 점수가 가장 높았어요 "
                   f"(후보 중 색상 {color_share}% · 핏 {fit_share}%).",
         "attributes": {"category": category, "color": color, "fit": fit, "pattern": pattern or PLAIN_PATTERN},
-        "search_url": SEARCH_BASE + "?" + urlencode({"keyword": title}),
+        "search_url": search_url(title),
         "wardrobe_matches": _wardrobe_matches(model, probabilities, target, wardrobe or []),
     }
