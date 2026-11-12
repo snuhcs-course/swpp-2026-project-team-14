@@ -1,7 +1,29 @@
 // AI-generated with Claude Code (Claude Opus 5.5), 2026-10-12, reviewed by Dongkun Moon
 package com.swpp.stylemate.ui.home
 
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.ui.semantics.Role
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.AlertDialog
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.text.style.TextOverflow
+import com.swpp.stylemate.data.recommendation.HomeRegion
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.runtime.key
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -34,6 +56,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
@@ -57,19 +80,23 @@ import com.swpp.stylemate.data.recommendation.Outfit
 import com.swpp.stylemate.data.recommendation.OutfitRepository
 import com.swpp.stylemate.data.recommendation.OutfitGarment
 import com.swpp.stylemate.data.wardrobe.WardrobeRepository
+import com.swpp.stylemate.ui.components.StarRating
+import com.swpp.stylemate.ui.components.starsOf
+import com.swpp.stylemate.ui.components.starsText
 import kotlinx.coroutines.CancellationException
 import java.util.Locale
 
 private val SLOT_WIDTH = mapOf("outerwear" to 0.82f, "top" to 0.72f, "bottom" to 0.62f)
 
 /**
- * 오늘의 코디 (mock-up p.3). [onChat] opens the chat editor for the current outfit.
+ * 오늘의 코디 (mock-up p.3): up to three outfits side by side, swiped horizontally. "새로 추천" (or pulling
+ * down) replaces all of them; the details, chat and fitting below follow the outfit in view.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     state: HomeState,
     onRefresh: () -> Unit,
-    onNext: () -> Unit,
     onLike: () -> Unit,
     onDislike: () -> Unit,
     onSave: () -> Unit,
@@ -77,15 +104,22 @@ fun HomeScreen(
     onOpenWardrobe: () -> Unit,
     onMessageShown: () -> Unit,
     modifier: Modifier = Modifier,
+    onSelect: (Int) -> Unit = {},
     onChat: (() -> Unit)? = null,
     fitting: (@Composable (Outfit, Modifier) -> Unit)? = null,
+    todayPlan: (@Composable () -> Unit)? = null,
+    hint: (@Composable () -> Unit)? = null,
+    onRegion: ((String) -> Unit)? = null,
     photo: @Composable (OutfitGarment, Modifier) -> Unit = { item, m -> GarmentThumbnail(item.imageUrl, item.name, m) },
 ) {
     val snackbar = remember { SnackbarHostState() }
     LaunchedEffect(state.message) {
-        state.message?.let { snackbar.showSnackbar(it); onMessageShown() }
+        // A reason plus what to do next takes longer to read than "저장했어요".
+        state.message?.let { snackbar.showSnackbar(it, duration = if (it.length > 25) SnackbarDuration.Long else SnackbarDuration.Short)
+            onMessageShown() }
     }
     val outfit = state.current
+    val canRefresh = !state.loading && state.errorCode != HomeState.NO_PROFILE
     Scaffold(
         modifier = modifier,
         containerColor = MaterialTheme.colorScheme.background,
@@ -93,77 +127,170 @@ fun HomeScreen(
         snackbarHost = { SnackbarHost(snackbar) },
         bottomBar = {
             if (outfit != null) Row(Modifier.padding(horizontal = 20.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Button(onClick = onChat ?: onNext, enabled = !state.loading, shape = RoundedCornerShape(16.dp),
-                    modifier = Modifier.weight(1f).heightIn(min = 56.dp)) {
-                    Text(if (onChat != null) "대화로 수정하기" else "다른 코디 보기", fontWeight = FontWeight.Bold)
-                }
                 if (onChat != null) {
-                    Spacer(Modifier.width(12.dp))
-                    OutlinedButton(onClick = onNext, enabled = !state.loading, shape = RoundedCornerShape(16.dp),
-                        modifier = Modifier.size(56.dp), contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)) {
-                        Icon(Icons.Filled.Refresh, contentDescription = "다른 코디")
+                    Button(onClick = onChat, enabled = !state.loading, shape = RoundedCornerShape(16.dp),
+                        modifier = Modifier.weight(1f).heightIn(min = 56.dp)) {
+                        Text("대화로 수정하기", fontWeight = FontWeight.Bold)
                     }
+                    Spacer(Modifier.width(12.dp))
+                }
+                // Replaces every outfit in the carousel; swiping steps through the current ones.
+                OutlinedButton(onClick = onRefresh, enabled = canRefresh, shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.heightIn(min = 56.dp).then(if (onChat == null) Modifier.weight(1f) else Modifier)) {
+                    Icon(Icons.Filled.Refresh, contentDescription = null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("새로 추천", fontWeight = FontWeight.Bold)
                 }
             }
         },
     ) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
-            Row(Modifier.fillMaxWidth().padding(top = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("오늘의 코디", Modifier.weight(1f), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                IconButton(onClick = onRefresh, enabled = !state.loading && state.errorCode != HomeState.NO_PROFILE) {
-                    Icon(Icons.Filled.Refresh, contentDescription = "새로 고침")
+        PullToRefreshBox(isRefreshing = state.loading && outfit != null, onRefresh = { if (canRefresh) onRefresh() },
+            modifier = Modifier.fillMaxSize().padding(padding)) {
+            Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                val side = Modifier.padding(horizontal = 20.dp)
+                Text("오늘의 코디", side.padding(top = 16.dp), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                WeatherLine(state, onRegion, side.padding(top = 4.dp, bottom = 12.dp))
+                todayPlan?.let { Box(side.padding(bottom = 12.dp)) { it() } }
+                hint?.let { Box(side.padding(bottom = 12.dp)) { it() } }
+                when {
+                    state.errorCode == HomeState.NO_PROFILE -> Box(side) { EmptyState("체형 정보가 필요해요",
+                        "체형 분석을 하면 내 몸에 맞는 옷으로 코디를 골라 드려요.", "체형 분석하기", onSetupProfile) }
+                    state.errorCode == "WARDROBE_TOO_SMALL" -> Box(side) { EmptyState("옷을 조금 더 등록해 주세요",
+                        state.error ?: "", "옷장으로 가기", onOpenWardrobe) }
+                    outfit == null && state.loading -> Box(side) { OutfitCard { CircularProgressIndicator(Modifier.padding(64.dp)) } }
+                    outfit == null -> Box(side) { EmptyState("코디를 불러오지 못했어요", state.error ?: OutfitRepository.SERVER_ERROR,
+                        "다시 시도", onRefresh) }
+                    else -> {
+                        OutfitCarousel(state, onSelect, photo)
+                        Column(side) {
+                            OutfitDetails(state, outfit, onLike, onDislike, onSave)
+                            fitting?.invoke(outfit, Modifier.fillMaxWidth().padding(top = 12.dp))
+                        }
+                    }
                 }
+                Spacer(Modifier.height(24.dp))
             }
-            Text(weatherLine(state), Modifier.padding(top = 4.dp, bottom = 16.dp),
-                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            when {
-                state.errorCode == HomeState.NO_PROFILE -> EmptyState("체형 정보가 필요해요",
-                    "체형 분석을 하면 내 몸에 맞는 옷으로 코디를 골라 드려요.", "체형 분석하기", onSetupProfile)
-                state.errorCode == "WARDROBE_TOO_SMALL" -> EmptyState("옷을 조금 더 등록해 주세요",
-                    state.error ?: "", "옷장으로 가기", onOpenWardrobe)
-                outfit == null && state.loading -> OutfitCard { CircularProgressIndicator(Modifier.padding(64.dp)) }
-                outfit == null -> EmptyState("코디를 불러오지 못했어요", state.error ?: OutfitRepository.SERVER_ERROR,
-                    "다시 시도", onRefresh)
-                else -> {
-                    OutfitDetails(state, outfit, onLike, onDislike, onSave, photo)
-                    fitting?.invoke(outfit, Modifier.fillMaxWidth().padding(top = 12.dp))
-                }
-            }
-            Spacer(Modifier.height(24.dp))
         }
     }
+}
+
+/** The outfits of one recommendation, side by side; neighbours peek in so swiping is discoverable. */
+@Composable
+private fun OutfitCarousel(state: HomeState, onSelect: (Int) -> Unit, photo: @Composable (OutfitGarment, Modifier) -> Unit) {
+    // A new recommendation is a new set of pages that starts from the first one.
+    key(state.outfits.firstOrNull()?.id) {
+        val pager = rememberPagerState(initialPage = state.index) { state.outfits.size }
+        // The details below follow the card as soon as it is more than halfway in, not only after it settles.
+        LaunchedEffect(pager) { snapshotFlow { pager.currentPage }.collect(onSelect) }
+        LaunchedEffect(state.index) { if (pager.currentPage != state.index) pager.animateScrollToPage(state.index) }
+        HorizontalPager(pager, Modifier.fillMaxWidth(),
+            contentPadding = PaddingValues(horizontal = if (state.outfits.size > 1) 32.dp else 20.dp),
+            pageSpacing = 12.dp, verticalAlignment = Alignment.Top, key = { state.outfits[it].id }) { page ->
+            val item = state.outfits[page]
+            OutfitCard(Modifier.semantics { contentDescription = "코디 ${page + 1} / ${state.outfits.size}" }) {
+                Column(Modifier.fillMaxWidth().padding(vertical = 24.dp), horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    item.items.forEach { garment ->
+                        photo(garment, Modifier.fillMaxWidth(SLOT_WIDTH[garment.slot] ?: 0.7f).height(150.dp).clip(RoundedCornerShape(16.dp)))
+                    }
+                }
+                if (state.outfits.size > 1) Surface(Modifier.align(Alignment.TopStart).padding(12.dp), shape = RoundedCornerShape(50),
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)) {
+                    Text("코디 ${page + 1}", Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                        style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                }
+                // Each card carries its own rating, so swiping compares them at a glance.
+                item.score?.let { score ->
+                    Surface(Modifier.align(Alignment.TopEnd).padding(12.dp), shape = RoundedCornerShape(50),
+                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)) {
+                        Row(Modifier.padding(horizontal = 10.dp, vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text("어울림", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Spacer(Modifier.width(4.dp))
+                            StarRating(starsOf(score), size = 14.dp)
+                            Spacer(Modifier.width(4.dp))
+                            Text(starsText(starsOf(score)), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+                if (state.loading) CircularProgressIndicator(Modifier.align(Alignment.Center))
+            }
+        }
+        if (state.outfits.size > 1) Row(Modifier.fillMaxWidth().padding(top = 14.dp), horizontalArrangement = Arrangement.Center) {
+            repeat(state.outfits.size) { page ->
+                val active = pager.currentPage == page
+                val width by animateDpAsState(if (active) 22.dp else 8.dp, label = "dot")
+                Box(Modifier.padding(horizontal = 3.dp).height(8.dp).width(width).clip(CircleShape)
+                    .background(if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant))
+            }
+        }
+    }
+}
+
+/** "서울 ▾ · 7°C · 대체로 맑음 · 초겨울": the region opens a picker, so home is not stuck on Seoul. */
+@Composable
+private fun WeatherLine(state: HomeState, onRegion: ((String) -> Unit)?, modifier: Modifier) {
+    var picking by rememberSaveable { mutableStateOf(false) }
+    val muted = MaterialTheme.colorScheme.onSurfaceVariant
+    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+        val region = Modifier.clip(RoundedCornerShape(8.dp)).then(
+            if (onRegion != null) Modifier.clickable(onClickLabel = "날씨 지역 바꾸기") { picking = true } else Modifier)
+        Row(region.padding(end = 2.dp, top = 2.dp, bottom = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Filled.LocationOn, contentDescription = null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+            Text(state.region, Modifier.padding(start = 2.dp), style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+            if (onRegion != null) Icon(Icons.Filled.ArrowDropDown, contentDescription = null, Modifier.size(18.dp), tint = muted)
+        }
+        val rest = weatherLine(state)
+        if (rest.isNotBlank()) Text(" · $rest", style = MaterialTheme.typography.bodyMedium, color = muted,
+            maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+    if (picking && onRegion != null) RegionDialog(state.region, onPick = { picking = false; onRegion(it) },
+        onDismiss = { picking = false })
+}
+
+@Composable
+private fun RegionDialog(current: String, onPick: (String) -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("날씨를 볼 지역") },
+        text = {
+            Column {
+                Text("오늘의 코디를 이 지역 날씨로 골라요. 여행지는 대화에서 \"내일 부산\"처럼 말해 주세요.",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.height(8.dp))
+                Column(Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState())) {
+                    HomeRegion.OPTIONS.forEach { option ->
+                        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp))
+                            .selectable(option.name == current, role = Role.RadioButton) { onPick(option.name) }
+                            .padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                            RadioButton(selected = option.name == current, onClick = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text(option.name, style = MaterialTheme.typography.bodyLarge)
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("닫기") } },
+    )
 }
 
 private fun weatherLine(state: HomeState): String {
     val w = state.weather ?: return when {
         state.outfits.isNotEmpty() -> "날씨 정보 없이 18°C 기준으로 골랐어요"
-        state.loading -> "오늘 날씨를 확인하고 있어요"
+        state.loading -> "날씨를 확인하고 있어요"
         else -> "" // no profile or an error: the card below explains
     }
-    val parts = listOf("서울 ${String.format(Locale.KOREA, "%.0f", w.temp)}°C", w.label,
+    val parts = listOf("${String.format(Locale.KOREA, "%.0f", w.temp)}°C", w.label,
         if (kotlin.math.abs(w.apparent - w.temp) >= 2) "체감 ${String.format(Locale.KOREA, "%.0f", w.apparent)}°C" else null, w.band)
     return parts.filterNotNull().filter { it.isNotBlank() }.joinToString(" · ")
 }
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun OutfitDetails(state: HomeState, outfit: Outfit, onLike: () -> Unit, onDislike: () -> Unit, onSave: () -> Unit,
-                          photo: @Composable (OutfitGarment, Modifier) -> Unit) {
-    OutfitCard {
-        Column(Modifier.fillMaxWidth().padding(vertical = 24.dp), horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            outfit.items.forEach { item ->
-                photo(item, Modifier.fillMaxWidth(SLOT_WIDTH[item.slot] ?: 0.7f).height(150.dp).clip(RoundedCornerShape(16.dp)))
-            }
-        }
-        if (state.outfits.size > 1) Text("${state.index + 1} / ${state.outfits.size}",
-            Modifier.align(Alignment.TopEnd).padding(14.dp), style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant)
-        if (state.loading) CircularProgressIndicator(Modifier.align(Alignment.Center))
-    }
+private fun OutfitDetails(state: HomeState, outfit: Outfit, onLike: () -> Unit, onDislike: () -> Unit, onSave: () -> Unit) {
     Row(Modifier.fillMaxWidth().padding(top = 16.dp), horizontalArrangement = Arrangement.Center) {
         Pill(Icons.Filled.Check, "내 옷장에서 100% 구성")
-        outfit.score?.let { Spacer(Modifier.width(8.dp)); Pill(null, "어울림 ${it}점", muted = true) }
     }
     FlowRow(Modifier.fillMaxWidth().padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -211,14 +338,16 @@ private fun OutfitDetails(state: HomeState, outfit: Outfit, onLike: () -> Unit, 
             }
         }
     }
+    if (state.outfits.size == 1) Text("옷을 더 등록하면 코디 3개를 나란히 비교할 수 있어요.", Modifier.padding(top = 8.dp),
+        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     state.notes.forEach { note ->
         Text(note, Modifier.padding(top = 8.dp), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
 @Composable
-private fun OutfitCard(content: @Composable androidx.compose.foundation.layout.BoxScope.() -> Unit) {
-    Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surfaceContainer,
+private fun OutfitCard(modifier: Modifier = Modifier, content: @Composable androidx.compose.foundation.layout.BoxScope.() -> Unit) {
+    Surface(modifier, shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surfaceContainer,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
         Box(Modifier.fillMaxWidth().heightIn(min = 280.dp), contentAlignment = Alignment.Center, content = content)
     }

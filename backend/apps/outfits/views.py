@@ -29,12 +29,13 @@ from django.views.decorators.http import require_GET, require_http_methods, requ
 from django.utils import timezone
 from onnxruntime.capi.onnxruntime_pybind11_state import Fail, InvalidGraph, InvalidProtobuf, NoSuchFile
 
-from apps.body_profiles.profile import body_from_request
+from apps.body_profiles.profile import body_or_unknown
 from apps.wardrobe.models import Garment
 from apps.users.auth import require_auth
 from apps.users.models import User
 from apps.users.pagination import account_page
 from recommendation import preference, season, weather
+from recommendation.body import UnknownBody
 from recommendation.catalog import Catalog
 from recommendation.external import ExternalModelUnavailable, matching_search
 from recommendation.gaps import enough_garments, wardrobe_gaps
@@ -142,7 +143,8 @@ def _weather(data: dict) -> tuple[float, str | None, dict]:
 def _garment_item(g: Garment, body):
     """Wardrobe garment -> recommender Item. Garments saved before labels existed get them computed
     on the fly from their dimensions (not stored: the user has not reviewed them)."""
-    labels = g.labels or label(g.attributes, g.dimensions, body)
+    # Without a body profile, fit and length stay open instead of being guessed from a placeholder height.
+    labels = g.labels or label(g.attributes, g.dimensions, None if isinstance(body, UnknownBody) else body)
     return to_item({"id": str(g.id), "attributes": g.attributes, "dimensions": g.dimensions, "labels": labels,
                     "image": f"/api/wardrobe/items/{g.id}/image/"})
 
@@ -181,8 +183,8 @@ def _create(source: str, garments: list[tuple[str, Garment, str]], **fields) -> 
 
 
 def _calculate(data, garments):
-    body = body_from_request(None, data)
-    profile = data["body"]
+    body = body_or_unknown(None, data)
+    profile = data.get("body") or {}
     pref_fit = data.get("pref_fit", profile.get("preferred_fit", "regular"))
     if pref_fit not in PREF_FITS:
         raise ValueError("Invalid pref_fit")
@@ -476,7 +478,7 @@ def weather_view(request):
     except ValueError:
         return _error("INVALID_LOCATION", 400)
     try:
-        current = weather.current(lat, lon)
+        current = weather.cached_current(lat, lon)
     except weather.WeatherError:
         return _error("WEATHER_UNAVAILABLE", 502)
     response = JsonResponse({**current.public(), "band": season.band(current.apparent).label},

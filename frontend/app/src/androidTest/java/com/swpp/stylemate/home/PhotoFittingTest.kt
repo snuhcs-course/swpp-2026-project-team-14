@@ -487,6 +487,10 @@ class PhotoFittingTest {
             compose.onNodeWithText("비슷한 가상 모델: 남성 170cm · 78kg 기준").assertIsDisplayed()
             compose.onNodeWithText("이 모델에게 입히기").assertIsEnabled()
             compose.onNodeWithText("사진 선택 방식으로 돌아가기").performScrollTo().performClick()
+            // The keyboard from the inputs may still be closing and squeezing the dialog for a moment.
+            compose.waitUntil(5_000) {
+                runCatching { compose.onNodeWithText("내 갤러리에서\n사진 고르기").assertIsDisplayed() }.isSuccess
+            }
             compose.onNodeWithText("내 갤러리에서\n사진 고르기").assertIsDisplayed()
         } finally { directory.deleteRecursively() }
     }

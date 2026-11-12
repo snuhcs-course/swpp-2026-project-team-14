@@ -228,6 +228,12 @@ fun GarmentLabelSection(model: GarmentLabelsViewModel, garmentId: String, attrib
 }
 
 @OptIn(ExperimentalLayoutApi::class)
+/**
+ * K-Fashion spells "normal" two ways (length "노말", fit "노멀"). The saved value keeps the vocabulary
+ * the model was trained on; only the text on screen is unified.
+ */
+internal fun labelText(value: String): String = if (value == "노말" || value == "노멀") "보통" else value
+
 @Composable
 internal fun LabelChips(label: String, choices: List<String>, selected: String?, basis: String?, enabled: Boolean,
                        onChange: (String?) -> Unit) {
@@ -237,7 +243,7 @@ internal fun LabelChips(label: String, choices: List<String>, selected: String?,
             choices.forEach { choice ->
                 FilterChip(selected = choice == selected, enabled = enabled,
                     onClick = { onChange(if (choice == selected) null else choice) },
-                    label = { Text(choice) }, shape = RoundedCornerShape(50),
+                    label = { Text(labelText(choice)) }, shape = RoundedCornerShape(50),
                     colors = FilterChipDefaults.filterChipColors(
                         selectedContainerColor = MaterialTheme.colorScheme.primary,
                         selectedLabelColor = MaterialTheme.colorScheme.onPrimary))

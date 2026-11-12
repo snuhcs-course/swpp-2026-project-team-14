@@ -2,6 +2,7 @@
 package com.swpp.stylemate.wardrobe
 
 import com.swpp.stylemate.data.LocalUserStore
+import com.swpp.stylemate.data.recommendation.ErrorMessages
 import com.swpp.stylemate.data.recommendation.GapGarment
 import com.swpp.stylemate.data.recommendation.WardrobeAnalysis
 import com.swpp.stylemate.data.testAccount
@@ -124,14 +125,14 @@ class WardrobeViewModelAnalysisTest {
         }
     }
 
-    @Test fun serverErrorKeepsTheDialogOpenWithTheAppsGenericMessage() {
+    @Test fun unavailableModelKeepsTheDialogOpenWithTheAppsUnavailableMessage() {
         responses.add(MockResponse().setResponseCode(503)
             .setBody("""{"error":"WARDROBE_GAPS_UNAVAILABLE","hint":"서버 내부 안내"}"""))
         viewModel.analyzeWardrobe()
         val state = settled()
         assertTrue(state.open)
         assertNull(state.result)
-        assertEquals("요청을 처리하지 못했어요. 잠시 후 다시 시도해 주세요.", state.error)
+        assertEquals(ErrorMessages.UNAVAILABLE, state.error)
     }
 
     @Test fun retryAfterFailureCanSucceed() {

@@ -239,6 +239,7 @@ fun MyProfileScreen(
     authBusy: Boolean = false,
     onDeleteRemote: (suspend () -> String?)? = null,
     onImport: (() -> Unit)? = null,
+    connections: (@Composable () -> Unit)? = null,
 ) {
     var page by rememberSaveable { mutableStateOf(ProfilePage.MAIN) }
     var inlineSaving by remember { mutableStateOf(false) }
@@ -306,6 +307,10 @@ fun MyProfileScreen(
                 if (style.favoriteColors.isEmpty()) {
                     Text("아직 저장한 컬러가 없어요", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 } else ColorTags(style.favoriteColors)
+            }
+            connections?.let {
+                SectionTitle("소셜 연동")
+                it()
             }
             SectionTitle("체형 밸런스 참고")
             Surface(onClick = { page = ProfilePage.BODY }, shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceVariant,

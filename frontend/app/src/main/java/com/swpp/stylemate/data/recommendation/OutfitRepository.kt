@@ -78,10 +78,11 @@ class OutfitApiException(val code: String, message: String) : Exception(message)
  * the weather, and the body-based labels of a garment being registered.
  */
 class OutfitRepository(private val account: AccountAccess) {
-    suspend fun weather(): Weather = parseWeather(call("GET", "/api/weather/"))
+    suspend fun weather(region: Region = HomeRegion.SEOUL): Weather = parseWeather(call("GET",
+        String.format(java.util.Locale.US, "/api/weather/?lat=%.4f&lon=%.4f", region.lat, region.lon)))
 
     suspend fun recommend(body: JSONObject, weather: Weather?, preference: JSONObject?, seenKeys: List<String>,
-                          count: Int = 3, anchorId: String? = null): Recommendation {
+                          count: Int = 3, anchorId: String? = null, occasion: String? = null): Recommendation {
         val request = JSONObject()
             .put("body", body)
             .put("count", count)
@@ -89,6 +90,7 @@ class OutfitRepository(private val account: AccountAccess) {
             .put("preference", preference ?: JSONObject.NULL)
         if (weather != null) request.put("weather", weather.json) else request.put("temp", DEFAULT_TEMP)
         anchorId?.let { request.put("anchor_id", it) }
+        occasion?.let { request.put("occasion", it) }  // only the occasion word, never the calendar event itself
         val result = call("POST", "/api/outfits/recommend/", request)
         return parseRecommendation(result)
     }
@@ -199,8 +201,8 @@ class OutfitRepository(private val account: AccountAccess) {
             throw OutfitApiException(error.code, when (error.code) {
                 "WARDROBE_TOO_SMALL" -> "상의와 하의를 한 벌씩 등록하면 코디를 만들어 드려요."
                 "WEATHER_UNAVAILABLE" -> "날씨를 불러오지 못했어요."
-                "NETWORK" -> NETWORK_ERROR
-                else -> if (error.code.startsWith("HTTP_") || error.code == "INVALID_RESPONSE") SERVER_ERROR else error.message.orEmpty()
+                else -> ErrorMessages.forCode(error.code)
+                    ?: if (error.code.startsWith("HTTP_")) SERVER_ERROR else error.message.orEmpty()
             })
         }
     }
@@ -213,8 +215,8 @@ class OutfitRepository(private val account: AccountAccess) {
                 uri.rawPath == "/search/goods" && !uri.rawQuery.isNullOrBlank() && uri.rawFragment == null
         } catch (_: Exception) { false }
 
-        const val NETWORK_ERROR = "서버에 연결하지 못했어요. 연결을 확인하고 다시 시도해 주세요."
-        const val SERVER_ERROR = "코디를 불러오지 못했어요. 잠시 후 다시 시도해 주세요."
+        const val NETWORK_ERROR = ErrorMessages.NETWORK
+        const val SERVER_ERROR = ErrorMessages.SERVER
         const val DEFAULT_TEMP = 18.0
         const val MAX_SEEN = 60
         fun parseWeather(json: JSONObject) = Weather(

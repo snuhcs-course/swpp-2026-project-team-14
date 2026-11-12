@@ -152,8 +152,8 @@ private fun WornReviewGarmentCard(item: WornBatchItem, catalog: JSONObject, enab
                         }
                     }
                     Column(Modifier.weight(.66f), verticalArrangement = Arrangement.spacedBy(11.dp)) {
-                        ReviewInfoLine("핏", if (labels.isNull("fit")) "미정" else labels.optString("fit"))
-                        ReviewInfoLine("기장", if (labels.isNull("length")) "미정" else labels.optString("length"))
+                        ReviewInfoLine("핏", if (labels.isNull("fit")) "미정" else labelText(labels.optString("fit")))
+                        ReviewInfoLine("기장", if (labels.isNull("length")) "미정" else labelText(labels.optString("length")))
                         val colors = attrs.optJSONArray("colors")
                         val color = colors?.optString(0)?.takeIf { it.startsWith("#") }
                         val colorName = color?.let { catalog.optJSONObject("color_palette")?.optString(it, it) } ?: "미정"

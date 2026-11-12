@@ -14,7 +14,9 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -38,8 +40,8 @@ fun ChatRoute(model: ChatViewModel, modifier: Modifier = Modifier) {
     BackHandler { model.close() }
     ChatScreen(state, onBack = model::close, onDraft = model::setDraft, onLock = model::toggleLock,
         onDirection = model::toggleDirection, onSend = model::send, onRetry = model::retry,
-        onUnlock = model::unlockAndRetry, onRestore = model::restore, onUndo = model::undo,
-        onSave = model::save, onFeedback = model::feedback, onLoadFeedback = model::loadFeedback, modifier = modifier)
+        onUnlock = model::unlockAndRetry, onRestore = model::restore, onUndo = model::cancelLast,
+        onSave = model::toggleSave, onFeedback = model::feedback, onLoadFeedback = model::loadFeedback, modifier = modifier)
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -62,6 +64,17 @@ fun ChatScreen(
 ) {
     val outfit = state.current ?: return
     var expanded by rememberSaveable(state.source?.id) { mutableStateOf(true) }
+    var confirmCancel by remember { mutableStateOf(false) }
+    val askCancel = { confirmCancel = true }
+    if (confirmCancel) AlertDialog(
+        onDismissRequest = { confirmCancel = false },
+        title = { Text("요청을 취소할까요?") },
+        text = { Text("이 요청을 보내기 전 코디와 잠금으로 돌아가요. 보낸 내용은 입력창에 다시 채워 둘게요.") },
+        confirmButton = {
+            TextButton(onClick = { confirmCancel = false; if (state.canCancelLast) onUndo() }) { Text("요청 취소") }
+        },
+        dismissButton = { TextButton(onClick = { confirmCancel = false }) { Text("계속 보기") } },
+    )
     val list = rememberLazyListState()
     val scope = rememberCoroutineScope()
     val keyboard = LocalSoftwareKeyboardController.current
@@ -71,7 +84,12 @@ fun ChatScreen(
         if (list.isScrollInProgress) followLatest = atBottom
     }
     val scrollRevision = state.turns.map { Triple(it.id, it.loading, it.result?.status ?: it.error) }
-    LaunchedEffect(scrollRevision) {
+    LaunchedEffect(scrollRevision, state.notice) {
+        followLatest = true
+        list.animateScrollToItem((list.layoutInfo.totalItemsCount - 1).coerceAtLeast(0))
+    }
+    // Saving or rating grows the newest card; stay at the bottom unless the user scrolled up to read.
+    LaunchedEffect(state.savedKeys, state.savingKeys, state.saveErrors, state.feedbackMessages) {
         if (followLatest) list.animateScrollToItem((list.layoutInfo.totalItemsCount - 1).coerceAtLeast(0))
     }
     LaunchedEffect(state.turns.size) { if (state.turns.isNotEmpty()) expanded = false }
@@ -88,7 +106,7 @@ fun ChatScreen(
         topBar = {
             Surface(color = MaterialTheme.colorScheme.background) {
                 Column {
-                    Row(Modifier.fillMaxWidth().padding(end = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Row(Modifier.fillMaxWidth().padding(end = 20.dp), verticalAlignment = Alignment.CenterVertically) {
                         IconButton(onClick = onBack) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "오늘의 코디로 돌아가기")
                         }
@@ -97,7 +115,6 @@ fun ChatScreen(
                             Text("옷을 눌러 잠그고, 원하는 방향을 골라요", style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                        TextButton(onClick = onUndo, enabled = !state.busy && state.snapshots.isNotEmpty()) { Text("되돌리기") }
                     }
                     Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text("현재 코디", Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
@@ -138,7 +155,7 @@ fun ChatScreen(
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
                     OutlinedTextField(value = state.draft, onValueChange = onDraft,
                         modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp),
-                        placeholder = { Text("더 원하는 게 있나요? (선택)") },
+                        placeholder = { Text("예: 내일 부산 여행 가는데 뭐 입지?") },
                         label = { Text("메시지") }, maxLines = 3,
                         trailingIcon = {
                             IconButton(onClick = ::send, enabled = state.canSend) {
@@ -175,7 +192,10 @@ fun ChatScreen(
                                 Row(Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp),
                                     verticalAlignment = Alignment.CenterVertically) {
                                     CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-                                    Text("잠근 옷을 유지하며 코디를 찾고 있어요", style = MaterialTheme.typography.bodySmall)
+                                    Text("잠근 옷을 유지하며 코디를 찾고 있어요", Modifier.weight(1f, fill = false),
+                                        style = MaterialTheme.typography.bodySmall)
+                                    if (state.canCancelLast && state.turns.lastOrNull()?.id == turn.id) TextButton(onClick = askCancel,
+                                        contentPadding = PaddingValues(horizontal = 8.dp)) { Text("취소") }
                                 }
                             }
                             turn.error != null -> {
@@ -196,10 +216,20 @@ fun ChatScreen(
                                 }
                                 result.outfit?.let { resultOutfit ->
                                     ResultCard(resultOutfit, result.changedIds, result.lockedIds, state,
-                                        onRestore, onSave, onFeedback, onLoadFeedback)
+                                        onRestore, onSave, onFeedback, onLoadFeedback,
+                                        onCancel = if (state.canCancelLast && state.turns.lastOrNull()?.id == turn.id) askCancel else null)
                                 }
                                 result.notes.forEach { note -> Text(note, style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                            }
+                        }
+                        // Answers without an outfit (a question back, an error) have no rating row to sit in.
+                        val noOutfit = turn.result?.outfit == null
+                        if (!turn.loading && noOutfit && state.canCancelLast && state.turns.lastOrNull()?.id == turn.id) {
+                            TextButton(onClick = askCancel, modifier = Modifier.align(Alignment.End),
+                                contentPadding = PaddingValues(horizontal = 8.dp)) {
+                                Text("요청 취소", style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                     }
@@ -270,7 +300,8 @@ private fun OutfitItems(
 private fun ResultCard(outfit: Outfit, changedIds: Set<String>, lockedIds: Set<String>, state: ChatState,
                        onRestore: (Outfit) -> Unit, onSave: (Outfit) -> Unit,
                        onFeedback: (Outfit, String) -> Unit = { _, _ -> },
-                       onLoadFeedback: (Outfit) -> Unit = {}) {
+                       onLoadFeedback: (Outfit) -> Unit = {},
+                       onCancel: (() -> Unit)? = null) {
     LaunchedEffect(outfit.key) { onLoadFeedback(outfit) }
     Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainer,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
@@ -285,7 +316,7 @@ private fun ResultCard(outfit: Outfit, changedIds: Set<String>, lockedIds: Set<S
             val loaded = outfit.key in state.feedbackLoaded
             val loading = outfit.key in state.feedbackLoading
             val pending = state.feedbackPending.isNotEmpty() || loading || !loaded
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
                 TextButton(onClick = { onFeedback(outfit, "liked") }, enabled = !pending) {
                     Icon(if (feedback == "liked") Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
                         contentDescription = null, tint = MaterialTheme.colorScheme.primary)
@@ -296,6 +327,14 @@ private fun ResultCard(outfit: Outfit, changedIds: Set<String>, lockedIds: Set<S
                     Text(if (feedback == "disliked") "별로예요 취소" else "별로예요",
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
+                // Quiet on purpose: next to the rating, for when the answer missed; it asks before undoing.
+                if (onCancel != null) {
+                    Spacer(Modifier.weight(1f))
+                    TextButton(onClick = onCancel, contentPadding = PaddingValues(horizontal = 8.dp)) {
+                        Text("요청 취소", style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
             }
             state.feedbackMessages[outfit.key]?.let { Text(it, style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant) }
@@ -303,12 +342,11 @@ private fun ResultCard(outfit: Outfit, changedIds: Set<String>, lockedIds: Set<S
                 if (state.current?.key != outfit.key) {
                     TextButton(onClick = { onRestore(outfit) }, enabled = !state.busy, modifier = Modifier.weight(1f)) { Text("이 코디로 돌아가기") }
                 }
-                Button(onClick = { onSave(outfit) }, enabled = outfit.key !in state.savedKeys && outfit.key !in state.savingKeys,
-                    modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp)) {
-                    Text(when (outfit.key) { in state.savedKeys -> "저장됨"; in state.savingKeys -> "저장 중…";
-                        in state.saveErrors -> "저장 다시 시도"; else -> "코디북에 저장" })
-                }
+                SaveToggle(saved = outfit.key in state.savedKeys, pending = outfit.key in state.savingKeys,
+                    failed = outfit.key in state.saveErrors, onClick = { onSave(outfit) }, modifier = Modifier.weight(1f))
             }
+            if (outfit.key in state.savedKeys && outfit.key !in state.savingKeys) Text("코디북에 저장했어요. 다시 누르면 저장이 취소돼요.",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (!loaded && !loading) {
                 TextButton(onClick = { onLoadFeedback(outfit) }) { Text("만족도 다시 불러오기") }
             }
@@ -316,4 +354,28 @@ private fun ResultCard(outfit: Outfit, changedIds: Set<String>, lockedIds: Set<S
                 color = MaterialTheme.colorScheme.error) }
         }
     }
+}
+
+/** Saved: a quiet outlined star button that takes the save back. Not saved: the primary action. */
+@Composable
+private fun SaveToggle(saved: Boolean, pending: Boolean, failed: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val label = when {
+        pending && saved -> "저장 취소 중…"
+        pending -> "저장 중…"
+        saved -> "코디북에 저장됨"
+        failed -> "저장 다시 시도"
+        else -> "코디북에 저장"
+    }
+    val content: @Composable RowScope.() -> Unit = {
+        if (saved) {
+            Icon(Icons.Filled.Star, contentDescription = null, Modifier.size(18.dp))
+            Spacer(Modifier.width(6.dp))
+        }
+        Text(label)
+    }
+    val toggle = modifier.semantics { stateDescription = if (saved) "저장됨" else "저장 안 됨" }
+    if (saved) OutlinedButton(onClick = onClick, enabled = !pending, modifier = toggle, shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary), content = content)
+    else Button(onClick = onClick, enabled = !pending, modifier = toggle, shape = RoundedCornerShape(12.dp), content = content)
 }
