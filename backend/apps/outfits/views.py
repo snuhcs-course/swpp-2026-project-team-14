@@ -297,11 +297,11 @@ def wardrobe_gaps_view(request):
         logger.exception("Wardrobe gap model loading failed")
         return _error("WARDROBE_GAPS_UNAVAILABLE", 503, "옷장을 분석하지 못했어요. 잠시 후 다시 시도해 주세요.")
     try:
-        result = wardrobe_gaps(wardrobe, masked, request.user.preferred_styles)
+        result = wardrobe_gaps(wardrobe, masked, request.user.preferred_styles, request.user.preferred_fits)
     except ExternalModelUnavailable:
         logger.exception("Wardrobe gap prediction unavailable")
         return _error("WARDROBE_GAPS_UNAVAILABLE", 503, "옷장을 분석하지 못했어요. 잠시 후 다시 시도해 주세요.")
-    return _json({"garment_count": len(saved), **result})
+    return _json(result)
 
 
 @require_http_methods(["GET", "POST"])

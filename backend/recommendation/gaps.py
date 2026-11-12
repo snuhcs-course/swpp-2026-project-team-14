@@ -6,6 +6,7 @@
 2. 후보를 (슬롯, 카테고리, 색상)으로 묶어 몇 벌의 옷이 그 후보를 골랐는지(표 수) 센다.
 3. 이미 가진 옷과 같은 종류(`wardrobe.similar`)는 버린다: "옷장에 없는 옷"만 남긴다.
 4. 표가 MIN_VOTES 이상인 후보를 표 수 → 평균 확률 순으로 최대 MAX_GAPS개 고른다.
+5. 핏은 계정의 선호 핏 중 그 슬롯에 맞는 첫 값을 쓰고, 없으면 표를 던진 옷들이 가장 원한 핏을 쓴다.
 
 화면에 보이는 "내 옷 N벌과 어울려요"의 N과 근거 옷 목록은 이 표 집계 그대로다.
 """
@@ -39,6 +40,12 @@ COLOR_TOP = 3  # 옷 한 벌이 보는 색상 후보 수
 VOTES_PER_GARMENT = 3  # 옷 한 벌이 투표하는 (카테고리, 색상) 조합 수
 SOURCE_SLOTS = ("상의", "하의", "아우터")
 SLOT_CODE = {"상의": "top", "하의": "bottom", "아우터": "outerwear"}
+
+# 계정 선호 핏(마이프로필) → 슬롯별 모델 핏. 슬롯에 없는 선호(상의의 와이드, 테이퍼드 등)는 모델 예측을 쓴다
+PROFILE_FITS = {
+    "상의": {"oversized": "오버사이즈", "regular": "노멀", "slim": "타이트"},
+    "하의": {"wide": "와이드", "regular": "노멀", "slim": "스키니"},
+}
 
 STATUS_OK = "ok"
 STATUS_ENOUGH = "enough"  # 분석했지만 사야 할 옷이 없다 (O5-4)
@@ -104,8 +111,14 @@ def _owned(candidate: _Candidate, wardrobe: list[Item]) -> bool:
     return any(similar(probe, garment) for garment in wardrobe)
 
 
-def _serialize(candidate: _Candidate) -> dict:
-    fit = candidate.fit()
+def preferred_fit(slot: str, preferred_fits: list[str] | None) -> str | None:
+    """선호 핏 목록에서 이 슬롯에 쓸 수 있는 첫 값 (모델 어휘). 없으면 None."""
+    mapping = PROFILE_FITS.get(slot, {})
+    return next((mapping[fit] for fit in preferred_fits or [] if fit in mapping), None)
+
+
+def _serialize(candidate: _Candidate, preferred_fits: list[str] | None) -> dict:
+    fit = preferred_fit(candidate.slot, preferred_fits) or candidate.fit()
     title = search_title(candidate.category, candidate.color, fit)
     # 근거 옷은 이 후보를 강하게 원한 순서로 보여 준다
     voters = sorted(candidate.votes, key=lambda vote: (-vote.share, vote.garment.id))
@@ -133,16 +146,19 @@ def enough_garments(wardrobe: list[Item]) -> bool:
     return counts["top"] >= 1 and counts["bottom"] >= 1 and sum(counts.values()) >= MIN_GARMENTS
 
 
-def wardrobe_gaps(wardrobe: list[Item], model, preferred_styles: list[str] | None = None) -> dict:
+def wardrobe_gaps(wardrobe: list[Item], model, preferred_styles: list[str] | None = None,
+                  preferred_fits: list[str] | None = None) -> dict:
     """옷장 전체를 보고 부족한 옷을 최대 MAX_GAPS개 추천한다.
 
-    반환값: {"status": ok|enough|too_few, "slot_counts": {...}, "gaps": [...]}
+    반환값: {"status": ok|enough|too_few, "garment_count": 분석한 옷 수, "slot_counts": {...}, "gaps": [...]}
+    garment_count는 분석에 쓴 상의·하의·아우터 수라서 slot_counts의 합과 같다 (원피스·신발 제외).
     모델을 쓸 수 없으면 ExternalModelUnavailable.
     """
     garments = [garment for garment in wardrobe if garment.slot in SOURCE_SLOTS]
     counts = slot_counts(garments)
+    summary = {"garment_count": sum(counts.values()), "slot_counts": counts}
     if not enough_garments(garments):
-        return {"status": STATUS_TOO_FEW, "slot_counts": counts, "gaps": []}
+        return {"status": STATUS_TOO_FEW, **summary, "gaps": []}
     if model is None:
         raise ExternalModelUnavailable("Masked model unavailable")
     style = preferred_style(preferred_styles)
@@ -159,5 +175,5 @@ def wardrobe_gaps(wardrobe: list[Item], model, preferred_styles: list[str] | Non
     gaps = [candidate for candidate in candidates.values()
             if len(candidate.votes) >= MIN_VOTES and not _owned(candidate, garments)]
     gaps.sort(key=lambda c: (-len(c.votes), -c.mean_share, c.slot, c.category, c.color))
-    chosen = [_serialize(candidate) for candidate in gaps[:MAX_GAPS]]
-    return {"status": STATUS_OK if chosen else STATUS_ENOUGH, "slot_counts": counts, "gaps": chosen}
+    chosen = [_serialize(candidate, preferred_fits) for candidate in gaps[:MAX_GAPS]]
+    return {"status": STATUS_OK if chosen else STATUS_ENOUGH, **summary, "gaps": chosen}

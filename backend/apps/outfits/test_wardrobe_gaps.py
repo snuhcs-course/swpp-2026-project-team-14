@@ -50,7 +50,7 @@ class WardrobeGapsApiTests(TestCase):
         self.assertEqual(response.status_code, 200, response.content)
         result = response.json()
         self.assertEqual(result["status"], "ok")
-        self.assertEqual(result["garment_count"], 6)  # 신발도 옷장 벌 수에는 들어간다
+        self.assertEqual(result["garment_count"], 5)  # 분석한 옷 수 = 상의·하의·아우터 합 (신발 제외)
         self.assertEqual(result["slot_counts"], {"top": 2, "bottom": 2, "outerwear": 1})
         self.assertEqual([(gap["title"], gap["slot"], gap["vote_count"]) for gap in result["gaps"]],
                          [("그레이 레귤러핏 니트", "top", 3), ("그레이 레귤러핏 팬츠", "bottom", 2)])
@@ -74,10 +74,17 @@ class WardrobeGapsApiTests(TestCase):
         hidden = garment(other, "남의 바지", "bottom", "pants", "#202020")
         draft = garment(self.user, "초안 바지", "bottom", "slacks", "#24344B", saved=False)
         result = self.get().json()
-        self.assertEqual(result["garment_count"], 6)
+        self.assertEqual(result["garment_count"], 5)
         ids = {match["garment_id"] for gap in result["gaps"] for match in gap["matched_garments"]}
         self.assertNotIn(str(hidden.id), ids)
         self.assertNotIn(str(draft.id), ids)
+
+    def test_saved_preferred_fits_shape_the_recommended_fit(self):
+        self.user.preferred_fits = ["oversized", "wide"]
+        self.user.save()
+        result = self.get().json()
+        self.assertEqual([(gap["title"], gap["attributes"]["fit"]) for gap in result["gaps"]],
+                         [("그레이 오버핏 니트", "오버사이즈"), ("그레이 와이드 팬츠", "와이드")])
 
     def test_owned_kind_is_not_recommended_and_nothing_to_buy_is_reported(self):
         garment(self.user, "회색 니트", "top", "knitwear", "#808080")
@@ -91,7 +98,7 @@ class WardrobeGapsApiTests(TestCase):
             item.delete()
         response = self.get()
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json(), {"garment_count": 3, "status": "too_few",
+        self.assertEqual(response.json(), {"garment_count": 2, "status": "too_few",
                                            "slot_counts": {"top": 1, "bottom": 1, "outerwear": 0}, "gaps": []})
         self.models.assert_not_called()
 

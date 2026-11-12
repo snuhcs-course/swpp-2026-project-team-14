@@ -93,7 +93,8 @@ def test_a_kind_already_in_the_wardrobe_is_never_recommended():
     navy_shirt = logprobs({"셔츠": 0.0}, {"네이비": 0.0})
     model = ModelDouble({"네이비": BEIGE_PANTS, "블루": navy_shirt, "블랙": navy_shirt, "베이지": navy_shirt})
     result = wardrobe_gaps(base_wardrobe(), model)
-    assert result == {"status": "enough", "slot_counts": {"top": 1, "bottom": 3, "outerwear": 0}, "gaps": []}
+    assert result == {"status": "enough", "garment_count": 4, "slot_counts": {"top": 1, "bottom": 3, "outerwear": 0},
+                      "gaps": []}
 
 
 def test_owned_check_compares_category_and_color_only():
@@ -160,6 +161,7 @@ def test_dresses_are_ignored():
     result = wardrobe_gaps(wardrobe, model)
     assert "화이트" not in [color for _, color, _, _ in model.calls]
     assert result["slot_counts"] == {"top": 1, "bottom": 3, "outerwear": 0}
+    assert result["garment_count"] == 4  # 분석한 옷 수 = slot_counts 합 (원피스 제외)
 
 
 @pytest.mark.parametrize("wardrobe", [
@@ -225,6 +227,32 @@ def test_fit_is_the_one_most_wanted_by_the_voters_and_feeds_the_search_link():
     url = urlsplit(gap["search_url"])
     assert (url.scheme, url.netloc, url.path) == ("https", "www.musinsa.com", "/search/goods")
     assert parse_qs(url.query) == {"keyword": ["그레이 루즈 니트"]}
+
+
+@pytest.mark.parametrize("preferred, title", [
+    (["oversized"], "그레이 오버핏 니트"),
+    (["slim"], "그레이 슬림 니트"),
+    (["regular"], "그레이 레귤러핏 니트"),
+    (["wide", "tapered", "oversized"], "그레이 오버핏 니트"),  # 상의에 안 맞는 선호는 건너뛰고 첫 번째로 맞는 값
+])
+def test_saved_preferred_fit_decides_the_fit_of_a_top(preferred, title):
+    loose = logprobs({"니트웨어": 0.0}, {"그레이": 0.0}, {"루즈": 0.0, "노멀": -2.0})
+    model = ModelDouble({"네이비": BEIGE_PANTS, "블루": loose, "블랙": loose, "베이지": loose})
+    gap = wardrobe_gaps(base_wardrobe(), model, preferred_fits=preferred)["gaps"][0]
+    assert gap["title"] == title
+    assert parse_qs(urlsplit(gap["search_url"]).query) == {"keyword": [title]}
+
+
+@pytest.mark.parametrize("preferred, fit", [(["wide"], "와이드"), (["slim"], "스키니"), (["oversized"], "노멀")])
+def test_saved_preferred_fit_decides_the_fit_of_a_bottom(preferred, fit):
+    # 상의 2벌이 베이지 팬츠를 원함. 오버핏은 하의에 없으니 모델이 가장 원한 핏(노멀)을 쓴다
+    wardrobe = [item("tee", "상의", "티셔츠", "블랙"), item("shirt", "상의", "셔츠", "화이트"),
+                item("jeans", "하의", "청바지", "블루"), item("skirt", "하의", "스커트", "네이비")]
+    pants = logprobs({"팬츠": 0.0}, {"베이지": 0.0}, {"노멀": 0.0, "와이드": -1.0})
+    model = ModelDouble({"블랙": pants, "화이트": pants, "블루": WHITE_TEE, "네이비": GRAY_KNIT})
+    gap = wardrobe_gaps(wardrobe, model, preferred_fits=preferred)["gaps"][0]
+    assert gap["attributes"]["category"] == "팬츠"
+    assert gap["attributes"]["fit"] == fit
 
 
 def test_shared_search_helpers_keep_the_matching_keyword_rules():
