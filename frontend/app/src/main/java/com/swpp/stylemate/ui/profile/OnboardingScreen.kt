@@ -47,6 +47,10 @@ private val ONBOARDING_MOODS = linkedMapOf("minimal" to "미니멀", "cityboy" t
 private val MOOD_IMAGES = mapOf("minimal" to R.drawable.onboarding_minimal, "cityboy" to R.drawable.onboarding_cityboy,
     "casual" to R.drawable.onboarding_casual, "street" to R.drawable.onboarding_street,
     "classic" to R.drawable.onboarding_classic, "sporty" to R.drawable.onboarding_sporty)
+// Key pieces of each mood, so the card says what the word means without relying on the photo alone (HE).
+private val MOOD_HINTS = mapOf("minimal" to "무채색 · 깔끔한 실루엣", "cityboy" to "셔츠 · 와이드 치노 · 볼캡",
+    "casual" to "티셔츠 · 데님 · 스니커즈", "street" to "후드 · 카고 팬츠", "classic" to "블레이저 · 슬랙스 · 로퍼",
+    "sporty" to "바람막이 · 트레이닝 팬츠")
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -178,7 +182,11 @@ fun OnboardingRoute(model: BodyProfileViewModel, accountStore: LocalUserStore? =
                                                 modifier = Modifier.fillMaxWidth().height(180.dp))
                                             SelectionMark(selected, Modifier.align(Alignment.TopEnd).padding(10.dp))
                                         }
-                                        Text(label, Modifier.padding(12.dp), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                                        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                            Text(label, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                                            MOOD_HINTS[code]?.let { Text(it, style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                                        }
                                     }
                                 }
                             }

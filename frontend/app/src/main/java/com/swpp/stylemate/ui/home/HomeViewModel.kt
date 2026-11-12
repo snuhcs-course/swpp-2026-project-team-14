@@ -4,7 +4,9 @@ package com.swpp.stylemate.ui.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.swpp.stylemate.data.recommendation.Outfit
+import com.swpp.stylemate.data.recommendation.HomeRegion
 import com.swpp.stylemate.data.recommendation.OutfitApiException
+import com.swpp.stylemate.data.recommendation.Region
 import com.swpp.stylemate.data.recommendation.OutfitRepository
 import com.swpp.stylemate.data.recommendation.TasteStore
 import com.swpp.stylemate.data.recommendation.Weather
@@ -25,6 +27,7 @@ data class HomeState(
     val errorCode: String? = null,
     val acting: Boolean = false,
     val message: String? = null,
+    val region: String = HomeRegion.SEOUL.name,
 ) {
     val current: Outfit? get() = outfits.getOrNull(index)
 
@@ -35,12 +38,30 @@ data class HomeState(
 
 /** 오늘의 코디: outfits from the user's own wardrobe for today's weather, liked/disliked/saved. */
 class HomeViewModel(private val repository: OutfitRepository, private val taste: TasteStore) : ViewModel() {
+    companion object {
+        const val CAROUSEL_SIZE = 3
+    }
+
     private val mutableState = MutableStateFlow(HomeState())
     val state = mutableState.asStateFlow()
     private val seen = mutableListOf<String>()
     private var body: JSONObject? = null
     private var job: Job? = null
     private var wardrobeRevision = 0
+    private var occasion: String? = null
+    private var region = HomeRegion.SEOUL
+
+    /** The region whose weather home uses. Changing it after the first load fetches its weather and new outfits. */
+    fun setRegion(value: Region, reload: Boolean = true) {
+        if (value == region) return
+        region = value
+        // The old region's weather must not stay on screen under the new name.
+        mutableState.value = mutableState.value.copy(region = value.name, weather = null)
+        if (reload && (mutableState.value.outfits.isNotEmpty() || mutableState.value.errorCode != null)) load(body)
+    }
+
+    /** The occasion of today's calendar events (from the device), sent with the next recommendation. */
+    fun setOccasion(value: String?) { occasion = value }
 
     /** First load, or the refresh button: new weather and new outfits. */
     fun load(body: JSONObject?, refreshWeather: Boolean = true) {
@@ -54,16 +75,23 @@ class HomeViewModel(private val repository: OutfitRepository, private val taste:
         job = viewModelScope.launch {
             try {
                 val weather = if (refreshWeather || mutableState.value.weather == null) {
-                    try { repository.weather() } catch (e: OutfitApiException) { mutableState.value.weather }
+                    try { repository.weather(region) } catch (e: OutfitApiException) { mutableState.value.weather }
                 } else mutableState.value.weather
-                val result = repository.recommend(body, weather, taste.load(), seen)
-                seen += result.outfits.map { it.key }
-                mutableState.value = mutableState.value.copy(loading = false, weather = weather, outfits = result.outfits,
+                val result = repository.recommend(body, weather, taste.load(), seen, count = CAROUSEL_SIZE, occasion = occasion)
+                // A small wardrobe cannot fill the carousel with distinct outfits: show the best one alone.
+                val outfits = if (result.outfits.size < CAROUSEL_SIZE) result.outfits.take(1) else result.outfits
+                seen += outfits.map { it.key }
+                mutableState.value = mutableState.value.copy(loading = false, weather = weather, outfits = outfits,
                     index = 0, notes = result.notes)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: OutfitApiException) {
-                mutableState.value = mutableState.value.copy(loading = false, error = e.message, errorCode = e.code)
+                val shown = mutableState.value
+                // A failed refresh keeps the outfits on screen, so the reason goes to a snackbar instead of the
+                // empty-state card it would otherwise never reach.
+                mutableState.value = if (shown.outfits.isNotEmpty() && e.code != "WARDROBE_TOO_SMALL")
+                    shown.copy(loading = false, message = e.message)
+                else shown.copy(loading = false, error = e.message, errorCode = e.code)
             }
         }
     }
@@ -83,7 +111,13 @@ class HomeViewModel(private val repository: OutfitRepository, private val taste:
         if (body?.toString() != this.body?.toString() || state.outfits.isEmpty() || state.errorCode != null) load(body)
     }
 
-    /** "다른 코디": the next of the current set, then a new set that avoids the outfits already shown. */
+    /** The outfit swiped into view; like, save, chat and fitting act on it. */
+    fun select(index: Int) {
+        val state = mutableState.value
+        if (index in state.outfits.indices && index != state.index) mutableState.value = state.copy(index = index)
+    }
+
+    /** After a dislike: the next of the current set, then a new set that avoids the outfits already shown. */
     fun next() {
         val state = mutableState.value
         if (state.loading) return

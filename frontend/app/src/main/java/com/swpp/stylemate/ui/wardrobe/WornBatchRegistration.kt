@@ -86,6 +86,36 @@ fun WornRegistration(account: AccountAccess, onBack: () -> Unit, onBatchSaved: (
             finally { reading = false }
         }
     }
+    // Camera capture goes to a temporary cache file that is deleted right after it is decoded.
+    val captureFile = remember { java.io.File(context.cacheDir, "body_photos/worn-capture.jpg") }
+    val camera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { saved ->
+        scope.launch {
+            if (saved) {
+                reading = true
+                photoError = null
+                try {
+                    val bitmap = decodeDownscaled(context, android.net.Uri.fromFile(captureFile), maxSide = 1536)
+                    if (bitmap != null) model.detect(bitmap) else photoError = "사진을 읽을 수 없어요. 다시 찍어 주세요."
+                } catch (cancelled: CancellationException) { throw cancelled }
+                catch (_: Exception) { photoError = "사진을 읽을 수 없어요. 다시 찍어 주세요." }
+                finally { reading = false }
+            }
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { captureFile.delete() }
+        }
+    }
+    fun capture() {
+        captureFile.parentFile?.mkdirs()
+        try { camera.launch(androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.photos", captureFile)) }
+        catch (_: Exception) { captureFile.delete(); photoError = "카메라를 열지 못했어요. 앨범에서 골라 주세요." }
+    }
+    val cameraPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) capture() else photoError = "카메라 권한을 허용하거나 앨범에서 사진을 골라 주세요."
+    }
+    fun takePhoto() {
+        if (androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.CAMERA) ==
+            android.content.pm.PackageManager.PERMISSION_GRANTED) capture()
+        else cameraPermission.launch(android.Manifest.permission.CAMERA)
+    }
     val editorItem = state.items.firstOrNull { it.id == editing }
     if (editorItem != null && catalog != null) {
         WornBatchEditor(editorItem, checkNotNull(catalog), account, onBack = { editing = null }, onEdit = {
@@ -114,17 +144,17 @@ fun WornRegistration(account: AccountAccess, onBack: () -> Unit, onBatchSaved: (
             else -> "선택한 ${state.selected.size}벌 사진 만들기"
         },
         primaryEnabled = !busy && catalog != null && candidates.isNotEmpty() && state.selected.isNotEmpty(),
-        onPrimary = { confirmation = "generate" to "" }) { padding ->
+        onPrimary = model::generateSelected) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 if (busy) WornProcessingIndicator(state.progress.ifBlank { "사진 읽는 중" })
                 Text("본인이 옷을 입은 사진을 골라 주세요. 사진에서 옷을 찾고 핏·기장을 제안해요.")
                 WornPhotoUpload(hasPhoto = state.original != null, enabled = !busy, onPick = {
                     picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                })
+                }, onCamera = ::takePhoto)
                 if (state.original != null) AutoGarmentCandidates(checkNotNull(state.original), candidates,
                     state.selected, !busy, model::select)
-                if (candidates.isNotEmpty()) Text("선택한 옷마다 이미지를 한 장씩 생성해요. 가려진 부분은 실제 옷과 다를 수 있어요.",
+                if (candidates.isNotEmpty()) Text("선택한 옷마다 이미지를 한 장씩 생성해요(옷마다 생성 비용 발생). 가려진 부분은 실제 옷과 다를 수 있어요.",
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
                 if (!busy && state.original != null && (state.photo == null || state.photo?.optString("status") == "detecting")) {
                     TextButton(onClick = model::refreshPhoto) { Text("찾은 결과 확인") }
@@ -236,21 +266,27 @@ private fun WornBatchEditor(item: WornBatchItem, catalog: JSONObject, account: A
         } })
 }
 
-/** Gallery entry styled like the existing body-profile photo slots. */
+/** Gallery entry styled like the existing body-profile photo slots, with an optional camera button. */
 @Composable
-internal fun WornPhotoUpload(hasPhoto: Boolean, enabled: Boolean, onPick: () -> Unit) {
-    Surface(Modifier.fillMaxWidth().clickable(enabled = enabled, role = Role.Button, onClick = onPick)
-        .semantics { contentDescription = if (hasPhoto) "다른 착용 사진 업로드" else "착용 사진 업로드" },
-        shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainer,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
-        Column(Modifier.fillMaxWidth().heightIn(min = if (hasPhoto) 88.dp else 232.dp).padding(20.dp),
-            verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(Icons.Default.Add, null, Modifier.size(32.dp), tint = MaterialTheme.colorScheme.primary)
-            Spacer(Modifier.height(12.dp))
-            Text(if (hasPhoto) "다른 사진 올리기" else "착용 사진 올리기", style = MaterialTheme.typography.titleMedium)
-            Spacer(Modifier.height(6.dp))
-            Text("눌러서 앨범에서 선택", style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant)
+internal fun WornPhotoUpload(hasPhoto: Boolean, enabled: Boolean, onCamera: (() -> Unit)? = null, onPick: () -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Surface(Modifier.fillMaxWidth().clickable(enabled = enabled, role = Role.Button, onClick = onPick)
+            .semantics { contentDescription = if (hasPhoto) "다른 착용 사진 업로드" else "착용 사진 업로드" },
+            shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainer,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
+            Column(Modifier.fillMaxWidth().heightIn(min = if (hasPhoto) 88.dp else 200.dp).padding(20.dp),
+                verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(Icons.Default.Add, null, Modifier.size(32.dp), tint = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.height(12.dp))
+                Text(if (hasPhoto) "다른 사진 올리기" else "착용 사진 올리기", style = MaterialTheme.typography.titleMedium)
+                Spacer(Modifier.height(6.dp))
+                Text("눌러서 앨범에서 선택", style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        if (onCamera != null) OutlinedButton(onClick = onCamera, enabled = enabled, modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(14.dp)) {
+            Text("카메라로 찍기")
         }
     }
 }

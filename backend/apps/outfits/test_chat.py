@@ -41,6 +41,12 @@ class ChatApiTests(ChatFixture):
         self.assertIn(str(self.bright.id), data['changed_ids'])
         self.assertFalse(Outfit.objects.exists())
 
+    def test_works_without_a_body_profile(self):
+        for body in (None, {'preferred_fit': 'regular', 'preferred_styles': []}):
+            response = self.post(body=body, locked_ids=[str(self.bottom.id)])
+            self.assertEqual(response.status_code, 200, body)
+            self.assertEqual(response.json()['status'], 'updated')
+
     def test_locked_outer_survives_hot_weather_with_complete_outfit(self):
         response = self.post(garment_ids=self.ids + [str(self.outer.id)], locked_ids=[str(self.outer.id), str(self.bottom.id)], temp=30)
         self.assertEqual(response.status_code, 200)

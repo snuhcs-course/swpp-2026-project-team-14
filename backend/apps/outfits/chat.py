@@ -8,7 +8,7 @@ from threading import BoundedSemaphore
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from apps.body_profiles.profile import body_from_request
+from apps.body_profiles.profile import body_or_unknown
 from apps.users.auth import require_auth
 from apps.wardrobe.models import Garment
 from recommendation import chat_intent, intent, season, trip, weather
@@ -25,7 +25,8 @@ SLOTS_GATE = BoundedSemaphore(2)
 
 
 def read(data, request):
-    body = body_from_request(request, data)
+    body = body_or_unknown(request, data)
+    profile = data.get('body') or {}
     current = views._strings(data.get('garment_ids'), 3, 40)
     locked = views._strings(data.get('locked_ids'), 3, 40)
     if not current or not set(locked) <= set(current):
@@ -39,10 +40,10 @@ def read(data, request):
         not isinstance(h, dict) or set(h) != {'role', 'text'} or h['role'] not in ('user', 'assistant')
         or not isinstance(h['text'], str) or len(h['text']) > 500 for h in history):
         raise ValueError('Invalid history')
-    pref_fit = data.get('pref_fit', data['body'].get('preferred_fit', 'regular'))
+    pref_fit = data.get('pref_fit', profile.get('preferred_fit', 'regular'))
     if pref_fit not in views.PREF_FITS:
         raise ValueError('Invalid fit')
-    styles = views._strings(data.get('styles', data['body'].get('preferred_styles')), 6, 20, views.PROFILE_STYLES)
+    styles = views._strings(data.get('styles', profile.get('preferred_styles')), 6, 20, views.PROFILE_STYLES)
     temp, wet, context = views._weather(data)
     taste = views._preference(data.get('preference'))
     seen = views._strings(data.get('seen_keys'), views.MAX_SEEN, 400)
@@ -103,11 +104,11 @@ def chat_view(request):
     except (ValueError, KeyError, TypeError, UnicodeDecodeError, OverflowError):
         return views._error('INVALID_CHAT_REQUEST', 400, '코디와 수정 요청을 확인해 주세요.')
     if not SLOTS_GATE.acquire(blocking=False):
-        return views._error('CHAT_BUSY', 429, '다른 코디를 수정 중이에요. 잠시 후 다시 시도해 주세요.')
+        return views._error('CHAT_BUSY', 429, '지금 대화 요청이 많아요. 30초쯤 뒤에 다시 보내 주세요.')
     try:
         return process(garments, *args)
     except chat_intent.ChatModelError:
-        return views._error('CHAT_MODEL_UNAVAILABLE', 503, '요청을 해석하지 못했어요. 잠시 후 다시 시도해 주세요.')
+        return views._error('CHAT_MODEL_UNAVAILABLE', 503, '문장을 해석하는 AI가 잠시 응답하지 않아요. 아래 버튼(밝게·캐주얼 등)으로 바꿔 보거나 30초쯤 뒤에 다시 보내 주세요.')
     finally:
         SLOTS_GATE.release()
 
