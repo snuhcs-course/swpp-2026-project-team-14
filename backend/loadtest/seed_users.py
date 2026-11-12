@@ -1,5 +1,6 @@
 # 부하 테스트용 계정 생성 (서버 파드 안에서 실행)
-#   kubectl exec -i -n team14 deploy/backend -c backend -- env TEMPLATE=<옷장 있는 기존 아이디> N=20 python manage.py shell < seed_users.py > tokens.json
+#   kubectl exec -i -n team14 deploy/backend -c backend -- env TEMPLATE=<옷장 있는 기존 아이디> N=20 python manage.py shell -v 0 < seed_users.py > tokens.json
+#   (-v 0: Django 5.2가 자동 import 안내를 stdout에 찍어 JSON이 깨지지 않게 함)
 # - TEMPLATE 사용자의 저장된 옷(saved=True)과 체형을 lt_001 ~ lt_0NN 계정에 복사한다
 # - 각 계정에 토큰을 발급하고, k6가 읽을 JSON 배열을 stdout으로 출력한다
 # - 사진 파일은 복사하지 않고 같은 경로를 참조만 한다 (계정 삭제 시 파일은 지워지지 않음)

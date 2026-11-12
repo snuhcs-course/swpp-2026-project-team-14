@@ -21,9 +21,9 @@ Copy `seed_users.py`, `inproc_timing.py` and `cleanup_users.py` to the server, t
 **0. Create 20 test accounts** (on the server). The recommendation API locks the user row, so each virtual user needs its own account.
 ```bash
 sudo k3s kubectl exec -i -n team14 deploy/backend -c backend -- \
-  env TEMPLATE=<username> N=20 python manage.py shell < seed_users.py > tokens.json
+  env TEMPLATE=<username> N=20 python manage.py shell -v 0 < seed_users.py > tokens.json
 ```
-Copy `tokens.json` next to the `.js` files on your PC. It contains tokens: never commit or share it.
+`-v 0` keeps Django 5.2 from printing its auto-import message into `tokens.json`. Copy `tokens.json` next to the `.js` files on your PC. It contains tokens: never commit or share it.
 
 **1. Step load** (on your PC, about 11 minutes). 1 → 8 RPS, each step 20 s ramp + 60 s hold.
 ```bash
@@ -34,7 +34,7 @@ Record `http_req_duration` p50/p95 and `http_req_failed`. Watch CPU with `sudo k
 **2. In-pod timing** (on the server, no load).
 ```bash
 sudo k3s kubectl exec -i -n team14 deploy/backend -c backend -- \
-  env USER_NAME=lt_001 python manage.py shell < inproc_timing.py
+  env USER_NAME=lt_001 python manage.py shell -v 0 < inproc_timing.py
 ```
 
 **3. Rolling restart** (about 8 minutes). Start k6, then restart the backend about one minute later.
@@ -47,7 +47,7 @@ sudo k3s kubectl rollout status deployment/backend -n team14
 
 **4. Clean up** (always).
 ```bash
-sudo k3s kubectl exec -i -n team14 deploy/backend -c backend -- python manage.py shell < cleanup_users.py
+sudo k3s kubectl exec -i -n team14 deploy/backend -c backend -- python manage.py shell -v 0 < cleanup_users.py
 ```
 This deletes the `lt_NNN` accounts and the outfits created during the test. Delete `tokens.json` on the server and on your PC.
 
