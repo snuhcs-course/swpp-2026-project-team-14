@@ -23,10 +23,10 @@ class WardrobeScreenTest {
                 onItemClick = { opened++ }, onDelete = { deleted++ })
         } }
         compose.onNodeWithContentDescription("내 셔츠 삭제").performClick()
-        compose.onNodeWithText("해당 의상을 삭제하시겠습니까?").assertIsDisplayed()
-        compose.onNodeWithText("이 의상이 포함된 코디도 함께 삭제됩니다.").assertIsDisplayed()
-        compose.onNodeWithText("아니요").performClick()
-        compose.onNodeWithText("해당 의상을 삭제하시겠습니까?").assertDoesNotExist()
+        compose.onNodeWithText("'내 셔츠'을(를) 옷장에서 삭제할까요?").assertIsDisplayed()
+        compose.onNodeWithText("이 옷이 들어간 코디북 코디도 함께 삭제돼요.").assertIsDisplayed()
+        compose.onNodeWithText("취소").performClick()
+        compose.onNodeWithText("'내 셔츠'을(를) 옷장에서 삭제할까요?").assertDoesNotExist()
         compose.onNodeWithText("내 셔츠").assertIsDisplayed()
         compose.runOnIdle { assertEquals(0, opened); assertEquals(0, deleted) }
     }
@@ -39,8 +39,8 @@ class WardrobeScreenTest {
             })
         } }
         compose.onNodeWithContentDescription("내 셔츠 삭제").performClick()
-        compose.onNodeWithText("예").performClick()
-        compose.onNodeWithText("해당 의상을 삭제하시겠습니까?").assertDoesNotExist()
+        compose.onNodeWithText("삭제").performClick()
+        compose.onNodeWithText("'내 셔츠'을(를) 옷장에서 삭제할까요?").assertDoesNotExist()
         compose.onNodeWithText("총 0벌").assertIsDisplayed()
         compose.onNodeWithText("아직 등록된 옷이 없습니다").assertIsDisplayed()
     }
@@ -62,12 +62,12 @@ class WardrobeScreenTest {
                 onDelete = { requests++; busy.value = it.id }, deletingId = busy.value, deleteError = error.value)
         } }
         compose.onNodeWithContentDescription("내 셔츠 삭제").performClick()
-        compose.onNodeWithText("예").performClick()
-        compose.onNodeWithText("예").assertIsNotEnabled()
-        compose.onNodeWithText("아니요").assertIsNotEnabled()
+        compose.onNodeWithText("삭제").performClick()
+        compose.onNodeWithText("삭제 중…").assertIsNotEnabled()
+        compose.onNodeWithText("취소").assertIsNotEnabled()
         compose.runOnIdle { busy.value = null; error.value = "서버에 연결하지 못했어요." }
         compose.onNodeWithText("서버에 연결하지 못했어요.").assertIsDisplayed()
-        compose.onNodeWithText("예").assertIsEnabled().performClick()
+        compose.onNodeWithText("삭제").assertIsEnabled().performClick()
         compose.runOnIdle { assertEquals(2, requests) }
     }
 

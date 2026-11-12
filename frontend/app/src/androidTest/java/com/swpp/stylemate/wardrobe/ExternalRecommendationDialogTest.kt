@@ -41,11 +41,12 @@ class ExternalRecommendationDialogTest {
                     onEdit = {}, onRecommend = { recommending = true }, onDismiss = {})
             }
         }
-        compose.onNodeWithText("이 옷과 어울리는 옷 무신사에서 보기").performClick()
-        compose.onNodeWithText("분석 완료!").assertIsDisplayed()
+        compose.onNodeWithText("어울리는 옷 찾기").performClick()
+        compose.onNodeWithText("어울리는 상의").assertIsDisplayed()
+        compose.onNodeWithText(result.title).assertIsDisplayed()
         compose.onNodeWithText(result.headline).assertIsDisplayed()
         compose.onNodeWithText(result.reason).assertIsDisplayed()
-        compose.onNodeWithText("외부 쇼핑몰에서 아이템 검색").performClick()
+        compose.onNodeWithText("무신사에서 비슷한 옷 찾기").performClick()
         compose.runOnIdle { assertEquals(result.searchUrl, opened) }
     }
 
@@ -55,7 +56,7 @@ class ExternalRecommendationDialogTest {
             WardrobeItemActionsDialog(WardrobeItem("shoes", "운동화", "shoes"),
                 onEdit = { edited = true }, onRecommend = {}, onDismiss = {})
         } }
-        compose.onNodeWithText("이 옷과 어울리는 옷 무신사에서 보기").assertIsNotEnabled()
+        compose.onNodeWithText("어울리는 옷 찾기").assertIsNotEnabled()
         compose.onNodeWithText("옷 정보 수정하기").performClick()
         compose.runOnIdle { assertEquals(true, edited) }
     }
@@ -65,8 +66,8 @@ class ExternalRecommendationDialogTest {
             ExternalRecommendationDialog(ExternalMatchState("pants", loading = true), {}, {}, {})
         } }
         compose.onNodeWithText("AI가 어울림 점수 분석 중...").assertIsDisplayed()
-        compose.onNodeWithText("외부 쇼핑몰에서 아이템 검색").assertDoesNotExist()
-        compose.onNodeWithText("내 옷장에서 아이템 검색").assertDoesNotExist()
+        compose.onNodeWithText("무신사에서 비슷한 옷 찾기").assertDoesNotExist()
+        compose.onNodeWithText("내 옷장에서").assertDoesNotExist()
     }
 
     @Test fun failureOffersRetryAndCloseWithoutASearchLink() {
@@ -77,20 +78,19 @@ class ExternalRecommendationDialogTest {
                 onRetry = { retries++ }, onOpenLink = {}, onDismiss = { closed = true })
         } }
         compose.onNodeWithText("다시 시도해 주세요.").assertIsDisplayed()
-        compose.onNodeWithText("외부 쇼핑몰에서 아이템 검색").assertDoesNotExist()
+        compose.onNodeWithText("무신사에서 비슷한 옷 찾기").assertDoesNotExist()
         compose.onNodeWithText("다시 시도").performClick()
         compose.onNodeWithText("닫기").performClick()
         compose.runOnIdle { assertEquals(1, retries); assertEquals(true, closed) }
     }
 
-    @Test fun wardrobeSearchListsRankedMatchesWithoutOpeningALink() {
+    @Test fun ownedMatchesAreShownRightAwayWithoutOpeningALink() {
         var opened: String? = null
         compose.setContent { StyleMateTheme {
             ExternalRecommendationDialog(ExternalMatchState("pants", result = result),
                 onRetry = {}, onOpenLink = { opened = it }, onDismiss = {})
         } }
-        compose.onNodeWithText("1. 검정 셔츠").assertDoesNotExist()
-        compose.onNodeWithText("내 옷장에서 아이템 검색").performClick()
+        compose.onNodeWithText("내 옷장에서").assertIsDisplayed()
         compose.onNodeWithText("1. 검정 셔츠").assertIsDisplayed()
         compose.onNodeWithText("2. 흰 티셔츠").assertIsDisplayed()
         compose.runOnIdle { assertEquals(null, opened) }
@@ -101,7 +101,6 @@ class ExternalRecommendationDialogTest {
             ExternalRecommendationDialog(ExternalMatchState("pants", result = result.copy(wardrobeMatches = emptyList())),
                 {}, {}, {})
         } }
-        compose.onNodeWithText("내 옷장에서 아이템 검색").performClick()
         compose.onNodeWithText("옷장에 어울리는 상의가 아직 없어요.").assertIsDisplayed()
     }
 }
