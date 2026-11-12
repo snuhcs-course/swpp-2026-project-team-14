@@ -1,5 +1,6 @@
 package com.swpp.stylemate.data.chat
 
+import com.swpp.stylemate.data.recommendation.ErrorMessages
 import com.swpp.stylemate.data.recommendation.Outfit
 import com.swpp.stylemate.data.recommendation.OutfitApiException
 import com.swpp.stylemate.data.recommendation.OutfitRepository
@@ -123,18 +124,24 @@ class ChatRepository(
             .method(method, body.toString().toRequestBody("application/json".toMediaType())).build()
         val (status, text) = try {
             client.newCall(request).execute().use { it.code to it.body?.string().orEmpty() }
+        } catch (e: java.io.InterruptedIOException) {
+            // The model call can take a while; a timeout is not the same as no connection.
+            throw OutfitApiException("TIMEOUT", ErrorMessages.TIMEOUT)
         } catch (e: IOException) {
-            throw OutfitApiException("NETWORK", OutfitRepository.NETWORK_ERROR)
+            throw OutfitApiException("NETWORK", ErrorMessages.NETWORK)
         }
         try { account.checkResponse(status) }
         catch (e: AuthException) { throw OutfitApiException(e.code, e.message.orEmpty()) }
         if (status !in 200..299) {
             val error = try { JSONObject(text) } catch (e: JSONException) { JSONObject() }
-            throw OutfitApiException(error.optString("error", "HTTP_$status"),
-                error.optString("hint").ifBlank { "요청을 처리하지 못했어요. 잠시 후 다시 시도해 주세요." })
+            val code = error.optString("error").ifBlank { "HTTP_$status" }
+            // The server's own hint when it has one; otherwise what the status means and what to do next.
+            throw OutfitApiException(code, error.optString("hint").ifBlank {
+                ErrorMessages.forCode(code) ?: ErrorMessages.forCode("HTTP_$status")
+                    ?: "요청을 처리하지 못했어요. 화면을 닫았다가 다시 시도해 주세요." })
         }
         try { JSONObject(text) }
-        catch (e: JSONException) { throw OutfitApiException("INVALID_RESPONSE", "응답을 읽지 못했어요. 다시 시도해 주세요.") }
+        catch (e: JSONException) { throw OutfitApiException("INVALID_RESPONSE", ErrorMessages.INVALID_RESPONSE) }
     }
 
     private fun strings(json: JSONObject, key: String): List<String> =
