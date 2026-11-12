@@ -210,8 +210,24 @@ class OutfitApiTests(TestCase):
         self.assertTrue(all(str(self.jeans.id) in {i["garment_id"] for i in o["items"]} for o in data["outfits"]))
         self.assertFalse(any(i["slot"] == "outerwear" for o in data["outfits"] for i in o["items"]))
 
+    def test_recommends_without_a_body_profile(self):
+        # Body analysis skipped in onboarding: no body at all, or only the onboarding preferences.
+        for body in (None, {"preferred_fit": "loose", "preferred_styles": ["미니멀"]}):
+            response = self.recommend(body=body)
+            self.assertEqual(response.status_code, 200, body)
+            data = response.json()
+            self.assertEqual(len(data["outfits"]), 3)
+            for outfit in data["outfits"]:
+                self.assertTrue({"top", "bottom"} <= {i["slot"] for i in outfit["items"]})
+                self.assertTrue(0 <= outfit["score"] <= 100 and outfit["reasons"])
+                # no measurements: no body-shape reason, and no "too small" filter
+                self.assertFalse(any(r["kind"] == "body" and "체형 분석" in r.get("sub", "") for r in outfit["reasons"]))
+        self.assertEqual(data["context"]["pref_fit"], "loose")
+        self.assertEqual(data["context"]["styles"], ["미니멀"])
+
     def test_errors(self):
-        self.assertEqual(self.recommend(body=None).status_code, 400)
+        self.assertEqual(self.recommend(body={"height_cm": 500}).status_code, 400)
+        self.assertEqual(self.recommend(body="tall").status_code, 400)
         self.assertEqual(self.recommend(temp=99).status_code, 400)
         self.assertEqual(self.recommend(pref_fit="tight").status_code, 400)
         self.assertEqual(self.recommend(styles=["없는스타일"]).status_code, 400)

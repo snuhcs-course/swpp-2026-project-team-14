@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.swpp.stylemate.data.BodyProfile
 import com.swpp.stylemate.data.BodyProfileJson
+import com.swpp.stylemate.data.StyleProfile
 import com.swpp.stylemate.data.chat.ChatRepository
 import com.swpp.stylemate.data.chat.ChatRequest
 import com.swpp.stylemate.data.chat.ChatResult
@@ -75,9 +76,9 @@ class ChatViewModel(private val repository: ChatRepository, private val taste: T
     private val mutableVisible = MutableStateFlow(false)
     val visible = mutableVisible.asStateFlow()
 
-    fun open(outfit: Outfit, profile: BodyProfile?, weather: Weather?) {
-        if (profile == null) return
-        val body = JSONObject(BodyProfileJson.encode(profile))
+    fun open(outfit: Outfit, profile: BodyProfile?, weather: Weather?, style: StyleProfile = StyleProfile()) {
+        // Works without a body profile too: then only the preferred fit and styles are sent.
+        val body = BodyProfileJson.request(profile, style)
         activeId = outfit.id
         val session = sessions[outfit.id]?.takeIf { it.body?.toString() == body.toString() }
             ?: ChatState(source = outfit, current = outfit, body = body, weather = weather,

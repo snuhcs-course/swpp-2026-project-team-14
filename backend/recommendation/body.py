@@ -105,3 +105,12 @@ class Body:
     @property
     def broad_shoulders(self) -> bool:
         return bool(self.shoulder) and self.shoulder / self.height >= SHOULDER_RATIO + SHOULDER_MARGIN
+
+
+@dataclass
+class UnknownBody(Body):
+    """No body profile yet (body analysis skipped in onboarding). It has no measurements, so nothing is
+    filtered as too small, no silhouette rule fires and the body/fit score rests on the preferred fit alone.
+    Its default height is only a placeholder: garment labels are not derived from it."""
+
+    gender: str = "unspecified"

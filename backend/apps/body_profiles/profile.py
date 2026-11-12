@@ -7,7 +7,7 @@ request. When the user table exists, read it from request.user here and nothing 
 
 from __future__ import annotations
 
-from recommendation.body import Body
+from recommendation.body import Body, UnknownBody
 
 # plausible ranges (cm) so a typo cannot turn every garment into "too small"
 RANGES = {
@@ -36,3 +36,13 @@ def body_from_request(request, data: dict) -> Body:
     if "height" not in raw and "height_cm" not in raw:
         raise ValueError("Height required")
     return body
+
+
+def body_or_unknown(request, data: dict) -> Body:
+    """Like body_from_request, but a missing body, or one with only preferences and no height (body analysis
+    skipped in onboarding), is an UnknownBody so recommendations still work. Raises ValueError otherwise."""
+    raw = data.get("body")
+    if raw is None or (isinstance(raw, dict) and "height" not in raw and "height_cm" not in raw
+                       and not raw.get("measurements")):
+        return UnknownBody()
+    return body_from_request(request, data)

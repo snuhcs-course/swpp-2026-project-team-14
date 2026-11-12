@@ -70,11 +70,15 @@ class ChatViewModelTest {
         viewModel.send()
     }
 
-    @Test fun openingWithoutABodyProfileDoesNothing() {
+    @Test fun openingWithoutABodyProfileSendsOnlyThePreferences() {
         val other = ChatViewModel(ChatRepository(server.baseUrl, testAccount(server.baseUrl)), InMemoryTasteStore())
-        other.open(start, null, null)
-        assertFalse(other.visible.value)
-        assertNull(other.state.value.current)
+        other.open(start, null, null, com.swpp.stylemate.data.StyleProfile(listOf("oversized"), listOf("minimal")))
+        assertTrue(other.visible.value)
+        assertEquals("o1", other.state.value.current?.id)
+        val body = other.state.value.body!!
+        assertEquals("loose", body.getString("preferred_fit"))
+        assertEquals("미니멀", body.getJSONArray("preferred_styles").getString(0))
+        assertFalse(body.has("height_cm"))
     }
 
     @Test fun openShowsTheOutfitAndReopeningRestoresTheSession() {

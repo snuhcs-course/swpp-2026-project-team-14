@@ -29,7 +29,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from recommendation import explain, fit, preference, season, weather
-from recommendation.body import Body
+from recommendation.body import Body, UnknownBody
 from recommendation.catalog import Catalog, Item
 from recommendation.color import outfit_color
 from recommendation.compat import percentile
@@ -331,10 +331,11 @@ def display_score(raw: float) -> int:
     return int(round(float(np.interp(max(0.0, min(1.0, raw)), xs, ys))))
 
 
-def _shown_total(components: dict, penalty: float, informative_taste: bool) -> float:
+def _shown_total(components: dict, penalty: float, informative_taste: bool, informative_body: bool = True) -> float:
     """The total people read. Taste with no feedback and no style choices is a flat 0.5 for every outfit:
-    it cannot tell outfits apart, so it is left out and the other weights are rescaled."""
-    keys = [k for k in WEIGHTS if k != "taste" or informative_taste]
+    it cannot tell outfits apart, so it is left out and the other weights are rescaled. The same goes for
+    body/fit without a body profile, so skipping body analysis does not read as a worse outfit."""
+    keys = [k for k in WEIGHTS if (k != "taste" or informative_taste) and (k != "body" or informative_body)]
     weight = sum(WEIGHTS[k] for k in keys)
     return sum(WEIGHTS[k] * components[k] for k in keys) / weight - penalty
 
@@ -342,7 +343,8 @@ def _shown_total(components: dict, penalty: float, informative_taste: bool) -> f
 def _present(catalog: Catalog, req: Request, band: season.Band, o: dict, has_feedback: bool) -> dict:
     items = [c.item for c in o["cands"]]
     components = {"compat": o["compat"], "body": o["body"], "color": o["color"], "season": o["season"], "taste": o["taste"]}
-    raw = _shown_total(components, o["penalty"], has_feedback or bool(req.styles))
+    raw = _shown_total(components, o["penalty"], has_feedback or bool(req.styles),
+                       informative_body=not isinstance(req.body, UnknownBody))
     reasons = [r for r in (
         explain.compat_reason(catalog, items),
         explain.body_reason(req.body, req.pref_fit, float(np.mean([c.fit for c in o["cands"]])),

@@ -21,3 +21,9 @@ def test_flat_taste_is_left_out_of_the_shown_total():
     assert abs(with_taste - (0.30 * 0.6 + 0.25 * 0.8 + 0.15 * 0.8 + 0.15 * 0.9 + 0.15 * 0.5)) < 1e-9
     assert abs(without - (0.30 * 0.6 + 0.25 * 0.8 + 0.15 * 0.8 + 0.15 * 0.9) / 0.85) < 1e-9
     assert search._shown_total(components, 0.1, informative_taste=False) == without - 0.1
+
+
+def test_body_is_left_out_without_a_body_profile():
+    components = {"compat": 0.6, "body": 0.5, "color": 0.8, "season": 0.9, "taste": 0.7}
+    shown = search._shown_total(components, 0.0, informative_taste=True, informative_body=False)
+    assert abs(shown - (0.30 * 0.6 + 0.15 * 0.8 + 0.15 * 0.9 + 0.15 * 0.7) / 0.75) < 1e-9

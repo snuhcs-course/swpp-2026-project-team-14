@@ -253,7 +253,8 @@ private fun MainTabs(viewModel: BodyProfileViewModel, authModel: AuthViewModel, 
         when (tab) {
             Tab.HOME -> HomeRoute(app.profile, onSetupProfile = viewModel::startReanalysis,
                 onOpenWardrobe = { tab = Tab.WARDROBE }, modifier = Modifier.padding(padding).consumeWindowInsets(padding),
-                onChat = { outfit, weather -> chat.open(outfit, app.profile, weather) }, wardrobeRevision = wardrobeRevision)
+                onChat = { outfit, weather -> chat.open(outfit, app.profile, weather, app.style) }, wardrobeRevision = wardrobeRevision,
+                style = app.style)
             Tab.WARDROBE -> Box(Modifier.padding(padding).consumeWindowInsets(padding)) { WardrobeRoute(onDeleted = { wardrobeRevision++ }) }
             Tab.CODIBOOK -> CodiBookRoute(Modifier.padding(padding).consumeWindowInsets(padding),
                 wardrobeRevision = wardrobeRevision, profile = app.profile)
