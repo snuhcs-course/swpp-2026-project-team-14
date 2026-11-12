@@ -1,0 +1,7160 @@
+{
+ "commit": "9cbd9a8",
+ "run_at": "2026-11-12T08:23:35+00:00",
+ "rules": {
+  "scored_outfits": 360,
+  "passed": 342,
+  "rate": 0.95,
+  "target": 0.95,
+  "verdict": "PASS",
+  "violations_by_rule": {
+   "R1": 0,
+   "R2": 0,
+   "R3": 17,
+   "R4": 0,
+   "R5": 0
+  },
+  "outfits_with_disclosed_exception": 36,
+  "rows": [
+   {
+    "case": "A01",
+    "request": "basic",
+    "temp": -3,
+    "combinations": 25,
+    "pass": true,
+    "key": "w:a00-bottom-4+w:a00-outerwear-2+w:a00-top-0",
+    "items": [
+     "w:a00-outerwear-2",
+     "w:a00-top-0",
+     "w:a00-bottom-4"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A01",
+    "request": "basic",
+    "temp": -3,
+    "combinations": 25,
+    "pass": true,
+    "key": "w:a00-bottom-5+w:a00-outerwear-0+w:a00-top-4",
+    "items": [
+     "w:a00-outerwear-0",
+     "w:a00-top-4",
+     "w:a00-bottom-5"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A01",
+    "request": "basic",
+    "temp": -3,
+    "combinations": 25,
+    "pass": true,
+    "key": "w:a00-bottom-0+w:a00-outerwear-0+w:a00-top-2",
+    "items": [
+     "w:a00-outerwear-0",
+     "w:a00-top-2",
+     "w:a00-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A01",
+    "request": "again",
+    "temp": -3,
+    "combinations": 25,
+    "pass": true,
+    "key": "w:a00-bottom-0+w:a00-outerwear-2+w:a00-top-0",
+    "items": [
+     "w:a00-outerwear-2",
+     "w:a00-top-0",
+     "w:a00-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A01",
+    "request": "again",
+    "temp": -3,
+    "combinations": 25,
+    "pass": true,
+    "key": "w:a00-bottom-1+w:a00-outerwear-0+w:a00-top-1",
+    "items": [
+     "w:a00-outerwear-0",
+     "w:a00-top-1",
+     "w:a00-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A01",
+    "request": "again",
+    "temp": -3,
+    "combinations": 25,
+    "pass": true,
+    "key": "w:a00-bottom-5+w:a00-outerwear-0+w:a00-top-2",
+    "items": [
+     "w:a00-outerwear-0",
+     "w:a00-top-2",
+     "w:a00-bottom-5"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A01",
+    "request": "locked",
+    "temp": -3,
+    "combinations": 25,
+    "pass": true,
+    "key": "w:a00-bottom-0+w:a00-outerwear-2+w:a00-top-3",
+    "items": [
+     "w:a00-outerwear-2",
+     "w:a00-top-3",
+     "w:a00-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A01",
+    "request": "locked",
+    "temp": -3,
+    "combinations": 25,
+    "pass": true,
+    "key": "w:a00-bottom-5+w:a00-outerwear-0+w:a00-top-3",
+    "items": [
+     "w:a00-outerwear-0",
+     "w:a00-top-3",
+     "w:a00-bottom-5"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A01",
+    "request": "locked",
+    "temp": -3,
+    "combinations": 25,
+    "pass": true,
+    "key": "w:a00-bottom-5+w:a00-outerwear-2+w:a00-top-3",
+    "items": [
+     "w:a00-outerwear-2",
+     "w:a00-top-3",
+     "w:a00-bottom-5"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A02",
+    "request": "basic",
+    "temp": 2,
+    "combinations": 6,
+    "pass": true,
+    "key": "w:a01-bottom-2+w:a01-outerwear-0+w:a01-top-6",
+    "items": [
+     "w:a01-outerwear-0",
+     "w:a01-top-6",
+     "w:a01-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A02",
+    "request": "basic",
+    "temp": 2,
+    "combinations": 6,
+    "pass": true,
+    "key": "w:a01-bottom-1+w:a01-outerwear-3+w:a01-top-4",
+    "items": [
+     "w:a01-outerwear-3",
+     "w:a01-top-4",
+     "w:a01-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A02",
+    "request": "basic",
+    "temp": 2,
+    "combinations": 6,
+    "pass": true,
+    "key": "w:a01-bottom-1+w:a01-outerwear-0+w:a01-top-2",
+    "items": [
+     "w:a01-outerwear-0",
+     "w:a01-top-2",
+     "w:a01-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A02",
+    "request": "again",
+    "temp": 2,
+    "combinations": 6,
+    "pass": true,
+    "key": "w:a01-bottom-1+w:a01-outerwear-0+w:a01-top-6",
+    "items": [
+     "w:a01-outerwear-0",
+     "w:a01-top-6",
+     "w:a01-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A02",
+    "request": "again",
+    "temp": 2,
+    "combinations": 6,
+    "pass": true,
+    "key": "w:a01-bottom-2+w:a01-outerwear-3+w:a01-top-2",
+    "items": [
+     "w:a01-outerwear-3",
+     "w:a01-top-2",
+     "w:a01-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A02",
+    "request": "again",
+    "temp": 2,
+    "combinations": 6,
+    "pass": true,
+    "key": "w:a01-bottom-2+w:a01-outerwear-2+w:a01-top-6",
+    "items": [
+     "w:a01-outerwear-2",
+     "w:a01-top-6",
+     "w:a01-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A02",
+    "request": "locked",
+    "temp": 2,
+    "combinations": 6,
+    "pass": true,
+    "key": "w:a01-bottom-2+w:a01-outerwear-0+w:a01-top-2",
+    "items": [
+     "w:a01-outerwear-0",
+     "w:a01-top-2",
+     "w:a01-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A02",
+    "request": "locked",
+    "temp": 2,
+    "combinations": 6,
+    "pass": true,
+    "key": "w:a01-bottom-1+w:a01-outerwear-2+w:a01-top-2",
+    "items": [
+     "w:a01-outerwear-2",
+     "w:a01-top-2",
+     "w:a01-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A02",
+    "request": "locked",
+    "temp": 2,
+    "combinations": 6,
+    "pass": true,
+    "key": "w:a01-bottom-2+w:a01-outerwear-3+w:a01-top-2",
+    "items": [
+     "w:a01-outerwear-3",
+     "w:a01-top-2",
+     "w:a01-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A03",
+    "request": "basic",
+    "temp": 6,
+    "combinations": 28,
+    "pass": false,
+    "key": "w:a02-bottom-1+w:a02-top-4",
+    "items": [
+     "w:a02-top-4",
+     "w:a02-bottom-1"
+    ],
+    "violations": [
+     "R3 no outerwear under 9 °C"
+    ],
+    "disclosed": []
+   },
+   {
+    "case": "A03",
+    "request": "basic",
+    "temp": 6,
+    "combinations": 28,
+    "pass": false,
+    "key": "w:a02-bottom-2+w:a02-top-2",
+    "items": [
+     "w:a02-top-2",
+     "w:a02-bottom-2"
+    ],
+    "violations": [
+     "R3 no outerwear under 9 °C"
+    ],
+    "disclosed": []
+   },
+   {
+    "case": "A03",
+    "request": "basic",
+    "temp": 6,
+    "combinations": 28,
+    "pass": false,
+    "key": "w:a02-bottom-3+w:a02-top-1",
+    "items": [
+     "w:a02-top-1",
+     "w:a02-bottom-3"
+    ],
+    "violations": [
+     "R3 no outerwear under 9 °C"
+    ],
+    "disclosed": []
+   },
+   {
+    "case": "A03",
+    "request": "again",
+    "temp": 6,
+    "combinations": 28,
+    "pass": false,
+    "key": "w:a02-bottom-1+w:a02-top-5",
+    "items": [
+     "w:a02-top-5",
+     "w:a02-bottom-1"
+    ],
+    "violations": [
+     "R3 no outerwear under 9 °C"
+    ],
+    "disclosed": []
+   },
+   {
+    "case": "A03",
+    "request": "again",
+    "temp": 6,
+    "combinations": 28,
+    "pass": false,
+    "key": "w:a02-bottom-0+w:a02-top-2",
+    "items": [
+     "w:a02-top-2",
+     "w:a02-bottom-0"
+    ],
+    "violations": [
+     "R3 no outerwear under 9 °C"
+    ],
+    "disclosed": []
+   },
+   {
+    "case": "A03",
+    "request": "again",
+    "temp": 6,
+    "combinations": 28,
+    "pass": false,
+    "key": "w:a02-bottom-2+w:a02-top-6",
+    "items": [
+     "w:a02-top-6",
+     "w:a02-bottom-2"
+    ],
+    "violations": [
+     "R3 no outerwear under 9 °C"
+    ],
+    "disclosed": []
+   },
+   {
+    "case": "A03",
+    "request": "locked",
+    "temp": 6,
+    "combinations": 28,
+    "pass": false,
+    "key": "w:a02-bottom-3+w:a02-top-1",
+    "items": [
+     "w:a02-top-1",
+     "w:a02-bottom-3"
+    ],
+    "violations": [
+     "R3 no outerwear under 9 °C"
+    ],
+    "disclosed": []
+   },
+   {
+    "case": "A03",
+    "request": "locked",
+    "temp": 6,
+    "combinations": 28,
+    "pass": false,
+    "key": "w:a02-bottom-0+w:a02-top-1",
+    "items": [
+     "w:a02-top-1",
+     "w:a02-bottom-0"
+    ],
+    "violations": [
+     "R3 no outerwear under 9 °C"
+    ],
+    "disclosed": []
+   },
+   {
+    "case": "A03",
+    "request": "locked",
+    "temp": 6,
+    "combinations": 28,
+    "pass": false,
+    "key": "w:a02-bottom-2+w:a02-top-1",
+    "items": [
+     "w:a02-top-1",
+     "w:a02-bottom-2"
+    ],
+    "violations": [
+     "R3 no outerwear under 9 °C"
+    ],
+    "disclosed": []
+   },
+   {
+    "case": "A04",
+    "request": "basic",
+    "temp": 10,
+    "combinations": 21,
+    "pass": true,
+    "key": "w:a03-bottom-0+w:a03-outerwear-0+w:a03-top-6",
+    "items": [
+     "w:a03-outerwear-0",
+     "w:a03-top-6",
+     "w:a03-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A04",
+    "request": "basic",
+    "temp": 10,
+    "combinations": 21,
+    "pass": true,
+    "key": "w:a03-bottom-3+w:a03-outerwear-1+w:a03-top-1",
+    "items": [
+     "w:a03-outerwear-1",
+     "w:a03-top-1",
+     "w:a03-bottom-3"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A04",
+    "request": "basic",
+    "temp": 10,
+    "combinations": 21,
+    "pass": true,
+    "key": "w:a03-bottom-3+w:a03-outerwear-0+w:a03-top-0",
+    "items": [
+     "w:a03-outerwear-0",
+     "w:a03-top-0",
+     "w:a03-bottom-3"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A04",
+    "request": "again",
+    "temp": 10,
+    "combinations": 21,
+    "pass": true,
+    "key": "w:a03-bottom-3+w:a03-outerwear-0+w:a03-top-6",
+    "items": [
+     "w:a03-outerwear-0",
+     "w:a03-top-6",
+     "w:a03-bottom-3"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A04",
+    "request": "again",
+    "temp": 10,
+    "combinations": 21,
+    "pass": true,
+    "key": "w:a03-bottom-0+w:a03-outerwear-1+w:a03-top-5",
+    "items": [
+     "w:a03-outerwear-1",
+     "w:a03-top-5",
+     "w:a03-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A04",
+    "request": "again",
+    "temp": 10,
+    "combinations": 21,
+    "pass": true,
+    "key": "w:a03-bottom-1+w:a03-outerwear-0+w:a03-top-4",
+    "items": [
+     "w:a03-outerwear-0",
+     "w:a03-top-4",
+     "w:a03-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A04",
+    "request": "locked",
+    "temp": 10,
+    "combinations": 21,
+    "pass": true,
+    "key": "w:a03-bottom-3+w:a03-outerwear-0+w:a03-top-0",
+    "items": [
+     "w:a03-outerwear-0",
+     "w:a03-top-0",
+     "w:a03-bottom-3"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A04",
+    "request": "locked",
+    "temp": 10,
+    "combinations": 21,
+    "pass": true,
+    "key": "w:a03-bottom-1+w:a03-outerwear-1+w:a03-top-0",
+    "items": [
+     "w:a03-outerwear-1",
+     "w:a03-top-0",
+     "w:a03-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A04",
+    "request": "locked",
+    "temp": 10,
+    "combinations": 21,
+    "pass": true,
+    "key": "w:a03-bottom-0+w:a03-outerwear-0+w:a03-top-0",
+    "items": [
+     "w:a03-outerwear-0",
+     "w:a03-top-0",
+     "w:a03-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A05",
+    "request": "basic",
+    "temp": 14,
+    "combinations": 21,
+    "pass": true,
+    "key": "w:a04-bottom-0+w:a04-outerwear-0+w:a04-top-5",
+    "items": [
+     "w:a04-outerwear-0",
+     "w:a04-top-5",
+     "w:a04-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A05",
+    "request": "basic",
+    "temp": 14,
+    "combinations": 21,
+    "pass": true,
+    "key": "w:a04-bottom-2+w:a04-top-6",
+    "items": [
+     "w:a04-top-6",
+     "w:a04-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A05",
+    "request": "basic",
+    "temp": 14,
+    "combinations": 21,
+    "pass": true,
+    "key": "w:a04-bottom-1+w:a04-top-3",
+    "items": [
+     "w:a04-top-3",
+     "w:a04-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A05",
+    "request": "again",
+    "temp": 14,
+    "combinations": 21,
+    "pass": true,
+    "key": "w:a04-bottom-1+w:a04-outerwear-0+w:a04-top-3",
+    "items": [
+     "w:a04-outerwear-0",
+     "w:a04-top-3",
+     "w:a04-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A05",
+    "request": "again",
+    "temp": 14,
+    "combinations": 21,
+    "pass": true,
+    "key": "w:a04-bottom-2+w:a04-top-5",
+    "items": [
+     "w:a04-top-5",
+     "w:a04-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A05",
+    "request": "again",
+    "temp": 14,
+    "combinations": 21,
+    "pass": true,
+    "key": "w:a04-bottom-0+w:a04-top-2",
+    "items": [
+     "w:a04-top-2",
+     "w:a04-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A05",
+    "request": "locked",
+    "temp": 14,
+    "combinations": 21,
+    "pass": true,
+    "key": "w:a04-bottom-0+w:a04-outerwear-0+w:a04-top-5",
+    "items": [
+     "w:a04-outerwear-0",
+     "w:a04-top-5",
+     "w:a04-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A05",
+    "request": "locked",
+    "temp": 14,
+    "combinations": 21,
+    "pass": true,
+    "key": "w:a04-bottom-2+w:a04-top-5",
+    "items": [
+     "w:a04-top-5",
+     "w:a04-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A05",
+    "request": "locked",
+    "temp": 14,
+    "combinations": 21,
+    "pass": true,
+    "key": "w:a04-bottom-1+w:a04-outerwear-1+w:a04-top-5",
+    "items": [
+     "w:a04-outerwear-1",
+     "w:a04-top-5",
+     "w:a04-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A06",
+    "request": "basic",
+    "temp": 18,
+    "combinations": 24,
+    "pass": true,
+    "key": "w:a05-bottom-2+w:a05-top-5",
+    "items": [
+     "w:a05-top-5",
+     "w:a05-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A06",
+    "request": "basic",
+    "temp": 18,
+    "combinations": 24,
+    "pass": true,
+    "key": "w:a05-bottom-3+w:a05-outerwear-1+w:a05-top-3",
+    "items": [
+     "w:a05-outerwear-1",
+     "w:a05-top-3",
+     "w:a05-bottom-3"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A06",
+    "request": "basic",
+    "temp": 18,
+    "combinations": 24,
+    "pass": true,
+    "key": "w:a05-bottom-0+w:a05-outerwear-0+w:a05-top-6",
+    "items": [
+     "w:a05-outerwear-0",
+     "w:a05-top-6",
+     "w:a05-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A06",
+    "request": "again",
+    "temp": 18,
+    "combinations": 24,
+    "pass": true,
+    "key": "w:a05-bottom-2+w:a05-outerwear-1+w:a05-top-7",
+    "items": [
+     "w:a05-outerwear-1",
+     "w:a05-top-7",
+     "w:a05-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A06",
+    "request": "again",
+    "temp": 18,
+    "combinations": 24,
+    "pass": true,
+    "key": "w:a05-bottom-0+w:a05-top-5",
+    "items": [
+     "w:a05-top-5",
+     "w:a05-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A06",
+    "request": "again",
+    "temp": 18,
+    "combinations": 24,
+    "pass": true,
+    "key": "w:a05-bottom-3+w:a05-top-3",
+    "items": [
+     "w:a05-top-3",
+     "w:a05-bottom-3"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A06",
+    "request": "locked",
+    "temp": 18,
+    "combinations": 24,
+    "pass": true,
+    "key": "w:a05-bottom-0+w:a05-outerwear-1+w:a05-top-2",
+    "items": [
+     "w:a05-outerwear-1",
+     "w:a05-top-2",
+     "w:a05-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A06",
+    "request": "locked",
+    "temp": 18,
+    "combinations": 24,
+    "pass": true,
+    "key": "w:a05-bottom-2+w:a05-top-2",
+    "items": [
+     "w:a05-top-2",
+     "w:a05-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A06",
+    "request": "locked",
+    "temp": 18,
+    "combinations": 24,
+    "pass": true,
+    "key": "w:a05-bottom-3+w:a05-outerwear-0+w:a05-top-2",
+    "items": [
+     "w:a05-outerwear-0",
+     "w:a05-top-2",
+     "w:a05-bottom-3"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A07",
+    "request": "basic",
+    "temp": 21,
+    "combinations": 30,
+    "pass": true,
+    "key": "w:a06-bottom-1+w:a06-top-0",
+    "items": [
+     "w:a06-top-0",
+     "w:a06-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A07",
+    "request": "basic",
+    "temp": 21,
+    "combinations": 30,
+    "pass": true,
+    "key": "w:a06-bottom-4+w:a06-outerwear-1+w:a06-top-2",
+    "items": [
+     "w:a06-outerwear-1",
+     "w:a06-top-2",
+     "w:a06-bottom-4"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A07",
+    "request": "basic",
+    "temp": 21,
+    "combinations": 30,
+    "pass": true,
+    "key": "w:a06-bottom-2+w:a06-top-1",
+    "items": [
+     "w:a06-top-1",
+     "w:a06-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A07",
+    "request": "again",
+    "temp": 21,
+    "combinations": 30,
+    "pass": true,
+    "key": "w:a06-bottom-4+w:a06-top-0",
+    "items": [
+     "w:a06-top-0",
+     "w:a06-bottom-4"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A07",
+    "request": "again",
+    "temp": 21,
+    "combinations": 30,
+    "pass": true,
+    "key": "w:a06-bottom-1+w:a06-outerwear-1+w:a06-top-2",
+    "items": [
+     "w:a06-outerwear-1",
+     "w:a06-top-2",
+     "w:a06-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A07",
+    "request": "again",
+    "temp": 21,
+    "combinations": 30,
+    "pass": true,
+    "key": "w:a06-bottom-2+w:a06-top-4",
+    "items": [
+     "w:a06-top-4",
+     "w:a06-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A07",
+    "request": "locked",
+    "temp": 21,
+    "combinations": 30,
+    "pass": true,
+    "key": "w:a06-bottom-1+w:a06-outerwear-1+w:a06-top-2",
+    "items": [
+     "w:a06-outerwear-1",
+     "w:a06-top-2",
+     "w:a06-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A07",
+    "request": "locked",
+    "temp": 21,
+    "combinations": 30,
+    "pass": true,
+    "key": "w:a06-bottom-4+w:a06-outerwear-2+w:a06-top-2",
+    "items": [
+     "w:a06-outerwear-2",
+     "w:a06-top-2",
+     "w:a06-bottom-4"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A07",
+    "request": "locked",
+    "temp": 21,
+    "combinations": 30,
+    "pass": true,
+    "key": "w:a06-bottom-3+w:a06-top-2",
+    "items": [
+     "w:a06-top-2",
+     "w:a06-bottom-3"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A08",
+    "request": "basic",
+    "temp": 25,
+    "combinations": 30,
+    "pass": true,
+    "key": "w:a07-bottom-2+w:a07-top-3",
+    "items": [
+     "w:a07-top-3",
+     "w:a07-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A08",
+    "request": "basic",
+    "temp": 25,
+    "combinations": 30,
+    "pass": true,
+    "key": "w:a07-bottom-1+w:a07-top-2",
+    "items": [
+     "w:a07-top-2",
+     "w:a07-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A08",
+    "request": "basic",
+    "temp": 25,
+    "combinations": 30,
+    "pass": true,
+    "key": "w:a07-bottom-3+w:a07-top-5",
+    "items": [
+     "w:a07-top-5",
+     "w:a07-bottom-3"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A08",
+    "request": "again",
+    "temp": 25,
+    "combinations": 30,
+    "pass": true,
+    "key": "w:a07-bottom-2+w:a07-top-4",
+    "items": [
+     "w:a07-top-4",
+     "w:a07-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A08",
+    "request": "again",
+    "temp": 25,
+    "combinations": 30,
+    "pass": true,
+    "key": "w:a07-bottom-1+w:a07-top-3",
+    "items": [
+     "w:a07-top-3",
+     "w:a07-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A08",
+    "request": "again",
+    "temp": 25,
+    "combinations": 30,
+    "pass": true,
+    "key": "w:a07-bottom-3+w:a07-top-2",
+    "items": [
+     "w:a07-top-2",
+     "w:a07-bottom-3"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A08",
+    "request": "locked",
+    "temp": 25,
+    "combinations": 30,
+    "pass": true,
+    "key": "w:a07-bottom-2+w:a07-top-4",
+    "items": [
+     "w:a07-top-4",
+     "w:a07-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A08",
+    "request": "locked",
+    "temp": 25,
+    "combinations": 30,
+    "pass": true,
+    "key": "w:a07-bottom-4+w:a07-top-4",
+    "items": [
+     "w:a07-top-4",
+     "w:a07-bottom-4"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A08",
+    "request": "locked",
+    "temp": 25,
+    "combinations": 30,
+    "pass": true,
+    "key": "w:a07-bottom-0+w:a07-top-4",
+    "items": [
+     "w:a07-top-4",
+     "w:a07-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A09",
+    "request": "basic",
+    "temp": 30,
+    "combinations": 30,
+    "pass": true,
+    "key": "w:a08-bottom-0+w:a08-top-0",
+    "items": [
+     "w:a08-top-0",
+     "w:a08-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A09",
+    "request": "basic",
+    "temp": 30,
+    "combinations": 30,
+    "pass": true,
+    "key": "w:a08-bottom-1+w:a08-top-2",
+    "items": [
+     "w:a08-top-2",
+     "w:a08-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A09",
+    "request": "basic",
+    "temp": 30,
+    "combinations": 30,
+    "pass": true,
+    "key": "w:a08-bottom-4+w:a08-top-1",
+    "items": [
+     "w:a08-top-1",
+     "w:a08-bottom-4"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A09",
+    "request": "again",
+    "temp": 30,
+    "combinations": 30,
+    "pass": true,
+    "key": "w:a08-bottom-2+w:a08-top-0",
+    "items": [
+     "w:a08-top-0",
+     "w:a08-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A09",
+    "request": "again",
+    "temp": 30,
+    "combinations": 30,
+    "pass": true,
+    "key": "w:a08-bottom-0+w:a08-top-3",
+    "items": [
+     "w:a08-top-3",
+     "w:a08-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A09",
+    "request": "again",
+    "temp": 30,
+    "combinations": 30,
+    "pass": true,
+    "key": "w:a08-bottom-3+w:a08-top-5",
+    "items": [
+     "w:a08-top-5",
+     "w:a08-bottom-3"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A09",
+    "request": "locked",
+    "temp": 30,
+    "combinations": 30,
+    "pass": true,
+    "key": "w:a08-bottom-2+w:a08-top-1",
+    "items": [
+     "w:a08-top-1",
+     "w:a08-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A09",
+    "request": "locked",
+    "temp": 30,
+    "combinations": 30,
+    "pass": true,
+    "key": "w:a08-bottom-4+w:a08-top-1",
+    "items": [
+     "w:a08-top-1",
+     "w:a08-bottom-4"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A09",
+    "request": "locked",
+    "temp": 30,
+    "combinations": 30,
+    "pass": true,
+    "key": "w:a08-bottom-3+w:a08-top-1",
+    "items": [
+     "w:a08-top-1",
+     "w:a08-bottom-3"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A10",
+    "request": "basic",
+    "temp": -3,
+    "combinations": 6,
+    "pass": false,
+    "key": "w:a09-bottom-0+w:a09-top-4",
+    "items": [
+     "w:a09-top-4",
+     "w:a09-bottom-0"
+    ],
+    "violations": [
+     "R3 no outerwear under 9 °C"
+    ],
+    "disclosed": []
+   },
+   {
+    "case": "A10",
+    "request": "basic",
+    "temp": -3,
+    "combinations": 6,
+    "pass": false,
+    "key": "w:a09-bottom-1+w:a09-top-2",
+    "items": [
+     "w:a09-top-2",
+     "w:a09-bottom-1"
+    ],
+    "violations": [
+     "R3 no outerwear under 9 °C"
+    ],
+    "disclosed": []
+   },
+   {
+    "case": "A10",
+    "request": "basic",
+    "temp": -3,
+    "combinations": 6,
+    "pass": false,
+    "key": "w:a09-bottom-0+w:a09-top-2",
+    "items": [
+     "w:a09-top-2",
+     "w:a09-bottom-0"
+    ],
+    "violations": [
+     "R3 no outerwear under 9 °C"
+    ],
+    "disclosed": []
+   },
+   {
+    "case": "A10",
+    "request": "again",
+    "temp": -3,
+    "combinations": 6,
+    "pass": false,
+    "key": "w:a09-bottom-1+w:a09-top-4",
+    "items": [
+     "w:a09-top-4",
+     "w:a09-bottom-1"
+    ],
+    "violations": [
+     "R3 no outerwear under 9 °C"
+    ],
+    "disclosed": []
+   },
+   {
+    "case": "A10",
+    "request": "again",
+    "temp": -3,
+    "combinations": 6,
+    "pass": false,
+    "key": "w:a09-bottom-0+w:a09-top-0",
+    "items": [
+     "w:a09-top-0",
+     "w:a09-bottom-0"
+    ],
+    "violations": [
+     "R3 no outerwear under 9 °C"
+    ],
+    "disclosed": []
+   },
+   {
+    "case": "A10",
+    "request": "again",
+    "temp": -3,
+    "combinations": 6,
+    "pass": false,
+    "key": "w:a09-bottom-1+w:a09-top-0",
+    "items": [
+     "w:a09-top-0",
+     "w:a09-bottom-1"
+    ],
+    "violations": [
+     "R3 no outerwear under 9 °C"
+    ],
+    "disclosed": []
+   },
+   {
+    "case": "A10",
+    "request": "locked",
+    "temp": -3,
+    "combinations": 6,
+    "pass": false,
+    "key": "w:a09-bottom-1+w:a09-top-1",
+    "items": [
+     "w:a09-top-1",
+     "w:a09-bottom-1"
+    ],
+    "violations": [
+     "R3 no outerwear under 9 °C"
+    ],
+    "disclosed": []
+   },
+   {
+    "case": "A10",
+    "request": "locked",
+    "temp": -3,
+    "combinations": 6,
+    "pass": false,
+    "key": "w:a09-bottom-0+w:a09-top-1",
+    "items": [
+     "w:a09-top-1",
+     "w:a09-bottom-0"
+    ],
+    "violations": [
+     "R3 no outerwear under 9 °C"
+    ],
+    "disclosed": []
+   },
+   {
+    "case": "A10",
+    "request": "locked",
+    "missing_outfits": 1,
+    "pass": false
+   },
+   {
+    "case": "A11",
+    "request": "basic",
+    "temp": 2,
+    "combinations": 15,
+    "pass": true,
+    "key": "w:a10-bottom-0+w:a10-top-0",
+    "items": [
+     "w:a10-top-0",
+     "w:a10-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": [
+     "R3 no outerwear under 9 °C"
+    ]
+   },
+   {
+    "case": "A11",
+    "request": "basic",
+    "temp": 2,
+    "combinations": 15,
+    "pass": true,
+    "key": "w:a10-bottom-4+w:a10-top-5",
+    "items": [
+     "w:a10-top-5",
+     "w:a10-bottom-4"
+    ],
+    "violations": [],
+    "disclosed": [
+     "R3 no outerwear under 9 °C"
+    ]
+   },
+   {
+    "case": "A11",
+    "request": "basic",
+    "temp": 2,
+    "combinations": 15,
+    "pass": true,
+    "key": "w:a10-bottom-1+w:a10-top-3",
+    "items": [
+     "w:a10-top-3",
+     "w:a10-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": [
+     "R3 no outerwear under 9 °C"
+    ]
+   },
+   {
+    "case": "A11",
+    "request": "again",
+    "temp": 2,
+    "combinations": 15,
+    "pass": true,
+    "key": "w:a10-bottom-0+w:a10-top-5",
+    "items": [
+     "w:a10-top-5",
+     "w:a10-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": [
+     "R3 no outerwear under 9 °C"
+    ]
+   },
+   {
+    "case": "A11",
+    "request": "again",
+    "temp": 2,
+    "combinations": 15,
+    "pass": true,
+    "key": "w:a10-bottom-4+w:a10-top-4",
+    "items": [
+     "w:a10-top-4",
+     "w:a10-bottom-4"
+    ],
+    "violations": [],
+    "disclosed": [
+     "R3 no outerwear under 9 °C"
+    ]
+   },
+   {
+    "case": "A11",
+    "request": "again",
+    "temp": 2,
+    "combinations": 15,
+    "pass": true,
+    "key": "w:a10-bottom-1+w:a10-top-0",
+    "items": [
+     "w:a10-top-0",
+     "w:a10-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": [
+     "R3 no outerwear under 9 °C"
+    ]
+   },
+   {
+    "case": "A11",
+    "request": "locked",
+    "temp": 2,
+    "combinations": 15,
+    "pass": true,
+    "key": "w:a10-bottom-0+w:a10-top-4",
+    "items": [
+     "w:a10-top-4",
+     "w:a10-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": [
+     "R3 no outerwear under 9 °C"
+    ]
+   },
+   {
+    "case": "A11",
+    "request": "locked",
+    "temp": 2,
+    "combinations": 15,
+    "pass": true,
+    "key": "w:a10-bottom-4+w:a10-top-4",
+    "items": [
+     "w:a10-top-4",
+     "w:a10-bottom-4"
+    ],
+    "violations": [],
+    "disclosed": [
+     "R3 no outerwear under 9 °C"
+    ]
+   },
+   {
+    "case": "A11",
+    "request": "locked",
+    "temp": 2,
+    "combinations": 15,
+    "pass": true,
+    "key": "w:a10-bottom-1+w:a10-top-4",
+    "items": [
+     "w:a10-top-4",
+     "w:a10-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": [
+     "R3 no outerwear under 9 °C"
+    ]
+   },
+   {
+    "case": "A12",
+    "request": "basic",
+    "temp": 6,
+    "combinations": 32,
+    "pass": true,
+    "key": "w:a11-bottom-2+w:a11-outerwear-0+w:a11-top-7",
+    "items": [
+     "w:a11-outerwear-0",
+     "w:a11-top-7",
+     "w:a11-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A12",
+    "request": "basic",
+    "temp": 6,
+    "combinations": 32,
+    "pass": true,
+    "key": "w:a11-bottom-4+w:a11-outerwear-0+w:a11-top-2",
+    "items": [
+     "w:a11-outerwear-0",
+     "w:a11-top-2",
+     "w:a11-bottom-4"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A12",
+    "request": "basic",
+    "temp": 6,
+    "combinations": 32,
+    "pass": true,
+    "key": "w:a11-bottom-1+w:a11-outerwear-0+w:a11-top-1",
+    "items": [
+     "w:a11-outerwear-0",
+     "w:a11-top-1",
+     "w:a11-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A12",
+    "request": "again",
+    "temp": 6,
+    "combinations": 32,
+    "pass": true,
+    "key": "w:a11-bottom-2+w:a11-outerwear-0+w:a11-top-2",
+    "items": [
+     "w:a11-outerwear-0",
+     "w:a11-top-2",
+     "w:a11-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A12",
+    "request": "again",
+    "temp": 6,
+    "combinations": 32,
+    "pass": true,
+    "key": "w:a11-bottom-1+w:a11-outerwear-0+w:a11-top-7",
+    "items": [
+     "w:a11-outerwear-0",
+     "w:a11-top-7",
+     "w:a11-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A12",
+    "request": "again",
+    "temp": 6,
+    "combinations": 32,
+    "pass": true,
+    "key": "w:a11-bottom-4+w:a11-outerwear-0+w:a11-top-1",
+    "items": [
+     "w:a11-outerwear-0",
+     "w:a11-top-1",
+     "w:a11-bottom-4"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A12",
+    "request": "locked",
+    "temp": 6,
+    "combinations": 32,
+    "pass": true,
+    "key": "w:a11-bottom-3+w:a11-outerwear-0+w:a11-top-2",
+    "items": [
+     "w:a11-outerwear-0",
+     "w:a11-top-2",
+     "w:a11-bottom-3"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A12",
+    "request": "locked",
+    "temp": 6,
+    "combinations": 32,
+    "pass": true,
+    "key": "w:a11-bottom-4+w:a11-outerwear-0+w:a11-top-2",
+    "items": [
+     "w:a11-outerwear-0",
+     "w:a11-top-2",
+     "w:a11-bottom-4"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A12",
+    "request": "locked",
+    "temp": 6,
+    "combinations": 32,
+    "pass": true,
+    "key": "w:a11-bottom-2+w:a11-outerwear-0+w:a11-top-2",
+    "items": [
+     "w:a11-outerwear-0",
+     "w:a11-top-2",
+     "w:a11-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A13",
+    "request": "basic",
+    "temp": 10,
+    "combinations": 8,
+    "pass": true,
+    "key": "w:a12-bottom-2+w:a12-outerwear-2+w:a12-top-3",
+    "items": [
+     "w:a12-outerwear-2",
+     "w:a12-top-3",
+     "w:a12-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A13",
+    "request": "basic",
+    "temp": 10,
+    "combinations": 8,
+    "pass": true,
+    "key": "w:a12-bottom-1+w:a12-outerwear-1+w:a12-top-4",
+    "items": [
+     "w:a12-outerwear-1",
+     "w:a12-top-4",
+     "w:a12-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A13",
+    "request": "basic",
+    "temp": 10,
+    "combinations": 8,
+    "pass": true,
+    "key": "w:a12-bottom-2+w:a12-outerwear-1+w:a12-top-1",
+    "items": [
+     "w:a12-outerwear-1",
+     "w:a12-top-1",
+     "w:a12-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A13",
+    "request": "again",
+    "temp": 10,
+    "combinations": 8,
+    "pass": true,
+    "key": "w:a12-bottom-2+w:a12-outerwear-1+w:a12-top-3",
+    "items": [
+     "w:a12-outerwear-1",
+     "w:a12-top-3",
+     "w:a12-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A13",
+    "request": "again",
+    "temp": 10,
+    "combinations": 8,
+    "pass": true,
+    "key": "w:a12-bottom-1+w:a12-outerwear-0+w:a12-top-2",
+    "items": [
+     "w:a12-outerwear-0",
+     "w:a12-top-2",
+     "w:a12-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A13",
+    "request": "again",
+    "temp": 10,
+    "combinations": 8,
+    "pass": true,
+    "key": "w:a12-bottom-1+w:a12-outerwear-2+w:a12-top-3",
+    "items": [
+     "w:a12-outerwear-2",
+     "w:a12-top-3",
+     "w:a12-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A13",
+    "request": "locked",
+    "temp": 10,
+    "combinations": 8,
+    "pass": true,
+    "key": "w:a12-bottom-1+w:a12-outerwear-0+w:a12-top-0",
+    "items": [
+     "w:a12-outerwear-0",
+     "w:a12-top-0",
+     "w:a12-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A13",
+    "request": "locked",
+    "temp": 10,
+    "combinations": 8,
+    "pass": true,
+    "key": "w:a12-bottom-2+w:a12-outerwear-2+w:a12-top-0",
+    "items": [
+     "w:a12-outerwear-2",
+     "w:a12-top-0",
+     "w:a12-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A13",
+    "request": "locked",
+    "temp": 10,
+    "combinations": 8,
+    "pass": true,
+    "key": "w:a12-bottom-1+w:a12-outerwear-1+w:a12-top-0",
+    "items": [
+     "w:a12-outerwear-1",
+     "w:a12-top-0",
+     "w:a12-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A14",
+    "request": "basic",
+    "temp": 14,
+    "combinations": 25,
+    "pass": true,
+    "key": "w:a13-bottom-1+w:a13-outerwear-1+w:a13-top-0",
+    "items": [
+     "w:a13-outerwear-1",
+     "w:a13-top-0",
+     "w:a13-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A14",
+    "request": "basic",
+    "temp": 14,
+    "combinations": 25,
+    "pass": true,
+    "key": "w:a13-bottom-0+w:a13-top-3",
+    "items": [
+     "w:a13-top-3",
+     "w:a13-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A14",
+    "request": "basic",
+    "temp": 14,
+    "combinations": 25,
+    "pass": true,
+    "key": "w:a13-bottom-2+w:a13-top-2",
+    "items": [
+     "w:a13-top-2",
+     "w:a13-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A14",
+    "request": "again",
+    "temp": 14,
+    "combinations": 25,
+    "pass": true,
+    "key": "w:a13-bottom-2+w:a13-outerwear-1+w:a13-top-2",
+    "items": [
+     "w:a13-outerwear-1",
+     "w:a13-top-2",
+     "w:a13-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A14",
+    "request": "again",
+    "temp": 14,
+    "combinations": 25,
+    "pass": true,
+    "key": "w:a13-bottom-0+w:a13-top-0",
+    "items": [
+     "w:a13-top-0",
+     "w:a13-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A14",
+    "request": "again",
+    "temp": 14,
+    "combinations": 25,
+    "pass": true,
+    "key": "w:a13-bottom-3+w:a13-top-4",
+    "items": [
+     "w:a13-top-4",
+     "w:a13-bottom-3"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A14",
+    "request": "locked",
+    "temp": 14,
+    "combinations": 25,
+    "pass": true,
+    "key": "w:a13-bottom-1+w:a13-outerwear-1+w:a13-top-0",
+    "items": [
+     "w:a13-outerwear-1",
+     "w:a13-top-0",
+     "w:a13-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A14",
+    "request": "locked",
+    "temp": 14,
+    "combinations": 25,
+    "pass": true,
+    "key": "w:a13-bottom-0+w:a13-top-0",
+    "items": [
+     "w:a13-top-0",
+     "w:a13-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A14",
+    "request": "locked",
+    "temp": 14,
+    "combinations": 25,
+    "pass": true,
+    "key": "w:a13-bottom-2+w:a13-outerwear-0+w:a13-top-0",
+    "items": [
+     "w:a13-outerwear-0",
+     "w:a13-top-0",
+     "w:a13-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A15",
+    "request": "basic",
+    "temp": 18,
+    "combinations": 40,
+    "pass": true,
+    "key": "w:a14-bottom-1+w:a14-top-7",
+    "items": [
+     "w:a14-top-7",
+     "w:a14-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A15",
+    "request": "basic",
+    "temp": 18,
+    "combinations": 40,
+    "pass": true,
+    "key": "w:a14-bottom-3+w:a14-outerwear-0+w:a14-top-5",
+    "items": [
+     "w:a14-outerwear-0",
+     "w:a14-top-5",
+     "w:a14-bottom-3"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A15",
+    "request": "basic",
+    "temp": 18,
+    "combinations": 40,
+    "pass": true,
+    "key": "w:a14-bottom-4+w:a14-outerwear-2+w:a14-top-4",
+    "items": [
+     "w:a14-outerwear-2",
+     "w:a14-top-4",
+     "w:a14-bottom-4"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A15",
+    "request": "again",
+    "temp": 18,
+    "combinations": 40,
+    "pass": true,
+    "key": "w:a14-bottom-2+w:a14-top-7",
+    "items": [
+     "w:a14-top-7",
+     "w:a14-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A15",
+    "request": "again",
+    "temp": 18,
+    "combinations": 40,
+    "pass": true,
+    "key": "w:a14-bottom-0+w:a14-outerwear-2+w:a14-top-4",
+    "items": [
+     "w:a14-outerwear-2",
+     "w:a14-top-4",
+     "w:a14-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A15",
+    "request": "again",
+    "temp": 18,
+    "combinations": 40,
+    "pass": true,
+    "key": "w:a14-bottom-1+w:a14-outerwear-0+w:a14-top-6",
+    "items": [
+     "w:a14-outerwear-0",
+     "w:a14-top-6",
+     "w:a14-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A15",
+    "request": "locked",
+    "temp": 18,
+    "combinations": 40,
+    "pass": true,
+    "key": "w:a14-bottom-1+w:a14-top-7",
+    "items": [
+     "w:a14-top-7",
+     "w:a14-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A15",
+    "request": "locked",
+    "temp": 18,
+    "combinations": 40,
+    "pass": true,
+    "key": "w:a14-bottom-4+w:a14-outerwear-0+w:a14-top-7",
+    "items": [
+     "w:a14-outerwear-0",
+     "w:a14-top-7",
+     "w:a14-bottom-4"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A15",
+    "request": "locked",
+    "temp": 18,
+    "combinations": 40,
+    "pass": true,
+    "key": "w:a14-bottom-2+w:a14-outerwear-2+w:a14-top-7",
+    "items": [
+     "w:a14-outerwear-2",
+     "w:a14-top-7",
+     "w:a14-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A16",
+    "request": "basic",
+    "temp": 21,
+    "combinations": 40,
+    "pass": true,
+    "key": "w:a15-bottom-3+w:a15-top-1",
+    "items": [
+     "w:a15-top-1",
+     "w:a15-bottom-3"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A16",
+    "request": "basic",
+    "temp": 21,
+    "combinations": 40,
+    "pass": true,
+    "key": "w:a15-bottom-1+w:a15-top-0",
+    "items": [
+     "w:a15-top-0",
+     "w:a15-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A16",
+    "request": "basic",
+    "temp": 21,
+    "combinations": 40,
+    "pass": true,
+    "key": "w:a15-bottom-2+w:a15-top-6",
+    "items": [
+     "w:a15-top-6",
+     "w:a15-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A16",
+    "request": "again",
+    "temp": 21,
+    "combinations": 40,
+    "pass": true,
+    "key": "w:a15-bottom-2+w:a15-top-1",
+    "items": [
+     "w:a15-top-1",
+     "w:a15-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A16",
+    "request": "again",
+    "temp": 21,
+    "combinations": 40,
+    "pass": true,
+    "key": "w:a15-bottom-1+w:a15-top-4",
+    "items": [
+     "w:a15-top-4",
+     "w:a15-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A16",
+    "request": "again",
+    "temp": 21,
+    "combinations": 40,
+    "pass": true,
+    "key": "w:a15-bottom-4+w:a15-top-6",
+    "items": [
+     "w:a15-top-6",
+     "w:a15-bottom-4"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A16",
+    "request": "locked",
+    "temp": 21,
+    "combinations": 40,
+    "pass": true,
+    "key": "w:a15-bottom-2+w:a15-top-6",
+    "items": [
+     "w:a15-top-6",
+     "w:a15-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A16",
+    "request": "locked",
+    "temp": 21,
+    "combinations": 40,
+    "pass": true,
+    "key": "w:a15-bottom-4+w:a15-top-6",
+    "items": [
+     "w:a15-top-6",
+     "w:a15-bottom-4"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A16",
+    "request": "locked",
+    "temp": 21,
+    "combinations": 40,
+    "pass": true,
+    "key": "w:a15-bottom-1+w:a15-top-6",
+    "items": [
+     "w:a15-top-6",
+     "w:a15-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A17",
+    "request": "basic",
+    "temp": 25,
+    "combinations": 25,
+    "pass": true,
+    "key": "w:a16-bottom-1+w:a16-top-0",
+    "items": [
+     "w:a16-top-0",
+     "w:a16-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A17",
+    "request": "basic",
+    "temp": 25,
+    "combinations": 25,
+    "pass": true,
+    "key": "w:a16-bottom-2+w:a16-top-1",
+    "items": [
+     "w:a16-top-1",
+     "w:a16-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A17",
+    "request": "basic",
+    "temp": 25,
+    "combinations": 25,
+    "pass": true,
+    "key": "w:a16-bottom-3+w:a16-top-3",
+    "items": [
+     "w:a16-top-3",
+     "w:a16-bottom-3"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A17",
+    "request": "again",
+    "temp": 25,
+    "combinations": 25,
+    "pass": true,
+    "key": "w:a16-bottom-1+w:a16-top-3",
+    "items": [
+     "w:a16-top-3",
+     "w:a16-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A17",
+    "request": "again",
+    "temp": 25,
+    "combinations": 25,
+    "pass": true,
+    "key": "w:a16-bottom-3+w:a16-top-2",
+    "items": [
+     "w:a16-top-2",
+     "w:a16-bottom-3"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A17",
+    "request": "again",
+    "temp": 25,
+    "combinations": 25,
+    "pass": true,
+    "key": "w:a16-bottom-0+w:a16-top-1",
+    "items": [
+     "w:a16-top-1",
+     "w:a16-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A17",
+    "request": "locked",
+    "temp": 25,
+    "combinations": 25,
+    "pass": true,
+    "key": "w:a16-bottom-1+w:a16-top-0",
+    "items": [
+     "w:a16-top-0",
+     "w:a16-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A17",
+    "request": "locked",
+    "temp": 25,
+    "combinations": 25,
+    "pass": true,
+    "key": "w:a16-bottom-2+w:a16-top-0",
+    "items": [
+     "w:a16-top-0",
+     "w:a16-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A17",
+    "request": "locked",
+    "temp": 25,
+    "combinations": 25,
+    "pass": true,
+    "key": "w:a16-bottom-3+w:a16-top-0",
+    "items": [
+     "w:a16-top-0",
+     "w:a16-bottom-3"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A18",
+    "request": "basic",
+    "temp": 30,
+    "combinations": 42,
+    "pass": true,
+    "key": "w:a17-bottom-0+w:a17-top-2",
+    "items": [
+     "w:a17-top-2",
+     "w:a17-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A18",
+    "request": "basic",
+    "temp": 30,
+    "combinations": 42,
+    "pass": true,
+    "key": "w:a17-bottom-3+w:a17-top-4",
+    "items": [
+     "w:a17-top-4",
+     "w:a17-bottom-3"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A18",
+    "request": "basic",
+    "temp": 30,
+    "combinations": 42,
+    "pass": true,
+    "key": "w:a17-bottom-2+w:a17-top-1",
+    "items": [
+     "w:a17-top-1",
+     "w:a17-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A18",
+    "request": "again",
+    "temp": 30,
+    "combinations": 42,
+    "pass": true,
+    "key": "w:a17-bottom-0+w:a17-top-1",
+    "items": [
+     "w:a17-top-1",
+     "w:a17-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A18",
+    "request": "again",
+    "temp": 30,
+    "combinations": 42,
+    "pass": true,
+    "key": "w:a17-bottom-2+w:a17-top-4",
+    "items": [
+     "w:a17-top-4",
+     "w:a17-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A18",
+    "request": "again",
+    "temp": 30,
+    "combinations": 42,
+    "pass": true,
+    "key": "w:a17-bottom-3+w:a17-top-2",
+    "items": [
+     "w:a17-top-2",
+     "w:a17-bottom-3"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A18",
+    "request": "locked",
+    "temp": 30,
+    "combinations": 42,
+    "pass": true,
+    "key": "w:a17-bottom-0+w:a17-top-0",
+    "items": [
+     "w:a17-top-0",
+     "w:a17-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A18",
+    "request": "locked",
+    "temp": 30,
+    "combinations": 42,
+    "pass": true,
+    "key": "w:a17-bottom-4+w:a17-top-0",
+    "items": [
+     "w:a17-top-0",
+     "w:a17-bottom-4"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A18",
+    "request": "locked",
+    "temp": 30,
+    "combinations": 42,
+    "pass": true,
+    "key": "w:a17-bottom-1+w:a17-top-0",
+    "items": [
+     "w:a17-top-0",
+     "w:a17-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A19",
+    "request": "basic",
+    "temp": -3,
+    "combinations": 12,
+    "pass": true,
+    "key": "w:a18-bottom-0+w:a18-outerwear-3+w:a18-top-3",
+    "items": [
+     "w:a18-outerwear-3",
+     "w:a18-top-3",
+     "w:a18-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A19",
+    "request": "basic",
+    "temp": -3,
+    "combinations": 12,
+    "pass": true,
+    "key": "w:a18-bottom-3+w:a18-outerwear-4+w:a18-top-1",
+    "items": [
+     "w:a18-outerwear-4",
+     "w:a18-top-1",
+     "w:a18-bottom-3"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A19",
+    "request": "basic",
+    "temp": -3,
+    "combinations": 12,
+    "pass": true,
+    "key": "w:a18-bottom-3+w:a18-outerwear-1+w:a18-top-3",
+    "items": [
+     "w:a18-outerwear-1",
+     "w:a18-top-3",
+     "w:a18-bottom-3"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A19",
+    "request": "again",
+    "temp": -3,
+    "combinations": 12,
+    "pass": true,
+    "key": "w:a18-bottom-0+w:a18-outerwear-1+w:a18-top-3",
+    "items": [
+     "w:a18-outerwear-1",
+     "w:a18-top-3",
+     "w:a18-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A19",
+    "request": "again",
+    "temp": -3,
+    "combinations": 12,
+    "pass": true,
+    "key": "w:a18-bottom-3+w:a18-outerwear-3+w:a18-top-0",
+    "items": [
+     "w:a18-outerwear-3",
+     "w:a18-top-0",
+     "w:a18-bottom-3"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A19",
+    "request": "again",
+    "temp": -3,
+    "combinations": 12,
+    "pass": true,
+    "key": "w:a18-bottom-3+w:a18-outerwear-4+w:a18-top-3",
+    "items": [
+     "w:a18-outerwear-4",
+     "w:a18-top-3",
+     "w:a18-bottom-3"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A19",
+    "request": "locked",
+    "temp": -3,
+    "combinations": 12,
+    "pass": true,
+    "key": "w:a18-bottom-0+w:a18-outerwear-4+w:a18-top-1",
+    "items": [
+     "w:a18-outerwear-4",
+     "w:a18-top-1",
+     "w:a18-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A19",
+    "request": "locked",
+    "temp": -3,
+    "combinations": 12,
+    "pass": true,
+    "key": "w:a18-bottom-3+w:a18-outerwear-3+w:a18-top-1",
+    "items": [
+     "w:a18-outerwear-3",
+     "w:a18-top-1",
+     "w:a18-bottom-3"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A19",
+    "request": "locked",
+    "temp": -3,
+    "combinations": 12,
+    "pass": true,
+    "key": "w:a18-bottom-0+w:a18-outerwear-1+w:a18-top-1",
+    "items": [
+     "w:a18-outerwear-1",
+     "w:a18-top-1",
+     "w:a18-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A20",
+    "request": "basic",
+    "temp": 2,
+    "combinations": 16,
+    "pass": true,
+    "key": "w:a19-bottom-2+w:a19-outerwear-2+w:a19-top-1",
+    "items": [
+     "w:a19-outerwear-2",
+     "w:a19-top-1",
+     "w:a19-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A20",
+    "request": "basic",
+    "temp": 2,
+    "combinations": 16,
+    "pass": true,
+    "key": "w:a19-bottom-4+w:a19-outerwear-0+w:a19-top-4",
+    "items": [
+     "w:a19-outerwear-0",
+     "w:a19-top-4",
+     "w:a19-bottom-4"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A20",
+    "request": "basic",
+    "temp": 2,
+    "combinations": 16,
+    "pass": true,
+    "key": "w:a19-bottom-1+w:a19-outerwear-3+w:a19-top-5",
+    "items": [
+     "w:a19-outerwear-3",
+     "w:a19-top-5",
+     "w:a19-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A20",
+    "request": "again",
+    "temp": 2,
+    "combinations": 16,
+    "pass": true,
+    "key": "w:a19-bottom-2+w:a19-outerwear-3+w:a19-top-1",
+    "items": [
+     "w:a19-outerwear-3",
+     "w:a19-top-1",
+     "w:a19-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A20",
+    "request": "again",
+    "temp": 2,
+    "combinations": 16,
+    "pass": true,
+    "key": "w:a19-bottom-3+w:a19-outerwear-0+w:a19-top-4",
+    "items": [
+     "w:a19-outerwear-0",
+     "w:a19-top-4",
+     "w:a19-bottom-3"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A20",
+    "request": "again",
+    "temp": 2,
+    "combinations": 16,
+    "pass": true,
+    "key": "w:a19-bottom-4+w:a19-outerwear-2+w:a19-top-5",
+    "items": [
+     "w:a19-outerwear-2",
+     "w:a19-top-5",
+     "w:a19-bottom-4"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A20",
+    "request": "locked",
+    "temp": 2,
+    "combinations": 16,
+    "pass": true,
+    "key": "w:a19-bottom-2+w:a19-outerwear-0+w:a19-top-2",
+    "items": [
+     "w:a19-outerwear-0",
+     "w:a19-top-2",
+     "w:a19-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A20",
+    "request": "locked",
+    "temp": 2,
+    "combinations": 16,
+    "pass": true,
+    "key": "w:a19-bottom-4+w:a19-outerwear-2+w:a19-top-2",
+    "items": [
+     "w:a19-outerwear-2",
+     "w:a19-top-2",
+     "w:a19-bottom-4"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A20",
+    "request": "locked",
+    "temp": 2,
+    "combinations": 16,
+    "pass": true,
+    "key": "w:a19-bottom-1+w:a19-outerwear-3+w:a19-top-2",
+    "items": [
+     "w:a19-outerwear-3",
+     "w:a19-top-2",
+     "w:a19-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A21",
+    "request": "basic",
+    "temp": 6,
+    "combinations": 18,
+    "pass": true,
+    "key": "w:a20-bottom-4+w:a20-top-5",
+    "items": [
+     "w:a20-top-5",
+     "w:a20-bottom-4"
+    ],
+    "violations": [],
+    "disclosed": [
+     "R3 no outerwear under 9 °C"
+    ]
+   },
+   {
+    "case": "A21",
+    "request": "basic",
+    "temp": 6,
+    "combinations": 18,
+    "pass": true,
+    "key": "w:a20-bottom-3+w:a20-top-0",
+    "items": [
+     "w:a20-top-0",
+     "w:a20-bottom-3"
+    ],
+    "violations": [],
+    "disclosed": [
+     "R3 no outerwear under 9 °C"
+    ]
+   },
+   {
+    "case": "A21",
+    "request": "basic",
+    "temp": 6,
+    "combinations": 18,
+    "pass": true,
+    "key": "w:a20-bottom-5+w:a20-top-3",
+    "items": [
+     "w:a20-top-3",
+     "w:a20-bottom-5"
+    ],
+    "violations": [],
+    "disclosed": [
+     "R3 no outerwear under 9 °C"
+    ]
+   },
+   {
+    "case": "A21",
+    "request": "again",
+    "temp": 6,
+    "combinations": 18,
+    "pass": true,
+    "key": "w:a20-bottom-2+w:a20-top-0",
+    "items": [
+     "w:a20-top-0",
+     "w:a20-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": [
+     "R3 no outerwear under 9 °C"
+    ]
+   },
+   {
+    "case": "A21",
+    "request": "again",
+    "temp": 6,
+    "combinations": 18,
+    "pass": true,
+    "key": "w:a20-bottom-4+w:a20-top-3",
+    "items": [
+     "w:a20-top-3",
+     "w:a20-bottom-4"
+    ],
+    "violations": [],
+    "disclosed": [
+     "R3 no outerwear under 9 °C"
+    ]
+   },
+   {
+    "case": "A21",
+    "request": "again",
+    "temp": 6,
+    "combinations": 18,
+    "pass": true,
+    "key": "w:a20-bottom-3+w:a20-top-5",
+    "items": [
+     "w:a20-top-5",
+     "w:a20-bottom-3"
+    ],
+    "violations": [],
+    "disclosed": [
+     "R3 no outerwear under 9 °C"
+    ]
+   },
+   {
+    "case": "A21",
+    "request": "locked",
+    "temp": 6,
+    "combinations": 18,
+    "pass": true,
+    "key": "w:a20-bottom-5+w:a20-top-2",
+    "items": [
+     "w:a20-top-2",
+     "w:a20-bottom-5"
+    ],
+    "violations": [],
+    "disclosed": [
+     "R3 no outerwear under 9 °C"
+    ]
+   },
+   {
+    "case": "A21",
+    "request": "locked",
+    "temp": 6,
+    "combinations": 18,
+    "pass": true,
+    "key": "w:a20-bottom-4+w:a20-top-2",
+    "items": [
+     "w:a20-top-2",
+     "w:a20-bottom-4"
+    ],
+    "violations": [],
+    "disclosed": [
+     "R3 no outerwear under 9 °C"
+    ]
+   },
+   {
+    "case": "A21",
+    "request": "locked",
+    "temp": 6,
+    "combinations": 18,
+    "pass": true,
+    "key": "w:a20-bottom-1+w:a20-top-2",
+    "items": [
+     "w:a20-top-2",
+     "w:a20-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": [
+     "R3 no outerwear under 9 °C"
+    ]
+   },
+   {
+    "case": "A22",
+    "request": "basic",
+    "temp": 10,
+    "combinations": 6,
+    "pass": true,
+    "key": "w:a21-bottom-1+w:a21-outerwear-0+w:a21-top-5",
+    "items": [
+     "w:a21-outerwear-0",
+     "w:a21-top-5",
+     "w:a21-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A22",
+    "request": "basic",
+    "temp": 10,
+    "combinations": 6,
+    "pass": true,
+    "key": "w:a21-bottom-2+w:a21-outerwear-1+w:a21-top-0",
+    "items": [
+     "w:a21-outerwear-1",
+     "w:a21-top-0",
+     "w:a21-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A22",
+    "request": "basic",
+    "temp": 10,
+    "combinations": 6,
+    "pass": true,
+    "key": "w:a21-bottom-2+w:a21-outerwear-0+w:a21-top-1",
+    "items": [
+     "w:a21-outerwear-0",
+     "w:a21-top-1",
+     "w:a21-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A22",
+    "request": "again",
+    "temp": 10,
+    "combinations": 6,
+    "pass": true,
+    "key": "w:a21-bottom-2+w:a21-outerwear-0+w:a21-top-5",
+    "items": [
+     "w:a21-outerwear-0",
+     "w:a21-top-5",
+     "w:a21-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A22",
+    "request": "again",
+    "temp": 10,
+    "combinations": 6,
+    "pass": true,
+    "key": "w:a21-bottom-1+w:a21-outerwear-1+w:a21-top-0",
+    "items": [
+     "w:a21-outerwear-1",
+     "w:a21-top-0",
+     "w:a21-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A22",
+    "request": "again",
+    "temp": 10,
+    "combinations": 6,
+    "pass": true,
+    "key": "w:a21-bottom-1+w:a21-outerwear-0+w:a21-top-1",
+    "items": [
+     "w:a21-outerwear-0",
+     "w:a21-top-1",
+     "w:a21-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A22",
+    "request": "locked",
+    "temp": 10,
+    "combinations": 6,
+    "pass": true,
+    "key": "w:a21-bottom-1+w:a21-outerwear-0+w:a21-top-1",
+    "items": [
+     "w:a21-outerwear-0",
+     "w:a21-top-1",
+     "w:a21-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A22",
+    "request": "locked",
+    "temp": 10,
+    "combinations": 6,
+    "pass": true,
+    "key": "w:a21-bottom-2+w:a21-outerwear-1+w:a21-top-1",
+    "items": [
+     "w:a21-outerwear-1",
+     "w:a21-top-1",
+     "w:a21-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A22",
+    "request": "locked",
+    "temp": 10,
+    "combinations": 6,
+    "pass": true,
+    "key": "w:a21-bottom-2+w:a21-outerwear-0+w:a21-top-1",
+    "items": [
+     "w:a21-outerwear-0",
+     "w:a21-top-1",
+     "w:a21-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A23",
+    "request": "basic",
+    "temp": 14,
+    "combinations": 24,
+    "pass": true,
+    "key": "w:a22-bottom-0+w:a22-top-4",
+    "items": [
+     "w:a22-top-4",
+     "w:a22-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A23",
+    "request": "basic",
+    "temp": 14,
+    "combinations": 24,
+    "pass": true,
+    "key": "w:a22-bottom-2+w:a22-outerwear-0+w:a22-top-6",
+    "items": [
+     "w:a22-outerwear-0",
+     "w:a22-top-6",
+     "w:a22-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A23",
+    "request": "basic",
+    "temp": 14,
+    "combinations": 24,
+    "pass": true,
+    "key": "w:a22-bottom-1+w:a22-top-1",
+    "items": [
+     "w:a22-top-1",
+     "w:a22-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A23",
+    "request": "again",
+    "temp": 14,
+    "combinations": 24,
+    "pass": true,
+    "key": "w:a22-bottom-0+w:a22-top-2",
+    "items": [
+     "w:a22-top-2",
+     "w:a22-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A23",
+    "request": "again",
+    "temp": 14,
+    "combinations": 24,
+    "pass": true,
+    "key": "w:a22-bottom-2+w:a22-outerwear-0+w:a22-top-4",
+    "items": [
+     "w:a22-outerwear-0",
+     "w:a22-top-4",
+     "w:a22-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A23",
+    "request": "again",
+    "temp": 14,
+    "combinations": 24,
+    "pass": true,
+    "key": "w:a22-bottom-1+w:a22-top-6",
+    "items": [
+     "w:a22-top-6",
+     "w:a22-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A23",
+    "request": "locked",
+    "temp": 14,
+    "combinations": 24,
+    "pass": true,
+    "key": "w:a22-bottom-0+w:a22-top-1",
+    "items": [
+     "w:a22-top-1",
+     "w:a22-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A23",
+    "request": "locked",
+    "temp": 14,
+    "combinations": 24,
+    "pass": true,
+    "key": "w:a22-bottom-2+w:a22-outerwear-0+w:a22-top-1",
+    "items": [
+     "w:a22-outerwear-0",
+     "w:a22-top-1",
+     "w:a22-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A23",
+    "request": "locked",
+    "temp": 14,
+    "combinations": 24,
+    "pass": true,
+    "key": "w:a22-bottom-0+w:a22-outerwear-0+w:a22-top-1",
+    "items": [
+     "w:a22-outerwear-0",
+     "w:a22-top-1",
+     "w:a22-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A24",
+    "request": "basic",
+    "temp": 18,
+    "combinations": 24,
+    "pass": true,
+    "key": "w:a23-bottom-1+w:a23-outerwear-3+w:a23-top-7",
+    "items": [
+     "w:a23-outerwear-3",
+     "w:a23-top-7",
+     "w:a23-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A24",
+    "request": "basic",
+    "temp": 18,
+    "combinations": 24,
+    "pass": true,
+    "key": "w:a23-bottom-2+w:a23-top-0",
+    "items": [
+     "w:a23-top-0",
+     "w:a23-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A24",
+    "request": "basic",
+    "temp": 18,
+    "combinations": 24,
+    "pass": true,
+    "key": "w:a23-bottom-0+w:a23-outerwear-2+w:a23-top-1",
+    "items": [
+     "w:a23-outerwear-2",
+     "w:a23-top-1",
+     "w:a23-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A24",
+    "request": "again",
+    "temp": 18,
+    "combinations": 24,
+    "pass": true,
+    "key": "w:a23-bottom-1+w:a23-top-7",
+    "items": [
+     "w:a23-top-7",
+     "w:a23-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A24",
+    "request": "again",
+    "temp": 18,
+    "combinations": 24,
+    "pass": true,
+    "key": "w:a23-bottom-2+w:a23-outerwear-3+w:a23-top-0",
+    "items": [
+     "w:a23-outerwear-3",
+     "w:a23-top-0",
+     "w:a23-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A24",
+    "request": "again",
+    "temp": 18,
+    "combinations": 24,
+    "pass": true,
+    "key": "w:a23-bottom-0+w:a23-outerwear-2+w:a23-top-5",
+    "items": [
+     "w:a23-outerwear-2",
+     "w:a23-top-5",
+     "w:a23-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A24",
+    "request": "locked",
+    "temp": 18,
+    "combinations": 24,
+    "pass": true,
+    "key": "w:a23-bottom-1+w:a23-outerwear-3+w:a23-top-2",
+    "items": [
+     "w:a23-outerwear-3",
+     "w:a23-top-2",
+     "w:a23-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A24",
+    "request": "locked",
+    "temp": 18,
+    "combinations": 24,
+    "pass": true,
+    "key": "w:a23-bottom-2+w:a23-outerwear-2+w:a23-top-2",
+    "items": [
+     "w:a23-outerwear-2",
+     "w:a23-top-2",
+     "w:a23-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A24",
+    "request": "locked",
+    "temp": 18,
+    "combinations": 24,
+    "pass": true,
+    "key": "w:a23-bottom-0+w:a23-top-2",
+    "items": [
+     "w:a23-top-2",
+     "w:a23-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A25",
+    "request": "basic",
+    "temp": 21,
+    "combinations": 36,
+    "pass": true,
+    "key": "w:a24-bottom-4+w:a24-top-0",
+    "items": [
+     "w:a24-top-0",
+     "w:a24-bottom-4"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A25",
+    "request": "basic",
+    "temp": 21,
+    "combinations": 36,
+    "pass": true,
+    "key": "w:a24-bottom-1+w:a24-top-3",
+    "items": [
+     "w:a24-top-3",
+     "w:a24-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A25",
+    "request": "basic",
+    "temp": 21,
+    "combinations": 36,
+    "pass": true,
+    "key": "w:a24-bottom-0+w:a24-top-4",
+    "items": [
+     "w:a24-top-4",
+     "w:a24-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A25",
+    "request": "again",
+    "temp": 21,
+    "combinations": 36,
+    "pass": true,
+    "key": "w:a24-bottom-4+w:a24-top-5",
+    "items": [
+     "w:a24-top-5",
+     "w:a24-bottom-4"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A25",
+    "request": "again",
+    "temp": 21,
+    "combinations": 36,
+    "pass": true,
+    "key": "w:a24-bottom-2+w:a24-top-4",
+    "items": [
+     "w:a24-top-4",
+     "w:a24-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A25",
+    "request": "again",
+    "temp": 21,
+    "combinations": 36,
+    "pass": true,
+    "key": "w:a24-bottom-1+w:a24-top-0",
+    "items": [
+     "w:a24-top-0",
+     "w:a24-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A25",
+    "request": "locked",
+    "temp": 21,
+    "combinations": 36,
+    "pass": true,
+    "key": "w:a24-bottom-0+w:a24-top-4",
+    "items": [
+     "w:a24-top-4",
+     "w:a24-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A25",
+    "request": "locked",
+    "temp": 21,
+    "combinations": 36,
+    "pass": true,
+    "key": "w:a24-bottom-2+w:a24-top-4",
+    "items": [
+     "w:a24-top-4",
+     "w:a24-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A25",
+    "request": "locked",
+    "temp": 21,
+    "combinations": 36,
+    "pass": true,
+    "key": "w:a24-bottom-5+w:a24-top-4",
+    "items": [
+     "w:a24-top-4",
+     "w:a24-bottom-5"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A26",
+    "request": "basic",
+    "temp": 25,
+    "combinations": 36,
+    "pass": true,
+    "key": "w:a25-bottom-1+w:a25-top-2",
+    "items": [
+     "w:a25-top-2",
+     "w:a25-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A26",
+    "request": "basic",
+    "temp": 25,
+    "combinations": 36,
+    "pass": true,
+    "key": "w:a25-bottom-2+w:a25-top-1",
+    "items": [
+     "w:a25-top-1",
+     "w:a25-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A26",
+    "request": "basic",
+    "temp": 25,
+    "combinations": 36,
+    "pass": true,
+    "key": "w:a25-bottom-4+w:a25-top-3",
+    "items": [
+     "w:a25-top-3",
+     "w:a25-bottom-4"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A26",
+    "request": "again",
+    "temp": 25,
+    "combinations": 36,
+    "pass": true,
+    "key": "w:a25-bottom-2+w:a25-top-2",
+    "items": [
+     "w:a25-top-2",
+     "w:a25-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A26",
+    "request": "again",
+    "temp": 25,
+    "combinations": 36,
+    "pass": true,
+    "key": "w:a25-bottom-0+w:a25-top-3",
+    "items": [
+     "w:a25-top-3",
+     "w:a25-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A26",
+    "request": "again",
+    "temp": 25,
+    "combinations": 36,
+    "pass": true,
+    "key": "w:a25-bottom-1+w:a25-top-1",
+    "items": [
+     "w:a25-top-1",
+     "w:a25-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A26",
+    "request": "locked",
+    "temp": 25,
+    "combinations": 36,
+    "pass": true,
+    "key": "w:a25-bottom-0+w:a25-top-4",
+    "items": [
+     "w:a25-top-4",
+     "w:a25-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A26",
+    "request": "locked",
+    "temp": 25,
+    "combinations": 36,
+    "pass": true,
+    "key": "w:a25-bottom-2+w:a25-top-4",
+    "items": [
+     "w:a25-top-4",
+     "w:a25-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A26",
+    "request": "locked",
+    "temp": 25,
+    "combinations": 36,
+    "pass": true,
+    "key": "w:a25-bottom-5+w:a25-top-4",
+    "items": [
+     "w:a25-top-4",
+     "w:a25-bottom-5"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A27",
+    "request": "basic",
+    "temp": 30,
+    "combinations": 32,
+    "pass": true,
+    "key": "w:a26-bottom-0+w:a26-top-5",
+    "items": [
+     "w:a26-top-5",
+     "w:a26-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A27",
+    "request": "basic",
+    "temp": 30,
+    "combinations": 32,
+    "pass": true,
+    "key": "w:a26-bottom-1+w:a26-top-7",
+    "items": [
+     "w:a26-top-7",
+     "w:a26-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A27",
+    "request": "basic",
+    "temp": 30,
+    "combinations": 32,
+    "pass": true,
+    "key": "w:a26-bottom-3+w:a26-top-0",
+    "items": [
+     "w:a26-top-0",
+     "w:a26-bottom-3"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A27",
+    "request": "again",
+    "temp": 30,
+    "combinations": 32,
+    "pass": true,
+    "key": "w:a26-bottom-1+w:a26-top-0",
+    "items": [
+     "w:a26-top-0",
+     "w:a26-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A27",
+    "request": "again",
+    "temp": 30,
+    "combinations": 32,
+    "pass": true,
+    "key": "w:a26-bottom-0+w:a26-top-4",
+    "items": [
+     "w:a26-top-4",
+     "w:a26-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A27",
+    "request": "again",
+    "temp": 30,
+    "combinations": 32,
+    "pass": true,
+    "key": "w:a26-bottom-3+w:a26-top-5",
+    "items": [
+     "w:a26-top-5",
+     "w:a26-bottom-3"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A27",
+    "request": "locked",
+    "temp": 30,
+    "combinations": 32,
+    "pass": true,
+    "key": "w:a26-bottom-0+w:a26-top-4",
+    "items": [
+     "w:a26-top-4",
+     "w:a26-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A27",
+    "request": "locked",
+    "temp": 30,
+    "combinations": 32,
+    "pass": true,
+    "key": "w:a26-bottom-1+w:a26-top-4",
+    "items": [
+     "w:a26-top-4",
+     "w:a26-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A27",
+    "request": "locked",
+    "temp": 30,
+    "combinations": 32,
+    "pass": true,
+    "key": "w:a26-bottom-3+w:a26-top-4",
+    "items": [
+     "w:a26-top-4",
+     "w:a26-bottom-3"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A28",
+    "request": "basic",
+    "temp": -3,
+    "combinations": 8,
+    "pass": true,
+    "key": "w:a27-bottom-0+w:a27-outerwear-2+w:a27-top-0",
+    "items": [
+     "w:a27-outerwear-2",
+     "w:a27-top-0",
+     "w:a27-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A28",
+    "request": "basic",
+    "temp": -3,
+    "combinations": 8,
+    "pass": true,
+    "key": "w:a27-bottom-1+w:a27-outerwear-0+w:a27-top-1",
+    "items": [
+     "w:a27-outerwear-0",
+     "w:a27-top-1",
+     "w:a27-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A28",
+    "request": "basic",
+    "temp": -3,
+    "combinations": 8,
+    "pass": true,
+    "key": "w:a27-bottom-1+w:a27-outerwear-2+w:a27-top-4",
+    "items": [
+     "w:a27-outerwear-2",
+     "w:a27-top-4",
+     "w:a27-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A28",
+    "request": "again",
+    "temp": -3,
+    "combinations": 8,
+    "pass": true,
+    "key": "w:a27-bottom-0+w:a27-outerwear-2+w:a27-top-5",
+    "items": [
+     "w:a27-outerwear-2",
+     "w:a27-top-5",
+     "w:a27-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A28",
+    "request": "again",
+    "temp": -3,
+    "combinations": 8,
+    "pass": true,
+    "key": "w:a27-bottom-1+w:a27-outerwear-0+w:a27-top-0",
+    "items": [
+     "w:a27-outerwear-0",
+     "w:a27-top-0",
+     "w:a27-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A28",
+    "request": "again",
+    "temp": -3,
+    "combinations": 8,
+    "pass": true,
+    "key": "w:a27-bottom-1+w:a27-outerwear-2+w:a27-top-1",
+    "items": [
+     "w:a27-outerwear-2",
+     "w:a27-top-1",
+     "w:a27-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A28",
+    "request": "locked",
+    "temp": -3,
+    "combinations": 8,
+    "pass": true,
+    "key": "w:a27-bottom-0+w:a27-outerwear-2+w:a27-top-4",
+    "items": [
+     "w:a27-outerwear-2",
+     "w:a27-top-4",
+     "w:a27-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A28",
+    "request": "locked",
+    "temp": -3,
+    "combinations": 8,
+    "pass": true,
+    "key": "w:a27-bottom-1+w:a27-outerwear-0+w:a27-top-4",
+    "items": [
+     "w:a27-outerwear-0",
+     "w:a27-top-4",
+     "w:a27-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A28",
+    "request": "locked",
+    "temp": -3,
+    "combinations": 8,
+    "pass": true,
+    "key": "w:a27-bottom-1+w:a27-outerwear-2+w:a27-top-4",
+    "items": [
+     "w:a27-outerwear-2",
+     "w:a27-top-4",
+     "w:a27-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A29",
+    "request": "basic",
+    "temp": 2,
+    "combinations": 20,
+    "pass": true,
+    "key": "w:a28-bottom-2+w:a28-outerwear-0+w:a28-top-0",
+    "items": [
+     "w:a28-outerwear-0",
+     "w:a28-top-0",
+     "w:a28-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A29",
+    "request": "basic",
+    "temp": 2,
+    "combinations": 20,
+    "pass": true,
+    "key": "w:a28-bottom-0+w:a28-outerwear-0+w:a28-top-6",
+    "items": [
+     "w:a28-outerwear-0",
+     "w:a28-top-6",
+     "w:a28-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A29",
+    "request": "basic",
+    "temp": 2,
+    "combinations": 20,
+    "pass": true,
+    "key": "w:a28-bottom-4+w:a28-outerwear-0+w:a28-top-1",
+    "items": [
+     "w:a28-outerwear-0",
+     "w:a28-top-1",
+     "w:a28-bottom-4"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A29",
+    "request": "again",
+    "temp": 2,
+    "combinations": 20,
+    "pass": true,
+    "key": "w:a28-bottom-0+w:a28-outerwear-0+w:a28-top-1",
+    "items": [
+     "w:a28-outerwear-0",
+     "w:a28-top-1",
+     "w:a28-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A29",
+    "request": "again",
+    "temp": 2,
+    "combinations": 20,
+    "pass": true,
+    "key": "w:a28-bottom-2+w:a28-outerwear-0+w:a28-top-6",
+    "items": [
+     "w:a28-outerwear-0",
+     "w:a28-top-6",
+     "w:a28-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A29",
+    "request": "again",
+    "temp": 2,
+    "combinations": 20,
+    "pass": true,
+    "key": "w:a28-bottom-4+w:a28-outerwear-0+w:a28-top-0",
+    "items": [
+     "w:a28-outerwear-0",
+     "w:a28-top-0",
+     "w:a28-bottom-4"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A29",
+    "request": "locked",
+    "temp": 2,
+    "combinations": 20,
+    "pass": true,
+    "key": "w:a28-bottom-2+w:a28-outerwear-0+w:a28-top-6",
+    "items": [
+     "w:a28-outerwear-0",
+     "w:a28-top-6",
+     "w:a28-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A29",
+    "request": "locked",
+    "temp": 2,
+    "combinations": 20,
+    "pass": true,
+    "key": "w:a28-bottom-0+w:a28-outerwear-0+w:a28-top-6",
+    "items": [
+     "w:a28-outerwear-0",
+     "w:a28-top-6",
+     "w:a28-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A29",
+    "request": "locked",
+    "temp": 2,
+    "combinations": 20,
+    "pass": true,
+    "key": "w:a28-bottom-4+w:a28-outerwear-0+w:a28-top-6",
+    "items": [
+     "w:a28-outerwear-0",
+     "w:a28-top-6",
+     "w:a28-bottom-4"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A30",
+    "request": "basic",
+    "temp": 6,
+    "combinations": 24,
+    "pass": true,
+    "key": "w:a29-bottom-2+w:a29-outerwear-1+w:a29-top-5",
+    "items": [
+     "w:a29-outerwear-1",
+     "w:a29-top-5",
+     "w:a29-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A30",
+    "request": "basic",
+    "temp": 6,
+    "combinations": 24,
+    "pass": true,
+    "key": "w:a29-bottom-3+w:a29-outerwear-0+w:a29-top-3",
+    "items": [
+     "w:a29-outerwear-0",
+     "w:a29-top-3",
+     "w:a29-bottom-3"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A30",
+    "request": "basic",
+    "temp": 6,
+    "combinations": 24,
+    "pass": true,
+    "key": "w:a29-bottom-0+w:a29-outerwear-3+w:a29-top-4",
+    "items": [
+     "w:a29-outerwear-3",
+     "w:a29-top-4",
+     "w:a29-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A30",
+    "request": "again",
+    "temp": 6,
+    "combinations": 24,
+    "pass": true,
+    "key": "w:a29-bottom-2+w:a29-outerwear-1+w:a29-top-1",
+    "items": [
+     "w:a29-outerwear-1",
+     "w:a29-top-1",
+     "w:a29-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A30",
+    "request": "again",
+    "temp": 6,
+    "combinations": 24,
+    "pass": true,
+    "key": "w:a29-bottom-3+w:a29-outerwear-0+w:a29-top-2",
+    "items": [
+     "w:a29-outerwear-0",
+     "w:a29-top-2",
+     "w:a29-bottom-3"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A30",
+    "request": "again",
+    "temp": 6,
+    "combinations": 24,
+    "pass": true,
+    "key": "w:a29-bottom-0+w:a29-outerwear-3+w:a29-top-0",
+    "items": [
+     "w:a29-outerwear-3",
+     "w:a29-top-0",
+     "w:a29-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A30",
+    "request": "locked",
+    "temp": 6,
+    "combinations": 24,
+    "pass": true,
+    "key": "w:a29-bottom-3+w:a29-outerwear-0+w:a29-top-7",
+    "items": [
+     "w:a29-outerwear-0",
+     "w:a29-top-7",
+     "w:a29-bottom-3"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A30",
+    "request": "locked",
+    "temp": 6,
+    "combinations": 24,
+    "pass": true,
+    "key": "w:a29-bottom-2+w:a29-outerwear-1+w:a29-top-7",
+    "items": [
+     "w:a29-outerwear-1",
+     "w:a29-top-7",
+     "w:a29-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A30",
+    "request": "locked",
+    "temp": 6,
+    "combinations": 24,
+    "pass": true,
+    "key": "w:a29-bottom-0+w:a29-outerwear-3+w:a29-top-7",
+    "items": [
+     "w:a29-outerwear-3",
+     "w:a29-top-7",
+     "w:a29-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A31",
+    "request": "basic",
+    "temp": 10,
+    "combinations": 42,
+    "pass": true,
+    "key": "w:a30-bottom-2+w:a30-outerwear-0+w:a30-top-5",
+    "items": [
+     "w:a30-outerwear-0",
+     "w:a30-top-5",
+     "w:a30-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A31",
+    "request": "basic",
+    "temp": 10,
+    "combinations": 42,
+    "pass": true,
+    "key": "w:a30-bottom-3+w:a30-outerwear-0+w:a30-top-1",
+    "items": [
+     "w:a30-outerwear-0",
+     "w:a30-top-1",
+     "w:a30-bottom-3"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A31",
+    "request": "basic",
+    "temp": 10,
+    "combinations": 42,
+    "pass": true,
+    "key": "w:a30-bottom-5+w:a30-outerwear-0+w:a30-top-6",
+    "items": [
+     "w:a30-outerwear-0",
+     "w:a30-top-6",
+     "w:a30-bottom-5"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A31",
+    "request": "again",
+    "temp": 10,
+    "combinations": 42,
+    "pass": true,
+    "key": "w:a30-bottom-2+w:a30-outerwear-0+w:a30-top-2",
+    "items": [
+     "w:a30-outerwear-0",
+     "w:a30-top-2",
+     "w:a30-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A31",
+    "request": "again",
+    "temp": 10,
+    "combinations": 42,
+    "pass": true,
+    "key": "w:a30-bottom-3+w:a30-outerwear-0+w:a30-top-6",
+    "items": [
+     "w:a30-outerwear-0",
+     "w:a30-top-6",
+     "w:a30-bottom-3"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A31",
+    "request": "again",
+    "temp": 10,
+    "combinations": 42,
+    "pass": true,
+    "key": "w:a30-bottom-5+w:a30-outerwear-0+w:a30-top-1",
+    "items": [
+     "w:a30-outerwear-0",
+     "w:a30-top-1",
+     "w:a30-bottom-5"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A31",
+    "request": "locked",
+    "temp": 10,
+    "combinations": 42,
+    "pass": true,
+    "key": "w:a30-bottom-1+w:a30-outerwear-0+w:a30-top-1",
+    "items": [
+     "w:a30-outerwear-0",
+     "w:a30-top-1",
+     "w:a30-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A31",
+    "request": "locked",
+    "temp": 10,
+    "combinations": 42,
+    "pass": true,
+    "key": "w:a30-bottom-5+w:a30-outerwear-0+w:a30-top-1",
+    "items": [
+     "w:a30-outerwear-0",
+     "w:a30-top-1",
+     "w:a30-bottom-5"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A31",
+    "request": "locked",
+    "temp": 10,
+    "combinations": 42,
+    "pass": true,
+    "key": "w:a30-bottom-2+w:a30-outerwear-0+w:a30-top-1",
+    "items": [
+     "w:a30-outerwear-0",
+     "w:a30-top-1",
+     "w:a30-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A32",
+    "request": "basic",
+    "temp": 14,
+    "combinations": 35,
+    "pass": true,
+    "key": "w:a31-bottom-0+w:a31-top-0",
+    "items": [
+     "w:a31-top-0",
+     "w:a31-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A32",
+    "request": "basic",
+    "temp": 14,
+    "combinations": 35,
+    "pass": true,
+    "key": "w:a31-bottom-1+w:a31-top-4",
+    "items": [
+     "w:a31-top-4",
+     "w:a31-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A32",
+    "request": "basic",
+    "temp": 14,
+    "combinations": 35,
+    "pass": true,
+    "key": "w:a31-bottom-3+w:a31-top-2",
+    "items": [
+     "w:a31-top-2",
+     "w:a31-bottom-3"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A32",
+    "request": "again",
+    "temp": 14,
+    "combinations": 35,
+    "pass": true,
+    "key": "w:a31-bottom-2+w:a31-top-4",
+    "items": [
+     "w:a31-top-4",
+     "w:a31-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A32",
+    "request": "again",
+    "temp": 14,
+    "combinations": 35,
+    "pass": true,
+    "key": "w:a31-bottom-0+w:a31-top-1",
+    "items": [
+     "w:a31-top-1",
+     "w:a31-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A32",
+    "request": "again",
+    "temp": 14,
+    "combinations": 35,
+    "pass": true,
+    "key": "w:a31-bottom-1+w:a31-top-0",
+    "items": [
+     "w:a31-top-0",
+     "w:a31-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A32",
+    "request": "locked",
+    "temp": 14,
+    "combinations": 35,
+    "pass": true,
+    "key": "w:a31-bottom-0+w:a31-top-0",
+    "items": [
+     "w:a31-top-0",
+     "w:a31-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A32",
+    "request": "locked",
+    "temp": 14,
+    "combinations": 35,
+    "pass": true,
+    "key": "w:a31-bottom-2+w:a31-top-0",
+    "items": [
+     "w:a31-top-0",
+     "w:a31-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A32",
+    "request": "locked",
+    "temp": 14,
+    "combinations": 35,
+    "pass": true,
+    "key": "w:a31-bottom-1+w:a31-top-0",
+    "items": [
+     "w:a31-top-0",
+     "w:a31-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A33",
+    "request": "basic",
+    "temp": 18,
+    "combinations": 30,
+    "pass": true,
+    "key": "w:a32-bottom-1+w:a32-top-0",
+    "items": [
+     "w:a32-top-0",
+     "w:a32-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A33",
+    "request": "basic",
+    "temp": 18,
+    "combinations": 30,
+    "pass": true,
+    "key": "w:a32-bottom-4+w:a32-outerwear-0+w:a32-top-4",
+    "items": [
+     "w:a32-outerwear-0",
+     "w:a32-top-4",
+     "w:a32-bottom-4"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A33",
+    "request": "basic",
+    "temp": 18,
+    "combinations": 30,
+    "pass": true,
+    "key": "w:a32-bottom-0+w:a32-top-3",
+    "items": [
+     "w:a32-top-3",
+     "w:a32-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A33",
+    "request": "again",
+    "temp": 18,
+    "combinations": 30,
+    "pass": true,
+    "key": "w:a32-bottom-1+w:a32-outerwear-0+w:a32-top-2",
+    "items": [
+     "w:a32-outerwear-0",
+     "w:a32-top-2",
+     "w:a32-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A33",
+    "request": "again",
+    "temp": 18,
+    "combinations": 30,
+    "pass": true,
+    "key": "w:a32-bottom-4+w:a32-top-4",
+    "items": [
+     "w:a32-top-4",
+     "w:a32-bottom-4"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A33",
+    "request": "again",
+    "temp": 18,
+    "combinations": 30,
+    "pass": true,
+    "key": "w:a32-bottom-3+w:a32-top-0",
+    "items": [
+     "w:a32-top-0",
+     "w:a32-bottom-3"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A33",
+    "request": "locked",
+    "temp": 18,
+    "combinations": 30,
+    "pass": true,
+    "key": "w:a32-bottom-1+w:a32-top-1",
+    "items": [
+     "w:a32-top-1",
+     "w:a32-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A33",
+    "request": "locked",
+    "temp": 18,
+    "combinations": 30,
+    "pass": true,
+    "key": "w:a32-bottom-4+w:a32-outerwear-1+w:a32-top-1",
+    "items": [
+     "w:a32-outerwear-1",
+     "w:a32-top-1",
+     "w:a32-bottom-4"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A33",
+    "request": "locked",
+    "temp": 18,
+    "combinations": 30,
+    "pass": true,
+    "key": "w:a32-bottom-0+w:a32-outerwear-0+w:a32-top-1",
+    "items": [
+     "w:a32-outerwear-0",
+     "w:a32-top-1",
+     "w:a32-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A34",
+    "request": "basic",
+    "temp": 21,
+    "combinations": 24,
+    "pass": true,
+    "key": "w:a33-bottom-3+w:a33-top-0",
+    "items": [
+     "w:a33-top-0",
+     "w:a33-bottom-3"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A34",
+    "request": "basic",
+    "temp": 21,
+    "combinations": 24,
+    "pass": true,
+    "key": "w:a33-bottom-1+w:a33-top-4",
+    "items": [
+     "w:a33-top-4",
+     "w:a33-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A34",
+    "request": "basic",
+    "temp": 21,
+    "combinations": 24,
+    "pass": true,
+    "key": "w:a33-bottom-2+w:a33-top-5",
+    "items": [
+     "w:a33-top-5",
+     "w:a33-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A34",
+    "request": "again",
+    "temp": 21,
+    "combinations": 24,
+    "pass": true,
+    "key": "w:a33-bottom-2+w:a33-top-0",
+    "items": [
+     "w:a33-top-0",
+     "w:a33-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A34",
+    "request": "again",
+    "temp": 21,
+    "combinations": 24,
+    "pass": true,
+    "key": "w:a33-bottom-3+w:a33-top-4",
+    "items": [
+     "w:a33-top-4",
+     "w:a33-bottom-3"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A34",
+    "request": "again",
+    "temp": 21,
+    "combinations": 24,
+    "pass": true,
+    "key": "w:a33-bottom-0+w:a33-top-5",
+    "items": [
+     "w:a33-top-5",
+     "w:a33-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A34",
+    "request": "locked",
+    "temp": 21,
+    "combinations": 24,
+    "pass": true,
+    "key": "w:a33-bottom-2+w:a33-top-5",
+    "items": [
+     "w:a33-top-5",
+     "w:a33-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A34",
+    "request": "locked",
+    "temp": 21,
+    "combinations": 24,
+    "pass": true,
+    "key": "w:a33-bottom-3+w:a33-top-5",
+    "items": [
+     "w:a33-top-5",
+     "w:a33-bottom-3"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A34",
+    "request": "locked",
+    "temp": 21,
+    "combinations": 24,
+    "pass": true,
+    "key": "w:a33-bottom-1+w:a33-top-5",
+    "items": [
+     "w:a33-top-5",
+     "w:a33-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A35",
+    "request": "basic",
+    "temp": 25,
+    "combinations": 24,
+    "pass": true,
+    "key": "w:a34-bottom-1+w:a34-top-1",
+    "items": [
+     "w:a34-top-1",
+     "w:a34-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A35",
+    "request": "basic",
+    "temp": 25,
+    "combinations": 24,
+    "pass": true,
+    "key": "w:a34-bottom-3+w:a34-top-0",
+    "items": [
+     "w:a34-top-0",
+     "w:a34-bottom-3"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A35",
+    "request": "basic",
+    "temp": 25,
+    "combinations": 24,
+    "pass": true,
+    "key": "w:a34-bottom-0+w:a34-top-3",
+    "items": [
+     "w:a34-top-3",
+     "w:a34-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A35",
+    "request": "again",
+    "temp": 25,
+    "combinations": 24,
+    "pass": true,
+    "key": "w:a34-bottom-0+w:a34-top-0",
+    "items": [
+     "w:a34-top-0",
+     "w:a34-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A35",
+    "request": "again",
+    "temp": 25,
+    "combinations": 24,
+    "pass": true,
+    "key": "w:a34-bottom-1+w:a34-top-3",
+    "items": [
+     "w:a34-top-3",
+     "w:a34-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A35",
+    "request": "again",
+    "temp": 25,
+    "combinations": 24,
+    "pass": true,
+    "key": "w:a34-bottom-3+w:a34-top-1",
+    "items": [
+     "w:a34-top-1",
+     "w:a34-bottom-3"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A35",
+    "request": "locked",
+    "temp": 25,
+    "combinations": 24,
+    "pass": true,
+    "key": "w:a34-bottom-1+w:a34-top-4",
+    "items": [
+     "w:a34-top-4",
+     "w:a34-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A35",
+    "request": "locked",
+    "temp": 25,
+    "combinations": 24,
+    "pass": true,
+    "key": "w:a34-bottom-3+w:a34-top-4",
+    "items": [
+     "w:a34-top-4",
+     "w:a34-bottom-3"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A35",
+    "request": "locked",
+    "temp": 25,
+    "combinations": 24,
+    "pass": true,
+    "key": "w:a34-bottom-0+w:a34-top-4",
+    "items": [
+     "w:a34-top-4",
+     "w:a34-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A36",
+    "request": "basic",
+    "temp": 30,
+    "combinations": 18,
+    "pass": true,
+    "key": "w:a35-bottom-1+w:a35-top-2",
+    "items": [
+     "w:a35-top-2",
+     "w:a35-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A36",
+    "request": "basic",
+    "temp": 30,
+    "combinations": 18,
+    "pass": true,
+    "key": "w:a35-bottom-0+w:a35-top-1",
+    "items": [
+     "w:a35-top-1",
+     "w:a35-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A36",
+    "request": "basic",
+    "temp": 30,
+    "combinations": 18,
+    "pass": true,
+    "key": "w:a35-bottom-2+w:a35-top-0",
+    "items": [
+     "w:a35-top-0",
+     "w:a35-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A36",
+    "request": "again",
+    "temp": 30,
+    "combinations": 18,
+    "pass": true,
+    "key": "w:a35-bottom-1+w:a35-top-0",
+    "items": [
+     "w:a35-top-0",
+     "w:a35-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A36",
+    "request": "again",
+    "temp": 30,
+    "combinations": 18,
+    "pass": true,
+    "key": "w:a35-bottom-2+w:a35-top-1",
+    "items": [
+     "w:a35-top-1",
+     "w:a35-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A36",
+    "request": "again",
+    "temp": 30,
+    "combinations": 18,
+    "pass": true,
+    "key": "w:a35-bottom-0+w:a35-top-2",
+    "items": [
+     "w:a35-top-2",
+     "w:a35-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A36",
+    "request": "locked",
+    "temp": 30,
+    "combinations": 18,
+    "pass": true,
+    "key": "w:a35-bottom-0+w:a35-top-5",
+    "items": [
+     "w:a35-top-5",
+     "w:a35-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A36",
+    "request": "locked",
+    "temp": 30,
+    "combinations": 18,
+    "pass": true,
+    "key": "w:a35-bottom-1+w:a35-top-5",
+    "items": [
+     "w:a35-top-5",
+     "w:a35-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A36",
+    "request": "locked",
+    "temp": 30,
+    "combinations": 18,
+    "pass": true,
+    "key": "w:a35-bottom-2+w:a35-top-5",
+    "items": [
+     "w:a35-top-5",
+     "w:a35-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A37",
+    "request": "basic",
+    "temp": -3,
+    "combinations": 0,
+    "pass": true,
+    "key": "w:a36-bottom-0+w:a36-outerwear-0+w:a36-top-4",
+    "items": [
+     "w:a36-outerwear-0",
+     "w:a36-top-4",
+     "w:a36-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": [
+     "R3 short sleeves or mini under 5 °C: w:a36-bottom-0"
+    ]
+   },
+   {
+    "case": "A37",
+    "request": "basic",
+    "temp": -3,
+    "combinations": 0,
+    "pass": true,
+    "key": "w:a36-bottom-2+w:a36-outerwear-1+w:a36-top-2",
+    "items": [
+     "w:a36-outerwear-1",
+     "w:a36-top-2",
+     "w:a36-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": [
+     "R3 short sleeves or mini under 5 °C: w:a36-bottom-2",
+     "R3 shorts under 20 °C: w:a36-bottom-2"
+    ]
+   },
+   {
+    "case": "A37",
+    "request": "basic",
+    "temp": -3,
+    "combinations": 0,
+    "pass": true,
+    "key": "w:a36-bottom-1+w:a36-outerwear-1+w:a36-top-3",
+    "items": [
+     "w:a36-outerwear-1",
+     "w:a36-top-3",
+     "w:a36-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": [
+     "R3 short sleeves or mini under 5 °C: w:a36-bottom-1"
+    ]
+   },
+   {
+    "case": "A37",
+    "request": "again",
+    "temp": -3,
+    "combinations": 0,
+    "pass": true,
+    "key": "w:a36-bottom-1+w:a36-outerwear-0+w:a36-top-4",
+    "items": [
+     "w:a36-outerwear-0",
+     "w:a36-top-4",
+     "w:a36-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": [
+     "R3 short sleeves or mini under 5 °C: w:a36-bottom-1"
+    ]
+   },
+   {
+    "case": "A37",
+    "request": "again",
+    "temp": -3,
+    "combinations": 0,
+    "pass": true,
+    "key": "w:a36-bottom-2+w:a36-outerwear-1+w:a36-top-3",
+    "items": [
+     "w:a36-outerwear-1",
+     "w:a36-top-3",
+     "w:a36-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": [
+     "R3 short sleeves or mini under 5 °C: w:a36-bottom-2",
+     "R3 shorts under 20 °C: w:a36-bottom-2"
+    ]
+   },
+   {
+    "case": "A37",
+    "request": "again",
+    "temp": -3,
+    "combinations": 0,
+    "pass": true,
+    "key": "w:a36-bottom-0+w:a36-outerwear-1+w:a36-top-0",
+    "items": [
+     "w:a36-outerwear-1",
+     "w:a36-top-0",
+     "w:a36-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": [
+     "R3 short sleeves or mini under 5 °C: w:a36-bottom-0"
+    ]
+   },
+   {
+    "case": "A37",
+    "request": "locked",
+    "temp": -3,
+    "combinations": 0,
+    "pass": true,
+    "key": "w:a36-bottom-2+w:a36-outerwear-1+w:a36-top-1",
+    "items": [
+     "w:a36-outerwear-1",
+     "w:a36-top-1",
+     "w:a36-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": [
+     "R3 short sleeves or mini under 5 °C: w:a36-bottom-2",
+     "R3 shorts under 20 °C: w:a36-bottom-2"
+    ]
+   },
+   {
+    "case": "A37",
+    "request": "locked",
+    "temp": -3,
+    "combinations": 0,
+    "pass": true,
+    "key": "w:a36-bottom-0+w:a36-outerwear-0+w:a36-top-1",
+    "items": [
+     "w:a36-outerwear-0",
+     "w:a36-top-1",
+     "w:a36-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": [
+     "R3 short sleeves or mini under 5 °C: w:a36-bottom-0"
+    ]
+   },
+   {
+    "case": "A37",
+    "request": "locked",
+    "temp": -3,
+    "combinations": 0,
+    "pass": true,
+    "key": "w:a36-bottom-1+w:a36-outerwear-1+w:a36-top-1",
+    "items": [
+     "w:a36-outerwear-1",
+     "w:a36-top-1",
+     "w:a36-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": [
+     "R3 short sleeves or mini under 5 °C: w:a36-bottom-1"
+    ]
+   },
+   {
+    "case": "A38",
+    "request": "basic",
+    "temp": 2,
+    "combinations": 18,
+    "pass": true,
+    "key": "w:a37-bottom-2+w:a37-outerwear-0+w:a37-top-2",
+    "items": [
+     "w:a37-outerwear-0",
+     "w:a37-top-2",
+     "w:a37-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A38",
+    "request": "basic",
+    "temp": 2,
+    "combinations": 18,
+    "pass": true,
+    "key": "w:a37-bottom-1+w:a37-outerwear-0+w:a37-top-3",
+    "items": [
+     "w:a37-outerwear-0",
+     "w:a37-top-3",
+     "w:a37-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A38",
+    "request": "basic",
+    "temp": 2,
+    "combinations": 18,
+    "pass": true,
+    "key": "w:a37-bottom-0+w:a37-outerwear-0+w:a37-top-4",
+    "items": [
+     "w:a37-outerwear-0",
+     "w:a37-top-4",
+     "w:a37-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A38",
+    "request": "again",
+    "temp": 2,
+    "combinations": 18,
+    "pass": true,
+    "key": "w:a37-bottom-2+w:a37-outerwear-0+w:a37-top-6",
+    "items": [
+     "w:a37-outerwear-0",
+     "w:a37-top-6",
+     "w:a37-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A38",
+    "request": "again",
+    "temp": 2,
+    "combinations": 18,
+    "pass": true,
+    "key": "w:a37-bottom-1+w:a37-outerwear-0+w:a37-top-2",
+    "items": [
+     "w:a37-outerwear-0",
+     "w:a37-top-2",
+     "w:a37-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A38",
+    "request": "again",
+    "temp": 2,
+    "combinations": 18,
+    "pass": true,
+    "key": "w:a37-bottom-0+w:a37-outerwear-0+w:a37-top-1",
+    "items": [
+     "w:a37-outerwear-0",
+     "w:a37-top-1",
+     "w:a37-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A38",
+    "request": "locked",
+    "temp": 2,
+    "combinations": 18,
+    "pass": true,
+    "key": "w:a37-bottom-2+w:a37-outerwear-0+w:a37-top-0",
+    "items": [
+     "w:a37-outerwear-0",
+     "w:a37-top-0",
+     "w:a37-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A38",
+    "request": "locked",
+    "temp": 2,
+    "combinations": 18,
+    "pass": true,
+    "key": "w:a37-bottom-0+w:a37-outerwear-0+w:a37-top-0",
+    "items": [
+     "w:a37-outerwear-0",
+     "w:a37-top-0",
+     "w:a37-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A38",
+    "request": "locked",
+    "temp": 2,
+    "combinations": 18,
+    "pass": true,
+    "key": "w:a37-bottom-1+w:a37-outerwear-0+w:a37-top-0",
+    "items": [
+     "w:a37-outerwear-0",
+     "w:a37-top-0",
+     "w:a37-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A39",
+    "request": "basic",
+    "temp": 6,
+    "combinations": 25,
+    "pass": true,
+    "key": "w:a38-bottom-2+w:a38-top-3",
+    "items": [
+     "w:a38-top-3",
+     "w:a38-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": [
+     "R3 no outerwear under 9 °C"
+    ]
+   },
+   {
+    "case": "A39",
+    "request": "basic",
+    "temp": 6,
+    "combinations": 25,
+    "pass": true,
+    "key": "w:a38-bottom-5+w:a38-top-4",
+    "items": [
+     "w:a38-top-4",
+     "w:a38-bottom-5"
+    ],
+    "violations": [],
+    "disclosed": [
+     "R3 no outerwear under 9 °C"
+    ]
+   },
+   {
+    "case": "A39",
+    "request": "basic",
+    "temp": 6,
+    "combinations": 25,
+    "pass": true,
+    "key": "w:a38-bottom-3+w:a38-top-6",
+    "items": [
+     "w:a38-top-6",
+     "w:a38-bottom-3"
+    ],
+    "violations": [],
+    "disclosed": [
+     "R3 no outerwear under 9 °C"
+    ]
+   },
+   {
+    "case": "A39",
+    "request": "again",
+    "temp": 6,
+    "combinations": 25,
+    "pass": true,
+    "key": "w:a38-bottom-2+w:a38-top-2",
+    "items": [
+     "w:a38-top-2",
+     "w:a38-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": [
+     "R3 no outerwear under 9 °C"
+    ]
+   },
+   {
+    "case": "A39",
+    "request": "again",
+    "temp": 6,
+    "combinations": 25,
+    "pass": true,
+    "key": "w:a38-bottom-0+w:a38-top-4",
+    "items": [
+     "w:a38-top-4",
+     "w:a38-bottom-0"
+    ],
+    "violations": [],
+    "disclosed": [
+     "R3 no outerwear under 9 °C"
+    ]
+   },
+   {
+    "case": "A39",
+    "request": "again",
+    "temp": 6,
+    "combinations": 25,
+    "pass": true,
+    "key": "w:a38-bottom-3+w:a38-top-3",
+    "items": [
+     "w:a38-top-3",
+     "w:a38-bottom-3"
+    ],
+    "violations": [],
+    "disclosed": [
+     "R3 no outerwear under 9 °C"
+    ]
+   },
+   {
+    "case": "A39",
+    "request": "locked",
+    "temp": 6,
+    "combinations": 25,
+    "pass": true,
+    "key": "w:a38-bottom-2+w:a38-top-0",
+    "items": [
+     "w:a38-top-0",
+     "w:a38-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": [
+     "R3 no outerwear under 9 °C"
+    ]
+   },
+   {
+    "case": "A39",
+    "request": "locked",
+    "temp": 6,
+    "combinations": 25,
+    "pass": true,
+    "key": "w:a38-bottom-3+w:a38-top-0",
+    "items": [
+     "w:a38-top-0",
+     "w:a38-bottom-3"
+    ],
+    "violations": [],
+    "disclosed": [
+     "R3 no outerwear under 9 °C"
+    ]
+   },
+   {
+    "case": "A39",
+    "request": "locked",
+    "temp": 6,
+    "combinations": 25,
+    "pass": true,
+    "key": "w:a38-bottom-4+w:a38-top-0",
+    "items": [
+     "w:a38-top-0",
+     "w:a38-bottom-4"
+    ],
+    "violations": [],
+    "disclosed": [
+     "R3 no outerwear under 9 °C"
+    ]
+   },
+   {
+    "case": "A40",
+    "request": "basic",
+    "temp": 10,
+    "combinations": 28,
+    "pass": true,
+    "key": "w:a39-bottom-5+w:a39-outerwear-0+w:a39-top-1",
+    "items": [
+     "w:a39-outerwear-0",
+     "w:a39-top-1",
+     "w:a39-bottom-5"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A40",
+    "request": "basic",
+    "temp": 10,
+    "combinations": 28,
+    "pass": true,
+    "key": "w:a39-bottom-3+w:a39-outerwear-1+w:a39-top-6",
+    "items": [
+     "w:a39-outerwear-1",
+     "w:a39-top-6",
+     "w:a39-bottom-3"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A40",
+    "request": "basic",
+    "temp": 10,
+    "combinations": 28,
+    "pass": true,
+    "key": "w:a39-bottom-1+w:a39-outerwear-0+w:a39-top-4",
+    "items": [
+     "w:a39-outerwear-0",
+     "w:a39-top-4",
+     "w:a39-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A40",
+    "request": "again",
+    "temp": 10,
+    "combinations": 28,
+    "pass": true,
+    "key": "w:a39-bottom-3+w:a39-outerwear-0+w:a39-top-1",
+    "items": [
+     "w:a39-outerwear-0",
+     "w:a39-top-1",
+     "w:a39-bottom-3"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A40",
+    "request": "again",
+    "temp": 10,
+    "combinations": 28,
+    "pass": true,
+    "key": "w:a39-bottom-5+w:a39-outerwear-1+w:a39-top-2",
+    "items": [
+     "w:a39-outerwear-1",
+     "w:a39-top-2",
+     "w:a39-bottom-5"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A40",
+    "request": "again",
+    "temp": 10,
+    "combinations": 28,
+    "pass": true,
+    "key": "w:a39-bottom-1+w:a39-outerwear-1+w:a39-top-6",
+    "items": [
+     "w:a39-outerwear-1",
+     "w:a39-top-6",
+     "w:a39-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A40",
+    "request": "locked",
+    "temp": 10,
+    "combinations": 28,
+    "pass": true,
+    "key": "w:a39-bottom-5+w:a39-outerwear-0+w:a39-top-7",
+    "items": [
+     "w:a39-outerwear-0",
+     "w:a39-top-7",
+     "w:a39-bottom-5"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A40",
+    "request": "locked",
+    "temp": 10,
+    "combinations": 28,
+    "pass": true,
+    "key": "w:a39-bottom-1+w:a39-outerwear-1+w:a39-top-7",
+    "items": [
+     "w:a39-outerwear-1",
+     "w:a39-top-7",
+     "w:a39-bottom-1"
+    ],
+    "violations": [],
+    "disclosed": []
+   },
+   {
+    "case": "A40",
+    "request": "locked",
+    "temp": 10,
+    "combinations": 28,
+    "pass": true,
+    "key": "w:a39-bottom-2+w:a39-outerwear-0+w:a39-top-7",
+    "items": [
+     "w:a39-outerwear-0",
+     "w:a39-top-7",
+     "w:a39-bottom-2"
+    ],
+    "violations": [],
+    "disclosed": []
+   }
+  ]
+ },
+ "bad_outfits": {
+  "pairs": 100,
+  "rate": 0.95,
+  "target": 0.9,
+  "verdict": "PASS",
+  "by_type": {
+   "winter_shorts": {
+    "pass_rate": 1.0,
+    "median_margin": 0.3107
+   },
+   "winter_sleeveless": {
+    "pass_rate": 1.0,
+    "median_margin": 0.361
+   },
+   "summer_padding": {
+    "pass_rate": 1.0,
+    "median_margin": 0.5708
+   },
+   "style_clash": {
+    "pass_rate": 0.8,
+    "median_margin": 0.2074
+   }
+  },
+  "rows": [
+   {
+    "id": "B-shorts-01",
+    "type": "winter_shorts",
+    "record": 24563,
+    "temp": 2,
+    "real": {
+     "raw_total": 0.3461,
+     "compat": 21,
+     "season": 25
+    },
+    "broken": {
+     "raw_total": 0.0581,
+     "compat": 20,
+     "season": 5
+    },
+    "margin": 0.288,
+    "pass": true
+   },
+   {
+    "id": "B-shorts-02",
+    "type": "winter_shorts",
+    "record": 33890,
+    "temp": 2,
+    "real": {
+     "raw_total": 0.6012,
+     "compat": 34,
+     "season": 100
+    },
+    "broken": {
+     "raw_total": 0.2609,
+     "compat": 22,
+     "season": 81
+    },
+    "margin": 0.3403,
+    "pass": true
+   },
+   {
+    "id": "B-shorts-03",
+    "type": "winter_shorts",
+    "record": 41642,
+    "temp": 2,
+    "real": {
+     "raw_total": 0.1195,
+     "compat": 37,
+     "season": 0
+    },
+    "broken": {
+     "raw_total": -0.1478,
+     "compat": 33,
+     "season": 0
+    },
+    "margin": 0.2673,
+    "pass": true
+   },
+   {
+    "id": "B-shorts-04",
+    "type": "winter_shorts",
+    "record": 43773,
+    "temp": 2,
+    "real": {
+     "raw_total": 0.4158,
+     "compat": 64,
+     "season": 67
+    },
+    "broken": {
+     "raw_total": 0.187,
+     "compat": 50,
+     "season": 97
+    },
+    "margin": 0.2288,
+    "pass": true
+   },
+   {
+    "id": "B-shorts-05",
+    "type": "winter_shorts",
+    "record": 72481,
+    "temp": 2,
+    "real": {
+     "raw_total": 0.7436,
+     "compat": 68,
+     "season": 88
+    },
+    "broken": {
+     "raw_total": 0.2969,
+     "compat": 44,
+     "season": 51
+    },
+    "margin": 0.4467,
+    "pass": true
+   },
+   {
+    "id": "B-shorts-06",
+    "type": "winter_shorts",
+    "record": 23432,
+    "temp": 2,
+    "real": {
+     "raw_total": 0.2578,
+     "compat": 61,
+     "season": 3
+    },
+    "broken": {
+     "raw_total": -0.0529,
+     "compat": 50,
+     "season": 1
+    },
+    "margin": 0.3107,
+    "pass": true
+   },
+   {
+    "id": "B-shorts-07",
+    "type": "winter_shorts",
+    "record": 31597,
+    "temp": 2,
+    "real": {
+     "raw_total": 0.4258,
+     "compat": 40,
+     "season": 16
+    },
+    "broken": {
+     "raw_total": 0.0616,
+     "compat": 23,
+     "season": 4
+    },
+    "margin": 0.3642,
+    "pass": true
+   },
+   {
+    "id": "B-shorts-08",
+    "type": "winter_shorts",
+    "record": 70072,
+    "temp": 2,
+    "real": {
+     "raw_total": 0.4396,
+     "compat": 51,
+     "season": 1
+    },
+    "broken": {
+     "raw_total": 0.0968,
+     "compat": 29,
+     "season": 0
+    },
+    "margin": 0.3428,
+    "pass": true
+   },
+   {
+    "id": "B-shorts-09",
+    "type": "winter_shorts",
+    "record": 71384,
+    "temp": 2,
+    "real": {
+     "raw_total": 0.1771,
+     "compat": 51,
+     "season": 0
+    },
+    "broken": {
+     "raw_total": -0.1197,
+     "compat": 42,
+     "season": 0
+    },
+    "margin": 0.2968,
+    "pass": true
+   },
+   {
+    "id": "B-shorts-10",
+    "type": "winter_shorts",
+    "record": 63534,
+    "temp": 2,
+    "real": {
+     "raw_total": 0.2106,
+     "compat": 55,
+     "season": 0
+    },
+    "broken": {
+     "raw_total": -0.0744,
+     "compat": 48,
+     "season": 0
+    },
+    "margin": 0.285,
+    "pass": true
+   },
+   {
+    "id": "B-shorts-11",
+    "type": "winter_shorts",
+    "record": 40108,
+    "temp": 2,
+    "real": {
+     "raw_total": 0.5641,
+     "compat": 61,
+     "season": 37
+    },
+    "broken": {
+     "raw_total": 0.2429,
+     "compat": 31,
+     "season": 67
+    },
+    "margin": 0.3212,
+    "pass": true
+   },
+   {
+    "id": "B-shorts-12",
+    "type": "winter_shorts",
+    "record": 67382,
+    "temp": 2,
+    "real": {
+     "raw_total": 0.1909,
+     "compat": 52,
+     "season": 0
+    },
+    "broken": {
+     "raw_total": -0.1303,
+     "compat": 37,
+     "season": 0
+    },
+    "margin": 0.3212,
+    "pass": true
+   },
+   {
+    "id": "B-shorts-13",
+    "type": "winter_shorts",
+    "record": 63533,
+    "temp": 2,
+    "real": {
+     "raw_total": 0.2106,
+     "compat": 55,
+     "season": 0
+    },
+    "broken": {
+     "raw_total": -0.0744,
+     "compat": 48,
+     "season": 0
+    },
+    "margin": 0.285,
+    "pass": true
+   },
+   {
+    "id": "B-shorts-14",
+    "type": "winter_shorts",
+    "record": 40604,
+    "temp": 2,
+    "real": {
+     "raw_total": 0.1981,
+     "compat": 54,
+     "season": 1
+    },
+    "broken": {
+     "raw_total": -0.1133,
+     "compat": 42,
+     "season": 0
+    },
+    "margin": 0.3114,
+    "pass": true
+   },
+   {
+    "id": "B-shorts-15",
+    "type": "winter_shorts",
+    "record": 69749,
+    "temp": 2,
+    "real": {
+     "raw_total": 0.5098,
+     "compat": 47,
+     "season": 37
+    },
+    "broken": {
+     "raw_total": 0.2167,
+     "compat": 24,
+     "season": 67
+    },
+    "margin": 0.2931,
+    "pass": true
+   },
+   {
+    "id": "B-shorts-16",
+    "type": "winter_shorts",
+    "record": 40111,
+    "temp": 2,
+    "real": {
+     "raw_total": 0.2876,
+     "compat": 69,
+     "season": 0
+    },
+    "broken": {
+     "raw_total": 0.009,
+     "compat": 64,
+     "season": 0
+    },
+    "margin": 0.2786,
+    "pass": true
+   },
+   {
+    "id": "B-shorts-17",
+    "type": "winter_shorts",
+    "record": 32584,
+    "temp": 2,
+    "real": {
+     "raw_total": 0.2,
+     "compat": 52,
+     "season": 7
+    },
+    "broken": {
+     "raw_total": -0.1358,
+     "compat": 37,
+     "season": 2
+    },
+    "margin": 0.3358,
+    "pass": true
+   },
+   {
+    "id": "B-shorts-18",
+    "type": "winter_shorts",
+    "record": 147,
+    "temp": 2,
+    "real": {
+     "raw_total": 0.479,
+     "compat": 30,
+     "season": 59
+    },
+    "broken": {
+     "raw_total": 0.1355,
+     "compat": 28,
+     "season": 25
+    },
+    "margin": 0.3435,
+    "pass": true
+   },
+   {
+    "id": "B-shorts-19",
+    "type": "winter_shorts",
+    "record": 71335,
+    "temp": 2,
+    "real": {
+     "raw_total": 0.2449,
+     "compat": 63,
+     "season": 0
+    },
+    "broken": {
+     "raw_total": -0.0318,
+     "compat": 54,
+     "season": 0
+    },
+    "margin": 0.2767,
+    "pass": true
+   },
+   {
+    "id": "B-shorts-20",
+    "type": "winter_shorts",
+    "record": 23429,
+    "temp": 2,
+    "real": {
+     "raw_total": 0.2864,
+     "compat": 69,
+     "season": 3
+    },
+    "broken": {
+     "raw_total": -0.0278,
+     "compat": 57,
+     "season": 1
+    },
+    "margin": 0.3142,
+    "pass": true
+   },
+   {
+    "id": "B-shorts-21",
+    "type": "winter_shorts",
+    "record": 23988,
+    "temp": 2,
+    "real": {
+     "raw_total": 0.4711,
+     "compat": 56,
+     "season": 3
+    },
+    "broken": {
+     "raw_total": 0.1078,
+     "compat": 32,
+     "season": 0
+    },
+    "margin": 0.3633,
+    "pass": true
+   },
+   {
+    "id": "B-shorts-22",
+    "type": "winter_shorts",
+    "record": 33659,
+    "temp": 2,
+    "real": {
+     "raw_total": 0.2157,
+     "compat": 57,
+     "season": 0
+    },
+    "broken": {
+     "raw_total": -0.0464,
+     "compat": 55,
+     "season": 0
+    },
+    "margin": 0.2621,
+    "pass": true
+   },
+   {
+    "id": "B-shorts-23",
+    "type": "winter_shorts",
+    "record": 23431,
+    "temp": 2,
+    "real": {
+     "raw_total": 0.286,
+     "compat": 67,
+     "season": 3
+    },
+    "broken": {
+     "raw_total": -0.0107,
+     "compat": 58,
+     "season": 1
+    },
+    "margin": 0.2967,
+    "pass": true
+   },
+   {
+    "id": "B-shorts-24",
+    "type": "winter_shorts",
+    "record": 40112,
+    "temp": 2,
+    "real": {
+     "raw_total": 0.2777,
+     "compat": 67,
+     "season": 0
+    },
+    "broken": {
+     "raw_total": -0.0031,
+     "compat": 61,
+     "season": 0
+    },
+    "margin": 0.2808,
+    "pass": true
+   },
+   {
+    "id": "B-shorts-25",
+    "type": "winter_shorts",
+    "record": 148,
+    "temp": 2,
+    "real": {
+     "raw_total": 0.479,
+     "compat": 30,
+     "season": 59
+    },
+    "broken": {
+     "raw_total": 0.1355,
+     "compat": 28,
+     "season": 25
+    },
+    "margin": 0.3435,
+    "pass": true
+   },
+   {
+    "id": "B-sleeveless-01",
+    "type": "winter_sleeveless",
+    "record": 77894,
+    "temp": 2,
+    "real": {
+     "raw_total": 0.2196,
+     "compat": 57,
+     "season": 0
+    },
+    "broken": {
+     "raw_total": -0.2148,
+     "compat": 20,
+     "season": 0
+    },
+    "margin": 0.4344,
+    "pass": true
+   },
+   {
+    "id": "B-sleeveless-02",
+    "type": "winter_sleeveless",
+    "record": 85339,
+    "temp": 2,
+    "real": {
+     "raw_total": 0.4171,
+     "compat": 37,
+     "season": 20
+    },
+    "broken": {
+     "raw_total": 0.0831,
+     "compat": 28,
+     "season": 5
+    },
+    "margin": 0.334,
+    "pass": true
+   },
+   {
+    "id": "B-sleeveless-03",
+    "type": "winter_sleeveless",
+    "record": 30280,
+    "temp": 2,
+    "real": {
+     "raw_total": 0.8014,
+     "compat": 71,
+     "season": 99
+    },
+    "broken": {
+     "raw_total": 0.4399,
+     "compat": 61,
+     "season": 74
+    },
+    "margin": 0.3615,
+    "pass": true
+   },
+   {
+    "id": "B-sleeveless-04",
+    "type": "winter_sleeveless",
+    "record": 39142,
+    "temp": 2,
+    "real": {
+     "raw_total": 0.4594,
+     "compat": 72,
+     "season": 67
+    },
+    "broken": {
+     "raw_total": 0.1498,
+     "compat": 45,
+     "season": 97
+    },
+    "margin": 0.3096,
+    "pass": true
+   },
+   {
+    "id": "B-sleeveless-05",
+    "type": "winter_sleeveless",
+    "record": 33635,
+    "temp": 2,
+    "real": {
+     "raw_total": 0.6883,
+     "compat": 52,
+     "season": 99
+    },
+    "broken": {
+     "raw_total": 0.3453,
+     "compat": 39,
+     "season": 88
+    },
+    "margin": 0.343,
+    "pass": true
+   },
+   {
+    "id": "B-sleeveless-06",
+    "type": "winter_sleeveless",
+    "record": 38485,
+    "temp": 2,
+    "real": {
+     "raw_total": 0.1906,
+     "compat": 51,
+     "season": 0
+    },
+    "broken": {
+     "raw_total": -0.2023,
+     "compat": 22,
+     "season": 0
+    },
+    "margin": 0.3929,
+    "pass": true
+   },
+   {
+    "id": "B-sleeveless-07",
+    "type": "winter_sleeveless",
+    "record": 38606,
+    "temp": 2,
+    "real": {
+     "raw_total": 0.4092,
+     "compat": 45,
+     "season": 2
+    },
+    "broken": {
+     "raw_total": 0.1196,
+     "compat": 38,
+     "season": 0
+    },
+    "margin": 0.2896,
+    "pass": true
+   },
+   {
+    "id": "B-sleeveless-08",
+    "type": "winter_sleeveless",
+    "record": 39018,
+    "temp": 2,
+    "real": {
+     "raw_total": 0.2937,
+     "compat": 69,
+     "season": 1
+    },
+    "broken": {
+     "raw_total": -0.0736,
+     "compat": 46,
+     "season": 0
+    },
+    "margin": 0.3673,
+    "pass": true
+   },
+   {
+    "id": "B-sleeveless-09",
+    "type": "winter_sleeveless",
+    "record": 84145,
+    "temp": 2,
+    "real": {
+     "raw_total": 0.6404,
+     "compat": 52,
+     "season": 81
+    },
+    "broken": {
+     "raw_total": 0.2245,
+     "compat": 38,
+     "season": 44
+    },
+    "margin": 0.4159,
+    "pass": true
+   },
+   {
+    "id": "B-sleeveless-10",
+    "type": "winter_sleeveless",
+    "record": 23428,
+    "temp": 2,
+    "real": {
+     "raw_total": 0.2514,
+     "compat": 62,
+     "season": 3
+    },
+    "broken": {
+     "raw_total": -0.1287,
+     "compat": 37,
+     "season": 0
+    },
+    "margin": 0.3801,
+    "pass": true
+   },
+   {
+    "id": "B-sleeveless-11",
+    "type": "winter_sleeveless",
+    "record": 38452,
+    "temp": 2,
+    "real": {
+     "raw_total": 0.2075,
+     "compat": 54,
+     "season": 0
+    },
+    "broken": {
+     "raw_total": -0.2008,
+     "compat": 23,
+     "season": 0
+    },
+    "margin": 0.4083,
+    "pass": true
+   },
+   {
+    "id": "B-sleeveless-12",
+    "type": "winter_sleeveless",
+    "record": 23430,
+    "temp": 2,
+    "real": {
+     "raw_total": 0.2898,
+     "compat": 67,
+     "season": 3
+    },
+    "broken": {
+     "raw_total": -0.1145,
+     "compat": 38,
+     "season": 0
+    },
+    "margin": 0.4043,
+    "pass": true
+   },
+   {
+    "id": "B-sleeveless-13",
+    "type": "winter_sleeveless",
+    "record": 50413,
+    "temp": 2,
+    "real": {
+     "raw_total": 0.1784,
+     "compat": 50,
+     "season": 0
+    },
+    "broken": {
+     "raw_total": -0.2381,
+     "compat": 17,
+     "season": 0
+    },
+    "margin": 0.4165,
+    "pass": true
+   },
+   {
+    "id": "B-sleeveless-14",
+    "type": "winter_sleeveless",
+    "record": 33779,
+    "temp": 2,
+    "real": {
+     "raw_total": 0.5961,
+     "compat": 57,
+     "season": 51
+    },
+    "broken": {
+     "raw_total": 0.2351,
+     "compat": 51,
+     "season": 20
+    },
+    "margin": 0.361,
+    "pass": true
+   },
+   {
+    "id": "B-sleeveless-15",
+    "type": "winter_sleeveless",
+    "record": 72701,
+    "temp": 2,
+    "real": {
+     "raw_total": 0.3972,
+     "compat": 42,
+     "season": 0
+    },
+    "broken": {
+     "raw_total": 0.0963,
+     "compat": 32,
+     "season": 0
+    },
+    "margin": 0.3009,
+    "pass": true
+   },
+   {
+    "id": "B-sleeveless-16",
+    "type": "winter_sleeveless",
+    "record": 40113,
+    "temp": 2,
+    "real": {
+     "raw_total": 0.4764,
+     "compat": 29,
+     "season": 59
+    },
+    "broken": {
+     "raw_total": 0.1198,
+     "compat": 25,
+     "season": 25
+    },
+    "margin": 0.3566,
+    "pass": true
+   },
+   {
+    "id": "B-sleeveless-17",
+    "type": "winter_sleeveless",
+    "record": 26640,
+    "temp": 2,
+    "real": {
+     "raw_total": 0.8066,
+     "compat": 80,
+     "season": 81
+    },
+    "broken": {
+     "raw_total": 0.3888,
+     "compat": 66,
+     "season": 44
+    },
+    "margin": 0.4178,
+    "pass": true
+   },
+   {
+    "id": "B-sleeveless-18",
+    "type": "winter_sleeveless",
+    "record": 33880,
+    "temp": 2,
+    "real": {
+     "raw_total": 0.5196,
+     "compat": 49,
+     "season": 37
+    },
+    "broken": {
+     "raw_total": 0.1364,
+     "compat": 35,
+     "season": 12
+    },
+    "margin": 0.3832,
+    "pass": true
+   },
+   {
+    "id": "B-sleeveless-19",
+    "type": "winter_sleeveless",
+    "record": 72476,
+    "temp": 2,
+    "real": {
+     "raw_total": 0.6805,
+     "compat": 51,
+     "season": 99
+    },
+    "broken": {
+     "raw_total": 0.3532,
+     "compat": 41,
+     "season": 88
+    },
+    "margin": 0.3273,
+    "pass": true
+   },
+   {
+    "id": "B-sleeveless-20",
+    "type": "winter_sleeveless",
+    "record": 40109,
+    "temp": 2,
+    "real": {
+     "raw_total": 0.0139,
+     "compat": 14,
+     "season": 7
+    },
+    "broken": {
+     "raw_total": -0.2581,
+     "compat": 13,
+     "season": 1
+    },
+    "margin": 0.272,
+    "pass": true
+   },
+   {
+    "id": "B-sleeveless-21",
+    "type": "winter_sleeveless",
+    "record": 69739,
+    "temp": 2,
+    "real": {
+     "raw_total": 0.4479,
+     "compat": 51,
+     "season": 5
+    },
+    "broken": {
+     "raw_total": 0.1409,
+     "compat": 42,
+     "season": 1
+    },
+    "margin": 0.307,
+    "pass": true
+   },
+   {
+    "id": "B-sleeveless-22",
+    "type": "winter_sleeveless",
+    "record": 29631,
+    "temp": 2,
+    "real": {
+     "raw_total": 0.5919,
+     "compat": 57,
+     "season": 37
+    },
+    "broken": {
+     "raw_total": 0.2514,
+     "compat": 51,
+     "season": 12
+    },
+    "margin": 0.3405,
+    "pass": true
+   },
+   {
+    "id": "B-sleeveless-23",
+    "type": "winter_sleeveless",
+    "record": 40114,
+    "temp": 2,
+    "real": {
+     "raw_total": 0.7587,
+     "compat": 70,
+     "season": 88
+    },
+    "broken": {
+     "raw_total": 0.3561,
+     "compat": 58,
+     "season": 51
+    },
+    "margin": 0.4026,
+    "pass": true
+   },
+   {
+    "id": "B-sleeveless-24",
+    "type": "winter_sleeveless",
+    "record": 31823,
+    "temp": 2,
+    "real": {
+     "raw_total": 0.5163,
+     "compat": 60,
+     "season": 4
+    },
+    "broken": {
+     "raw_total": 0.2179,
+     "compat": 52,
+     "season": 1
+    },
+    "margin": 0.2984,
+    "pass": true
+   },
+   {
+    "id": "B-sleeveless-25",
+    "type": "winter_sleeveless",
+    "record": 30507,
+    "temp": 2,
+    "real": {
+     "raw_total": 0.426,
+     "compat": 41,
+     "season": 16
+    },
+    "broken": {
+     "raw_total": 0.1016,
+     "compat": 33,
+     "season": 4
+    },
+    "margin": 0.3244,
+    "pass": true
+   },
+   {
+    "id": "B-padding-01",
+    "type": "summer_padding",
+    "record": 6835,
+    "temp": 29,
+    "real": {
+     "raw_total": 0.6513,
+     "compat": 57,
+     "season": 55
+    },
+    "broken": {
+     "raw_total": 0.0964,
+     "compat": 28,
+     "season": 0
+    },
+    "margin": 0.5549,
+    "pass": true
+   },
+   {
+    "id": "B-padding-02",
+    "type": "summer_padding",
+    "record": 46533,
+    "temp": 29,
+    "real": {
+     "raw_total": 0.3145,
+     "compat": 2,
+     "season": 51
+    },
+    "broken": {
+     "raw_total": -0.0471,
+     "compat": 4,
+     "season": 0
+    },
+    "margin": 0.3616,
+    "pass": true
+   },
+   {
+    "id": "B-padding-03",
+    "type": "summer_padding",
+    "record": 88567,
+    "temp": 29,
+    "real": {
+     "raw_total": 0.5611,
+     "compat": 37,
+     "season": 63
+    },
+    "broken": {
+     "raw_total": 0.0072,
+     "compat": 11,
+     "season": 0
+    },
+    "margin": 0.5539,
+    "pass": true
+   },
+   {
+    "id": "B-padding-04",
+    "type": "summer_padding",
+    "record": 85759,
+    "temp": 29,
+    "real": {
+     "raw_total": 0.7159,
+     "compat": 52,
+     "season": 95
+    },
+    "broken": {
+     "raw_total": 0.0388,
+     "compat": 17,
+     "season": 0
+    },
+    "margin": 0.6771,
+    "pass": true
+   },
+   {
+    "id": "B-padding-05",
+    "type": "summer_padding",
+    "record": 75886,
+    "temp": 29,
+    "real": {
+     "raw_total": 0.605,
+     "compat": 32,
+     "season": 98
+    },
+    "broken": {
+     "raw_total": -0.0067,
+     "compat": 9,
+     "season": 0
+    },
+    "margin": 0.6117,
+    "pass": true
+   },
+   {
+    "id": "B-padding-06",
+    "type": "summer_padding",
+    "record": 8210,
+    "temp": 29,
+    "real": {
+     "raw_total": 0.5608,
+     "compat": 39,
+     "season": 74
+    },
+    "broken": {
+     "raw_total": -0.0254,
+     "compat": 10,
+     "season": 0
+    },
+    "margin": 0.5862,
+    "pass": true
+   },
+   {
+    "id": "B-padding-07",
+    "type": "summer_padding",
+    "record": 53377,
+    "temp": 29,
+    "real": {
+     "raw_total": 0.4976,
+     "compat": 29,
+     "season": 71
+    },
+    "broken": {
+     "raw_total": -0.0147,
+     "compat": 11,
+     "season": 0
+    },
+    "margin": 0.5123,
+    "pass": true
+   },
+   {
+    "id": "B-padding-08",
+    "type": "summer_padding",
+    "record": 77095,
+    "temp": 29,
+    "real": {
+     "raw_total": 0.5022,
+     "compat": 18,
+     "season": 88
+    },
+    "broken": {
+     "raw_total": -0.0221,
+     "compat": 9,
+     "season": 0
+    },
+    "margin": 0.5243,
+    "pass": true
+   },
+   {
+    "id": "B-padding-09",
+    "type": "summer_padding",
+    "record": 90603,
+    "temp": 29,
+    "real": {
+     "raw_total": 0.5417,
+     "compat": 25,
+     "season": 97
+    },
+    "broken": {
+     "raw_total": 0.0333,
+     "compat": 20,
+     "season": 0
+    },
+    "margin": 0.5084,
+    "pass": true
+   },
+   {
+    "id": "B-padding-10",
+    "type": "summer_padding",
+    "record": 73190,
+    "temp": 29,
+    "real": {
+     "raw_total": 0.5141,
+     "compat": 32,
+     "season": 59
+    },
+    "broken": {
+     "raw_total": 0.0032,
+     "compat": 11,
+     "season": 0
+    },
+    "margin": 0.5109,
+    "pass": true
+   },
+   {
+    "id": "B-padding-11",
+    "type": "summer_padding",
+    "record": 46252,
+    "temp": 29,
+    "real": {
+     "raw_total": 0.7581,
+     "compat": 85,
+     "season": 44
+    },
+    "broken": {
+     "raw_total": 0.0994,
+     "compat": 29,
+     "season": 0
+    },
+    "margin": 0.6587,
+    "pass": true
+   },
+   {
+    "id": "B-padding-12",
+    "type": "summer_padding",
+    "record": 78643,
+    "temp": 29,
+    "real": {
+     "raw_total": 0.2418,
+     "compat": 16,
+     "season": 93
+    },
+    "broken": {
+     "raw_total": -0.1951,
+     "compat": 26,
+     "season": 0
+    },
+    "margin": 0.4369,
+    "pass": true
+   },
+   {
+    "id": "B-padding-13",
+    "type": "summer_padding",
+    "record": 14746,
+    "temp": 29,
+    "real": {
+     "raw_total": 0.7329,
+     "compat": 61,
+     "season": 95
+    },
+    "broken": {
+     "raw_total": 0.0401,
+     "compat": 21,
+     "season": 0
+    },
+    "margin": 0.6928,
+    "pass": true
+   },
+   {
+    "id": "B-padding-14",
+    "type": "summer_padding",
+    "record": 51166,
+    "temp": 29,
+    "real": {
+     "raw_total": 0.6658,
+     "compat": 68,
+     "season": 44
+    },
+    "broken": {
+     "raw_total": 0.07,
+     "compat": 24,
+     "season": 0
+    },
+    "margin": 0.5958,
+    "pass": true
+   },
+   {
+    "id": "B-padding-15",
+    "type": "summer_padding",
+    "record": 87300,
+    "temp": 29,
+    "real": {
+     "raw_total": 0.5946,
+     "compat": 40,
+     "season": 81
+    },
+    "broken": {
+     "raw_total": 0.0219,
+     "compat": 18,
+     "season": 0
+    },
+    "margin": 0.5727,
+    "pass": true
+   },
+   {
+    "id": "B-padding-16",
+    "type": "summer_padding",
+    "record": 68755,
+    "temp": 29,
+    "real": {
+     "raw_total": 0.5866,
+     "compat": 31,
+     "season": 100
+    },
+    "broken": {
+     "raw_total": 0.0422,
+     "compat": 21,
+     "season": 0
+    },
+    "margin": 0.5444,
+    "pass": true
+   },
+   {
+    "id": "B-padding-17",
+    "type": "summer_padding",
+    "record": 78200,
+    "temp": 29,
+    "real": {
+     "raw_total": 0.5592,
+     "compat": 28,
+     "season": 78
+    },
+    "broken": {
+     "raw_total": -0.0201,
+     "compat": 5,
+     "season": 0
+    },
+    "margin": 0.5793,
+    "pass": true
+   },
+   {
+    "id": "B-padding-18",
+    "type": "summer_padding",
+    "record": 78481,
+    "temp": 29,
+    "real": {
+     "raw_total": 0.5198,
+     "compat": 46,
+     "season": 44
+    },
+    "broken": {
+     "raw_total": -0.0148,
+     "compat": 12,
+     "season": 0
+    },
+    "margin": 0.5346,
+    "pass": true
+   },
+   {
+    "id": "B-padding-19",
+    "type": "summer_padding",
+    "record": 1991,
+    "temp": 29,
+    "real": {
+     "raw_total": 0.6278,
+     "compat": 35,
+     "season": 97
+    },
+    "broken": {
+     "raw_total": -0.0028,
+     "compat": 10,
+     "season": 0
+    },
+    "margin": 0.6306,
+    "pass": true
+   },
+   {
+    "id": "B-padding-20",
+    "type": "summer_padding",
+    "record": 87945,
+    "temp": 29,
+    "real": {
+     "raw_total": 0.7162,
+     "compat": 58,
+     "season": 78
+    },
+    "broken": {
+     "raw_total": 0.0716,
+     "compat": 23,
+     "season": 0
+    },
+    "margin": 0.6446,
+    "pass": true
+   },
+   {
+    "id": "B-padding-21",
+    "type": "summer_padding",
+    "record": 13495,
+    "temp": 29,
+    "real": {
+     "raw_total": 0.6021,
+     "compat": 62,
+     "season": 44
+    },
+    "broken": {
+     "raw_total": 0.0071,
+     "compat": 16,
+     "season": 0
+    },
+    "margin": 0.595,
+    "pass": true
+   },
+   {
+    "id": "B-padding-22",
+    "type": "summer_padding",
+    "record": 8569,
+    "temp": 29,
+    "real": {
+     "raw_total": 0.6343,
+     "compat": 71,
+     "season": 44
+    },
+    "broken": {
+     "raw_total": 0.0635,
+     "compat": 26,
+     "season": 0
+    },
+    "margin": 0.5708,
+    "pass": true
+   },
+   {
+    "id": "B-padding-23",
+    "type": "summer_padding",
+    "record": 3314,
+    "temp": 29,
+    "real": {
+     "raw_total": 0.5042,
+     "compat": 44,
+     "season": 37
+    },
+    "broken": {
+     "raw_total": -0.0055,
+     "compat": 14,
+     "season": 0
+    },
+    "margin": 0.5097,
+    "pass": true
+   },
+   {
+    "id": "B-padding-24",
+    "type": "summer_padding",
+    "record": 78632,
+    "temp": 29,
+    "real": {
+     "raw_total": 0.4801,
+     "compat": 8,
+     "season": 100
+    },
+    "broken": {
+     "raw_total": 0.0373,
+     "compat": 17,
+     "season": 0
+    },
+    "margin": 0.4428,
+    "pass": true
+   },
+   {
+    "id": "B-padding-25",
+    "type": "summer_padding",
+    "record": 7717,
+    "temp": 29,
+    "real": {
+     "raw_total": 0.7785,
+     "compat": 65,
+     "season": 93
+    },
+    "broken": {
+     "raw_total": 0.1168,
+     "compat": 33,
+     "season": 0
+    },
+    "margin": 0.6617,
+    "pass": true
+   },
+   {
+    "id": "B-style-01",
+    "type": "style_clash",
+    "record": 84333,
+    "temp": 16,
+    "real": {
+     "raw_total": 0.4186,
+     "compat": 39,
+     "season": 12
+    },
+    "broken": {
+     "raw_total": 0.2399,
+     "compat": 2,
+     "season": 20
+    },
+    "margin": 0.1787,
+    "pass": true
+   },
+   {
+    "id": "B-style-02",
+    "type": "style_clash",
+    "record": 82256,
+    "temp": 16,
+    "real": {
+     "raw_total": 0.5968,
+     "compat": 76,
+     "season": 12
+    },
+    "broken": {
+     "raw_total": 0.2596,
+     "compat": 8,
+     "season": 20
+    },
+    "margin": 0.3372,
+    "pass": true
+   },
+   {
+    "id": "B-style-03",
+    "type": "style_clash",
+    "record": 28452,
+    "temp": 16,
+    "real": {
+     "raw_total": 0.3832,
+     "compat": 39,
+     "season": 0
+    },
+    "broken": {
+     "raw_total": 0.2041,
+     "compat": 3,
+     "season": 1
+    },
+    "margin": 0.1791,
+    "pass": true
+   },
+   {
+    "id": "B-style-04",
+    "type": "style_clash",
+    "record": 28649,
+    "temp": 16,
+    "real": {
+     "raw_total": 0.4871,
+     "compat": 56,
+     "season": 0
+    },
+    "broken": {
+     "raw_total": 0.2792,
+     "compat": 17,
+     "season": 0
+    },
+    "margin": 0.2079,
+    "pass": true
+   },
+   {
+    "id": "B-style-05",
+    "type": "style_clash",
+    "record": 26432,
+    "temp": 16,
+    "real": {
+     "raw_total": 0.2338,
+     "compat": 15,
+     "season": 0
+    },
+    "broken": {
+     "raw_total": 0.1774,
+     "compat": 0,
+     "season": 0
+    },
+    "margin": 0.0564,
+    "pass": true
+   },
+   {
+    "id": "B-style-06",
+    "type": "style_clash",
+    "record": 28720,
+    "temp": 27,
+    "real": {
+     "raw_total": 0.3754,
+     "compat": 33,
+     "season": 12
+    },
+    "broken": {
+     "raw_total": 0.5797,
+     "compat": 46,
+     "season": 51
+    },
+    "margin": -0.2043,
+    "pass": false
+   },
+   {
+    "id": "B-style-07",
+    "type": "style_clash",
+    "record": 26877,
+    "temp": 16,
+    "real": {
+     "raw_total": 0.2285,
+     "compat": 10,
+     "season": 2
+    },
+    "broken": {
+     "raw_total": 0.3249,
+     "compat": 25,
+     "season": 0
+    },
+    "margin": -0.0964,
+    "pass": false
+   },
+   {
+    "id": "B-style-08",
+    "type": "style_clash",
+    "record": 26325,
+    "temp": 16,
+    "real": {
+     "raw_total": 0.4494,
+     "compat": 41,
+     "season": 25
+    },
+    "broken": {
+     "raw_total": 0.2623,
+     "compat": 6,
+     "season": 20
+    },
+    "margin": 0.1871,
+    "pass": true
+   },
+   {
+    "id": "B-style-09",
+    "type": "style_clash",
+    "record": 82299,
+    "temp": 27,
+    "real": {
+     "raw_total": 0.33,
+     "compat": 4,
+     "season": 47
+    },
+    "broken": {
+     "raw_total": 0.3941,
+     "compat": 1,
+     "season": 85
+    },
+    "margin": -0.0641,
+    "pass": false
+   },
+   {
+    "id": "B-style-10",
+    "type": "style_clash",
+    "record": 84216,
+    "temp": 16,
+    "real": {
+     "raw_total": 0.5201,
+     "compat": 59,
+     "season": 1
+    },
+    "broken": {
+     "raw_total": 0.3127,
+     "compat": 26,
+     "season": 1
+    },
+    "margin": 0.2074,
+    "pass": true
+   },
+   {
+    "id": "B-style-11",
+    "type": "style_clash",
+    "record": 28598,
+    "temp": 16,
+    "real": {
+     "raw_total": 0.6201,
+     "compat": 78,
+     "season": 1
+    },
+    "broken": {
+     "raw_total": 0.1422,
+     "compat": 1,
+     "season": 0
+    },
+    "margin": 0.4779,
+    "pass": true
+   },
+   {
+    "id": "B-style-12",
+    "type": "style_clash",
+    "record": 83796,
+    "temp": 16,
+    "real": {
+     "raw_total": 0.6009,
+     "compat": 86,
+     "season": 1
+    },
+    "broken": {
+     "raw_total": 0.2066,
+     "compat": 3,
+     "season": 1
+    },
+    "margin": 0.3943,
+    "pass": true
+   },
+   {
+    "id": "B-style-13",
+    "type": "style_clash",
+    "record": 28644,
+    "temp": 16,
+    "real": {
+     "raw_total": 0.5396,
+     "compat": 65,
+     "season": 1
+    },
+    "broken": {
+     "raw_total": 0.1641,
+     "compat": 0,
+     "season": 1
+    },
+    "margin": 0.3755,
+    "pass": true
+   },
+   {
+    "id": "B-style-14",
+    "type": "style_clash",
+    "record": 84312,
+    "temp": 16,
+    "real": {
+     "raw_total": 0.6012,
+     "compat": 80,
+     "season": 12
+    },
+    "broken": {
+     "raw_total": 0.2412,
+     "compat": 2,
+     "season": 20
+    },
+    "margin": 0.36,
+    "pass": true
+   },
+   {
+    "id": "B-style-15",
+    "type": "style_clash",
+    "record": 81405,
+    "temp": 27,
+    "real": {
+     "raw_total": 0.3941,
+     "compat": 31,
+     "season": 25
+    },
+    "broken": {
+     "raw_total": 0.528,
+     "compat": 46,
+     "season": 51
+    },
+    "margin": -0.1339,
+    "pass": false
+   },
+   {
+    "id": "B-style-16",
+    "type": "style_clash",
+    "record": 27160,
+    "temp": 16,
+    "real": {
+     "raw_total": 0.5636,
+     "compat": 73,
+     "season": 1
+    },
+    "broken": {
+     "raw_total": 0.2038,
+     "compat": 3,
+     "season": 1
+    },
+    "margin": 0.3598,
+    "pass": true
+   },
+   {
+    "id": "B-style-17",
+    "type": "style_clash",
+    "record": 81532,
+    "temp": 16,
+    "real": {
+     "raw_total": 0.4063,
+     "compat": 44,
+     "season": 7
+    },
+    "broken": {
+     "raw_total": 0.2614,
+     "compat": 6,
+     "season": 25
+    },
+    "margin": 0.1449,
+    "pass": true
+   },
+   {
+    "id": "B-style-18",
+    "type": "style_clash",
+    "record": 28335,
+    "temp": 16,
+    "real": {
+     "raw_total": 0.594,
+     "compat": 77,
+     "season": 1
+    },
+    "broken": {
+     "raw_total": 0.2463,
+     "compat": 8,
+     "season": 1
+    },
+    "margin": 0.3477,
+    "pass": true
+   },
+   {
+    "id": "B-style-19",
+    "type": "style_clash",
+    "record": 83699,
+    "temp": 16,
+    "real": {
+     "raw_total": 0.4413,
+     "compat": 52,
+     "season": 0
+    },
+    "broken": {
+     "raw_total": 0.2289,
+     "compat": 9,
+     "season": 0
+    },
+    "margin": 0.2124,
+    "pass": true
+   },
+   {
+    "id": "B-style-20",
+    "type": "style_clash",
+    "record": 27863,
+    "temp": 16,
+    "real": {
+     "raw_total": 0.3686,
+     "compat": 36,
+     "season": 0
+    },
+    "broken": {
+     "raw_total": 0.1891,
+     "compat": 0,
+     "season": 0
+    },
+    "margin": 0.1795,
+    "pass": true
+   },
+   {
+    "id": "B-style-21",
+    "type": "style_clash",
+    "record": 81414,
+    "temp": 16,
+    "real": {
+     "raw_total": 0.4038,
+     "compat": 38,
+     "season": 12
+    },
+    "broken": {
+     "raw_total": 0.2554,
+     "compat": 11,
+     "season": 7
+    },
+    "margin": 0.1484,
+    "pass": true
+   },
+   {
+    "id": "B-style-22",
+    "type": "style_clash",
+    "record": 82770,
+    "temp": 16,
+    "real": {
+     "raw_total": 0.295,
+     "compat": 18,
+     "season": 12
+    },
+    "broken": {
+     "raw_total": 0.344,
+     "compat": 23,
+     "season": 20
+    },
+    "margin": -0.049,
+    "pass": false
+   },
+   {
+    "id": "B-style-23",
+    "type": "style_clash",
+    "record": 28821,
+    "temp": 16,
+    "real": {
+     "raw_total": 0.517,
+     "compat": 63,
+     "season": 0
+    },
+    "broken": {
+     "raw_total": 0.1886,
+     "compat": 0,
+     "season": 0
+    },
+    "margin": 0.3284,
+    "pass": true
+   },
+   {
+    "id": "B-style-24",
+    "type": "style_clash",
+    "record": 84184,
+    "temp": 16,
+    "real": {
+     "raw_total": 0.5456,
+     "compat": 72,
+     "season": 1
+    },
+    "broken": {
+     "raw_total": 0.2167,
+     "compat": 6,
+     "season": 1
+    },
+    "margin": 0.3289,
+    "pass": true
+   },
+   {
+    "id": "B-style-25",
+    "type": "style_clash",
+    "record": 28707,
+    "temp": 16,
+    "real": {
+     "raw_total": 0.5222,
+     "compat": 60,
+     "season": 2
+    },
+    "broken": {
+     "raw_total": 0.2134,
+     "compat": 2,
+     "season": 1
+    },
+    "margin": 0.3088,
+    "pass": true
+   }
+  ]
+ }
+}
