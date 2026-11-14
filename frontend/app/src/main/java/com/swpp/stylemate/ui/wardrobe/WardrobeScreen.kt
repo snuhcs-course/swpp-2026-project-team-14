@@ -66,6 +66,8 @@ import org.json.JSONObject
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 
+const val ANALYZE_BUTTON_TEXT = "옷장 분석"
+
 data class WardrobeItem(val id: String, val name: String, val category: String, val style: String? = null,
                         val thumbnail: ImageBitmap? = null, val imageUrl: String? = null)
 
@@ -116,6 +118,7 @@ fun WardrobeRoute(
         if (wardrobe.deletedId != null) { wardrobeModel.clearDeleted(); onDeleted() }
     }
     val externalMatch by wardrobeModel.externalMatch.collectAsStateWithLifecycle()
+    val wardrobeAnalysis by wardrobeModel.wardrobeAnalysis.collectAsStateWithLifecycle()
     var actionItemId by rememberSaveable { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) { wardrobeModel.refresh() }
     val labelsModel: GarmentLabelsViewModel = viewModel(factory = viewModelFactory {
@@ -154,6 +157,19 @@ fun WardrobeRoute(
                 WardrobeItem(record.getString("id"), attrs.getString("name"), attrs.getString("category"),
                     imageUrl = record.optString("image_url").ifBlank { null })
             },
+        )
+    }
+    if (wardrobeAnalysis.open) {
+        WardrobeAnalysisDialog(wardrobeAnalysis,
+            onRetry = wardrobeModel::analyzeWardrobe,
+            onOpenLink = { url ->
+                try { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
+                catch (_: ActivityNotFoundException) {
+                    wardrobeModel.closeWardrobeAnalysis()
+                    message = "검색 페이지를 열 수 있는 앱이 없어요."
+                }
+            },
+            onDismiss = wardrobeModel::closeWardrobeAnalysis,
         )
     }
     var savedPhoto by remember(editingId) { mutableStateOf<ImageBitmap?>(null) }
@@ -354,6 +370,7 @@ fun WardrobeRoute(
             onWornPhoto = { wornRegistration = true },
             onCapture = { wardrobeModel.clearSaveState(); takePhoto() },
             onItemClick = { actionItemId = it.id },
+            onAnalyze = wardrobeModel::analyzeWardrobe,
             onDelete = { wardrobeModel.delete(it.id) },
             deletingId = wardrobe.deletingId, deleteError = wardrobe.deleteError,
             onDeleteDismiss = wardrobeModel::clearDeleteError,
@@ -493,7 +510,8 @@ fun WardrobeScreen(items: List<WardrobeItem>, message: String?, cameraBusy: Bool
                    onItemClick: (WardrobeItem) -> Unit = {}, loading: Boolean = false, onRetry: (() -> Unit)? = null,
                    onWornPhoto: (() -> Unit)? = null,
                    onDelete: ((WardrobeItem) -> Unit)? = null, deletingId: String? = null,
-                   deleteError: String? = null, onDeleteDismiss: () -> Unit = {}) {
+                   deleteError: String? = null, onDeleteDismiss: () -> Unit = {},
+                   onAnalyze: (() -> Unit)? = null) {
     var pendingDeleteId by rememberSaveable { mutableStateOf<String?>(null) }
     val pendingDelete = items.firstOrNull { it.id == pendingDeleteId }
     LaunchedEffect(items) {
@@ -549,7 +567,12 @@ fun WardrobeScreen(items: List<WardrobeItem>, message: String?, cameraBusy: Bool
     ) { insets ->
         Column(Modifier.fillMaxSize().padding(insets).padding(horizontal = 20.dp)) {
             Spacer(Modifier.height(16.dp))
-            Text("내 옷장", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text("내 옷장", Modifier.weight(1f), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                // 옷장 전체를 보고 부족한 옷을 추천받는다 (WardrobeAnalysisDialog)
+                if (onAnalyze != null) OutlinedButton(onClick = onAnalyze, enabled = !loading && deletingId == null,
+                    shape = RoundedCornerShape(50)) { Text(ANALYZE_BUTTON_TEXT) }
+            }
             Text("총 ${items.size}벌", Modifier.padding(top = 4.dp, bottom = 8.dp),
                 style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (loading) LinearProgressIndicator(Modifier.fillMaxWidth())

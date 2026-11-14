@@ -8,6 +8,7 @@ urlpatterns = [
     path("", views.outfits_view),
     path("recommend/", views.recommend_view),
     path("match-external/", views.match_external_view),
+    path("wardrobe-gaps/", views.wardrobe_gaps_view),
     path("chat/", chat_view),
     path("chat/feedback/", views.chat_feedback_view),
     path("chat/feedback/state/", views.chat_feedback_state_view),
