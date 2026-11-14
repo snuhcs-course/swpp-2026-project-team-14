@@ -86,6 +86,18 @@ class WardrobeGapsApiTests(TestCase):
         self.assertEqual([(gap["title"], gap["attributes"]["fit"]) for gap in result["gaps"]],
                          [("그레이 오버핏 니트", "오버사이즈"), ("그레이 와이드 팬츠", "와이드")])
 
+    def test_men_are_not_recommended_skirts(self):
+        # 상의 대상이면 니트, 하의 대상이면 스커트를 원하는 예측
+        self.model.values = [("카테고리", "니트웨어"), ("카테고리", "스커트"), ("색상", "그레이"), ("핏", "노멀")]
+        self.model.slot_logprobs.return_value = {"카테고리": [3, 3, NEG, NEG], "색상": [NEG, NEG, 1, NEG],
+                                                 "핏": [NEG, NEG, NEG, 5]}
+        for gender, categories in (("female", ["니트웨어", "스커트"]), ("male", ["니트웨어"])):
+            with self.subTest(gender=gender):
+                self.user.body_profile = {"height_cm": 175, "gender": gender}
+                self.user.save()
+                result = self.get().json()
+                self.assertEqual([gap["attributes"]["category"] for gap in result["gaps"]], categories)
+
     def test_owned_kind_is_not_recommended_and_nothing_to_buy_is_reported(self):
         garment(self.user, "회색 니트", "top", "knitwear", "#808080")
         garment(self.user, "회색 바지", "bottom", "pants", "#808080")

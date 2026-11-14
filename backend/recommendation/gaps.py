@@ -7,6 +7,7 @@
 3. 이미 가진 옷과 같은 종류(`wardrobe.similar`)는 버린다: "옷장에 없는 옷"만 남긴다.
 4. 표가 MIN_VOTES 이상인 후보를 표 수 → 평균 확률 순으로 최대 MAX_GAPS개 고른다.
 5. 핏은 계정의 선호 핏 중 그 슬롯에 맞는 첫 값을 쓰고, 없으면 표를 던진 옷들이 가장 원한 핏을 쓴다.
+6. 남성이면 홈 추천과 같은 규칙(`vocab.is_unisex`)으로 여성 전용 카테고리·색상(스커트, 핑크 등)을 뺀다.
 
 화면에 보이는 "내 옷 N벌과 어울려요"의 N과 근거 옷 목록은 이 표 집계 그대로다.
 """
@@ -29,7 +30,7 @@ from recommendation.external import (
     search_title,
     search_url,
 )
-from recommendation.vocab import BOTTOM_FITS, CATEGORIES, COLORS, UPPER_FITS
+from recommendation.vocab import BOTTOM_FITS, CATEGORIES, COLORS, UPPER_FITS, is_unisex
 from recommendation.wardrobe import similar
 
 MIN_GARMENTS = 4  # 상의·하의·아우터 합계가 이보다 적으면 분석하지 않는다
@@ -117,6 +118,11 @@ def preferred_fit(slot: str, preferred_fits: list[str] | None) -> str | None:
     return next((mapping[fit] for fit in preferred_fits or [] if fit in mapping), None)
 
 
+def _wearable(candidate: _Candidate, male: bool) -> bool:
+    """남성에게는 홈 추천과 같은 규칙으로 여성 전용 카테고리·색상을 추천하지 않는다."""
+    return not male or is_unisex(candidate.slot, {"카테고리": candidate.category, "색상": candidate.color})
+
+
 def _serialize(candidate: _Candidate, preferred_fits: list[str] | None) -> dict:
     fit = preferred_fit(candidate.slot, preferred_fits) or candidate.fit()
     title = search_title(candidate.category, candidate.color, fit)
@@ -147,7 +153,7 @@ def enough_garments(wardrobe: list[Item]) -> bool:
 
 
 def wardrobe_gaps(wardrobe: list[Item], model, preferred_styles: list[str] | None = None,
-                  preferred_fits: list[str] | None = None) -> dict:
+                  preferred_fits: list[str] | None = None, male: bool = False) -> dict:
     """옷장 전체를 보고 부족한 옷을 최대 MAX_GAPS개 추천한다.
 
     반환값: {"status": ok|enough|too_few, "garment_count": 분석한 옷 수, "slot_counts": {...}, "gaps": [...]}
@@ -173,7 +179,7 @@ def wardrobe_gaps(wardrobe: list[Item], model, preferred_styles: list[str] | Non
 
     # (슬롯, 카테고리, 색상)으로 묶었으므로 남은 후보끼리는 서로 similar()하지 않다
     gaps = [candidate for candidate in candidates.values()
-            if len(candidate.votes) >= MIN_VOTES and not _owned(candidate, garments)]
+            if len(candidate.votes) >= MIN_VOTES and not _owned(candidate, garments) and _wearable(candidate, male)]
     gaps.sort(key=lambda c: (-len(c.votes), -c.mean_share, c.slot, c.category, c.color))
     chosen = [_serialize(candidate, preferred_fits) for candidate in gaps[:MAX_GAPS]]
     return {"status": STATUS_OK if chosen else STATUS_ENOUGH, **summary, "gaps": chosen}

@@ -279,6 +279,14 @@ def match_external_view(request):
     return _json({"source_garment_id": str(garment.id), **result})
 
 
+def _is_male(user) -> bool:
+    """계정 체형 프로필의 성별. 프로필이 없거나 형식이 맞지 않으면 남성으로 보지 않는다."""
+    try:
+        return body_or_unknown(None, {"body": user.body_profile}).male
+    except ValueError:
+        return False
+
+
 @require_GET
 @require_auth
 def wardrobe_gaps_view(request):
@@ -299,7 +307,8 @@ def wardrobe_gaps_view(request):
         logger.exception("Wardrobe gap model loading failed")
         return _error("WARDROBE_GAPS_UNAVAILABLE", 503, "옷장을 분석하지 못했어요. 잠시 후 다시 시도해 주세요.")
     try:
-        result = wardrobe_gaps(wardrobe, masked, request.user.preferred_styles, request.user.preferred_fits)
+        result = wardrobe_gaps(wardrobe, masked, request.user.preferred_styles, request.user.preferred_fits,
+                               male=_is_male(request.user))
     except ExternalModelUnavailable:
         logger.exception("Wardrobe gap prediction unavailable")
         return _error("WARDROBE_GAPS_UNAVAILABLE", 503, "옷장을 분석하지 못했어요. 잠시 후 다시 시도해 주세요.")

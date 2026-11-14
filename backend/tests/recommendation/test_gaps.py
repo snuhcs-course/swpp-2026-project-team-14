@@ -16,7 +16,7 @@ VALUES = [
     ("", "<pad>"),
     ("카테고리", "셔츠"), ("카테고리", "니트웨어"), ("카테고리", "티셔츠"),
     ("카테고리", "팬츠"), ("카테고리", "스커트"), ("카테고리", "청바지"),
-    ("색상", "블랙"), ("색상", "화이트"), ("색상", "그레이"), ("색상", "베이지"), ("색상", "네이비"), ("색상", "블루"),
+    ("색상", "블랙"), ("색상", "화이트"), ("색상", "그레이"), ("색상", "베이지"), ("색상", "네이비"), ("색상", "블루"), ("색상", "핑크"),
     ("핏", "노멀"), ("핏", "루즈"), ("핏", "와이드"), ("핏", "오버사이즈"),
 ]
 
@@ -253,6 +253,22 @@ def test_saved_preferred_fit_decides_the_fit_of_a_bottom(preferred, fit):
     gap = wardrobe_gaps(wardrobe, model, preferred_fits=preferred)["gaps"][0]
     assert gap["attributes"]["category"] == "팬츠"
     assert gap["attributes"]["fit"] == fit
+
+
+@pytest.mark.parametrize("male", [False, True])
+def test_men_are_not_recommended_women_only_categories_or_colours(male):
+    # 상의 2벌은 네이비 스커트·팬츠를, 하의 2벌은 핑크·그레이 니트를 원한다 (모두 2표)
+    wardrobe = [item("tee", "상의", "티셔츠", "블랙"), item("shirt", "상의", "셔츠", "화이트"),
+                item("jeans", "하의", "청바지", "블루"), item("pants", "하의", "팬츠", "그레이")]
+    for_bottom = logprobs({"스커트": 0.0, "팬츠": -0.1}, {"네이비": 0.0})
+    for_top = logprobs({"니트웨어": 0.0}, {"핑크": 0.0, "그레이": -0.1})
+    model = ModelDouble({"블랙": for_bottom, "화이트": for_bottom, "블루": for_top, "그레이": for_top})
+    kinds = [(gap["attributes"]["category"], gap["attributes"]["color"])
+             for gap in wardrobe_gaps(wardrobe, model, male=male)["gaps"]]
+    if male:  # 홈 추천과 같은 규칙: 스커트와 핑크는 빼고 남녀 공용만
+        assert kinds == [("니트웨어", "그레이"), ("팬츠", "네이비")]
+    else:
+        assert kinds == [("니트웨어", "핑크"), ("스커트", "네이비"), ("니트웨어", "그레이")]
 
 
 def test_shared_search_helpers_keep_the_matching_keyword_rules():
