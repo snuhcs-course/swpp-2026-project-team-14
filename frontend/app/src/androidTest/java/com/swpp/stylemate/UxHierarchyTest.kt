@@ -66,6 +66,33 @@ class UxHierarchyTest {
         compose.runOnIdle { assertEquals(listOf("o2"), removed) }
     }
 
+    @Test fun photoPreviewStaysInlineAndKeepsTheMessageFocused() {
+        var state by mutableStateOf(ChatState(source = outfit, current = outfit))
+        compose.activityRule.scenario.onActivity {
+            it.enableStyleMateEdgeToEdge()
+            it.window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+        }
+        compose.setContent { StyleMateTheme { Box(Modifier.width(360.dp).fillMaxHeight()) {
+            val keyboard = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
+            DisposableEffect(Unit) { onDispose { keyboard?.hide() } }
+            ChatScreen(state, {}, { state = state.copy(draft = it) }, { id -> state = state.copy(lockedIds =
+                if (id in state.lockedIds) state.lockedIds - id else state.lockedIds + id) }, {}, {}, {}, {}, {}, {}, {},
+                photo = { _, m -> Box(m.background(Color(0xFFE8E5E0))) })
+        } } }
+        compose.onNode(hasSetTextAction()).performTextInput("하의만 바꿔줘")
+        // Match MainActivity's window behavior rather than panning a height-constrained test box.
+        compose.waitUntil(5_000) { compose.onAllNodesWithText("코디 사진 보기").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("코디 사진 보기").performClick()
+        compose.onNode(hasSetTextAction()).assertIsFocused().assertTextContains("하의만 바꿔줘")
+        compose.onNodeWithContentDescription("오늘의 코디로 돌아가기").assertIsDisplayed()
+        compose.onAllNodesWithTag("chat-keep-a").assertCountEquals(1)
+        compose.onNodeWithText("그대로 입기").assertDoesNotExist()
+        compose.onNodeWithTag("chat-keep-a").assertIsOff().performClick().assertIsOn()
+        capture("chat-keyboard-preview")
+        compose.onNodeWithText("코디 사진 접기").performClick()
+        compose.onNode(hasSetTextAction()).assertIsFocused()
+    }
+
     @Test fun homeRatingStaysBelowThePhotoAndReasonsKeepTheirHierarchy() {
         show { HomeScreen(HomeState(outfits = listOf(outfit)), {}, {}, {}, {}, {}, {}, {},
             photo = { _, m -> Box(m.background(Color(0xFFE8E5E0))) }) }

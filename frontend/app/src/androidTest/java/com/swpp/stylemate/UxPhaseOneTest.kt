@@ -167,18 +167,20 @@ class UxPhaseOneTest {
         model.open(outfit, BodyProfile(AnalysisInput(170, 65, Gender.MALE), emptyList(), PreferredFit.REGULAR, emptyList()), null)
         compose.setContent { StyleMateTheme { ChatRoute(model) } }
         compose.onNodeWithContentDescription("메시지 보내기").assertIsNotEnabled()
-        compose.onNodeWithText("조건 선택").performClick()
+        compose.onNodeWithContentDescription("수정 조건 선택").performClick()
         compose.onNodeWithText("밝기").assertIsDisplayed()
-        compose.onNodeWithText("밝게").performClick()
-        compose.onNode(hasText("어둡게") and hasClickAction()).performClick()
+        compose.onNodeWithTag("chat-direction-brighter").performClick()
+        compose.onNodeWithTag("chat-direction-darker").performClick()
         compose.runOnIdle { assertEquals(setOf("darker"), model.state.value.directions) }
-        compose.onNode(hasText("밝게") and hasClickAction()).assertIsNotSelected()
-        compose.onNode(hasText("어둡게") and hasClickAction()).assertIsSelected()
+        compose.onNodeWithTag("chat-direction-brighter").assertIsNotSelected()
+        compose.onNodeWithTag("chat-direction-darker").assertIsSelected()
         compose.onNodeWithText("단정하게").performScrollTo().performClick()
         compose.runOnIdle { assertEquals(setOf("darker", "formal"), model.state.value.directions) }
-        compose.onNodeWithText("선택한 조건으로 수정").assertIsEnabled()
-        compose.onNode(hasText("어둡게") and hasClickAction()).performScrollTo().performClick()
+        compose.onNodeWithText("선택한 조건으로 수정").assertDoesNotExist()
+        compose.onNodeWithTag("chat-direction-darker").performScrollTo().performClick()
         compose.runOnIdle { assertEquals(setOf("formal"), model.state.value.directions); assertTrue(model.state.value.turns.isEmpty()) }
+        compose.onNodeWithText("닫기").performClick()
+        compose.onNodeWithContentDescription("메시지 보내기").assertIsEnabled()
     }
 
     @Test fun profileOnlyOffersImportForAnEligibleSignedInUser() {
