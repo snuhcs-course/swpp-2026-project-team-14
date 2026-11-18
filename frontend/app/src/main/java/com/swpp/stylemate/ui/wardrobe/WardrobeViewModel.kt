@@ -6,6 +6,7 @@ import com.swpp.stylemate.data.LocalUserStore
 import com.swpp.stylemate.data.AccountAccess
 import com.swpp.stylemate.data.recommendation.ExternalRecommendation
 import com.swpp.stylemate.data.recommendation.OutfitRepository
+import com.swpp.stylemate.data.recommendation.WardrobeAnalysis
 
 import android.graphics.BitmapFactory
 import android.os.Build
@@ -33,12 +34,19 @@ data class WardrobeState(val records: List<JSONObject> = emptyList(), val catalo
 data class ExternalMatchState(val garmentId: String? = null, val loading: Boolean = false,
                               val result: ExternalRecommendation? = null, val error: String? = null)
 
+/** 옷장 분석 팝업 상태. open이 false면 팝업을 띄우지 않는다. */
+data class WardrobeAnalysisState(val open: Boolean = false, val loading: Boolean = false,
+                                 val result: WardrobeAnalysis? = null, val error: String? = null)
+
 class WardrobeViewModel(private val store: LocalUserStore, private val account: AccountAccess) : ViewModel() {
     private val mutableState = MutableStateFlow(WardrobeState())
     val state = mutableState.asStateFlow()
     private val mutableExternalMatch = MutableStateFlow(ExternalMatchState())
     val externalMatch = mutableExternalMatch.asStateFlow()
     private var externalMatchJob: Job? = null
+    private val mutableAnalysis = MutableStateFlow(WardrobeAnalysisState())
+    val wardrobeAnalysis = mutableAnalysis.asStateFlow()
+    private var analysisJob: Job? = null
     init { refresh() }
 
     fun refresh() {
@@ -118,6 +126,29 @@ class WardrobeViewModel(private val store: LocalUserStore, private val account: 
         externalMatchJob?.cancel()
         externalMatchJob = null
         mutableExternalMatch.value = ExternalMatchState()
+    }
+
+    /** 옷장 전체 분석. 다시 누르거나 다시 시도하면 이전 요청을 취소하고 새로 요청한다. */
+    fun analyzeWardrobe() {
+        analysisJob?.cancel()
+        mutableAnalysis.value = WardrobeAnalysisState(open = true, loading = true)
+        analysisJob = viewModelScope.launch {
+            try {
+                val result = OutfitRepository(account).wardrobeGaps()
+                mutableAnalysis.value = WardrobeAnalysisState(open = true, result = result)
+            } catch (error: CancellationException) { throw error }
+            catch (error: Exception) {
+                mutableAnalysis.value = WardrobeAnalysisState(open = true,
+                    error = error.message ?: "옷장을 분석하지 못했어요. 다시 시도해 주세요.")
+            }
+        }
+    }
+
+    /** 팝업을 닫으면 진행 중인 요청을 취소해, 늦게 온 응답이 팝업을 다시 열지 않게 한다. */
+    fun closeWardrobeAnalysis() {
+        analysisJob?.cancel()
+        analysisJob = null
+        mutableAnalysis.value = WardrobeAnalysisState()
     }
 
 }
