@@ -51,6 +51,13 @@ import com.swpp.stylemate.data.recommendation.LocalTasteStore
 import com.swpp.stylemate.ui.LocalAccountAccess
 import com.swpp.stylemate.data.LocalUserStore
 import com.swpp.stylemate.data.tryon.FittingRepository
+import com.swpp.stylemate.data.tryon.FittingWork
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.repeatOnLifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import com.swpp.stylemate.ui.tryon.FittingDialog
 import com.swpp.stylemate.ui.tryon.FittingPreview
 import com.swpp.stylemate.ui.tryon.LocalFittingNotificationKey
@@ -61,25 +68,28 @@ fun HomeRoute(profile: BodyProfile?, onSetupProfile: () -> Unit, onOpenWardrobe:
               onChat: (Outfit, Weather?) -> Unit, wardrobeRevision: Int = 0, style: StyleProfile = StyleProfile()) {
     val context = LocalContext.current.applicationContext
     val account = checkNotNull(LocalAccountAccess.current)
+    val store = remember(account) { LocalUserStore.forContext(context, account.userId) }
     val fitting = remember(account) { FittingRepository(LocalUserStore.forContext(context, account.userId), account) }
     var selected by remember { mutableStateOf<Outfit?>(null) }
     val notification = LocalFittingNotificationKey.current
     LaunchedEffect(notification) { if (notification != null) selected = null }
     val model: HomeViewModel = viewModel(factory = viewModelFactory {
-        initializer { HomeViewModel(OutfitRepository(account), LocalTasteStore(context, account.userId)) }
+        initializer {
+            HomeViewModel(OutfitRepository(account), LocalTasteStore(context, account.userId)).apply {
+                // Restore the region before the first weather/recommendation request.
+                setRegion(HomeRegion.load(store), reload = false)
+            }
+        }
     })
     val state by model.state.collectAsStateWithLifecycle()
     // Without a body profile (analysis skipped in onboarding) outfits still come, from the preferred fit and styles.
     val body = remember(profile, style) { BodyProfileJson.request(profile, style) }
     // Today's outfit-related events from the phone's own calendars, once connected in My Profile.
-    val store = remember(account) { LocalUserStore.forContext(context, account.userId) }
     var events by remember { mutableStateOf<List<CalendarEvent>>(emptyList()) }
     LaunchedEffect(account.userId) {
         events = if (CalendarConnection.enabled(context, store)) EventOccasion.relevant(DeviceCalendar.today(context)) else emptyList()
         model.setOccasion(EventOccasion.of(events))
     }
-    // The saved region is set before the first load, so the first weather is already the right place.
-    remember(account.userId) { model.setRegion(HomeRegion.load(store), reload = false) }
     LaunchedEffect(body?.toString(), wardrobeRevision) { model.ensureLoaded(body, wardrobeRevision) }
     HomeScreen(
         state = state,

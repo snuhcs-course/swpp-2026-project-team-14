@@ -79,17 +79,26 @@ class HomeScreenTest {
         compose.onNodeWithText("사진:베이지 니트").assertIsDisplayed()
         compose.onNodeWithText("사진:검정 슬랙스").assertIsDisplayed()
         compose.onNodeWithText("사진:재킷").assertIsDisplayed()
-        compose.onNodeWithText("1 / 2").assertIsDisplayed()
+        compose.onNodeWithText("1 / 2").assertDoesNotExist()
         compose.onNodeWithText("가상 피팅").assertIsDisplayed().performClick()
-        compose.onNodeWithText("코디북에 저장").assertIsDisplayed()
+        compose.onNodeWithContentDescription("코디북에 저장").assertIsDisplayed()
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "저장 안 됨")).performClick()
         compose.onNodeWithText("저장됨").assertIsDisplayed()
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "저장됨"))
         compose.onNodeWithText("대화로 수정하기").assertIsDisplayed().performClick()
+        val fittingBounds = compose.onNodeWithText("가상 피팅").fetchSemanticsNode().boundsInRoot
+        val chatBounds = compose.onNodeWithText("대화로 수정하기").fetchSemanticsNode().boundsInRoot
+        assertEquals(fittingBounds.top, chatBounds.top, 1f)
         compose.onNodeWithText("내 옷장에서 100% 구성").assertDoesNotExist()
         compose.onNodeWithText("어울림 78점").assertDoesNotExist()
         compose.onNodeWithText("좋아요").performScrollTo().performClick()
         compose.onNodeWithText("별로예요").performClick()
+        val saveBounds = compose.onNodeWithContentDescription("코디북에 저장됨").fetchSemanticsNode().boundsInRoot
+        val likeBounds = compose.onNodeWithText("좋아요").fetchSemanticsNode().boundsInRoot
+        val dislikeBounds = compose.onNodeWithText("별로예요").fetchSemanticsNode().boundsInRoot
+        assertEquals(saveBounds.top, likeBounds.top, 1f)
+        assertEquals(likeBounds.top, dislikeBounds.top, 1f)
+        assertEquals(saveBounds.width, likeBounds.width, 2f)
         compose.runOnIdle { assertEquals(listOf("fitting:o1", "save:o1", "chat:o1", "like", "dislike"), events) }
     }
 
@@ -97,15 +106,15 @@ class HomeScreenTest {
         val events = mutableListOf<String>()
         show(HomeState(outfits = listOf(outfit, outfit.copy(id = "o2", key = "k2"), outfit.copy(id = "o3", key = "k3"))), events)
         compose.onNodeWithContentDescription("코디 1 / 3").performTouchInput { swipeLeft() }
-        compose.onNodeWithText("2 / 3").assertIsDisplayed()
+        compose.onNodeWithText("2 / 3").assertDoesNotExist()
         compose.onNodeWithContentDescription("코디 2 선택").assertIsSelected()
         compose.onNodeWithText("가상 피팅").performClick()
-        compose.onNodeWithText("코디북에 저장").performClick()
+        compose.onNodeWithContentDescription("코디북에 저장").performClick()
         compose.onNodeWithContentDescription("코디 1 선택").performClick()
-        compose.onNodeWithText("1 / 3").assertIsDisplayed()
+        compose.onNodeWithText("1 / 3").assertDoesNotExist()
         // Jump over an intermediate page: it must not reset the selection during animation.
         compose.onNodeWithContentDescription("코디 3 선택").performClick()
-        compose.onNodeWithText("3 / 3").assertIsDisplayed()
+        compose.onNodeWithText("3 / 3").assertDoesNotExist()
         compose.onNodeWithContentDescription("코디 3 선택").assertIsSelected()
         compose.onNodeWithText("대화로 수정하기").performClick()
         compose.runOnIdle { assertEquals(listOf("fitting:o2", "save:o2", "chat:o3"), events) }
@@ -119,7 +128,7 @@ class HomeScreenTest {
         )
         show(HomeState(outfits = listOf(outfit.copy(reasons = reasons)), notes = listOf("날씨에 맞는 옷이 부족해요.")))
         compose.onNodeWithText("이 코디를 고른 이유").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithContentDescription("추천 별점 4.0점 (5점 만점)").assertIsDisplayed().assertHasNoClickAction()
+        compose.onNodeWithContentDescription("추천 별점 4.5점 (5점 만점)").performScrollTo().assertIsDisplayed().assertHasNoClickAction()
         reasons.forEach { compose.onNodeWithText(it.text).performScrollTo().assertIsDisplayed() }
         reasons.forEach { compose.onNodeWithText(it.sub).assertDoesNotExist() }
         compose.onNodeWithText("코디 정보").assertDoesNotExist()
@@ -157,10 +166,10 @@ class HomeScreenTest {
             moveBy(Offset(-width * 0.6f, 0f), delayMillis = 64)
         }
         compose.onNodeWithText("가상 피팅").assertIsNotEnabled()
-        compose.onNodeWithText("코디북에 저장").assertIsNotEnabled()
+        compose.onNodeWithContentDescription("코디북에 저장").assertIsNotEnabled()
         compose.onNodeWithText("대화로 수정하기").assertIsNotEnabled()
         compose.onNodeWithContentDescription("코디 1 / 2").performTouchInput { up() }
-        compose.onNodeWithText("2 / 2").assertIsDisplayed()
+        compose.onNodeWithText("2 / 2").assertDoesNotExist()
         compose.onNodeWithText("가상 피팅").assertIsEnabled().performClick()
         compose.runOnIdle { assertEquals(listOf("fitting:o2"), events) }
     }
@@ -186,13 +195,13 @@ class HomeScreenTest {
             }
         }
         compose.onNodeWithContentDescription("코디 2 선택").performClick()
-        compose.onNodeWithText("2 / 2").assertIsDisplayed()
+        compose.onNodeWithText("2 / 2").assertDoesNotExist()
         compose.runOnIdle { state = HomeState(errorCode = HomeState.NO_PROFILE) }
         compose.onNodeWithText("체형 분석하기").assertIsDisplayed()
         compose.runOnIdle { state = HomeState(outfits = listOf(outfit.copy(id = "new1"), outfit.copy(id = "new2", key = "new2"))) }
-        compose.onNodeWithText("1 / 2").assertIsDisplayed()
+        compose.onNodeWithText("1 / 2").assertDoesNotExist()
         compose.onNodeWithContentDescription("코디 1 선택").assertIsSelected()
-        compose.onNodeWithText("코디북에 저장").assertIsEnabled().performClick()
+        compose.onNodeWithContentDescription("코디북에 저장").assertIsEnabled().performClick()
         compose.runOnIdle { assertEquals(listOf("new1"), saved) }
     }
 
@@ -200,7 +209,7 @@ class HomeScreenTest {
         show(HomeState(loading = true, outfits = listOf(outfit, outfit.copy(id = "o2", key = "k2"))))
         compose.onNodeWithText("새로 추천").assertIsNotEnabled()
         compose.onNodeWithText("가상 피팅").assertIsNotEnabled()
-        compose.onNodeWithText("코디북에 저장").assertIsNotEnabled()
+        compose.onNodeWithContentDescription("코디북에 저장").assertIsNotEnabled()
         compose.onNodeWithContentDescription("코디 2 선택").assertIsNotEnabled()
     }
 
