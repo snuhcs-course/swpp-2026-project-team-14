@@ -40,6 +40,8 @@ MySQL에 사용할 DB와 계정을 준비한 뒤 `.env`를 입력하고 다음 �
 .\.venv\Scripts\python.exe manage.py migrate
 ```
 
+기존 DB에서 채팅 코디의 평가 조회가 500을 반환하면 `manage.py showmigrations outfits`로 적용 상태를 확인한다. `outfits.0004_feedbacktaste_feedbackrecord`는 평가·취향 기록 테이블 두 개를 추가한다. 미적용 상태라면 `manage.py migrate outfits 0004_feedbacktaste_feedbackrecord`를 실행한다. 기존 계정·옷·코디 데이터는 삭제하거나 초기화하지 않는다.
+
 옷장 마이그레이션은 새 DB 기준의 `0001_initial`과 추천 라벨 컬럼을 더하는 `0002_garment_labels`, 코디 테이블은 `outfits.0001_initial`이다. 이전 0001~0004를 적용한 테스트 DB에는 그대로 적용하지 않으며, 해당 DB를 초기화한 뒤 실행한다. 이후 스키마 변경은 새 마이그레이션으로 관리한다.
 
 | 저장 대상 | 기본 경로 | 경로 변경 환경변수 |

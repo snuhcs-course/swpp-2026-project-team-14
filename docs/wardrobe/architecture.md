@@ -9,12 +9,13 @@ swpp-2026-project-team-14/
 |   |   |-- MainActivity.kt                       # 공통 앱 진입·밝은 테마 시스템 바 아이콘 적용
 |   |   |-- data/
 |   |   |   |-- BodyMeasurements.kt              # 체형 치수·선호 정보 모델
-|   |   |   |-- LocalUserStore.kt                # 계정별 프로필·옷장 캐시·추천 취향·온보딩 초안
+|   |   |   |-- LocalUserStore.kt                # 계정별 프로필·옷장 캐시·추천 취향·온보딩 초안·피팅 결과 파일 확인
 |   |   |   |-- BodyProfileStore.kt              # 체형·독립 스타일·온보딩 상태 저장 연결
 |   |   |   |-- AuthRepository.kt                # 인증·프로필·세션·만료·응답 제한·계정 목록 분할 조회
 |   |   |   |-- GuestImportRepository.kt         # 가져오기 후보·충돌 조회·지문·계정별 재시도 처리
 |   |   |   |-- AuthSessionStore.kt              # Keystore AES-GCM 암호화 세션 보관·백업 제외
 |   |   |   |-- recommendation/                 # 계정 코디·외부 검색 API·계정별 취향 저장
+|   |   |   |-- tryon/FittingRepository.kt      # 인증 피팅·계정별 결과 저장/존재 확인·알림 설정
 |   |   |   |-- RemoteBodyAnalyzer.kt            # 체형 분석 API 호출
 |   |   |   `-- wardrobe/
 |   |   |       |-- WardrobeRepository.kt         # 계정 서버 옷 조회·저장·캐시·인증 사진 요청
@@ -27,13 +28,21 @@ swpp-2026-project-team-14/
 |   |   |       `-- CaptureType.kt                # 측정 종류 → 하의 세부 종류 기본값
 |   |   `-- ui/
 |   |       |-- StyleMateApp.kt                   # 로그인 필수 진입·계정별 탭/편집 상태 보존·수동 가져오기·만료 시 상태 폐기
-|   |       |-- components/ScreenComponents.kt   # 체형·옷장 공통 상단바 교체 슬롯·하단 버튼·섹션 제목
-|   |       |-- components/StarRating.kt         # 서버 값을 반별 단위·5개 별로 표시하는 읽기 전용 추천 별점
+|   |       |-- components/ScreenComponents.kt   # 탭/하위 제목 위계·뒤로가기 정렬·상단바 교체 슬롯·하단 버튼·섹션 제목
+|   |       |-- components/StarRating.kt         # 서버 보정 점수를 0.5–5개·반별 단위로 표시하는 읽기 전용 추천 별점
+|   |       |-- components/OutfitFeedbackButtons.kt # 홈·대화 공용 저장·엄지 평가 보조 버튼·선택/해제 표시
+|   |       |-- components/OutfitBoard.kt         # 홈·코디북 공용 코디 사진 배치·아우터 옆 상/하의 구성
 |   |       |-- theme/Theme.kt                    # 앱 전체 흑백 팔레트·글자 위계·모서리·시스템 바 스타일
 |   |       |-- home/
 |   |       |   |-- HomeScreen.kt                # 압축 코디판·좌우 비교·행동/피드백 버튼·별점/추천 문장·재시도
-|   |       |   |-- HomeRoute.kt                 # 선택 코디의 채팅/피팅 연결·계정 저장소·의상 삭제 후 갱신
-|   |       |   `-- HomeViewModel.kt             # 추천 상태·요청 없는 코디 선택·저장/피드백·삭제 시 무효화
+|   |       |   |-- HomeRoute.kt                 # 선택 코디의 채팅/피팅 연결·계정별 코디북 피팅 상태·의상 삭제 후 갱신
+|   |       |   |-- CodiBookScreen.kt            # 슬라이드/목록·코디별 복귀 위치·피팅 상태·저장 해제 확인/재시도
+|   |       |   `-- HomeViewModel.kt             # 홈 추천/저장/평가·코디북 조회/중복 해제 방지·오류 분리·삭제 시 무효화
+|   |       |-- chat/
+|   |       |   |-- ChatScreen.kt                # 단일 코디 미리보기·조건 요약/전송·대화·실패 요청 복구
+|   |       |   |-- ChatComponents.kt            # 조건·사진 기록 시트·작은 그대로 입기 칩·코디 하단 저장·분리된 평가
+|   |       |   |-- ChatPresentation.kt          # 실제 변경 전후 이름·추가/제외 표시·코디 버전 목록
+|   |       |   `-- ChatViewModel.kt             # 미해결 요청 문맥·코디별 대화·잠금·재시도·실패 초안 복구·저장/평가
 |   |       |-- profile/
 |   |       |   |-- AuthScreens.kt               # 로그인 진입 화면·회원가입·비밀번호 표시·오류 안내
 |   |       |   |-- AuthViewModel.kt             # 중복 제출 방지·시도 제한 대기·포그라운드 검증·만료 안내
@@ -43,17 +52,26 @@ swpp-2026-project-team-14/
 |   |       |   |-- OnboardingScreen.kt          # 공통 상단바·8페이지·등록 개수 현황·선택적 분석·계정 옷 등록 반복·완료
 |   |       |   |-- PhotoInputScreen.kt          # 사진 박스 선택·교체·가이드 왕복·키보드 대응·기본 정보 입력
 |   |       |   |-- ReviewScreen.kt              # 체형 결과·치수 수정·온보딩 확인과 재분석 저장
-|   |       |   `-- MyProfileScreen.kt           # 핏·무드 즉시 저장·컬러 편집·계정 카드/로그아웃·기존 데이터 가져오기·체형 상세
+|   |       |   |-- MyProfileScreen.kt           # MY 목록·읽기용 체형 상세·통합 취향·계정 설정/로그아웃 확인·조건부 가져오기
+|   |       |   |-- ProfilePreferenceEditor.kt   # 통합 핏/무드·29색 팔레트·명시적 저장·변경 버리기 확인·실패 재시도
+|   |       |   |-- ProfilePreferencesViewModel.kt # 계정별 취향 초안·핏/무드 동시 저장·대표 핏 순서·탭 이동 중 요청 유지
+|   |       |   |-- BodySummaryFigure.kt          # 온보딩 예시 모델에 실제 저장된 분석 치수 위치 표시
+|   |       |   `-- ConnectionsSection.kt        # MY 안의 캘린더 스위치·권한 거부 복구·연결 상태 갱신
 |   |       `-- wardrobe/
-|   |           |-- WardrobeScreen.kt            # 옷장 목록·등록 방식 선택 시트·옷 선택 메뉴·온보딩/사진/편집 연결
-|   |           |-- WardrobeCollection.kt        # 옷장 메인 전용 헤더·반응형 사진 그리드·필터·상태·등록 행동 표시
+|   |           |-- WardrobeScreen.kt            # 목록/상세/추천 페이지·복귀 상태·등록/편집·삭제 연결
+|   |           |-- WardrobeCollection.kt        # 옷장 헤더·반응형 사진 그리드·필터 아래 분석 진입·상태·등록 행동 표시
 |   |           |-- WardrobeStyle.kt             # 공통 팔레트를 참조하는 옷장 배치·모서리 별칭
-|   |           |-- WardrobeViewModel.kt         # 계정 목록·저장·삭제/중복 방지·외부 추천 상태
-|   |           |-- ExternalRecommendationDialog.kt # 선택 옷 메뉴·추천 속성·무신사 바로가기 팝업
+|   |           |-- WardrobeViewModel.kt         # 계정 목록·저장·삭제/중복 방지·외부 추천·옷장 분석 상태
+|   |           |-- WardrobeAnalysisDialog.kt    # 부족한 옷 분석 결과·내 옷 근거·외부 검색·재시도
+|   |           |-- ExternalRecommendationDialog.kt # 이전 팝업 구성(앱의 실제 진입 흐름에서는 미사용)
+|   |           |-- GarmentLayout.kt             # 상세/수정 공용 상단바·사진/출처 안내·정보 구획·항목 정렬
+|   |           |-- GarmentDetailScreen.kt       # 읽기용 옷 상세·수정/삭제 메뉴·하단 추천·선택 옷 삭제 확인
+|   |           |-- GarmentMatchScreen.kt        # 내 옷 사진 추천·상세 연결·별도 무신사 검색
 |   |           |-- GarmentAnalysisViewModel.kt  # 분석 진행·실패·초안 복원·사진 변경 시 이전 분석 취소
 |   |           |-- WardrobeColorField.kt       # 색상표·사진 좌표 변환·픽셀 색상 선택
+|   |           |-- GarmentChoiceField.kt        # 기본 속성/라벨 공용 선택 시트·단일/다중 선택·저장 코드 유지
 |   |           |-- GarmentEditor.kt             # 특징·실측·메모 편집·초안 복원·버리기 확인·하단 고정 저장
-|   |           |-- GarmentEstimates.kt          # 실측과 분리한 읽기 전용 추정값·범위 표시·편집 후 무효화
+|   |           |-- GarmentEstimates.kt          # 실측과 분리한 단일 추정 범위·대표값 대체·편집 후 무효화
 |   |           |-- WornBatchRegistration.kt     # 사진 업로드 영역·후보 선택·원본 분석/생성·기존 편집과 승인 저장 연결
 |   |           |-- WornBatchReviewScreen.kt     # 서비스/미리보기 공용 카드·전체 선택·원본 비교·접이식 치수·처리 스피너
 |   |           |-- WornBatchViewModel.kt        # 원본 분석 멱등성·순차 생성·부분 실패/제외·저장·취소 후 상태 보호
@@ -70,26 +88,44 @@ swpp-2026-project-team-14/
 |   |   `-- java/com/swpp/stylemate/ui/wardrobe/
 |   |       |-- WornPreviewActivity.kt            # 개인 앱 파일의 기존 이미지·예시 값으로 UI만 체험, 네트워크/저장 없음
 |   |       `-- WornPreviewReviewScreen.kt        # 서비스 공용 확인 화면에 로컬 이미지·예시 상태/설정만 제공
+|   |-- main/res/drawable/ic_star_outline.xml     # 미저장 코디용 실제 윤곽선 별
+|   |-- main/res/drawable-nodpi/body_capture_guide.png # 생성한 성인 정면/측면 촬영 자세 예시
+|   |-- main/res/drawable/ic_clothing.xml         # 이모지 대신 쓰는 의류 벡터
+|   |-- main/res/drawable/ic_lock_open.xml        # 변경 가능한 옷 표시
+|   |-- main/res/drawable/ic_lock_closed.xml      # 계속 입을 옷 표시
+|   |-- main/res/drawable/ic_history.xml          # 수정 버전 기록 진입
+|   |-- main/res/drawable/ic_view_slides.xml      # 코디북 슬라이드 보기
+|   |-- main/res/drawable/ic_view_list.xml        # 코디북 목록 보기
+|   |-- main/res/drawable/ic_chat_conditions.xml # 입력창 안 수정 조건 필터 아이콘
 |   |-- main/res/drawable/ic_remove_garment.xml # 카드 우상단 의상 삭제 아이콘
 |   |-- main/res/values/themes.xml             # 흰 시작 화면·검정 기본 강조·밝은 시스템 바 기본 리소스
 |   |-- main/res/values-v27/themes.xml         # API 27 이상에서 어두운 내비게이션 바 아이콘 적용
 |   |-- main/res/drawable-nodpi/                # 생성한 온보딩 환영·6종 무드 사진
 |   |-- test/java/com/swpp/stylemate/             # 인증·만료·계정 캐시·추천 요청·재시도 검사
-|   |   |-- ui/components/StarRatingTest.kt        # 기존 반별 표시 규칙·경계값·문자열 검사
+|   |   |-- data/ExistingOnboardingTest.kt        # 기존 취향 계정 건너뛰기·신규 기본값·진행 중 초안 유지
+|   |   |-- ui/components/StarRatingTest.kt        # develop 별점 범위·반별 경계값·문자열 검사
+|   |   |-- chat/ChatPresentationTest.kt          # 변경 없음·실제 교체·아우터 제외 표시 검사
+|   |   |-- chat/ChatViewModelTest.kt             # 대화 상태·재시도·잠금·실패 요청의 세션별 복구 검사
 |   |   |-- profile/
 |   |   |   |-- AuthViewModelTest.kt              # 세션 복원·가입/로그인·제한시간·중복 차단·만료·로그아웃 검사
+|   |   |   |-- ProfilePreferencesViewModelTest.kt # 대표 핏 보존·저장 실패/중복 차단·컬러 초기화 회귀 검사
 |   |   |   |-- GuestImportViewModelTest.kt       # 동의·충돌 결정·부분 실패·중복 저장 방지·재시도·취소 검사
 |   |   |   `-- ProfileViewModelTestSupport.kt    # 제어 가능한 Main·메모리 세션·HTTP 응답 게이트·가져오기 대역
 |   |   `-- wardrobe/
 |   |       |-- WardrobeViewModelTest.kt          # 목록·저장 명세의 캐시/오류/재시도·빈 목록·중복 요청 차단 검사
+|   |       |-- GarmentEstimatePresentationTest.kt # 중복 대표값 생략·잘못된 범위/값의 표시 대체 검사
 |   |       |-- GarmentAnalysisViewModelTest.kt   # 분석·초안 복원·재시도·사진 변경과 화면 종료 시 취소 검사
 |   |       |-- WornBatchViewModelTest.kt         # 후보 선택·순차 생성·부분 실패·비용 중복 방지·편집/저장·초기화 검사
 |   |       |-- WornGenerationViewModelTest.kt    # 생성 조회/재생성·이미지 승인/거절·작업 취소·임시 사진 수명 검사
 |   |       `-- WardrobeModelTestSupport.kt       # 가상 시간·ViewModel 정리·사진/생성 요청 대역
 |   `-- androidTest/java/com/swpp/stylemate/      # 로그인 차단·로그아웃/만료·계정 온보딩·옷장·측정점 검사
+|       |-- UxHierarchyTest.kt                   # 하단 4:6·250개 코디북·입력 포커스·단일 스피너·공용 선택·가이드·별점 배치
 |       |-- UxPhaseOneTest.kt                    # 탭/계정별 초안·저장/버리기·사진 취소/가이드·채팅 조건·가져오기 표시 회귀
 |       |-- GlobalThemeTest.kt                   # 실제 앱 탭·로그인/가입·편집/체형/채팅/피팅의 이전 테마 색상 검출·화면 촬영
 |       |-- home/HomeScreenTest.kt               # 작은 화면의 행동 노출·선택 상태·별점/추천 문장·실패 재시도 검사
+|       |-- chat/ChatScreenTest.kt               # 조건/단일 전송·중복 미리보기 제거·복구 확인·오류 범위·작은 화면 검사
+|       |-- chat/OutfitActionLayoutTest.kt       # 사진 아래 별 저장 전환·48dp 자물쇠·저장 중/실패·큰 글자 검사
+|       |-- wardrobe/GarmentDetailFlowTest.kt     # 관리 메뉴·상세/수정 배치·추정/출처 안내·내 옷/쇼핑 분리·신발 필터
 |       |-- wardrobe/WornRegistrationTest.kt      # 자동 후보 체크·슬라이더 없음·일괄 저장 조건·원본 크롭·기존 진입 검사
 |       |-- wardrobe/WardrobeRedesignTest.kt       # 동일 샘플 전후 촬영·로딩/오류 구분·필터 접근성·작은 화면/큰 글자 검사
 |       `-- wardrobe/WornPreviewTest.kt           # 계정/서버 없이 선택·실패 이유·등록 모의 동작·확대 원본 비교 검사
@@ -119,6 +155,8 @@ swpp-2026-project-team-14/
 |   |   |-- outfits/
 |   |   |   |-- models.py                        # 코디·소유 사용자·옷 연결 저장
 |   |   |   |-- views.py                         # 인증된 계정 코디 분할 조회·옷 UUID 검증·추천/피드백 API
+|   |   |   |-- chat.py                          # 계정 옷·확인된 소매/핏 전달·고정 조건의 채팅 미리보기
+|   |   |   |-- test_chat.py                     # 미해결 질문 문맥·실제 등록 옷 선택·고정·저장 없는 미리보기 검사
 |   |   |   |-- migrations/0002_outfit_user.py    # 코디 소유 사용자 외래 키 추가
 |   |   |   `-- migrations/0003_alter_outfit_user.py # 무소유 코디 정리·소유자 필수 전환
 |   |   `-- wardrobe/
@@ -152,6 +190,8 @@ swpp-2026-project-team-14/
 |   |       |-- migrations/0005_garment_image_source.py # 기존 사진 보존·착용 사진 출처 구분
 |   |       `-- test_landmarks.py                # 원본 사진의 자동 측정점·좌표 변환 검사
 |   |-- recommendation/                          # 저장 라벨 → 모델 입력, 계절·색·모델 어휘 정규화
+|   |   |-- search.py                            # 기존 추천 계산·고정 옷/명시적으로 추가한 종류의 결과 포함
+|   |   |-- chat_intent.py                       # 문맥을 이용한 짧은 답변·등록 옷 선택의 구조화 해석
 |   |   `-- external.py                          # 단일 옷의 상대 속성 예측·외부 검색 URL 생성
 |   |-- body_analysis/                           # MediaPipe 체형 분석
 |   |-- wardrobe/garment-landmarks/              # HRNet 가중치·메타데이터·라이선스
