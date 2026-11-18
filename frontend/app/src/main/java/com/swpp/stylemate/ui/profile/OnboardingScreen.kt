@@ -64,7 +64,8 @@ fun OnboardingHeader(step: Int, onBack: () -> Unit, onSkip: () -> Unit, enabled:
         Column(Modifier.padding(horizontal = 20.dp).padding(bottom = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("STEP ${step.toString().padStart(2, '0')} / 08", style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
-            LinearProgressIndicator(progress = { step / 8f }, modifier = Modifier.fillMaxWidth())
+            LinearProgressIndicator(progress = { step / 8f }, modifier = Modifier.fillMaxWidth(),
+                drawStopIndicator = {})
         }
     }
 }
@@ -80,15 +81,28 @@ fun OnboardingRoute(model: BodyProfileViewModel, accountStore: LocalUserStore? =
     var records by remember { mutableStateOf(emptyList<JSONObject>()) }
     var loadError by remember { mutableStateOf<String?>(null) }
     var refresh by remember { mutableIntStateOf(0) }
+    var checkingExistingAccount by remember { mutableStateOf(progress.step == 1) }
     LaunchedEffect(progress.step, refresh) {
-        if (progress.step in setOf(6, 8)) {
+        if (progress.step in setOf(1, 6, 8)) {
             try {
                 val rows = WardrobeRepository.json("/api/wardrobe/items/", store = store, account = account).getJSONArray("items")
                 records = (0 until rows.length()).map { rows.getJSONObject(it) }; loadError = null
+                if (progress.step == 1 && records.isNotEmpty()) model.skipSetup()
             }
             catch (cancelled: CancellationException) { throw cancelled }
             catch (_: Exception) { loadError = "옷장을 불러오지 못했어요." }
+            finally { if (progress.step == 1) checkingExistingAccount = false }
         }
+    }
+    if (progress.step == 1 && (checkingExistingAccount || loadError != null)) {
+        ScreenScaffold("StyleMate", null, false, {}) { padding ->
+            Column(Modifier.fillMaxSize().padding(padding).padding(24.dp),
+                verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
+                if (checkingExistingAccount) { CircularProgressIndicator(); Text("계정 정보를 확인하고 있어요.") }
+                else { Text(loadError.orEmpty()); TextButton(onClick = { checkingExistingAccount = true; refresh++ }) { Text("다시 확인") } }
+            }
+        }
+        return
     }
     val step = progress.step
     val chosenFits = remember(progress.draft) {
@@ -194,10 +208,10 @@ fun OnboardingRoute(model: BodyProfileViewModel, accountStore: LocalUserStore? =
                     }
                     6 -> {
                         OnboardingTitle("자주 입는 옷부터 담아볼까요?")
-                        Text("상의 2벌 · 하의 2벌 · 신발 1켤레를 권장해요.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("상의와 하의를 2벌씩 등록하면 코디를 비교하기 좋아요.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                         OnboardingCard {
                             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                                listOf(Triple("top", "상의", 2), Triple("bottom", "하의", 2), Triple("shoes", "신발", 1)).forEachIndexed { index, (category, label, target) ->
+                                listOf(Triple("top", "상의", 2), Triple("bottom", "하의", 2), Triple("outerwear", "아우터", 1)).forEachIndexed { index, (category, label, target) ->
                                     if (index > 0) VerticalDivider(Modifier.height(20.dp), color = MaterialTheme.colorScheme.outlineVariant)
                                     Text("$label ${records.count { it.getJSONObject("attributes").optString("category") == category }}/$target",
                                         Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center, maxLines = 1)
@@ -205,31 +219,34 @@ fun OnboardingRoute(model: BodyProfileViewModel, accountStore: LocalUserStore? =
                             }
                         }
                         loadError?.let { Text(it, color = MaterialTheme.colorScheme.error); TextButton(onClick = { refresh++ }) { Text("다시 불러오기") } }
-                        for ((category, label) in listOf("top" to "상의 추가", "bottom" to "하의 추가", "shoes" to "신발 추가")) {
+                        for ((category, label) in listOf("top" to "상의 추가", "bottom" to "하의 추가", "outerwear" to "아우터 추가")) {
                             OutlinedButton(onClick = { model.startOnboardingGarment(category) }, modifier = Modifier.fillMaxWidth()) { Text("+ $label") }
                         }
                         GarmentSummary(records, store) { row -> model.startOnboardingGarment(row.getJSONObject("attributes").getString("category"), row.getString("id")) }
                     }
                     8 -> {
-                        Surface(color = MaterialTheme.colorScheme.secondaryContainer, shape = MaterialTheme.shapes.large, modifier = Modifier.size(72.dp).align(Alignment.CenterHorizontally)) {
-                            Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.padding(20.dp), tint = MaterialTheme.colorScheme.primary)
+                        Column(Modifier.fillMaxWidth().padding(vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Icon(Icons.Filled.Check, null, Modifier.size(32.dp))
+                            OnboardingTitle("이제 내 옷으로 시작해요")
+                            Text("취향은 MY에서, 등록한 옷은 옷장에서 바꿀 수 있어요.",
+                                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                        OnboardingTitle("설정을 마쳤어요")
                         OnboardingCard {
-                            Text("나의 스타일", fontWeight = FontWeight.Bold)
+                            Text("선택한 취향", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                             Text(app.style.preferredFits.joinToString(" · ") { ONBOARDING_FITS[it] ?: it })
-                            if (app.style.preferredStyles.isNotEmpty()) Text(app.style.preferredStyles.joinToString(" · ") { ONBOARDING_MOODS[it] ?: it })
+                            Text(app.style.preferredStyles.joinToString(" · ") { ONBOARDING_MOODS[it] ?: it }.ifBlank { "분위기는 나중에 골라도 괜찮아요." },
+                                style = MaterialTheme.typography.bodyMedium)
+                            HorizontalDivider()
+                            Text("등록한 옷 ${records.size}벌", style = MaterialTheme.typography.bodyMedium)
+                            Text(if (app.profile != null) "체형 정보 저장 완료" else "체형 분석은 나중에 이어서 할 수 있어요.",
+                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                        Text("등록한 옷 ${records.size}개", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                         loadError?.let { Text(it, color = MaterialTheme.colorScheme.error); TextButton(onClick = { refresh++ }) { Text("다시 불러오기") } }
-                        GarmentSummary(records, store)
-                        Text("입력한 정보는 내 계정에 저장됐어요.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        if (app.profile == null) Text("맞춤 코디 추천을 받으려면 체형 분석이 필요해요. 홈에서 이어서 할 수 있어요.",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
                         if (records.none { it.getJSONObject("attributes").optString("category") == "top" } ||
                             records.none { it.getJSONObject("attributes").optString("category") == "bottom" }) {
-                            Text("코디에 사용할 상의와 하의를 옷장에 등록해 주세요.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("상의와 하의를 등록하면 바로 코디를 추천받을 수 있어요.", style = MaterialTheme.typography.bodyMedium)
                         }
+
                     }
                 }
                 Spacer(Modifier.height(4.dp))

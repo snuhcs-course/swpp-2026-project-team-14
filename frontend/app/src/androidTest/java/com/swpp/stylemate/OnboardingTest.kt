@@ -67,6 +67,7 @@ class OnboardingTest {
             key(generation) { OnboardingRoute(current, store) }
         } } }
         compose.onNodeWithText("이미 계정이 있나요? 로그인").assertDoesNotExist()
+        compose.waitUntil(5000) { compose.onAllNodesWithText("시작하기").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("시작하기").performClick()
         compose.onNodeWithText("와이드").performClick()
         compose.onNodeWithText("다음").performClick()
@@ -92,7 +93,7 @@ class OnboardingTest {
         compose.onNodeWithText("건너뛰기").performClick()
         compose.waitUntil(5_000) { current.onboarding.value.step == 8 }
         compose.onNodeWithText("첫 코디 보러 가기").assertDoesNotExist()
-        compose.onNodeWithText("맞춤 코디 추천을 받으려면 체형 분석이 필요해요.", substring = true).performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("체형 분석은 나중에 이어서 할 수 있어요.").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("홈으로 가기").performClick()
         compose.runOnIdle { assertTrue(store.onboarding().completed); assertNull(current.app.value.profile) }
     }

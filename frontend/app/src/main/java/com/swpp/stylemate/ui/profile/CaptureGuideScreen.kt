@@ -66,16 +66,14 @@ fun CaptureGuideScreen(onStart: () -> Unit, onSkip: () -> Unit, returnToInput: B
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(16.dp))
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(MaterialTheme.shapes.medium)
-                    .background(MaterialTheme.colorScheme.surfaceContainer)
-                    .padding(vertical = 20.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-            ) {
-                PoseIllustration("정면", side = false)
-                PoseIllustration("측면", side = true)
+            androidx.compose.foundation.Image(
+                androidx.compose.ui.res.painterResource(com.swpp.stylemate.R.drawable.body_capture_guide),
+                "촬영 자세 예시: 정면은 팔을 몸에서 살짝 떼고, 측면은 똑바로 서서 전신을 촬영해 주세요.",
+                Modifier.fillMaxWidth().clip(MaterialTheme.shapes.medium),
+                contentScale = androidx.compose.ui.layout.ContentScale.Fit)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceAround) {
+                Text("정면", style = MaterialTheme.typography.labelLarge)
+                Text("측면", style = MaterialTheme.typography.labelLarge)
             }
             Spacer(Modifier.height(20.dp))
             CAPTURE_TIPS.forEach { tip ->
@@ -119,37 +117,6 @@ fun PrivacyNote() {
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-    }
-}
-
-/** Simple A-pose figure so users see the expected posture without a photo. */
-@Composable
-private fun PoseIllustration(label: String, side: Boolean) {
-    val color = MaterialTheme.colorScheme.primary
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Canvas(Modifier.size(width = 90.dp, height = 150.dp)) {
-            val w = size.width
-            val h = size.height
-            val stroke = 5.dp.toPx()
-            val cx = w / 2
-            drawCircle(color, radius = h * 0.07f, center = Offset(cx, h * 0.09f))
-            val neck = Offset(cx, h * 0.17f)
-            val hip = Offset(cx, h * 0.55f)
-            fun line(a: Offset, b: Offset) = drawLine(color, a, b, stroke, StrokeCap.Round)
-            line(neck, hip)
-            if (side) {
-                line(Offset(cx, h * 0.22f), Offset(cx + w * 0.05f, h * 0.52f))
-                line(hip, Offset(cx, h * 0.97f))
-            } else {
-                line(Offset(cx, h * 0.22f), Offset(cx - w * 0.32f, h * 0.52f))
-                line(Offset(cx, h * 0.22f), Offset(cx + w * 0.32f, h * 0.52f))
-                line(hip, Offset(cx - w * 0.16f, h * 0.97f))
-                line(hip, Offset(cx + w * 0.16f, h * 0.97f))
-            }
-            drawLine(Color.LightGray, Offset(0f, h), Offset(w, h), 2.dp.toPx())
-        }
-        Spacer(Modifier.height(8.dp))
-        Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
     }
 }
 

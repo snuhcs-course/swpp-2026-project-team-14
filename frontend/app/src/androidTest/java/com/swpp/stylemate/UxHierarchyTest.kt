@@ -131,6 +131,15 @@ class UxHierarchyTest {
         capture("single-loading")
     }
 
+    @Test fun captureGuideUsesFullBodyImagesAndReturnsToTheInput() {
+        show { PhotoInputScreen(SetupState(heightText = "170"), {}, { _, _ -> }, {}, {}, {}, {}, {}) }
+        compose.onNodeWithText("촬영 예시").performClick()
+        compose.onNodeWithContentDescription("촬영 자세 예시:", substring = true).assertIsDisplayed()
+        capture("capture-guide")
+        compose.onNodeWithText("사진 입력으로 돌아가기").performClick()
+        compose.onNodeWithText("키 (cm) *").performScrollTo().assertTextContains("170")
+    }
+
     @Test fun homeRatingStaysBelowThePhotoAndReasonsKeepTheirHierarchy() {
         show { HomeScreen(HomeState(outfits = listOf(outfit)), {}, {}, {}, {}, {}, {}, {},
             photo = { _, m -> Box(m.background(Color(0xFFE8E5E0))) }) }

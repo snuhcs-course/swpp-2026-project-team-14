@@ -36,6 +36,8 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -52,6 +54,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -68,6 +71,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -123,10 +128,15 @@ fun PhotoInputScreen(
                 .padding(horizontal = 20.dp),
         ) {
             state.errorMessage?.let { WarningBanner(it) }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically) {
-                SectionTitle("전신 사진", "정면 · 측면")
-                TextButton(onClick = { guideVisible = true }) { Text("촬영 예시") }
+            Row(Modifier.fillMaxWidth().padding(top = 20.dp, bottom = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                val hintColor = MaterialTheme.colorScheme.onSurfaceVariant
+                Text(androidx.compose.ui.text.buildAnnotatedString {
+                    withStyle(androidx.compose.ui.text.SpanStyle(fontWeight = FontWeight.Bold)) { append("전신 사진") }
+                    withStyle(androidx.compose.ui.text.SpanStyle(fontSize = 12.sp, color = hintColor)) { append("  정면 · 측면") }
+                }, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
+                OutlinedButton(onClick = { guideVisible = true }, shape = MaterialTheme.shapes.medium,
+                    contentPadding = PaddingValues(horizontal = 10.dp), modifier = Modifier.heightIn(min = 48.dp)) { Text("촬영 예시") }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 PhotoSlotCard(
@@ -279,7 +289,7 @@ private fun ClothingTip() {
             .background(MaterialTheme.colorScheme.surfaceContainer)
             .padding(horizontal = 16.dp, vertical = 12.dp),
     ) {
-        Text("👕", style = MaterialTheme.typography.titleMedium)
+        Icon(androidx.compose.ui.res.painterResource(com.swpp.stylemate.R.drawable.ic_clothing), null, Modifier.size(20.dp))
         Spacer(Modifier.width(12.dp))
         Text(
             "속옷이나 몸에 딱 붙는 옷을 입고 찍어야 가장 정확해요. 헐렁한 옷은 자동으로 감지해서 알려드려요.",
