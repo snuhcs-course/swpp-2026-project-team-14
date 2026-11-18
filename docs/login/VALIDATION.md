@@ -235,3 +235,11 @@ UI 회귀는 `UxPhaseOneTest`, `OnboardingTest`, `AuthenticationFlowTest`, `Phot
 - 홈 지역 복원을 ViewModel 생성 시 초기화하도록 옮겨 첫 날씨 조회 전에 적용되는 순서를 유지했다. 기존 `RememberReturnType` 오류는 해결됐고 최종 `lintDebug`는 오류 0개·경고 39개·힌트 1개다. 과거 절의 린트 실패 기록은 당시 결과로 남긴다.
 - 사용자 요청으로 문서용 스크린샷 파일과 이미지 링크를 모두 제거했다. 앱에서 사용하는 촬영 가이드 리소스는 기능 자산으로 유지한다. 공통 디자인·구조·검증 설명과 문서 링크·공백 검사는 유지한다.
 - 체형 분석 엔진·환경 복구, 실제 AI 사진 판정·유료 생성·실기기 AR 및 전체 TalkBack 동작은 이번 커밋 검증에서 수행하지 않았다. CI는 푸시한 최종 커밋 기준으로 별도 확인한다.
+
+## 2026-11-19 PR #82 피팅 CI 선택자 수정
+
+- 제공된 CI 로그에서 앱·검사 APK 빌드는 성공했으나 피팅 검사 39개 중 3개가 제거된 `닫기` 텍스트를 찾다가 실패했다. 현재 피팅 화면의 종료 행동은 공통 헤더의 `뒤로` 화살표다.
+- `PhotoFittingTest`의 종료 선택자 3곳을 `뒤로` 접근성 설명으로 바꾸고 화면 표시 후 누르도록 했다. 알림 ON/OFF·권한 허용/거부·다른 코디 및 재진입 후 설정 유지 검사는 유지했으며 앱 동작이나 CI의 검사 범위는 변경하지 않았다.
+- 로컬 API 37 에뮬레이터에서 CI와 같은 `-PandroidTestCoverage` 설정으로 앱·검사 APK를 빌드하고, `PhotoFittingTest,FittingWorkerTest,FittingFlowTest`의 기기 검사 39개를 실행해 실패·오류·건너뜀 0개를 확인했다. CI에서 실패했던 3개 각각의 통과도 XML 결과로 확인했다.
+- `createDebugAndroidTestCoverageReport createAggregatedCoverageReport` 성공. 통합 보고서 생성 과정의 JVM 검사 375개도 실패·오류·건너뜀 없이 통과했으며 기기·통합 HTML 보고서가 생성되었다. 빌드 출력·프로젝트 캐시는 `/private/tmp/stylemate-fitting-ci-*`로 분리했고, 테스트를 위해 허용한 에뮬레이터의 알림 권한은 실행 전 거부 상태로 복구했다.
+- 합성 이미지·가짜 계정·대체 서버 응답을 사용했다. 실제 AI·유료 생성·서버 DB 변경은 수행하지 않았으며, GitHub CI의 API 35/x86_64 재실행과 실기기는 이번 확인 범위에 포함하지 않았다.

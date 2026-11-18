@@ -127,7 +127,7 @@ class PhotoFittingTest {
                 !runBlocking { FittingRepository(LocalUserStore.inDirectory(directory, ACCOUNT_ID), account).notificationSettings().enabled }
             }
             bell.assertIsOff()
-            compose.onNodeWithText("닫기").performClick()
+            compose.onNodeWithContentDescription("뒤로").assertIsDisplayed().performClick()
             compose.onNodeWithText("다른 코디 피팅").performClick()
             compose.onNodeWithText("내 갤러리에서\n사진 고르기").assertIsDisplayed()
             bell.assertIsOff().performClick()
@@ -135,7 +135,7 @@ class PhotoFittingTest {
                 runBlocking { FittingRepository(LocalUserStore.inDirectory(directory, ACCOUNT_ID), account).notificationSettings().enabled }
             }
             bell.assertIsOn()
-            compose.onNodeWithText("닫기").performClick()
+            compose.onNodeWithContentDescription("뒤로").assertIsDisplayed().performClick()
             compose.onNodeWithText("첫 코디 피팅").performClick()
             compose.onNodeWithText("내 갤러리에서\n사진 고르기").assertIsDisplayed()
             bell.assertIsOn()
@@ -243,7 +243,7 @@ class PhotoFittingTest {
             }
             val bell = compose.onNodeWithContentDescription("피팅 완료 알림")
             if (grant) bell.assertIsOn() else bell.assertIsOff()
-            compose.onNodeWithText("닫기").performClick()
+            compose.onNodeWithContentDescription("뒤로").assertIsDisplayed().performClick()
             compose.onNodeWithText("다른 피팅 권한 확인").performClick()
             compose.onNodeWithText("내 갤러리에서\n사진 고르기").assertIsDisplayed()
             if (grant) bell.assertIsOn() else bell.assertIsOff()
