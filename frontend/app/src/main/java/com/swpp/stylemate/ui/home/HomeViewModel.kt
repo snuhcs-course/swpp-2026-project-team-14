@@ -186,22 +186,26 @@ class HomeViewModel(private val repository: OutfitRepository, private val taste:
 }
 
 /** 코디북: saved outfits. */
-data class CodiBookState(val loading: Boolean = false, val outfits: List<Outfit> = emptyList(), val error: String? = null)
+data class CodiBookState(val loading: Boolean = false, val outfits: List<Outfit> = emptyList(), val error: String? = null,
+    val removingId: String? = null, val removeErrorId: String? = null, val removeError: String? = null)
 
 class CodiBookViewModel(private val repository: OutfitRepository) : ViewModel() {
     private val mutableState = MutableStateFlow(CodiBookState())
     val state = mutableState.asStateFlow()
     private var loadJob: Job? = null
+    private var removeJob: Job? = null
     private var wardrobeRevision = 0
 
     fun invalidateWardrobe(revision: Int) {
         if (wardrobeRevision == revision) return
         wardrobeRevision = revision
         loadJob?.cancel()
+        removeJob?.cancel()
         mutableState.value = CodiBookState()
     }
 
     fun load() {
+        if (mutableState.value.removingId != null) return
         loadJob?.cancel()
         mutableState.value = mutableState.value.copy(loading = true, error = null)
         loadJob = viewModelScope.launch {
@@ -216,15 +220,26 @@ class CodiBookViewModel(private val repository: OutfitRepository) : ViewModel() 
     }
 
     fun remove(outfit: Outfit) {
-        viewModelScope.launch {
+        if (mutableState.value.removingId != null || mutableState.value.outfits.none { it.id == outfit.id }) return
+        // A refresh started before removal must not put the removed outfit back into the list.
+        loadJob?.cancel()
+        mutableState.value = mutableState.value.copy(loading = false, removingId = outfit.id,
+            removeError = null, removeErrorId = null)
+        removeJob = viewModelScope.launch {
             try {
                 repository.setSaved(outfit.id, false)
-                mutableState.value = mutableState.value.copy(outfits = mutableState.value.outfits.filter { it.id != outfit.id })
+                mutableState.value = mutableState.value.copy(removingId = null,
+                    outfits = mutableState.value.outfits.filter { it.id != outfit.id })
             } catch (e: CancellationException) {
                 throw e
             } catch (e: OutfitApiException) {
-                mutableState.value = mutableState.value.copy(error = e.message)
+                mutableState.value = mutableState.value.copy(removingId = null,
+                    removeErrorId = outfit.id, removeError = e.message)
             }
         }
+    }
+
+    fun clearRemoveError() {
+        mutableState.value = mutableState.value.copy(removeError = null, removeErrorId = null)
     }
 }

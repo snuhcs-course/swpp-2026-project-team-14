@@ -163,6 +163,34 @@ fun CodiBookRoute(modifier: Modifier = Modifier, wardrobeRevision: Int = 0, prof
     })
     val state by model.state.collectAsStateWithLifecycle()
     LaunchedEffect(wardrobeRevision) { model.invalidateWardrobe(wardrobeRevision); model.load() }
-    CodiBookScreen(state, onRemove = model::remove, onRetry = model::load, modifier = modifier, onTryOn = { selected = it })
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    val work = remember(context) { FittingWork(context) }
+    var fittingStatuses by remember(account.userId) { mutableStateOf<Map<String, CodiBookFittingStatus>>(emptyMap()) }
+    LaunchedEffect(fitting, state.outfits, selected, lifecycle) {
+        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            do {
+                val statuses = buildMap {
+                    for (outfit in state.outfits) {
+                        try {
+                            val task = work.state(fitting.taskKey(outfit))?.takeIf { it.optString("owner") == account.userId }
+                            val source = fitting.latestSource(outfit)
+                            put(outfit.id, when {
+                                task?.optString("state") in listOf("queued", "running") -> CodiBookFittingStatus.GENERATING
+                                task?.optString("state") == "failed" -> CodiBookFittingStatus.FAILED
+                                source != null && fitting.hasResult(outfit, source) -> CodiBookFittingStatus.READY
+                                else -> CodiBookFittingStatus.NONE
+                            })
+                        } catch (error: CancellationException) { throw error }
+                        catch (_: Exception) { /* Leave unknown local state unlabelled; opening fitting can retry. */ }
+                    }
+                }
+                fittingStatuses = statuses
+                if (statuses.values.none { it == CodiBookFittingStatus.GENERATING }) break
+                delay(1_500)
+            } while (isActive)
+        }
+    }
+    CodiBookScreen(state, onRemove = model::remove, onRetry = model::load, modifier = modifier,
+        onTryOn = { selected = it }, fittingStatuses = fittingStatuses, onClearRemoveError = model::clearRemoveError)
     selected?.let { FittingDialog(it, fitting, account, onClose = { selected = null }, profile = profile) }
 }

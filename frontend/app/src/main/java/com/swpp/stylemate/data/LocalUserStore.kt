@@ -209,6 +209,9 @@ class LocalUserStore(private val directory: File) {
     fun fittingResult(key: String): ByteArray? = synchronized(lock) {
         fittingFile(key).takeIf { it.isFile }?.readBytes()
     }
+    fun hasFittingResult(key: String): Boolean = synchronized(lock) {
+        fittingFile(key).let { it.isFile && it.length() > 0 }
+    }
     fun saveFittingResult(key: String, image: ByteArray) = synchronized(lock) {
         require(image.isNotEmpty())
         write(fittingFile(key), image)

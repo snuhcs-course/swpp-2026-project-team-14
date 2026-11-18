@@ -44,6 +44,28 @@ class UxHierarchyTest {
         }
     }
 
+    @Test fun aLargeCodiBookUsesBoundedControlsAndConfirmsStarRemoval() {
+        val removed = mutableListOf<String>()
+        val rows = (1..250).map { outfit.copy(id = "o$it", key = "k$it", name = "저장 코디 $it") }
+        show { CodiBookScreen(CodiBookState(outfits = rows), { removed += it.id }, {}, photo = { _, m -> Box(m.background(Color(0xFFE8E5E0))) }) }
+        compose.onNodeWithText("슬라이드").assertDoesNotExist()
+        compose.onNodeWithContentDescription("목록 보기").assertIsDisplayed()
+        compose.onNodeWithText("1 / 250").assertIsDisplayed()
+        compose.onNodeWithContentDescription("다음 코디").performClick()
+        compose.onNodeWithText("2 / 250").assertIsDisplayed()
+        capture("codibook")
+        compose.onNodeWithContentDescription("목록 보기").performClick().assertIsSelected()
+        compose.onNodeWithContentDescription("저장 코디 2 크게 보기").performClick()
+        compose.onNodeWithContentDescription("슬라이드 보기").assertIsSelected()
+        compose.onNodeWithText("2 / 250").assertIsDisplayed()
+        compose.onNodeWithContentDescription("코디북에서 빼기").performClick()
+        compose.onNodeWithText("취소").performClick()
+        compose.runOnIdle { assertTrue(removed.isEmpty()) }
+        compose.onNodeWithContentDescription("코디북에서 빼기").performClick()
+        compose.onNodeWithText("빼기").performClick()
+        compose.runOnIdle { assertEquals(listOf("o2"), removed) }
+    }
+
     @Test fun homeRatingStaysBelowThePhotoAndReasonsKeepTheirHierarchy() {
         show { HomeScreen(HomeState(outfits = listOf(outfit)), {}, {}, {}, {}, {}, {}, {},
             photo = { _, m -> Box(m.background(Color(0xFFE8E5E0))) }) }
