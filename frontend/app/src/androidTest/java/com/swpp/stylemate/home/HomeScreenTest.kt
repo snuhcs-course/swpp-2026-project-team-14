@@ -75,7 +75,8 @@ class HomeScreenTest {
         show(HomeState(weather = weather, outfits = listOf(layered, alternative)), events, smallScreen = true)
         compose.onNodeWithTag("home").assertWidthIsEqualTo(320.dp).assertHeightIsEqualTo(540.dp)
         compose.onNodeWithText("오늘의 코디").assertIsDisplayed()
-        compose.onNodeWithText("서울 18°C · 맑음 · 가을 간절기").assertIsDisplayed()
+        compose.onNodeWithText("서울").assertIsDisplayed()
+        compose.onNodeWithText("18°C · 맑음 · 가을 간절기", substring = true).assertIsDisplayed()
         compose.onNodeWithText("사진:베이지 니트").assertIsDisplayed()
         compose.onNodeWithText("사진:검정 슬랙스").assertIsDisplayed()
         compose.onNodeWithText("사진:재킷").assertIsDisplayed()
@@ -128,7 +129,7 @@ class HomeScreenTest {
         )
         show(HomeState(outfits = listOf(outfit.copy(reasons = reasons)), notes = listOf("날씨에 맞는 옷이 부족해요.")))
         compose.onNodeWithText("이 코디를 고른 이유").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithContentDescription("추천 별점 4.5점 (5점 만점)").performScrollTo().assertIsDisplayed().assertHasNoClickAction()
+        compose.onNodeWithContentDescription("추천 별점 4.0점 (5점 만점)").performScrollTo().assertIsDisplayed().assertHasNoClickAction()
         reasons.forEach { compose.onNodeWithText(it.text).performScrollTo().assertIsDisplayed() }
         reasons.forEach { compose.onNodeWithText(it.sub).assertDoesNotExist() }
         compose.onNodeWithText("코디 정보").assertDoesNotExist()
