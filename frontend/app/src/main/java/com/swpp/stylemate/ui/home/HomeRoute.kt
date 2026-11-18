@@ -2,6 +2,11 @@
 package com.swpp.stylemate.ui.home
 
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.material3.Button
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -23,7 +28,6 @@ import com.swpp.stylemate.ui.LocalAccountAccess
 import com.swpp.stylemate.data.LocalUserStore
 import com.swpp.stylemate.data.tryon.FittingRepository
 import com.swpp.stylemate.ui.tryon.FittingDialog
-import com.swpp.stylemate.ui.tryon.FittingPreview
 import com.swpp.stylemate.ui.tryon.LocalFittingNotificationKey
 import org.json.JSONObject
 
@@ -45,7 +49,7 @@ fun HomeRoute(profile: BodyProfile?, onSetupProfile: () -> Unit, onOpenWardrobe:
     HomeScreen(
         state = state,
         onRefresh = { model.load(body) },
-        onNext = model::next,
+        onSelect = model::select,
         onLike = { model.feedback("liked") },
         onDislike = { model.feedback("disliked") },
         onSave = model::toggleSaved,
@@ -54,8 +58,9 @@ fun HomeRoute(profile: BodyProfile?, onSetupProfile: () -> Unit, onOpenWardrobe:
         onMessageShown = model::messageShown,
         onChat = { state.current?.let { onChat(it, state.weather) } },
         modifier = modifier,
-        fitting = { outfit, previewModifier ->
-            FittingPreview(onExpand = { selected = outfit }, modifier = previewModifier)
+        fitting = { outfit, previewModifier, enabled ->
+            Button(onClick = { selected = outfit }, enabled = enabled,
+                modifier = previewModifier.heightIn(min = 52.dp), shape = MaterialTheme.shapes.medium) { Text("가상 피팅") }
         },
     )
     selected?.let { FittingDialog(it, fitting, account, onClose = { selected = null }, profile = profile) }

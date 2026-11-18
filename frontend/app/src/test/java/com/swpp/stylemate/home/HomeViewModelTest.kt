@@ -144,6 +144,22 @@ class HomeViewModelTest {
         assertEquals(listOf("w:a+w:b", "w:c+w:d"), (0 until seen.length()).map { seen.getString(it) })
     }
 
+    @Test fun selectingAnOutfitIsLocalAndSavingUsesTheSelectedId() {
+        loadTwoOutfits()
+        val preference = taste.load().toString()
+        viewModel.select(1)
+        viewModel.select(-1)
+        viewModel.select(2)
+        assertEquals("o2", viewModel.state.value.current?.id)
+        assertEquals(1, server.requests("POST /api/outfits/recommend/").size)
+        assertEquals(preference, taste.load().toString())
+        server.on("PUT /api/outfits/o2/", json(outfitJson("o2", "c", "d", saved = true).toString()))
+        viewModel.toggleSaved()
+        assertTrue(idle().current!!.saved)
+        assertEquals(1, server.requests("PUT /api/outfits/o2/").size)
+        assertTrue(server.requests("PUT /api/outfits/o1/").isEmpty())
+    }
+
     @Test fun likeStoresFeedbackAndTheUpdatedTaste() {
         loadTwoOutfits()
         server.on("POST /api/outfits/o1/feedback/", feedbackResult(outfitJson("o1", "a", "b", feedback = "liked"), 0.3))
@@ -197,6 +213,8 @@ class HomeViewModelTest {
         assertTrue(viewModel.state.value.acting)
         viewModel.toggleSaved()
         viewModel.feedback("disliked")
+        viewModel.select(1)
+        assertEquals("o1", viewModel.state.value.current?.id)
         idle()
         assertEquals(1, server.requests("POST /api/outfits/o1/feedback/").size)
         assertTrue(server.requests("PUT /api/outfits/o1/").isEmpty())

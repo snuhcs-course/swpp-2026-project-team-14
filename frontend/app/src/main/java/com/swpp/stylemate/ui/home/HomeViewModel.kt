@@ -83,7 +83,15 @@ class HomeViewModel(private val repository: OutfitRepository, private val taste:
         if (body?.toString() != this.body?.toString() || state.outfits.isEmpty() || state.errorCode != null) load(body)
     }
 
-    /** "다른 코디": the next of the current set, then a new set that avoids the outfits already shown. */
+    /** Carousel selection only: no recommendation request or taste change. */
+    fun select(index: Int) {
+        val state = mutableState.value
+        if (!state.loading && !state.acting && index in state.outfits.indices && index != state.index) {
+            mutableState.value = state.copy(index = index)
+        }
+    }
+
+    /** After a dislike: the next of the current set, then a new set avoiding outfits already shown. */
     fun next() {
         val state = mutableState.value
         if (state.loading) return
