@@ -33,6 +33,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -228,6 +229,10 @@ private fun MainTabs(viewModel: BodyProfileViewModel, authModel: AuthViewModel, 
             LocalTasteStore(context, account.userId)) }
     })
     val chatting by chat.visible.collectAsStateWithLifecycle()
+    val importing by importModel.state.collectAsStateWithLifecycle()
+    LaunchedEffect(tab, importing.stage) {
+        if (tab == Tab.PROFILE && importing.stage == com.swpp.stylemate.ui.profile.GuestImportStage.HIDDEN) importModel.checkAvailable()
+    }
 
     Box(Modifier.fillMaxSize()) {
     Scaffold(
@@ -255,7 +260,7 @@ private fun MainTabs(viewModel: BodyProfileViewModel, authModel: AuthViewModel, 
             }
         },
     ) { padding ->
-        when (tab) {
+        AccountTabContent(account.userId, tab.name) { when (tab) {
             Tab.HOME -> HomeRoute(app.profile, onSetupProfile = viewModel::startReanalysis,
                 onOpenWardrobe = { tab = Tab.WARDROBE }, modifier = Modifier.padding(padding).consumeWindowInsets(padding),
                 onChat = { outfit, weather -> chat.open(outfit, app.profile, weather) }, wardrobeRevision = wardrobeRevision)
@@ -282,12 +287,21 @@ private fun MainTabs(viewModel: BodyProfileViewModel, authModel: AuthViewModel, 
                 modifier = Modifier.padding(padding),
                 username = auth.session?.user?.username,
                 onLogout = authModel::logout,
-                onImport = importModel::open,
+                onImport = if (importing.available) importModel::open else null,
                 authBusy = auth.busy,
                 onDeleteRemote = viewModel::deleteAccountProfile,
             )
-        }
+        } }
     }
     if (chatting) ChatRoute(chat)
+    }
+}
+
+/** Removed with the authenticated subtree on logout; tab drafts never share an account key. */
+@Composable
+internal fun AccountTabContent(accountId: String, tab: String, content: @Composable () -> Unit) {
+    key(accountId) {
+        val tabs = rememberSaveableStateHolder()
+        tabs.SaveableStateProvider("$accountId:$tab", content)
     }
 }

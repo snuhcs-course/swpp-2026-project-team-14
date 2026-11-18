@@ -4,6 +4,9 @@ import androidx.activity.compose.BackHandler
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -62,6 +65,7 @@ fun ChatScreen(
 ) {
     val outfit = state.current ?: return
     var expanded by rememberSaveable(state.source?.id) { mutableStateOf(true) }
+    var choosingDirections by rememberSaveable(state.source?.id) { mutableStateOf(false) }
     val list = rememberLazyListState()
     val scope = rememberCoroutineScope()
     val keyboard = LocalSoftwareKeyboardController.current
@@ -94,8 +98,6 @@ fun ChatScreen(
                         }
                         Column(Modifier.weight(1f)) {
                             Text("코디 수정", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                            Text("옷을 눌러 잠그고, 원하는 방향을 골라요", style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         TextButton(onClick = onUndo, enabled = !state.busy && state.snapshots.isNotEmpty()) { Text("되돌리기") }
                     }
@@ -128,17 +130,31 @@ fun ChatScreen(
         bottomBar = {
             Surface(color = MaterialTheme.colorScheme.surfaceContainer) {
                 Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp)) {
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        CHAT_DIRECTIONS.forEach { (code, label) ->
-                            FilterChip(selected = code in state.directions, onClick = { onDirection(code) },
-                                label = { Text(label) })
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(if (state.directions.isEmpty()) "조건을 고르거나 메시지를 입력하세요"
+                            else state.directions.joinToString(" · ") { CHAT_DIRECTIONS[it] ?: it },
+                            Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
+                        TextButton(onClick = { choosingDirections = !choosingDirections }, enabled = !state.busy) {
+                            Text(if (choosingDirections) "조건 접기" else "조건 선택")
+                        }
+                    }
+                    if (choosingDirections) Column(Modifier.heightIn(max = 200.dp).verticalScroll(rememberScrollState())) {
+                        Text("묶음마다 하나씩 선택해요. 다시 누르면 해제돼요.", style = MaterialTheme.typography.bodySmall)
+                        listOf("밝기" to listOf("brighter", "darker"), "보온" to listOf("warmer", "cooler"),
+                            "격식" to listOf("formal", "casual"), "핏" to listOf("looser"),
+                            "조합" to listOf("different")).forEach { (group, codes) ->
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text(group, Modifier.width(56.dp), style = MaterialTheme.typography.labelMedium)
+                                codes.forEach { code -> FilterChip(selected = code in state.directions,
+                                    enabled = !state.busy, onClick = { onDirection(code) }, label = { Text(CHAT_DIRECTIONS.getValue(code)) }) }
+                            }
                         }
                     }
                     if (state.allLocked) Text("바꿀 옷의 잠금을 하나 이상 풀어 주세요.",
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
                     OutlinedTextField(value = state.draft, onValueChange = onDraft,
-                        modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp),
-                        placeholder = { Text("더 원하는 게 있나요? (선택)") },
+                        modifier = Modifier.fillMaxWidth().onFocusChanged { if (it.isFocused) choosingDirections = false }, shape = MaterialTheme.shapes.medium,
+                        placeholder = { Text("예: 상의만 밝게, 바지는 유지") },
                         label = { Text("메시지") }, maxLines = 3,
                         trailingIcon = {
                             IconButton(onClick = ::send, enabled = state.canSend) {
@@ -147,7 +163,7 @@ fun ChatScreen(
                         })
                     if (state.directions.isNotEmpty()) {
                         Button(onClick = ::send, enabled = state.canSend, modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
-                            shape = RoundedCornerShape(14.dp)) {
+                            shape = MaterialTheme.shapes.medium) {
                             Text(if (state.busy) "코디 수정 중…" else "선택한 조건으로 수정")
                         }
                     }
@@ -159,19 +175,19 @@ fun ChatScreen(
             LazyColumn(Modifier.fillMaxSize(), state = list,
                 contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
                 item(key = "intro") {
-                    AssistantBubble("유지할 옷은 눌러서 잠가 주세요. 아래 버튼을 고르거나, 원하는 내용을 메시지로 알려 주세요.")
+                    AssistantBubble("유지할 옷을 눌러 잠근 뒤, 조건을 고르거나 메시지로 원하는 수정을 알려 주세요.")
                 }
                 items(state.turns, key = { it.id }) { turn ->
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                            Surface(shape = RoundedCornerShape(20.dp, 4.dp, 20.dp, 20.dp),
+                            Surface(shape = RoundedCornerShape(4.dp, 2.dp, 4.dp, 4.dp),
                                 color = MaterialTheme.colorScheme.surfaceVariant) {
                                 Text(ChatViewModel.summary(turn.request), Modifier.padding(14.dp).widthIn(max = 280.dp),
                                     style = MaterialTheme.typography.bodyMedium)
                             }
                         }
                         when {
-                            turn.loading -> Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
+                            turn.loading -> Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainer) {
                                 Row(Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp),
                                     verticalAlignment = Alignment.CenterVertically) {
                                     CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
@@ -222,7 +238,7 @@ private fun AssistantBubble(message: String) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text("StyleMate", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary,
             fontWeight = FontWeight.Bold)
-        Surface(shape = RoundedCornerShape(4.dp, 20.dp, 20.dp, 20.dp), color = MaterialTheme.colorScheme.secondaryContainer) {
+        Surface(shape = RoundedCornerShape(2.dp, 4.dp, 4.dp, 4.dp), color = MaterialTheme.colorScheme.secondaryContainer) {
             Text(message, Modifier.padding(14.dp), style = MaterialTheme.typography.bodyMedium)
         }
     }
@@ -246,7 +262,7 @@ private fun OutfitItems(
                 .semantics { stateDescription = if (locked) "잠김, 유지" else "잠금 해제, 변경 가능" }
                 .clickable(enabled = enabled, role = Role.Button, onClickLabel = if (locked) "잠금 해제" else "옷 유지") {
                     onLock(item.garmentId)
-                } else Modifier), shape = RoundedCornerShape(14.dp),
+                } else Modifier), shape = MaterialTheme.shapes.medium,
                 color = MaterialTheme.colorScheme.surfaceContainer,
                 border = BorderStroke(if (locked) 2.dp else 1.dp,
                     if (locked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant)) {
@@ -272,7 +288,7 @@ private fun ResultCard(outfit: Outfit, changedIds: Set<String>, lockedIds: Set<S
                        onFeedback: (Outfit, String) -> Unit = { _, _ -> },
                        onLoadFeedback: (Outfit) -> Unit = {}) {
     LaunchedEffect(outfit.key) { onLoadFeedback(outfit) }
-    Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainer,
+    Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainer,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
         Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(if (state.current?.key == outfit.key) "이 코디로 계속 수정 중" else "수정한 코디",
@@ -304,7 +320,7 @@ private fun ResultCard(outfit: Outfit, changedIds: Set<String>, lockedIds: Set<S
                     TextButton(onClick = { onRestore(outfit) }, enabled = !state.busy, modifier = Modifier.weight(1f)) { Text("이 코디로 돌아가기") }
                 }
                 Button(onClick = { onSave(outfit) }, enabled = outfit.key !in state.savedKeys && outfit.key !in state.savingKeys,
-                    modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp)) {
+                    modifier = Modifier.weight(1f), shape = MaterialTheme.shapes.medium) {
                     Text(when (outfit.key) { in state.savedKeys -> "저장됨"; in state.savingKeys -> "저장 중…";
                         in state.saveErrors -> "저장 다시 시도"; else -> "코디북에 저장" })
                 }

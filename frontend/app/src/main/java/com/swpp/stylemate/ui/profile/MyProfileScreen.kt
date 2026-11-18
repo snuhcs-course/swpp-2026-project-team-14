@@ -18,9 +18,6 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.graphics.vector.path
 import com.swpp.stylemate.data.StyleProfile
 import com.swpp.stylemate.ui.components.ScreenScaffold
 
@@ -35,7 +32,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -122,11 +118,11 @@ private fun BodyDetailsScreen(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.height(20.dp))
-        Button(onClick = onReanalyze, shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth().height(52.dp)) {
+        Button(onClick = onReanalyze, shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth().height(52.dp)) {
             Text("체형 다시 분석하기", fontWeight = FontWeight.Bold)
         }
         Spacer(Modifier.height(8.dp))
-        OutlinedButton(onClick = { confirmDelete = true }, shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
+        OutlinedButton(onClick = { confirmDelete = true }, shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth()) {
             Text("체형 프로필 삭제")
         }
         Spacer(Modifier.height(24.dp))
@@ -165,7 +161,7 @@ private fun EmptyProfile(onCreate: () -> Unit) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(20.dp))
-            Button(onClick = onCreate, shape = RoundedCornerShape(16.dp)) { Text("체형 분석 시작하기") }
+            Button(onClick = onCreate, shape = MaterialTheme.shapes.medium) { Text("체형 분석 시작하기") }
         }
     }
 }
@@ -179,7 +175,7 @@ private fun InfoCard(profile: BodyProfile) {
     )
     Column(
         Modifier
-            .clip(RoundedCornerShape(16.dp))
+            .clip(MaterialTheme.shapes.medium)
             .background(MaterialTheme.colorScheme.surfaceContainer)
             .padding(horizontal = 16.dp, vertical = 8.dp),
     ) {
@@ -217,15 +213,6 @@ private val MOOD_LABELS = linkedMapOf("minimal" to "미니멀", "cityboy" to "�
 private val PROFILE_COLORS = linkedMapOf("#202020" to "블랙", "#FFFFFF" to "화이트", "#888888" to "그레이", "#1F2A44" to "네이비",
     "#C7B69A" to "베이지", "#F0E6D2" to "크림", "#795548" to "브라운", "#686B42" to "카키",
     "#3975C6" to "블루", "#E9A2B3" to "핑크", "#B83232" to "레드", "#9464AA" to "퍼플")
-private val PROFILE_IMPORT_ICON = ImageVector.Builder(name = "ImportData", defaultWidth = 24.dp, defaultHeight = 24.dp,
-    viewportWidth = 24f, viewportHeight = 24f).apply {
-    path(fill = SolidColor(Color.Black)) {
-        moveTo(19f, 9f); lineTo(15f, 9f); lineTo(15f, 3f); lineTo(9f, 3f)
-        lineTo(9f, 9f); lineTo(5f, 9f); lineTo(12f, 16f); close()
-        moveTo(5f, 18f); lineTo(5f, 20f); lineTo(19f, 20f); lineTo(19f, 18f); close()
-    }
-}.build()
-
 @Composable
 fun MyProfileScreen(
     profile: BodyProfile?,
@@ -269,21 +256,16 @@ fun MyProfileScreen(
             Spacer(Modifier.height(4.dp))
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                 Text("마이프로필", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                if (username != null) onImport?.let {
-                    IconButton(onClick = it, enabled = !authBusy && !inlineSaving) {
-                        Icon(PROFILE_IMPORT_ICON, contentDescription = "이 기기의 데이터 가져오기", tint = MaterialTheme.colorScheme.primary)
-                    }
-                }
 
             }
-            Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.fillMaxWidth()) {
+            Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.fillMaxWidth()) {
                 Row(Modifier.padding(horizontal = 16.dp, vertical = 18.dp).fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         Text(username.orEmpty(), fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text("로그인됨", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    OutlinedButton(onClick = onLogout, enabled = !authBusy && !inlineSaving, shape = RoundedCornerShape(12.dp)) {
+                    OutlinedButton(onClick = onLogout, enabled = !authBusy && !inlineSaving, shape = MaterialTheme.shapes.medium) {
                         Text(if (authBusy) "처리 중…" else "로그아웃")
                     }
                 }
@@ -308,11 +290,15 @@ fun MyProfileScreen(
                 } else ColorTags(style.favoriteColors)
             }
             SectionTitle("체형 밸런스 참고")
-            Surface(onClick = { page = ProfilePage.BODY }, shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceVariant,
+            Surface(onClick = { page = ProfilePage.BODY }, shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceVariant,
                 modifier = Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(if (profile == null) "내 체형 분석하기" else "내 체형 정보 보기", fontWeight = FontWeight.Bold)
                 }
+            }
+            if (username != null) onImport?.let { import ->
+                TextButton(onClick = import, enabled = !authBusy && !inlineSaving,
+                    modifier = Modifier.fillMaxWidth()) { Text("이 기기의 기존 데이터 가져오기") }
             }
             Spacer(Modifier.height(12.dp))
         }
@@ -321,7 +307,7 @@ fun MyProfileScreen(
 
 @Composable
 private fun ProfileCard(content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
-    Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.fillMaxWidth()) {
+    Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp), content = content)
     }
 }
@@ -339,7 +325,7 @@ private fun ProfileSectionHeader(title: String, action: String, enabled: Boolean
 private fun PreferenceChoices(options: Map<String, String>, selected: List<String>, enabled: Boolean, onChange: (List<String>) -> Unit) {
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         options.forEach { (code, label) ->
-            FilterChip(selected = code in selected, enabled = enabled, shape = RoundedCornerShape(50),
+            FilterChip(selected = code in selected, enabled = enabled, shape = MaterialTheme.shapes.large,
                 onClick = { onChange(if (code in selected) selected - code else selected + code) },
                 label = { Text(label, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium) })
         }
@@ -399,7 +385,7 @@ private fun ColorChoices(options: Map<String, String>, selected: List<String>, l
                 val checked = hex in selected
                 Surface(onClick = { onChange(if (checked) selected - hex else selected + hex) },
                     enabled = enabled && (checked || selected.size < limit), selected = checked,
-                    shape = RoundedCornerShape(12.dp), color = Color.Transparent, modifier = Modifier.weight(1f)) {
+                    shape = MaterialTheme.shapes.medium, color = Color.Transparent, modifier = Modifier.weight(1f)) {
                     Column(Modifier.padding(vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Surface(Modifier.size(48.dp), shape = CircleShape, color = Color(android.graphics.Color.parseColor(hex)),

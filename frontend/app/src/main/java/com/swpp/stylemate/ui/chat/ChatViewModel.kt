@@ -19,7 +19,7 @@ import org.json.JSONObject
 import java.util.UUID
 
 val CHAT_DIRECTIONS = linkedMapOf(
-    "brighter" to "밝게", "darker" to "차분하게", "warmer" to "따뜻하게", "cooler" to "시원하게",
+    "brighter" to "밝게", "darker" to "어둡게", "warmer" to "따뜻하게", "cooler" to "시원하게",
     "formal" to "단정하게", "casual" to "편하게", "looser" to "넉넉하게", "different" to "다른 조합",
 )
 private val OPPOSITES = mapOf("brighter" to "darker", "darker" to "brighter", "warmer" to "cooler",

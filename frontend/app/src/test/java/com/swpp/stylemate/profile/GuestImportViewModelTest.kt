@@ -42,6 +42,38 @@ class GuestImportViewModelTest {
         assertTrue(api.imports.isEmpty())
     }
 
+    @Test fun availabilityOnlyReadsLocalCandidatesAndNeverStartsAnImport() = runTest(main.dispatcher) {
+        val model = model()
+        model.checkAvailable()
+        advanceUntilIdle()
+        assertFalse(model.state.value.available)
+        api.records = listOf(garment())
+        model.checkAvailable()
+        advanceUntilIdle()
+        assertTrue(model.state.value.available)
+        assertEquals(GuestImportStage.HIDDEN, model.state.value.stage)
+        assertTrue(api.previews.isEmpty())
+        assertTrue(api.imports.isEmpty())
+        api.records = emptyList()
+        model.checkAvailable()
+        advanceUntilIdle()
+        assertFalse(model.state.value.available)
+    }
+
+    @Test fun availabilityDoesNotLeakBetweenAccountScopedModels() = runTest(main.dispatcher) {
+        api.records = listOf(garment())
+        val first = model()
+        first.checkAvailable()
+        advanceUntilIdle()
+        assertTrue(first.state.value.available)
+        val other = FakeGuestImport()
+        val second = main.own(GuestImportViewModel(other::snapshot, other::preview, other::importRecord, other::refresh))
+        second.checkAvailable()
+        advanceUntilIdle()
+        assertFalse(second.state.value.available)
+        assertEquals(GuestImportStage.HIDDEN, second.state.value.stage)
+    }
+
     @Test fun open_nonemptySnapshotRequiresConsentAndIncludesPreviouslyKeptRecords() = runTest(main.dispatcher) {
         api.records = listOf(garment())
         val model = model()

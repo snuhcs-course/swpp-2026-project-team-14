@@ -63,7 +63,9 @@ class AppNavigationTest {
         } }
         compose.onNodeWithText("member_1").assertIsDisplayed()
         compose.onNodeWithText("로그인됨").assertIsDisplayed()
-        compose.onNodeWithContentDescription("이 기기의 데이터 가져오기").assertIsDisplayed()
+        compose.onNodeWithContentDescription("이 기기의 데이터 가져오기").assertDoesNotExist()
+        compose.onNodeWithText("이 기기의 기존 데이터 가져오기").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("로그아웃").performScrollTo()
         compose.onNodeWithText("내 정보를 계정에 보관하세요").assertDoesNotExist()
         compose.onNodeWithText("로그아웃").performClick()
         compose.runOnIdle { org.junit.Assert.assertTrue(loggedOut) }

@@ -171,6 +171,7 @@ fun WardrobeRoute(
             message = null
             wardrobeModel.clearSaveState()
             editorDraftText = null
+            labelsModel.reset()
             onSaved?.invoke()
         }
     }
@@ -203,9 +204,7 @@ fun WardrobeRoute(
             selected = name
             selectedMeasurements = result.data?.getStringExtra("measurements")
             message = null
-        } else {
-            message = "실측 촬영이 취소되었습니다. 기존 사진은 유지됩니다."
-        }
+        } else message = null
     }
     fun launchCamera() {
         if (measurementBusy) return
@@ -279,6 +278,7 @@ fun WardrobeRoute(
     fun discard() {
         files.delete(selected); files.delete(frontPhoto)
         selected = null; frontPhoto = null; selectedMeasurements = null; editorDraftText = null; message = null
+        labelsModel.reset()
     }
     BackHandler(selected != null || editingId != null) {
         if (!wardrobe.saving && !analysis.busy && !measurementBusy) {
@@ -343,9 +343,10 @@ fun WardrobeRoute(
                 style = style, imageUrl = record.getString("image_url"))
         }
         WardrobeScreen(items = items, message = message ?: wardrobe.error, cameraBusy = measurementBusy,
-            onWornPhoto = { wornRegistration = true },
+            onWornPhoto = { message = null; wornRegistration = true },
+            onInteraction = { message = null },
             onCapture = { wardrobeModel.clearSaveState(); takePhoto() },
-            onItemClick = { actionItemId = it.id },
+            onItemClick = { message = null; actionItemId = it.id },
             onDelete = { wardrobeModel.delete(it.id) },
             deletingId = wardrobe.deletingId, deleteError = wardrobe.deleteError,
             onDeleteDismiss = wardrobeModel::clearDeleteError,
@@ -425,10 +426,13 @@ fun WardrobeRoute(
                         enabled = !(wardrobe.saving || wardrobe.loading), garmentType = if (editing == null) garmentType else null,
                         manualFit = worn)
                 },
-                topBar = topBar,
+                topBar = onboardingTopBar?.let { render -> { guardedBack ->
+                    render(guardedBack, !(wardrobe.saving || analysis.busy || measurementBusy))
+                } },
                 draft = editorDraftText?.let { JSONObject(it) },
                 onDraftChange = if (onDraftChange == null) null else { draft -> editorDraftText = draft.toString() },
                 measurementsEnabled = !worn,
+                hasLabelChanges = labelState.garmentId == record.getString("id") && labelState.edits.isNotEmpty(),
                 estimatedDimensions = matchingWornEstimates(record, initialAttributes,
                     labelsModel.merged(initialAttributes.optString("category"), catalog.optJSONObject("label_options")) ?: record.optJSONObject("labels")),
             )
@@ -485,7 +489,7 @@ fun WardrobeScreen(items: List<WardrobeItem>, message: String?, cameraBusy: Bool
                    onItemClick: (WardrobeItem) -> Unit = {}, loading: Boolean = false, onRetry: (() -> Unit)? = null,
                    onWornPhoto: (() -> Unit)? = null,
                    onDelete: ((WardrobeItem) -> Unit)? = null, deletingId: String? = null,
-                   deleteError: String? = null, onDeleteDismiss: () -> Unit = {}) {
+                   deleteError: String? = null, onDeleteDismiss: () -> Unit = {}, onInteraction: () -> Unit = {}) {
     var pendingDeleteId by rememberSaveable { mutableStateOf<String?>(null) }
     val pendingDelete = items.firstOrNull { it.id == pendingDeleteId }
     LaunchedEffect(items) {
@@ -648,15 +652,15 @@ internal fun RegistrationMethodSheet(onDismiss: () -> Unit, onWornPhoto: (() -> 
         Column(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, bottom = 28.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("어떻게 등록할까요?", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            onWornPhoto?.let { RegistrationMethodCard("착용 사진으로 등록", "내가 입은 사진에서 옷을 찾아요", it) }
-            RegistrationMethodCard("직접 촬영하기", "옷을 펼쳐 찍고 치수를 측정해요", onCapture)
+            onWornPhoto?.let { RegistrationMethodCard("착용 사진으로 등록", "본인 사진에서 상의·하의·아우터를 찾아요", it) }
+            RegistrationMethodCard("직접 촬영하기", "옷을 평평하게 펼쳐 치수를 재요. 상의·아우터는 뒷면 측정 후 앞면 사진을 추가해요.", onCapture)
         }
     }
 }
 
 @Composable
 private fun RegistrationMethodCard(title: String, description: String, onClick: () -> Unit) {
-    Surface(onClick = onClick, shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
+    Surface(onClick = onClick, shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainer) {
         Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             Text(description, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)

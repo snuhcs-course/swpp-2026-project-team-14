@@ -6,7 +6,6 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -129,7 +128,7 @@ fun OnboardingRoute(model: BodyProfileViewModel, accountStore: LocalUserStore? =
             onCancel = model::finishOnboardingGarment,
             onboardingTopBar = { routeBack, enabled -> OnboardingHeader(7, routeBack, routeBack, enabled && !busy) })
         else -> ScreenScaffold(title = "StyleMate", primaryLabel = when (step) {
-            8 -> "첫 코디 보러 가기"
+            8 -> "홈으로 가기"
             else -> "다음"
         }, primaryEnabled = !busy && (loadError == null || step !in setOf(6, 8)), onPrimary = {
             when (step) { 2 -> model.confirmOnboardingFits()
@@ -143,14 +142,14 @@ fun OnboardingRoute(model: BodyProfileViewModel, accountStore: LocalUserStore? =
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             listOf("minimal", "cityboy", "classic").forEach { mood ->
                                 Image(painterResource(MOOD_IMAGES.getValue(mood)), contentDescription = null, contentScale = ContentScale.Crop,
-                                    modifier = Modifier.weight(1f).height(144.dp).clip(RoundedCornerShape(12.dp)))
+                                    modifier = Modifier.weight(1f).height(144.dp).clip(MaterialTheme.shapes.medium))
                             }
                         }
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { ONBOARDING_FITS.forEach { (code, label) ->
                             val selected = code in chosenFits
                             Surface(selected = selected, onClick = { model.setOnboardingFits(
                                 if (selected) chosenFits - code else chosenFits + code) },
-                                shape = RoundedCornerShape(12.dp),
+                                shape = MaterialTheme.shapes.medium,
                                 border = BorderStroke(1.dp, if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant),
                                 color = if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainer) {
                                 Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically,
@@ -170,7 +169,7 @@ fun OnboardingRoute(model: BodyProfileViewModel, accountStore: LocalUserStore? =
                                     val selected = code in app.style.preferredStyles
                                     Card(enabled = !busy, onClick = { model.updateOnboardingStyle(app.style.copy(preferredStyles =
                                         if (selected) app.style.preferredStyles - code else app.style.preferredStyles + code)) },
-                                        modifier = Modifier.weight(1f).semantics { this.selected = selected }, shape = RoundedCornerShape(12.dp),
+                                        modifier = Modifier.weight(1f).semantics { this.selected = selected }, shape = MaterialTheme.shapes.medium,
                                         border = BorderStroke(1.dp, if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant),
                                         colors = CardDefaults.cardColors(containerColor = if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainer)) {
                                         Box {
@@ -204,10 +203,10 @@ fun OnboardingRoute(model: BodyProfileViewModel, accountStore: LocalUserStore? =
                         GarmentSummary(records, store) { row -> model.startOnboardingGarment(row.getJSONObject("attributes").getString("category"), row.getString("id")) }
                     }
                     8 -> {
-                        Surface(color = MaterialTheme.colorScheme.secondaryContainer, shape = RoundedCornerShape(50), modifier = Modifier.size(72.dp).align(Alignment.CenterHorizontally)) {
+                        Surface(color = MaterialTheme.colorScheme.secondaryContainer, shape = MaterialTheme.shapes.large, modifier = Modifier.size(72.dp).align(Alignment.CenterHorizontally)) {
                             Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.padding(20.dp), tint = MaterialTheme.colorScheme.primary)
                         }
-                        OnboardingTitle("시작할 준비가 됐어요!")
+                        OnboardingTitle("설정을 마쳤어요")
                         OnboardingCard {
                             Text("나의 스타일", fontWeight = FontWeight.Bold)
                             Text(app.style.preferredFits.joinToString(" · ") { ONBOARDING_FITS[it] ?: it })
@@ -217,6 +216,12 @@ fun OnboardingRoute(model: BodyProfileViewModel, accountStore: LocalUserStore? =
                         loadError?.let { Text(it, color = MaterialTheme.colorScheme.error); TextButton(onClick = { refresh++ }) { Text("다시 불러오기") } }
                         GarmentSummary(records, store)
                         Text("입력한 정보는 내 계정에 저장됐어요.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (app.profile == null) Text("맞춤 코디 추천을 받으려면 체형 분석이 필요해요. 홈에서 이어서 할 수 있어요.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (records.none { it.getJSONObject("attributes").optString("category") == "top" } ||
+                            records.none { it.getJSONObject("attributes").optString("category") == "bottom" }) {
+                            Text("코디에 사용할 상의와 하의를 옷장에 등록해 주세요.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
                     }
                 }
                 Spacer(Modifier.height(4.dp))
@@ -242,7 +247,7 @@ private fun OnboardingWelcome(header: @Composable () -> Unit, onStart: () -> Uni
     Scaffold(containerColor = MaterialTheme.colorScheme.background, topBar = header, bottomBar = {
         Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 20.dp).padding(top = 12.dp, bottom = 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally) {
-            Button(onClick = onStart, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp), shape = RoundedCornerShape(16.dp)) {
+            Button(onClick = onStart, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp), shape = MaterialTheme.shapes.medium) {
                 Text("시작하기", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
             }
 
@@ -251,7 +256,7 @@ private fun OnboardingWelcome(header: @Composable () -> Unit, onStart: () -> Uni
         Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)) {
             Image(painterResource(R.drawable.onboarding_welcome), contentDescription = null,
-                modifier = Modifier.fillMaxWidth().aspectRatio(1.25f).clip(RoundedCornerShape(16.dp)), contentScale = ContentScale.Crop)
+                modifier = Modifier.fillMaxWidth().aspectRatio(1.25f).clip(MaterialTheme.shapes.medium), contentScale = ContentScale.Crop)
             Text("내 옷으로, 더 나은 오늘을.", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             Text("내 취향과 옷장을 담아 나만의 스타일을 시작해요.", style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -261,7 +266,7 @@ private fun OnboardingWelcome(header: @Composable () -> Unit, onStart: () -> Uni
 
 @Composable
 private fun OnboardingCard(content: @Composable ColumnScope.() -> Unit) {
-    Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.fillMaxWidth()) {
+    Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp), content = content)
     }
 }
@@ -278,7 +283,7 @@ private fun GarmentSummary(records: List<JSONObject>, store: LocalUserStore, onC
                     catch (cancelled: CancellationException) { throw cancelled }
                     catch (_: Exception) { value = null }
                 }
-                Surface(onClick = { onClick?.invoke(record) }, enabled = onClick != null, shape = RoundedCornerShape(14.dp),
+                Surface(onClick = { onClick?.invoke(record) }, enabled = onClick != null, shape = MaterialTheme.shapes.medium,
                     color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.weight(1f)) {
                     Column {
                         Box(Modifier.fillMaxWidth().height(150.dp), contentAlignment = Alignment.Center) {

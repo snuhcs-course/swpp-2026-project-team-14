@@ -17,16 +17,19 @@ import androidx.exifinterface.media.ExifInterface
 import java.io.File
 import java.io.IOException
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.compose.BackHandler
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -36,8 +39,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -46,21 +51,33 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.AlertDialog
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
@@ -83,6 +100,12 @@ fun PhotoInputScreen(
     onAnalyze: () -> Unit,
     topBar: (@Composable () -> Unit)? = null,
 ) {
+    var guideVisible by rememberSaveable { mutableStateOf(false) }
+    if (guideVisible) {
+        BackHandler { guideVisible = false }
+        CaptureGuideScreen({ guideVisible = false }, { guideVisible = false }, returnToInput = true)
+        return
+    }
     ScreenScaffold(
         title = "체형 분석",
         onBack = onBack,
@@ -90,6 +113,7 @@ fun PhotoInputScreen(
         primaryEnabled = state.canAnalyze,
         onPrimary = onAnalyze,
         topBar = topBar,
+        modifier = Modifier.imePadding(),
     ) { padding ->
         Column(
             modifier = Modifier
@@ -99,20 +123,24 @@ fun PhotoInputScreen(
                 .padding(horizontal = 20.dp),
         ) {
             state.errorMessage?.let { WarningBanner(it) }
-            SectionTitle("전신 사진", "정면 · 측면 모두 필요")
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically) {
+                SectionTitle("전신 사진", "정면 · 측면")
+                TextButton(onClick = { guideVisible = true }) { Text("촬영 예시") }
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 PhotoSlotCard(
                     label = "정면",
                     bitmap = state.frontPhoto,
                     onPicked = { onPhoto(PhotoSlot.FRONT, it) },
-                    onPickFailed = { onPhotoError(PHOTO_LOAD_ERROR) },
+                    onPickFailed = onPhotoError,
                     modifier = Modifier.weight(1f),
                 )
                 PhotoSlotCard(
                     label = "측면",
                     bitmap = state.sidePhoto,
                     onPicked = { onPhoto(PhotoSlot.SIDE, it) },
-                    onPickFailed = { onPhotoError(PHOTO_LOAD_ERROR) },
+                    onPickFailed = onPhotoError,
                     modifier = Modifier.weight(1f),
                 )
             }
@@ -120,7 +148,7 @@ fun PhotoInputScreen(
             Spacer(Modifier.height(12.dp))
             ClothingTip()
 
-            SectionTitle("기본 정보", "키는 치수 계산의 기준이 돼요")
+            SectionTitle("기본 정보", "키로 치수를 계산해요")
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 NumberField(
                     value = state.heightText,
@@ -153,16 +181,17 @@ private fun PhotoSlotCard(
     label: String,
     bitmap: Bitmap?,
     onPicked: (Bitmap?) -> Unit,
-    onPickFailed: () -> Unit,
+    onPickFailed: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    var choosingSource by rememberSaveable { mutableStateOf(false) }
     // Full-resolution capture into a temporary cache file; the file is deleted right after decoding.
     val captureFile = remember { File(context.cacheDir, "body_photos/$label.jpg") }
     val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { saved ->
         scope.launch {
-            if (saved) decodeDownscaled(context, Uri.fromFile(captureFile))?.let(onPicked) ?: onPickFailed()
+            if (saved) decodeDownscaled(context, Uri.fromFile(captureFile))?.let(onPicked) ?: onPickFailed(PHOTO_LOAD_ERROR)
             withContext(Dispatchers.IO) { captureFile.delete() }
         }
     }
@@ -170,10 +199,10 @@ private fun PhotoSlotCard(
         captureFile.parentFile?.mkdirs()
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.photos", captureFile)
         try { cameraLauncher.launch(uri) }
-        catch (_: Exception) { captureFile.delete(); onPickFailed() }
+        catch (_: Exception) { captureFile.delete(); onPickFailed("카메라를 열지 못했어요. 앨범에서 사진을 골라 주세요.") }
     }
     val cameraPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) capture() else onPickFailed()
+        if (granted) capture() else onPickFailed("카메라 권한이 꺼져 있어요. 기기 설정에서 허용하거나 앨범에서 사진을 골라 주세요.")
     }
     fun launchCamera() {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) capture()
@@ -181,17 +210,30 @@ private fun PhotoSlotCard(
     }
     val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         // A failed decode keeps the previous photo and shows a message instead of clearing it.
-        if (uri != null) scope.launch { decodeDownscaled(context, uri)?.let(onPicked) ?: onPickFailed() }
+        if (uri != null) scope.launch { decodeDownscaled(context, uri)?.let(onPicked) ?: onPickFailed(PHOTO_LOAD_ERROR) }
     }
+
+    if (choosingSource) AlertDialog(onDismissRequest = { choosingSource = false },
+        title = { Text("$label 사진 선택") },
+        text = { Text("머리부터 발끝까지 보이는 $label 전신 사진을 골라 주세요.") },
+        confirmButton = { TextButton(onClick = { choosingSource = false
+            galleryLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+        }) { Text("앨범") } },
+        dismissButton = { TextButton(onClick = { choosingSource = false; launchCamera() }) { Text("카메라") } })
 
     Column(modifier) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(3f / 4f)
-                .clip(RoundedCornerShape(16.dp))
+                .clip(MaterialTheme.shapes.medium)
                 .background(MaterialTheme.colorScheme.surfaceContainer)
-                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(16.dp)),
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, MaterialTheme.shapes.medium)
+                .clickable(role = Role.Button, onClickLabel = "사진 선택 또는 교체") { choosingSource = true }
+                .semantics {
+                    contentDescription = "$label 사진 선택"
+                    stateDescription = if (bitmap == null) "필수 사진 없음" else "사진 있음, 교체 가능"
+                },
             contentAlignment = Alignment.Center,
         ) {
             if (bitmap != null) {
@@ -206,8 +248,8 @@ private fun PhotoSlotCard(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(4.dp)
-                        .size(32.dp)
-                        .clip(RoundedCornerShape(50))
+                        .size(48.dp)
+                        .clip(MaterialTheme.shapes.large)
                         .background(MaterialTheme.colorScheme.background.copy(alpha = 0.8f)),
                 ) {
                     Icon(Icons.Filled.Close, contentDescription = "$label 사진 지우기", modifier = Modifier.size(18.dp))
@@ -216,33 +258,13 @@ private fun PhotoSlotCard(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Text(
-                        "필수",
+                        "눌러서 사진 선택 · 필수",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.primary,
                     )
                 }
             }
         }
-        Spacer(Modifier.height(8.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            SmallOutlinedButton("카메라", Modifier.weight(1f)) { launchCamera() }
-            SmallOutlinedButton("앨범", Modifier.weight(1f)) {
-                galleryLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-            }
-        }
-    }
-}
-
-@Composable
-private fun SmallOutlinedButton(text: String, modifier: Modifier, onClick: () -> Unit) {
-    OutlinedButton(
-        onClick = onClick,
-        modifier = modifier.height(40.dp),
-        shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        contentPadding = PaddingValues(0.dp),
-    ) {
-        Text(text, style = MaterialTheme.typography.labelLarge)
     }
 }
 
@@ -253,7 +275,7 @@ private fun ClothingTip() {
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
+            .clip(MaterialTheme.shapes.medium)
             .background(MaterialTheme.colorScheme.surfaceContainer)
             .padding(horizontal = 16.dp, vertical = 12.dp),
     ) {
@@ -285,6 +307,7 @@ private fun GenderSelector(selected: Gender, onSelect: (Gender) -> Unit) {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun NumberField(
     value: String,
@@ -294,6 +317,12 @@ private fun NumberField(
     supporting: String?,
     modifier: Modifier = Modifier,
 ) {
+    val bringIntoView = remember { BringIntoViewRequester() }
+    var focused by remember { mutableStateOf(false) }
+    val keyboardHeight = WindowInsets.ime.getBottom(LocalDensity.current)
+    LaunchedEffect(focused, keyboardHeight, supporting) {
+        if (focused) bringIntoView.bringIntoView()
+    }
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
@@ -302,8 +331,8 @@ private fun NumberField(
         singleLine = true,
         supportingText = supporting?.let { { Text(it) } },
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-        shape = RoundedCornerShape(12.dp),
-        modifier = modifier,
+        shape = MaterialTheme.shapes.medium,
+        modifier = modifier.bringIntoViewRequester(bringIntoView).onFocusChanged { focused = it.isFocused },
     )
 }
 

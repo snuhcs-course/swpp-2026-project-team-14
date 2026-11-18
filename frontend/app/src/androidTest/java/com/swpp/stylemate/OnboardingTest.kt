@@ -91,7 +91,9 @@ class OnboardingTest {
         compose.waitUntil(5_000) { current.onboarding.value.step == 6 }
         compose.onNodeWithText("건너뛰기").performClick()
         compose.waitUntil(5_000) { current.onboarding.value.step == 8 }
-        compose.onNodeWithText("첫 코디 보러 가기").performClick()
+        compose.onNodeWithText("첫 코디 보러 가기").assertDoesNotExist()
+        compose.onNodeWithText("맞춤 코디 추천을 받으려면 체형 분석이 필요해요.", substring = true).performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("홈으로 가기").performClick()
         compose.runOnIdle { assertTrue(store.onboarding().completed); assertNull(current.app.value.profile) }
     }
 

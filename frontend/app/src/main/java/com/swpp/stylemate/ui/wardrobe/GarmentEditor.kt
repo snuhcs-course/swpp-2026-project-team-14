@@ -1,10 +1,10 @@
 // AI-generated with Codex, 2026-09-29, reviewed by Hyeon U Jeong; recommendation labels added with Claude Code (Claude Opus 5.5), 2026-10-12, reviewed by Dongkun Moon
 package com.swpp.stylemate.ui.wardrobe
 
+import androidx.activity.compose.BackHandler
 import com.swpp.stylemate.data.wardrobe.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -63,12 +63,13 @@ fun GarmentEditor(id: String, initialAttributes: JSONObject, initialDimensions: 
                   onBack: (() -> Unit)? = null, image: ImageBitmap? = null, photo: @Composable () -> Unit = {},
                   canSaveLabels: (JSONObject, JSONObject?) -> Boolean = { _, _ -> true },
                   labels: @Composable (attributes: JSONObject, dimensions: JSONObject?) -> Unit = { _, _ -> },
-                  topBar: (@Composable () -> Unit)? = null,
+                  topBar: (@Composable (onBack: () -> Unit) -> Unit)? = null,
                   draft: JSONObject? = null,
                   onDraftChange: ((JSONObject) -> Unit)? = null,
                   measurementsEnabled: Boolean = true,
                   saveLabel: String? = null,
-                  estimatedDimensions: JSONObject? = null) {
+                  estimatedDimensions: JSONObject? = null,
+                  hasLabelChanges: Boolean = false) {
     var attributesText by rememberSaveable(id) { mutableStateOf((draft?.optJSONObject("attributes") ?: initialAttributes).toString()) }
     var notes by rememberSaveable(id) { mutableStateOf(draft?.optString("notes") ?: initialNotes) }
     var dimensionText by rememberSaveable(id) {
@@ -81,6 +82,21 @@ fun GarmentEditor(id: String, initialAttributes: JSONObject, initialDimensions: 
     var extra by rememberSaveable(id) { mutableStateOf(false) }
     val attributes = remember(attributesText) { JSONObject(attributesText) }
     val inputs = remember(dimensionText) { JSONObject(dimensionText) }
+    val originalDimensions = remember(id) { JSONObject().apply {
+        initialDimensions?.keysList()?.filter { it != "unit" }?.forEach { key ->
+            initialDimensions.optJSONObject(key)?.let { put(key, String.format(Locale.US, "%.2f", it.getDouble("value"))) }
+        }
+    }.toString() }
+    // Keep the baseline through tab restoration, even when the server list is refreshed.
+    val baseline by rememberSaveable(id) { mutableStateOf(listOf(initialAttributes.toString(), initialNotes, originalDimensions)) }
+    val changed = hasLabelChanges || attributesText != baseline[0] || notes != baseline[1] || dimensionText != baseline[2]
+    var confirmingDiscard by rememberSaveable(id) { mutableStateOf(false) }
+    fun leave() { if (!busy) { if (changed) confirmingDiscard = true else onBack?.invoke() } }
+    BackHandler(enabled = onBack != null) { leave() }
+    if (confirmingDiscard) AlertDialog(onDismissRequest = { confirmingDiscard = false },
+        title = { Text("변경 내용을 버릴까요?") }, text = { Text("저장하지 않은 수정 내용이 사라져요.") },
+        confirmButton = { TextButton(onClick = { confirmingDiscard = false; onBack?.invoke() }) { Text("버리기") } },
+        dismissButton = { TextButton(onClick = { confirmingDiscard = false }) { Text("계속 편집") } })
     androidx.compose.runtime.LaunchedEffect(attributesText, notes, dimensionText) {
         onDraftChange?.invoke(JSONObject().put("attributes", JSONObject(attributesText)).put("notes", notes)
             .put("dimension_inputs", JSONObject(dimensionText)))
@@ -153,11 +169,11 @@ fun GarmentEditor(id: String, initialAttributes: JSONObject, initialDimensions: 
         primaryLabel = if (busy) "저장 중" else saveLabel ?: if (saved) "저장하기" else "옷장에 추가",
         primaryEnabled = valid && !busy && canSaveLabels(attributes, currentDimensions()),
         onPrimary = ::save,
-        onBack = onBack,
+        onBack = onBack?.let { { leave() } },
         navigationEnabled = !busy,
         contentWindowInsets = WindowInsets(0),
         modifier = Modifier.imePadding(),
-        topBar = topBar,
+        topBar = topBar?.let { { it(::leave) } },
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
             photo()
@@ -166,7 +182,7 @@ fun GarmentEditor(id: String, initialAttributes: JSONObject, initialDimensions: 
                 OutlinedTextField(value = attributes.optString("name"), onValueChange = {
                     if (it.length <= 80) attributesText = JSONObject(attributesText).put("name", it).toString()
                 }, label = { Text("이름") }, singleLine = true, enabled = !busy,
-                    shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth())
+                    shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth())
                 primary.forEach { attribute(it) }
                 val colorValues = attributes.getJSONArray("colors")
                 val palette = catalog.getJSONObject("color_palette")
@@ -190,7 +206,7 @@ fun GarmentEditor(id: String, initialAttributes: JSONObject, initialDimensions: 
                             supportingText = if (!validNumber(text)) ({ Text("소수 둘째 자리까지 양수를 입력해 주세요.") })
                                              else null,
                             isError = !validNumber(text), singleLine = true, enabled = !busy,
-                            shape = RoundedCornerShape(12.dp),
+                            shape = MaterialTheme.shapes.medium,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), modifier = Modifier.fillMaxWidth())
                     }
                 }
@@ -200,7 +216,7 @@ fun GarmentEditor(id: String, initialAttributes: JSONObject, initialDimensions: 
             Spacer(Modifier.height(20.dp))
             OutlinedTextField(value = notes, onValueChange = { if (it.length <= 2000) notes = it },
                 label = { Text("메모") }, minLines = 4, enabled = !busy,
-                shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth())
+                shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth())
             error?.let { Text(it, Modifier.padding(top = 12.dp), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error) }
             Spacer(Modifier.height(24.dp))
         }
@@ -209,14 +225,14 @@ fun GarmentEditor(id: String, initialAttributes: JSONObject, initialDimensions: 
 
 @Composable
 private fun EditorSection(content: @Composable ColumnScope.() -> Unit) {
-    Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
+    Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainer) {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp), content = content)
     }
 }
 
 @Composable
 private fun ExpandSection(label: String, expanded: Boolean, onClick: () -> Unit) {
-    TextButton(onClick = onClick, shape = RoundedCornerShape(12.dp),
+    TextButton(onClick = onClick, shape = MaterialTheme.shapes.medium,
         contentPadding = PaddingValues(vertical = 8.dp), modifier = Modifier.fillMaxWidth().padding(top = 20.dp)) {
         Text(label, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
@@ -234,7 +250,7 @@ private fun ChoiceField(label: String, choices: JSONObject, value: Any?, multipl
     val description = selected.mapNotNull { if (choices.has(it)) choices.getString(it) else null }.joinToString(", ").ifEmpty { "미입력" }
     Box(Modifier.fillMaxWidth()) {
         OutlinedButton(onClick = { expanded = true }, enabled = enabled,
-            shape = RoundedCornerShape(12.dp), contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+            shape = MaterialTheme.shapes.medium, contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
             colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
             modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
             Text("$label: $description", Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)

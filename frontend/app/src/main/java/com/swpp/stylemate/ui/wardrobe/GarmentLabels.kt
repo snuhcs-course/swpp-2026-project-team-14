@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -118,12 +117,14 @@ class GarmentLabelsViewModel(private val repository: OutfitRepository) : ViewMod
     val state = mutableState.asStateFlow()
     private var job: Job? = null
 
-    /** Opening an editor (each visit starts fresh: edits that were not saved are dropped). Saved labels
-     * count as already computed for the garment's current inputs. */
+    /** Tab re-entry keeps edits; explicit discard or successful save resets this account's editor. */
     fun start(garmentId: String, stored: JSONObject?, inputKey: String) {
+        if (mutableState.value.garmentId == garmentId) return
         job?.cancel()
         mutableState.value = LabelState(garmentId, stored, inputKey = if (stored != null) inputKey else null)
     }
+
+    fun reset() { job?.cancel(); mutableState.value = LabelState() }
 
     fun compute(garmentId: String, attributes: JSONObject, dimensions: JSONObject?, body: JSONObject?,
                 details: JSONObject?, garmentType: String?, inputKey: String, force: Boolean = false,
@@ -180,7 +181,7 @@ fun GarmentLabelSection(model: GarmentLabelsViewModel, garmentId: String, attrib
         model.compute(garmentId, attributes, dimensions, body, details, garmentType, key, manualFit = manualFit, photoSuggestions = stored)
     }
     SectionTitle("내 몸 기준 라벨", "추천에 쓰여요")
-    Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
+    Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainer) {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             if (manualFit) {
                 Text("본인 착용 사진에서 보이는 핏·기장을 제안해요. 틀리면 수정하고, 모르는 항목은 비워둬도 돼요.")
@@ -237,7 +238,7 @@ internal fun LabelChips(label: String, choices: List<String>, selected: String?,
             choices.forEach { choice ->
                 FilterChip(selected = choice == selected, enabled = enabled,
                     onClick = { onChange(if (choice == selected) null else choice) },
-                    label = { Text(choice) }, shape = RoundedCornerShape(50),
+                    label = { Text(choice) }, shape = MaterialTheme.shapes.large,
                     colors = FilterChipDefaults.filterChipColors(
                         selectedContainerColor = MaterialTheme.colorScheme.primary,
                         selectedLabelColor = MaterialTheme.colorScheme.onPrimary))
@@ -253,7 +254,7 @@ internal fun LabelMenu(label: String, choices: List<String>, selected: List<Stri
                       onChange: (List<String>) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     Box(Modifier.fillMaxWidth()) {
-        OutlinedButton(onClick = { expanded = true }, enabled = enabled, shape = RoundedCornerShape(12.dp),
+        OutlinedButton(onClick = { expanded = true }, enabled = enabled, shape = MaterialTheme.shapes.medium,
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
             colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
             modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
