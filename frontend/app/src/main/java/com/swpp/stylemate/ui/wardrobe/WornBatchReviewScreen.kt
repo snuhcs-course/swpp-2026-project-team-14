@@ -58,7 +58,7 @@ internal fun WornBatchReviewScreen(state: WornBatchState, catalog: JSONObject?, 
                     if (enabled) wornBatchSaveProblem(items)?.let { Text(it, color = MaterialTheme.colorScheme.error, fontSize = 12.sp) }
                     Button(onClick = onSave, enabled = enabled && catalog != null && canSaveWornBatch(items),
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = Color.White),
-                        shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp)) {
+                        shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp)) {
                         if (state.busy) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
                         else Icon(Icons.Default.Check, null, Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
@@ -88,7 +88,7 @@ internal fun WornBatchReviewScreen(state: WornBatchState, catalog: JSONObject?, 
                     onEdit = { if (catalog != null) onEdit(item.id) }, onCompare = { comparisonId = item.id },
                     onRegenerate = { onRegenerate(item.id) }, onCrop = { onCrop(item.id) }, onRefresh = { onRefresh(item.id) })
             } }
-            Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
+            Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceVariant) {
                 Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Icon(Icons.Default.Edit, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
@@ -122,7 +122,7 @@ private fun WornReviewGarmentCard(item: WornBatchItem, catalog: JSONObject, enab
     val ready = item.generation.optString("status") == "ready"
     val path = if (item.imageChoice == "crop") original else if (ready) item.generation.optString("generated_url").takeIf { it.startsWith("/api/wardrobe/") } else null
     val processing = item.generation.optString("status") in setOf("pending", "running")
-    Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
+    Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainer) {
         Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Checkbox(item.included, onCheckedChange = onInclude, enabled = enabled,
@@ -146,7 +146,7 @@ private fun WornReviewGarmentCard(item: WornBatchItem, catalog: JSONObject, enab
                             else Text(if (processing) "생성 대기" else "생성 실패", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         if (path != null) Surface(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(5.dp).clickable(enabled = enabled, onClick = onCompare),
-                            color = Color.White.copy(alpha = .94f), shape = RoundedCornerShape(5.dp)) {
+                            color = Color.White.copy(alpha = .94f), shape = MaterialTheme.shapes.medium) {
                             Text("원본 비교", Modifier.padding(vertical = 5.dp), fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
                                 textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                         }
@@ -160,7 +160,7 @@ private fun WornReviewGarmentCard(item: WornBatchItem, catalog: JSONObject, enab
                         ReviewInfoLine("색상", colorName, color)
                         val materials = labels.optJSONArray("materials")
                         ReviewInfoLine("소재", materials?.let { a -> (0 until a.length()).map { a.getString(it) }.joinToString(" · ").ifBlank { "미정" } } ?: "미정")
-                        Surface(shape = RoundedCornerShape(5.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
+                        Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceVariant) {
                             Text(if (item.imageChoice == "crop") "착용 사진 일부" else "AI 재구성 이미지", Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
                                 fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
@@ -191,7 +191,7 @@ private fun ReviewInfoLine(label: String, value: String, hex: String? = null) {
         Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
             if (hex != null) {
                 val swatch = runCatching { Color(android.graphics.Color.parseColor(hex)) }.getOrDefault(MaterialTheme.colorScheme.onSurfaceVariant)
-                Box(Modifier.size(9.dp).clip(RoundedCornerShape(50)).background(swatch))
+                Box(Modifier.size(9.dp).clip(MaterialTheme.shapes.large).background(swatch))
             }
             Text(value, fontSize = 12.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
         }
@@ -224,7 +224,7 @@ private fun ReviewEstimatePanel(estimate: JSONObject?, category: String, catalog
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         pair.forEach { field ->
                             val value = measures!!.getJSONObject(field)
-                            Surface(Modifier.weight(1f), shape = RoundedCornerShape(5.dp), color = Color.White) {
+                            Surface(Modifier.weight(1f), shape = MaterialTheme.shapes.medium, color = Color.White) {
                                 Column(Modifier.padding(9.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                     Text(definitions!!.getJSONObject(field).getString("label"), fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     Text("약 ${value.getInt("value")}cm", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
@@ -276,7 +276,7 @@ private fun WornReviewComparison(item: WornBatchItem, photo: WornReviewPhoto, en
 
 @Composable
 internal fun WornProcessingIndicator(message: String) {
-    Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
+    Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainer) {
         Row(Modifier.fillMaxWidth().padding(18.dp), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             CircularProgressIndicator(Modifier.size(28.dp).semantics { contentDescription = "처리 중" }, strokeWidth = 3.dp)

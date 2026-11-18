@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
@@ -44,12 +43,13 @@ private val CAPTURE_TIPS = listOf(
 )
 
 @Composable
-fun CaptureGuideScreen(onStart: () -> Unit, onSkip: () -> Unit) {
+fun CaptureGuideScreen(onStart: () -> Unit, onSkip: () -> Unit, returnToInput: Boolean = false) {
     ScreenScaffold(
         title = "체형 촬영 가이드",
-        actionLabel = "건너뛰기",
+        actionLabel = if (returnToInput) null else "건너뛰기",
+        onBack = if (returnToInput) onSkip else null,
         onAction = onSkip,
-        primaryLabel = "사진 찍으러 가기",
+        primaryLabel = if (returnToInput) "사진 입력으로 돌아가기" else "사진 찍으러 가기",
         primaryEnabled = true,
         onPrimary = onStart,
     ) { padding ->
@@ -69,7 +69,7 @@ fun CaptureGuideScreen(onStart: () -> Unit, onSkip: () -> Unit) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
+                    .clip(MaterialTheme.shapes.medium)
                     .background(MaterialTheme.colorScheme.surfaceContainer)
                     .padding(vertical = 20.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly,
@@ -102,7 +102,7 @@ fun PrivacyNote() {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(MaterialTheme.shapes.medium)
             .background(MaterialTheme.colorScheme.surfaceVariant)
             .padding(14.dp),
         verticalAlignment = Alignment.Top,

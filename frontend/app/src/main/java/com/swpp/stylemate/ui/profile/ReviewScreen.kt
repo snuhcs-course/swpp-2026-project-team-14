@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -171,7 +170,7 @@ fun WarningBanner(text: String) {
         modifier = Modifier
             .padding(top = 12.dp)
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(MaterialTheme.shapes.medium)
             .background(MaterialTheme.colorScheme.secondaryContainer)
             .padding(12.dp),
     ) {
@@ -194,7 +193,7 @@ fun MeasurementCard(
 ) {
     Column(
         Modifier
-            .clip(RoundedCornerShape(16.dp))
+            .clip(MaterialTheme.shapes.medium)
             .background(MaterialTheme.colorScheme.surfaceContainer),
     ) {
         items.forEachIndexed { index, item ->
@@ -212,7 +211,7 @@ fun MeasurementCard(
                 }
                 Box(
                     Modifier
-                        .clip(RoundedCornerShape(50))
+                        .clip(MaterialTheme.shapes.large)
                         .background(MaterialTheme.colorScheme.surfaceVariant)
                         .padding(horizontal = 14.dp, vertical = 6.dp),
                 ) {
@@ -260,7 +259,7 @@ private fun StyleChips(selected: List<String>, onToggle: (String) -> Unit) {
                 onClick = { onToggle(style) },
                 enabled = isSelected || !full,
                 label = { Text(style) },
-                shape = RoundedCornerShape(50),
+                shape = MaterialTheme.shapes.large,
                 colors = FilterChipDefaults.filterChipColors(
                     selectedContainerColor = MaterialTheme.colorScheme.primary,
                     selectedLabelColor = Color.White,

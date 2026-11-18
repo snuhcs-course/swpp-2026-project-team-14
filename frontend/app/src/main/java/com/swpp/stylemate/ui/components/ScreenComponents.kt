@@ -2,7 +2,6 @@
 package com.swpp.stylemate.ui.components
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
@@ -11,6 +10,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.swpp.stylemate.ui.theme.StyleMateColors
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -67,14 +67,22 @@ fun ScreenScaffold(
 
 @Composable
 fun PrimaryActionBar(label: String, enabled: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Box(modifier.padding(horizontal = 20.dp, vertical = 12.dp)) {
-        Button(
-            onClick = onClick,
-            enabled = enabled,
-            shape = RoundedCornerShape(16.dp),
-            modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
-        ) {
-            Text(label, fontWeight = FontWeight.Bold)
+    Surface(color = MaterialTheme.colorScheme.background) {
+        Column {
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Box(modifier.padding(horizontal = 20.dp, vertical = 12.dp)) {
+                Button(
+                    onClick = onClick,
+                    enabled = enabled,
+                    shape = MaterialTheme.shapes.medium,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                    colors = ButtonDefaults.buttonColors(disabledContainerColor = StyleMateColors.Disabled,
+                        disabledContentColor = StyleMateColors.DisabledInk),
+                ) {
+                    Text(label, fontWeight = FontWeight.Bold)
+                }
+            }
         }
     }
 }
