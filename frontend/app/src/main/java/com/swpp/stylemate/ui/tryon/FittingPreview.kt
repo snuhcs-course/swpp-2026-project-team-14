@@ -242,16 +242,11 @@ internal fun PhotoFitting(outfit: Outfit, repository: FittingRepository, account
     }
 
     Column(Modifier.fillMaxSize().systemBarsPadding()) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-            if (result == null) TextButton(onClick = onClose) { Text("닫기") }
-            else Spacer(Modifier.size(64.dp, 48.dp))
-            Text("가상 피팅", Modifier.weight(1f), style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+        com.swpp.stylemate.ui.components.PageHeader("가상 피팅", onBack = onClose, actions = {
             if (result == null && !restoring) FittingNotificationToggle(notificationSettings.enabled && FittingNotifications.allowed(context),
                 onCheckedChange = ::saveNotificationChoice,
-                enabled = !restoring && !changingNotification && !requestingNotificationPermission, modifier = Modifier.width(64.dp))
-            else Spacer(Modifier.size(64.dp, 48.dp))
-        }
+                enabled = !changingNotification && !requestingNotificationPermission, modifier = Modifier.width(64.dp))
+        })
         when {
             restoring -> Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(Modifier.size(40.dp))
