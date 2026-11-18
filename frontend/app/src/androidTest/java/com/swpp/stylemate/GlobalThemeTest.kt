@@ -66,6 +66,8 @@ class GlobalThemeTest {
                 "/api/wardrobe/items/" -> JSONObject().put("items", JSONArray()).put("next", JSONObject.NULL)
                 "/api/wardrobe/options/" -> catalog
                 "/api/outfits/" -> JSONObject().put("outfits", JSONArray()).put("next", JSONObject.NULL)
+                "/api/weather/" -> JSONObject().put("temp", 18).put("apparent", 18).put("label", "맑음")
+                "/api/outfits/recommend/" -> JSONObject().put("outfits", JSONArray()).put("notes", JSONArray())
                 else -> JSONObject()
             }
             Response.Builder().request(request).protocol(Protocol.HTTP_1_1).code(200).message("fixture")
@@ -79,21 +81,21 @@ class GlobalThemeTest {
         val auth = AuthViewModel(repository)
         val profile = BodyProfileViewModel(FakeBodyAnalyzer(0)).apply { skipSetup() }
         compose.setContent { StyleMateTheme { StyleMateApp(profile, auth) } }
-        compose.waitUntil(5_000) { compose.onAllNodesWithText("마이프로필").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(5_000) { compose.onAllNodesWithText("MY").fetchSemanticsNodes().isNotEmpty() }
         capture("01-home-with-navigation")
         compose.onNode(hasText("옷장") and isSelectable()).performClick().assertIsSelected()
         compose.waitUntil(5_000) { compose.onAllNodesWithText("아직 등록된 옷이 없습니다").fetchSemanticsNodes().isNotEmpty() }
         capture("02-wardrobe-with-navigation")
         compose.onNodeWithText("등록하기").performClick()
-        compose.onNodeWithText("착용 사진으로 등록").assertIsDisplayed()
+        compose.onNodeWithText("사진으로 등록").assertIsDisplayed()
         compose.onNodeWithText("직접 촬영하기").assertIsDisplayed()
         capture("03-registration-sheet")
         androidx.test.espresso.Espresso.pressBack()
         compose.onNode(hasText("코디북") and isSelectable()).performClick().assertIsSelected()
         compose.waitUntil(5_000) { compose.onAllNodesWithText("저장한 코디 0개").fetchSemanticsNodes().isNotEmpty() }
         capture("04-codibook-with-navigation")
-        compose.onNode(hasText("마이프로필") and isSelectable()).performClick().assertIsSelected()
-        compose.onNodeWithText("theme_preview").assertIsDisplayed()
+        compose.onNode(hasText("MY") and isSelectable()).performClick().assertIsSelected()
+        compose.onNodeWithText("내 체형 정보").assertIsDisplayed()
         capture("05-profile-with-navigation")
     }
 

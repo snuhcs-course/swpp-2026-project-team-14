@@ -88,7 +88,7 @@ private enum class Tab(val label: String, val icon: ImageVector) {
     HOME("홈", Icons.Filled.Home),
     WARDROBE("옷장", Icons.AutoMirrored.Filled.List),
     CODIBOOK("코디북", Icons.Filled.Star),
-    PROFILE("마이프로필", Icons.Filled.Person),
+    PROFILE("MY", Icons.Filled.Person),
 }
 
 val LocalAccountAccess = staticCompositionLocalOf<AccountAccess?> { null }
@@ -225,6 +225,14 @@ private fun MainTabs(viewModel: BodyProfileViewModel, authModel: AuthViewModel, 
     val account = checkNotNull(LocalAccountAccess.current)
     var tab by rememberSaveable { mutableStateOf(Tab.HOME) }
     val context = LocalContext.current.applicationContext
+    val profileStore = remember(account.userId) { LocalUserStore.forContext(context, account.userId) }
+    var calendarConnected by remember(account.userId) {
+        mutableStateOf(com.swpp.stylemate.data.calendar.CalendarConnection.enabled(context, profileStore))
+    }
+    androidx.lifecycle.compose.LifecycleResumeEffect(account.userId) {
+        calendarConnected = com.swpp.stylemate.data.calendar.CalendarConnection.enabled(context, profileStore)
+        onPauseOrDispose { }
+    }
     val chat: ChatViewModel = viewModel(factory = viewModelFactory {
         initializer { ChatViewModel(ChatRepository(BuildConfig.API_BASE_URL, account = account),
             LocalTasteStore(context, account.userId)) }
@@ -293,9 +301,9 @@ private fun MainTabs(viewModel: BodyProfileViewModel, authModel: AuthViewModel, 
                 authBusy = auth.busy,
                 onDeleteRemote = viewModel::deleteAccountProfile,
                 connections = {
-                    val store = remember(account.userId) { LocalUserStore.forContext(context, account.userId) }
-                    CalendarConnectionCard(store)
+                    CalendarConnectionCard(profileStore, onConnectionChanged = { calendarConnected = it })
                 },
+                connectionSummary = if (calendarConnected) "연결됨" else "연결 안 됨",
             )
         } }
     }

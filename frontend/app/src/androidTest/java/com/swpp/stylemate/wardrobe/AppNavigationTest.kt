@@ -41,17 +41,19 @@ class AppNavigationTest {
     @Test fun colorsAreOnlyAppliedAfterSavingAndCanBeCleared() {
         var saved by mutableStateOf(StyleProfile())
         compose.setContent { StyleMateTheme { MyProfileScreen(null, saved, { saved = it; null }, {}, {}) } }
-        compose.onNodeWithText("팔레트 관리").performScrollTo().performClick()
-        compose.onNodeWithText("네이비").performClick()
+        compose.onNodeWithText("컬러 기록").performScrollTo().performClick()
+        compose.onNodeWithText("네이비").performScrollTo().performClick()
         compose.onNodeWithText("취소").assertDoesNotExist()
         compose.onNodeWithContentDescription("뒤로").performClick()
+        compose.onNodeWithText("변경 내용을 버릴까요?").assertIsDisplayed()
+        compose.onNodeWithText("버리기").performClick()
         compose.runOnIdle { assertEquals(emptyList<String>(), saved.favoriteColors) }
-        compose.onNodeWithText("팔레트 관리").performScrollTo().performClick()
-        compose.onNodeWithText("네이비").performClick()
+        compose.onNodeWithText("컬러 기록").performScrollTo().performClick()
+        compose.onNodeWithText("네이비").performScrollTo().performClick()
         compose.onNodeWithText("저장하기").performClick()
         compose.runOnIdle { assertEquals(listOf("#1F2A44"), saved.favoriteColors) }
-        compose.onNodeWithText("팔레트 관리").performScrollTo().performClick()
-        compose.onAllNodesWithText("네이비").onLast().performClick()
+        compose.onNodeWithText("컬러 기록").performScrollTo().performClick()
+        compose.onAllNodesWithText("네이비").onLast().performScrollTo().performClick()
         compose.onNodeWithText("저장하기").performClick()
         compose.runOnIdle { assertEquals(emptyList<String>(), saved.favoriteColors) }
     }
@@ -61,13 +63,17 @@ class AppNavigationTest {
         compose.setContent { StyleMateTheme {
             MyProfileScreen(null, StyleProfile(), { null }, {}, {}, username = "member_1", onLogout = { loggedOut = true }, onImport = {})
         } }
-        compose.onNodeWithText("member_1").assertIsDisplayed()
-        compose.onNodeWithText("로그인됨").assertIsDisplayed()
+        compose.onNodeWithText("member_1").assertDoesNotExist()
+        compose.onNodeWithText("MY").assertIsDisplayed()
         compose.onNodeWithContentDescription("이 기기의 데이터 가져오기").assertDoesNotExist()
         compose.onNodeWithText("이 기기의 기존 데이터 가져오기").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText("로그아웃").performScrollTo()
+        compose.onNodeWithText("계정 설정").performScrollTo().performClick()
+        compose.onNodeWithText("member_1").assertIsDisplayed()
         compose.onNodeWithText("내 정보를 계정에 보관하세요").assertDoesNotExist()
         compose.onNodeWithText("로그아웃").performClick()
+        compose.onNodeWithText("로그아웃할까요?").assertIsDisplayed()
+        compose.runOnIdle { org.junit.Assert.assertFalse(loggedOut) }
+        compose.onAllNodesWithText("로그아웃").onLast().performClick()
         compose.runOnIdle { org.junit.Assert.assertTrue(loggedOut) }
     }
 
@@ -81,8 +87,8 @@ class AppNavigationTest {
                 if (calls == 1) { pending.await(); "저장 연결 오류" } else { saved = it; null }
             }, {}, {})
         } }
-        compose.onNodeWithText("팔레트 관리").performScrollTo().performClick()
-        compose.onNodeWithText("네이비").performClick()
+        compose.onNodeWithText("컬러 기록").performScrollTo().performClick()
+        compose.onNodeWithText("네이비").performScrollTo().performClick()
         compose.onNodeWithText("저장하기").performClick()
         compose.onNodeWithText("저장 중…").assertIsNotEnabled()
         compose.onNodeWithContentDescription("뒤로").assertIsNotEnabled()
@@ -93,28 +99,35 @@ class AppNavigationTest {
         compose.runOnIdle { assertEquals(2, calls); assertEquals(listOf("#1F2A44"), saved.favoriteColors) }
     }
 
-    @Test fun inlineToggleRollsBackOnFailureAndPreservesOtherPreferences() {
+    @Test fun fitIsEditedExplicitlyAndFailedSaveRetainsItsDraftAndOtherPreferences() {
         val pending = CompletableDeferred<Unit>()
         var calls = 0
-        var saved by mutableStateOf(StyleProfile(preferredStyles = listOf("minimal"), favoriteColors = listOf("#1F2A44")))
+        var saved by mutableStateOf(StyleProfile(preferredFits = listOf("regular", "slim"),
+            preferredStyles = listOf("minimal"), favoriteColors = listOf("#1F2A44")))
         compose.setContent { StyleMateTheme {
             MyProfileScreen(null, saved, {
                 calls++
                 if (calls == 1) { pending.await(); "저장 연결 오류" } else { saved = it; null }
             }, {}, {})
         } }
-        compose.onNodeWithText("와이드").performClick()
-        compose.onNodeWithText("와이드").assertIsSelected().assertIsNotEnabled()
-        compose.onNodeWithText("시티보이").assertIsNotEnabled()
-        compose.runOnIdle { assertEquals(listOf("regular"), saved.preferredFits); pending.complete(Unit) }
+        compose.onNodeWithText("와이드").assertDoesNotExist()
+        compose.onNodeWithText("나의 취향").performClick()
+        compose.onNodeWithText("와이드").performScrollTo().performClick()
+        compose.runOnIdle { assertEquals(0, calls); assertEquals(listOf("regular", "slim"), saved.preferredFits) }
+        compose.onNodeWithText("저장하기").performClick()
+        compose.onNodeWithText("저장 중…").assertIsNotEnabled()
+        compose.onNodeWithContentDescription("뒤로").assertIsNotEnabled()
+        compose.runOnIdle { pending.complete(Unit) }
         compose.onNodeWithText("저장 연결 오류").assertIsDisplayed()
-        compose.onNodeWithText("와이드").assertIsNotSelected().assertIsEnabled().performClick()
+        compose.onNodeWithText("와이드").assertIsSelected()
+        compose.onNodeWithText("저장하기").performClick()
         compose.runOnIdle {
             assertEquals(2, calls)
-            assertEquals(listOf("regular", "wide"), saved.preferredFits)
+            assertEquals(listOf("wide", "regular", "slim"), saved.preferredFits)
             assertEquals(listOf("minimal"), saved.preferredStyles)
             assertEquals(listOf("#1F2A44"), saved.favoriteColors)
         }
+        compose.onNodeWithText("MY").assertIsDisplayed()
     }
 
     private fun guestAuth() = AuthViewModel(AuthRepository("http://127.0.0.1:1", object : AuthSessionStore {
