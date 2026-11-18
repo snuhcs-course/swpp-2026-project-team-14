@@ -643,7 +643,7 @@ internal fun RegistrationMethodSheet(onDismiss: () -> Unit, onWornPhoto: (() -> 
         Column(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, bottom = 28.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("어떻게 등록할까요?", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            onWornPhoto?.let { RegistrationMethodCard("착용 사진으로 등록", "본인 사진에서 상의·하의·아우터를 찾아요", it) }
+            onWornPhoto?.let { RegistrationMethodCard("사진으로 등록", "옷만 찍었거나 한 명이 입은 사진에서 옷을 찾아요", it) }
             RegistrationMethodCard("직접 촬영하기", "옷을 평평하게 펼쳐 치수를 재요. 상의·아우터는 뒷면 측정 후 앞면 사진을 추가해요.", onCapture)
         }
     }
@@ -651,7 +651,8 @@ internal fun RegistrationMethodSheet(onDismiss: () -> Unit, onWornPhoto: (() -> 
 
 @Composable
 private fun RegistrationMethodCard(title: String, description: String, onClick: () -> Unit) {
-    Surface(onClick = onClick, shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainer) {
+    Surface(onClick = onClick, shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceVariant,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
         Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             Text(description, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)

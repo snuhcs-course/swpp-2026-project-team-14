@@ -63,7 +63,7 @@ internal fun WardrobeCollection(
         // MainTabs owns system-bar and shared navigation insets.
         contentWindowInsets = WindowInsets(0),
         containerColor = WardrobeStyle.Canvas,
-        bottomBar = { WardrobeRegistrationBar(cameraBusy, onRegister) },
+        bottomBar = { WardrobeRegistrationBar(cameraBusy, onRegister, onAnalyze, !loading && deletingId == null) },
     ) { padding ->
         BoxWithConstraints(Modifier.fillMaxSize().padding(padding)) {
             val fontScale = LocalDensity.current.fontScale
@@ -88,10 +88,6 @@ internal fun WardrobeCollection(
                             categories.forEach { (code, label) ->
                                 WardrobeCategoryFilter(label, category == code) { onCategory(code) }
                             }
-                        }
-                        if (onAnalyze != null) OutlinedButton(onClick = onAnalyze, enabled = !loading && deletingId == null,
-                            shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
-                            Text("옷장 분석")
                         }
                         HorizontalDivider(color = WardrobeStyle.Border)
                         if (loading && total > 0) {
@@ -232,19 +228,22 @@ private fun WardrobeRetryButton(enabled: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-private fun WardrobeRegistrationBar(busy: Boolean, onClick: () -> Unit) {
+private fun WardrobeRegistrationBar(busy: Boolean, onClick: () -> Unit, onAnalyze: (() -> Unit)?, analysisEnabled: Boolean) {
     Surface(color = WardrobeStyle.Canvas) {
         Column {
             HorizontalDivider(color = WardrobeStyle.Border)
-            Button(onClick = onClick, enabled = !busy, shape = WardrobeStyle.ImageShape,
-                modifier = Modifier.padding(horizontal = WardrobeStyle.PageInset, vertical = 12.dp)
-                    .fillMaxWidth().heightIn(min = 48.dp),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = WardrobeStyle.Ink, contentColor = WardrobeStyle.Canvas,
-                    disabledContainerColor = WardrobeStyle.Disabled, disabledContentColor = WardrobeStyle.DisabledInk)) {
-                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(20.dp))
-                Spacer(Modifier.width(8.dp))
-                Text(if (busy) "촬영 중" else "등록하기", style = MaterialTheme.typography.labelLarge)
+            Row(Modifier.fillMaxWidth().padding(horizontal = WardrobeStyle.PageInset, vertical = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (onAnalyze != null) OutlinedButton(onClick = onAnalyze, enabled = analysisEnabled && !busy,
+                    shape = WardrobeStyle.ImageShape, contentPadding = PaddingValues(horizontal = 8.dp),
+                    modifier = Modifier.weight(.4f).heightIn(min = 52.dp)) { Text(ANALYZE_BUTTON_TEXT) }
+                Button(onClick = onClick, enabled = !busy, shape = WardrobeStyle.ImageShape,
+                    modifier = Modifier.weight(.6f).heightIn(min = 52.dp), contentPadding = PaddingValues(horizontal = 8.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = WardrobeStyle.Ink, contentColor = WardrobeStyle.Canvas,
+                        disabledContainerColor = WardrobeStyle.Disabled, disabledContentColor = WardrobeStyle.DisabledInk)) {
+                    Icon(Icons.Default.Add, null, Modifier.size(20.dp)); Spacer(Modifier.width(6.dp))
+                    Text(if (busy) "촬영 중" else "등록하기", style = MaterialTheme.typography.labelLarge)
+                }
             }
         }
     }

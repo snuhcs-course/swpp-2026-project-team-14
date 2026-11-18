@@ -134,7 +134,7 @@ fun WornRegistration(account: AccountAccess, onBack: () -> Unit, onBatchSaved: (
         photo = { label, path, requestId, modifier, scale ->
             ComparisonPhoto(label, path, account, requestId, modifier, contentScale = scale, framed = false)
         })
-    else ScreenScaffold(title = "착용 사진으로 등록",
+    else ScreenScaffold(title = "사진으로 등록",
         onBack = { model.reset(); onBack() }, navigationEnabled = !busy,
         primaryLabel = when {
             state.original == null -> null
@@ -147,8 +147,8 @@ fun WornRegistration(account: AccountAccess, onBack: () -> Unit, onBatchSaved: (
         onPrimary = model::generateSelected) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                if (busy) WornProcessingIndicator(state.progress.ifBlank { "사진 읽는 중" })
-                Text("본인이 옷을 입은 사진을 골라 주세요. 사진에서 옷을 찾고 핏·기장을 제안해요.")
+                if (busy) WornBusyOverlay(state.progress.ifBlank { "사진 읽는 중" })
+                Text("옷이 잘 보이는 사진을 골라 주세요. 옷만 찍은 사진도 가능하고, 두 명 이상 나온 사진은 사용할 수 없어요.")
                 WornPhotoUpload(hasPhoto = state.original != null, enabled = !busy, onPick = {
                     picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                 }, onCamera = ::takePhoto)
@@ -273,14 +273,14 @@ private fun WornBatchEditor(item: WornBatchItem, catalog: JSONObject, account: A
 internal fun WornPhotoUpload(hasPhoto: Boolean, enabled: Boolean, onCamera: (() -> Unit)? = null, onPick: () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Surface(Modifier.fillMaxWidth().clickable(enabled = enabled, role = Role.Button, onClick = onPick)
-            .semantics { contentDescription = if (hasPhoto) "다른 착용 사진 업로드" else "착용 사진 업로드" },
+            .semantics { contentDescription = if (hasPhoto) "다른 옷 사진 업로드" else "옷 사진 업로드" },
             shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainer,
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
             Column(Modifier.fillMaxWidth().heightIn(min = if (hasPhoto) 88.dp else 200.dp).padding(20.dp),
                 verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
                 Icon(Icons.Default.Add, null, Modifier.size(32.dp), tint = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.height(12.dp))
-                Text(if (hasPhoto) "다른 사진 올리기" else "착용 사진 올리기", style = MaterialTheme.typography.titleMedium)
+                Text(if (hasPhoto) "다른 사진 올리기" else "옷 사진 올리기", style = MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.height(6.dp))
                 Text("눌러서 앨범에서 선택", style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)

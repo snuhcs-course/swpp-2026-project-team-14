@@ -47,9 +47,8 @@ internal fun WornBatchReviewScreen(state: WornBatchState, catalog: JSONObject?, 
     var comparisonId by remember { mutableStateOf<String?>(null) }
     CompositionLocalProvider(LocalTextStyle provides LocalTextStyle.current.copy(lineHeight = 18.sp, letterSpacing = 0.sp)) {
     Scaffold(containerColor = MaterialTheme.colorScheme.background,
-        topBar = { TopAppBar(title = { Text("등록할 옷 확인", fontSize = 20.sp, lineHeight = 26.sp, fontWeight = FontWeight.Bold) },
-            navigationIcon = { IconButton(onClick = onBack, enabled = enabled) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "뒤로") } },
-            actions = { previewActions() }, colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)) },
+        topBar = { com.swpp.stylemate.ui.components.PageHeader("등록할 옷 확인", onBack = onBack,
+            enabled = !state.busy, actions = { previewActions() }) },
         bottomBar = {
             Surface(color = MaterialTheme.colorScheme.background) {
                 Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 20.dp, vertical = 12.dp),
@@ -59,8 +58,7 @@ internal fun WornBatchReviewScreen(state: WornBatchState, catalog: JSONObject?, 
                     Button(onClick = onSave, enabled = enabled && catalog != null && canSaveWornBatch(items),
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = Color.White),
                         shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp)) {
-                        if (state.busy) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-                        else Icon(Icons.Default.Check, null, Modifier.size(18.dp))
+                        if (!state.busy) Icon(Icons.Default.Check, null, Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
                         Text(if (state.busy) "처리 중" else "선택한 ${selected}벌 내 옷장에 등록", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                     }
@@ -70,7 +68,7 @@ internal fun WornBatchReviewScreen(state: WornBatchState, catalog: JSONObject?, 
         }) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            if (state.busy) WornProcessingIndicator(state.progress)
+            if (state.busy) WornBusyOverlay(state.progress)
             state.error?.let { Text(it, color = MaterialTheme.colorScheme.error, fontSize = 13.sp) }
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text("사진에서 ${items.size}벌의 옷을 찾았어요.", fontSize = 15.sp, fontWeight = FontWeight.Medium)
@@ -142,7 +140,7 @@ private fun WornReviewGarmentCard(item: WornBatchItem, catalog: JSONObject, enab
                     Box(Modifier.weight(.34f).aspectRatio(1f).clip(RoundedCornerShape(8.dp))) {
                         if (path != null) photo("$name 표시 이미지", path, item.generation.optString("request_id"), Modifier.fillMaxSize(), ContentScale.Crop)
                         else Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
-                            if (processing && !enabled) CircularProgressIndicator(Modifier.size(26.dp))
+                            if (processing && !enabled) Text("처리 중", style = MaterialTheme.typography.bodySmall)
                             else Text(if (processing) "생성 대기" else "생성 실패", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         if (path != null) Surface(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(5.dp).clickable(enabled = enabled, onClick = onCompare),
@@ -282,5 +280,14 @@ internal fun WornProcessingIndicator(message: String) {
             CircularProgressIndicator(Modifier.size(28.dp).semantics { contentDescription = "처리 중" }, strokeWidth = 3.dp)
             Text(message.ifBlank { "처리하고 있어요" }, style = MaterialTheme.typography.bodyMedium)
         }
+    }
+}
+
+
+@Composable
+internal fun WornBusyOverlay(message: String) {
+    androidx.compose.ui.window.Dialog(onDismissRequest = {}, properties = androidx.compose.ui.window.DialogProperties(
+        dismissOnBackPress = false, dismissOnClickOutside = false)) {
+        WornProcessingIndicator(message)
     }
 }

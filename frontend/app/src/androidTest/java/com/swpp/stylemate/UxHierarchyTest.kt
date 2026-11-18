@@ -44,6 +44,22 @@ class UxHierarchyTest {
         }
     }
 
+    @Test fun wardrobeAnalysisAndRegistrationShareTheBottomBar() {
+        var analyzed = 0
+        show { WardrobeScreen(emptyList(), null, false, {}, onAnalyze = { analyzed++ }, onWornPhoto = {}) }
+        val analysis = compose.onNodeWithText("옷장 분석").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        val register = compose.onNodeWithText("등록하기").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        assertEquals(analysis.top, register.top, 1f)
+        assertTrue(analysis.width / register.width in .60f.. .74f)
+        compose.onNodeWithText("옷장 분석").performClick()
+        compose.runOnIdle { assertEquals(1, analyzed) }
+        capture("wardrobe")
+        compose.onNodeWithText("등록하기").performClick()
+        compose.onNodeWithText("사진으로 등록").assertHasClickAction().assertIsDisplayed()
+        compose.onNodeWithText("직접 촬영하기").assertHasClickAction().assertIsDisplayed()
+        capture("registration")
+    }
+
     @Test fun aLargeCodiBookUsesBoundedControlsAndConfirmsStarRemoval() {
         val removed = mutableListOf<String>()
         val rows = (1..250).map { outfit.copy(id = "o$it", key = "k$it", name = "저장 코디 $it") }
@@ -103,6 +119,16 @@ class UxHierarchyTest {
         compose.onNodeWithText("클래식").assertIsNotEnabled()
         compose.onNodeWithText("완료").performClick()
         compose.runOnIdle { assertEquals(listOf("minimal", "casual"), selected) }
+    }
+
+    @Test fun registrationHasOneBusyIndicatorForAllCards() {
+        val items = (1..3).map { WornBatchItem(JSONObject().put("id", "item$it"), JSONObject().put("status", "running"),
+            JSONObject().put("attributes", JSONObject().put("name", "등록할 옷 $it").put("category", "top")).put("labels", JSONObject())) }
+        show { WornBatchReviewScreen(WornBatchState(items = items, busy = true, progress = "옷 사진을 준비하고 있어요"),
+            JSONObject(), {}, {}, { _, _ -> }, {}, {}, {}, {}, photo = { _, _, _, m, _ -> Box(m.background(Color.LightGray)) }) }
+        compose.onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsProperties.ProgressBarRangeInfo)).assertCountEquals(1)
+        compose.onNodeWithText("옷 사진을 준비하고 있어요").assertIsDisplayed()
+        capture("single-loading")
     }
 
     @Test fun homeRatingStaysBelowThePhotoAndReasonsKeepTheirHierarchy() {

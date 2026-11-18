@@ -63,7 +63,7 @@ class WornBatchViewModelTest {
         val model = model()
         api.uploadReply = { _, _ -> wornPhoto("failed", "IMAGE_NO_PERSON").put("candidates", JSONArray()) }
         detect(model)
-        assertEquals("옷을 입은 사람이 보이는 사진을 골라 주세요.", model.state.value.error)
+        assertEquals("등록할 옷이 잘 보이는 사진으로 다시 선택해 주세요. 옷만 찍은 사진도 사용할 수 있어요.", model.state.value.error)
         assertTrue(model.state.value.selected.isEmpty())
         api.uploadReply = { _, _ -> wornPhoto() }
         detect(model)

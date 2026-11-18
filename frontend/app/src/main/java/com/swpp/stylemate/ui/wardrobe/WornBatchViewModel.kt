@@ -55,7 +55,7 @@ internal fun wornBatchSaveProblem(items: List<WornBatchItem>): String? {
 
 internal fun detectionErrorMessage(code: String): String = when (code) {
     "IMAGE_MULTIPLE_PEOPLE" -> "한 사람만 나온 사진을 골라 주세요."
-    "IMAGE_NO_PERSON" -> "옷을 입은 사람이 보이는 사진을 골라 주세요."
+    "IMAGE_NO_PERSON" -> "등록할 옷이 잘 보이는 사진으로 다시 선택해 주세요. 옷만 찍은 사진도 사용할 수 있어요."
     "IMAGE_TARGET_UNCLEAR" -> "등록할 옷을 구분하지 못했어요. 옷이 더 잘 보이는 다른 사진을 골라 주세요."
     "AI_RATE_LIMITED", "AI_BUSY" -> "분석 요청이 많습니다. 잠시 후 다른 사진으로 다시 시도해 주세요."
     "AI_CREDITS_REQUIRED" -> "옷 분석 서비스의 잔액이 부족해요. 관리자에게 충전을 요청해 주세요."
