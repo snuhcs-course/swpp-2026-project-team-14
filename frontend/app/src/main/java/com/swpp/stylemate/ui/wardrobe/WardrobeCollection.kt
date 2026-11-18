@@ -53,6 +53,7 @@ internal fun WardrobeCollection(
     onItemClick: (WardrobeItem) -> Unit,
     onDelete: ((WardrobeItem) -> Unit)?,
     deletingId: String?,
+    onAnalyze: (() -> Unit)? = null,
     photo: @Composable (WardrobeItem) -> Unit,
 ) {
     Scaffold(
@@ -89,6 +90,10 @@ internal fun WardrobeCollection(
                             categories.forEach { (code, label) ->
                                 WardrobeCategoryFilter(label, category == code) { onCategory(code) }
                             }
+                        }
+                        if (onAnalyze != null) OutlinedButton(onClick = onAnalyze, enabled = !loading && deletingId == null,
+                            shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                            Text("옷장 분석")
                         }
                         HorizontalDivider(color = WardrobeStyle.Border)
                         if (loading && total > 0) {

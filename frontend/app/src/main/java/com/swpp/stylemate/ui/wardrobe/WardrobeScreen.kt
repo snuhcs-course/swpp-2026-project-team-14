@@ -52,6 +52,8 @@ import org.json.JSONObject
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 
+const val ANALYZE_BUTTON_TEXT = "옷장 분석"
+
 data class WardrobeItem(val id: String, val name: String, val category: String, val style: String? = null,
                         val thumbnail: ImageBitmap? = null, val imageUrl: String? = null)
 
@@ -102,6 +104,7 @@ fun WardrobeRoute(
         if (wardrobe.deletedId != null) { wardrobeModel.clearDeleted(); onDeleted() }
     }
     val externalMatch by wardrobeModel.externalMatch.collectAsStateWithLifecycle()
+    val wardrobeAnalysis by wardrobeModel.wardrobeAnalysis.collectAsStateWithLifecycle()
     var actionItemId by rememberSaveable { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) { wardrobeModel.refresh() }
     val labelsModel: GarmentLabelsViewModel = viewModel(factory = viewModelFactory {
@@ -135,6 +138,24 @@ fun WardrobeRoute(
                 }
             },
             onDismiss = wardrobeModel::closeExternalMatch,
+            wardrobe = wardrobe.records.map { record ->
+                val attrs = record.getJSONObject("attributes")
+                WardrobeItem(record.getString("id"), attrs.getString("name"), attrs.getString("category"),
+                    imageUrl = record.optString("image_url").ifBlank { null })
+            },
+        )
+    }
+    if (wardrobeAnalysis.open) {
+        WardrobeAnalysisDialog(wardrobeAnalysis,
+            onRetry = wardrobeModel::analyzeWardrobe,
+            onOpenLink = { url ->
+                try { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
+                catch (_: ActivityNotFoundException) {
+                    wardrobeModel.closeWardrobeAnalysis()
+                    message = "검색 페이지를 열 수 있는 앱이 없어요."
+                }
+            },
+            onDismiss = wardrobeModel::closeWardrobeAnalysis,
         )
     }
     var savedPhoto by remember(editingId) { mutableStateOf<ImageBitmap?>(null) }
@@ -336,6 +357,7 @@ fun WardrobeRoute(
             onInteraction = { message = null },
             onCapture = { wardrobeModel.clearSaveState(); takePhoto() },
             onItemClick = { message = null; actionItemId = it.id },
+            onAnalyze = wardrobeModel::analyzeWardrobe,
             onDelete = { wardrobeModel.delete(it.id) },
             deletingId = wardrobe.deletingId, deleteError = wardrobe.deleteError,
             onDeleteDismiss = wardrobeModel::clearDeleteError,
@@ -478,7 +500,8 @@ fun WardrobeScreen(items: List<WardrobeItem>, message: String?, cameraBusy: Bool
                    onItemClick: (WardrobeItem) -> Unit = {}, loading: Boolean = false, onRetry: (() -> Unit)? = null,
                    onWornPhoto: (() -> Unit)? = null,
                    onDelete: ((WardrobeItem) -> Unit)? = null, deletingId: String? = null,
-                   deleteError: String? = null, onDeleteDismiss: () -> Unit = {}, onInteraction: () -> Unit = {}) {
+                   deleteError: String? = null, onDeleteDismiss: () -> Unit = {}, onInteraction: () -> Unit = {},
+                   onAnalyze: (() -> Unit)? = null) {
     var pendingDeleteId by rememberSaveable { mutableStateOf<String?>(null) }
     val pendingDelete = items.firstOrNull { it.id == pendingDeleteId }
     LaunchedEffect(items) {
@@ -491,17 +514,24 @@ fun WardrobeScreen(items: List<WardrobeItem>, message: String?, cameraBusy: Bool
         }
         AlertDialog(
             onDismissRequest = ::dismissDelete,
-            title = { Text("의상 삭제") },
+            icon = { Icon(Icons.Outlined.Delete, contentDescription = null) },
+            title = { Text("옷 삭제") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("해당 의상을 삭제하시겠습니까?")
-                    Text("이 의상이 포함된 코디도 함께 삭제됩니다.", style = MaterialTheme.typography.bodyMedium)
+                    Text("'${pendingDelete.name}'을(를) 옷장에서 삭제할까요?")
+                    Text("이 옷이 들어간 코디북 코디도 함께 삭제돼요.", style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
                     deleteError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                     if (deleting) LinearProgressIndicator(Modifier.fillMaxWidth())
                 }
             },
-            confirmButton = { TextButton(onClick = { onDelete(pendingDelete) }, enabled = !deleting) { Text("예") } },
-            dismissButton = { TextButton(onClick = ::dismissDelete, enabled = !deleting) { Text("아니요") } },
+            confirmButton = {
+                TextButton(onClick = { onDelete(pendingDelete) }, enabled = !deleting,
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) {
+                    Text(if (deleting) "삭제 중…" else "삭제")
+                }
+            },
+            dismissButton = { TextButton(onClick = ::dismissDelete, enabled = !deleting) { Text("취소") } },
         )
     }
     var choosingMethod by rememberSaveable { mutableStateOf(false) }
@@ -518,6 +548,7 @@ fun WardrobeScreen(items: List<WardrobeItem>, message: String?, cameraBusy: Bool
         onRegister = { onInteraction(); choosingMethod = true }, onRetry = onRetry,
         onItemClick = onItemClick, deletingId = deletingId,
         onDelete = onDelete?.let { { garment -> onDeleteDismiss(); pendingDeleteId = garment.id } },
+        onAnalyze = onAnalyze,
         photo = { garment -> GarmentPhoto(checkNotNull(garment.imageUrl), garment.name, framed = false) },
     )
 }

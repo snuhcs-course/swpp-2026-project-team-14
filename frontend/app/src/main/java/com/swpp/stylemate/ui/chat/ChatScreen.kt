@@ -42,7 +42,7 @@ fun ChatRoute(model: ChatViewModel, modifier: Modifier = Modifier) {
     ChatScreen(state, onBack = model::close, onDraft = model::setDraft, onLock = model::toggleLock,
         onDirection = model::toggleDirection, onSend = model::send, onRetry = model::retry,
         onUnlock = model::unlockAndRetry, onRestore = model::restore, onUndo = model::undo,
-        onSave = model::save, onFeedback = model::feedback, onLoadFeedback = model::loadFeedback, modifier = modifier)
+        onSave = model::toggleSave, onFeedback = model::feedback, onLoadFeedback = model::loadFeedback, modifier = modifier)
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -319,7 +319,7 @@ private fun ResultCard(outfit: Outfit, changedIds: Set<String>, lockedIds: Set<S
                 if (state.current?.key != outfit.key) {
                     TextButton(onClick = { onRestore(outfit) }, enabled = !state.busy, modifier = Modifier.weight(1f)) { Text("이 코디로 돌아가기") }
                 }
-                Button(onClick = { onSave(outfit) }, enabled = outfit.key !in state.savedKeys && outfit.key !in state.savingKeys,
+                Button(onClick = { onSave(outfit) }, enabled = !state.busy && outfit.key !in state.savingKeys,
                     modifier = Modifier.weight(1f), shape = MaterialTheme.shapes.medium) {
                     Text(when (outfit.key) { in state.savedKeys -> "저장됨"; in state.savingKeys -> "저장 중…";
                         in state.saveErrors -> "저장 다시 시도"; else -> "코디북에 저장" })

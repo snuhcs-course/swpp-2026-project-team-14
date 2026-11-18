@@ -187,6 +187,10 @@ class FittingFlowTest {
                 } finally { expected.recycle() }
                 assertEquals("Only the generated fixture image should be published", 1, saved.size)
                 photos.add(saved.single())
+                // The image is published before the save coroutine marks it saved, and Compose does not wait for it.
+                compose.waitUntil(5_000) {
+                    compose.onAllNodes(hasText("저장") and isNotEnabled()).fetchSemanticsNodes().isNotEmpty()
+                }
                 compose.onNodeWithText("저장").assertIsNotEnabled()
             }
             compose.onNodeWithText("확인").performClick()

@@ -35,6 +35,18 @@ class BodyProfileStoreTest {
     }
 
     @Test
+    fun requestBodyIsTheProfileOrOnlyThePreferences() {
+        val style = StyleProfile(listOf("slim"), listOf("street", "unknown"))
+        assertEquals(BodyProfileJson.encode(profile), BodyProfileJson.request(profile, style).toString())
+        // Body analysis skipped: no height or measurements, so the server recommends without the body.
+        val prefs = BodyProfileJson.request(null, style)
+        assertEquals("slim", prefs.getString("preferred_fit"))
+        assertEquals(listOf("스트릿"), List(prefs.getJSONArray("preferred_styles").length()) {
+            prefs.getJSONArray("preferred_styles").getString(it) })
+        assertFalse(prefs.has("height_cm") || prefs.has("measurements"))
+    }
+
+    @Test
     fun brokenOrForeignJsonIsIgnored() {
         assertNull(BodyProfileJson.decode("not json"))
         assertNull(BodyProfileJson.decode("""{"height_cm": 170}"""))

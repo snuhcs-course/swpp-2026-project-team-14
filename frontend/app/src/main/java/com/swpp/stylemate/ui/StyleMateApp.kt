@@ -77,6 +77,7 @@ import com.swpp.stylemate.ui.profile.AnalyzingScreen
 import com.swpp.stylemate.ui.profile.BodyProfileViewModel
 import com.swpp.stylemate.ui.profile.CaptureGuideScreen
 import com.swpp.stylemate.ui.profile.MyProfileScreen
+import com.swpp.stylemate.ui.profile.CalendarConnectionCard
 import com.swpp.stylemate.ui.profile.PhotoInputScreen
 import com.swpp.stylemate.ui.profile.ReviewScreen
 import com.swpp.stylemate.ui.profile.SetupStep
@@ -263,7 +264,8 @@ private fun MainTabs(viewModel: BodyProfileViewModel, authModel: AuthViewModel, 
         AccountTabContent(account.userId, tab.name) { when (tab) {
             Tab.HOME -> HomeRoute(app.profile, onSetupProfile = viewModel::startReanalysis,
                 onOpenWardrobe = { tab = Tab.WARDROBE }, modifier = Modifier.padding(padding).consumeWindowInsets(padding),
-                onChat = { outfit, weather -> chat.open(outfit, app.profile, weather) }, wardrobeRevision = wardrobeRevision)
+                onChat = { outfit, weather -> chat.open(outfit, app.profile, weather, app.style) }, wardrobeRevision = wardrobeRevision,
+                style = app.style)
             Tab.WARDROBE -> Box(Modifier.padding(padding).consumeWindowInsets(padding)) { WardrobeRoute(onDeleted = { wardrobeRevision++ }) }
             Tab.CODIBOOK -> CodiBookRoute(Modifier.padding(padding).consumeWindowInsets(padding),
                 wardrobeRevision = wardrobeRevision, profile = app.profile)
@@ -290,6 +292,10 @@ private fun MainTabs(viewModel: BodyProfileViewModel, authModel: AuthViewModel, 
                 onImport = if (importing.available) importModel::open else null,
                 authBusy = auth.busy,
                 onDeleteRemote = viewModel::deleteAccountProfile,
+                connections = {
+                    val store = remember(account.userId) { LocalUserStore.forContext(context, account.userId) }
+                    CalendarConnectionCard(store)
+                },
             )
         } }
     }

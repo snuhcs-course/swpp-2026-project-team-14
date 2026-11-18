@@ -16,11 +16,13 @@ import com.swpp.stylemate.data.recommendation.Outfit
 import com.swpp.stylemate.data.recommendation.OutfitGarment
 import com.swpp.stylemate.data.recommendation.Reason
 import com.swpp.stylemate.data.recommendation.Weather
+import com.swpp.stylemate.ui.home.BodyHint
 import com.swpp.stylemate.ui.home.HomeScreen
 import com.swpp.stylemate.ui.home.HomeState
 import com.swpp.stylemate.ui.theme.StyleMateTheme
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 

@@ -111,8 +111,9 @@ class AuthRepository(
 
     internal fun invalidate(session: AuthSession) = synchronized(lock) {
         if (mutableStatus.value.session?.token == session.token) {
-            mutableStatus.value = AuthStatus(notice = EXPIRED)
+            // Clear first so no observer of the expired state can still read the old token.
             runCatching { storage.clear() }
+            mutableStatus.value = AuthStatus(notice = EXPIRED)
         }
     }
 
