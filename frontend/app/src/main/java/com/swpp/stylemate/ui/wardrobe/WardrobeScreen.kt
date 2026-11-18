@@ -28,12 +28,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
@@ -43,15 +38,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.res.painterResource
-import com.swpp.stylemate.R
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
-import com.swpp.stylemate.ui.components.PrimaryActionBar
 import com.swpp.stylemate.ui.components.ScreenScaffold
 import com.swpp.stylemate.ui.components.SectionTitle
 import androidx.compose.ui.unit.dp
@@ -522,81 +511,21 @@ fun WardrobeScreen(items: List<WardrobeItem>, message: String?, cameraBusy: Bool
     var category by rememberSaveable { mutableStateOf("all") }
     val categories = listOf("all" to "전체", "top" to "상의", "bottom" to "하의", "outerwear" to "아우터", "shoes" to "신발")
     val visible = items.filter { category == "all" || it.category == category }
-    val configuration = LocalConfiguration.current
-    val columns = if (configuration.screenWidthDp < 352 || configuration.fontScale > 1.3f) 2 else 3
-    val nameStyle = MaterialTheme.typography.bodyMedium
-    val detailStyle = MaterialTheme.typography.bodySmall
-    val cardTextHeight = with(LocalDensity.current) { nameStyle.lineHeight.toDp() * 2 + detailStyle.lineHeight.toDp() } + 4.dp
-    Scaffold(
-        contentWindowInsets = WindowInsets(0),
-        bottomBar = {
-            PrimaryActionBar(if (cameraBusy) "촬영 중" else "등록하기", !cameraBusy, { choosingMethod = true })
-        },
-    ) { insets ->
-        Column(Modifier.fillMaxSize().padding(insets).padding(horizontal = 20.dp)) {
-            Spacer(Modifier.height(16.dp))
-            Text("내 옷장", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-            Text("총 ${items.size}벌", Modifier.padding(top = 4.dp, bottom = 8.dp),
-                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            if (loading) LinearProgressIndicator(Modifier.fillMaxWidth())
-            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                categories.forEach { (code, label) ->
-                    FilterChip(selected = category == code, onClick = { category = code }, label = { Text(label) },
-                        shape = RoundedCornerShape(50), colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = MaterialTheme.colorScheme.primary,
-                            selectedLabelColor = MaterialTheme.colorScheme.onPrimary))
-                }
-            }
-            message?.let { Text(it, Modifier.padding(vertical = 8.dp), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error) }
-            if (onRetry != null) TextButton(onClick = onRetry, enabled = !loading) { Text("다시 불러오기") }
-            Spacer(Modifier.height(8.dp))
-            if (visible.isEmpty()) {
-                Column(Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(if (items.isEmpty()) "아직 등록된 옷이 없습니다" else "이 카테고리에 등록된 옷이 없습니다", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(8.dp))
-                    Text("등록하기를 눌러 옷을 추가해 보세요.", style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            } else {
-                LazyVerticalGrid(columns = GridCells.Fixed(columns), modifier = Modifier.weight(1f),
-                    contentPadding = PaddingValues(bottom = 12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    items(visible, key = { it.id }) { garment ->
-                        Card(onClick = { onItemClick(garment) }, enabled = deletingId == null, shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
-                            Box(Modifier.fillMaxWidth().aspectRatio(1f), contentAlignment = Alignment.Center) {
-                                if (garment.thumbnail != null) Image(garment.thumbnail, garment.name, Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
-                                else if (garment.imageUrl != null) GarmentPhoto(garment.imageUrl, garment.name)
-                                else Text("사진 없음", style = MaterialTheme.typography.labelSmall)
-                                if (onDelete != null) IconButton(
-                                    onClick = { onDeleteDismiss(); pendingDeleteId = garment.id },
-                                    modifier = Modifier.align(Alignment.TopEnd),
-                                    enabled = !loading && deletingId == null,
-                                ) {
-                                    Icon(painterResource(R.drawable.ic_remove_garment), "${garment.name} 삭제",
-                                        Modifier.size(24.dp), tint = MaterialTheme.colorScheme.primary)
-                                }
-                            }
-                            Column(Modifier.fillMaxWidth().padding(12.dp).heightIn(min = cardTextHeight),
-                                verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically)) {
-                                Text(garment.name, style = nameStyle, fontWeight = FontWeight.SemiBold,
-                                    maxLines = 2, overflow = TextOverflow.Ellipsis)
-                                garment.style?.takeIf { it.isNotBlank() }?.let { style ->
-                                    Text(style, style = detailStyle, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
+    WardrobeCollection(
+        total = items.size, items = visible, categories = categories, category = category,
+        onCategory = { onInteraction(); category = it },
+        message = message, loading = loading, cameraBusy = cameraBusy,
+        onRegister = { onInteraction(); choosingMethod = true }, onRetry = onRetry,
+        onItemClick = onItemClick, deletingId = deletingId,
+        onDelete = onDelete?.let { { garment -> onDeleteDismiss(); pendingDeleteId = garment.id } },
+        photo = { garment -> GarmentPhoto(checkNotNull(garment.imageUrl), garment.name, framed = false) },
+    )
 }
 
 
 @Composable
-private fun GarmentPhoto(path: String, name: String, onLoaded: (ImageBitmap?) -> Unit = {}, store: LocalUserStore? = null) {
+private fun GarmentPhoto(path: String, name: String, onLoaded: (ImageBitmap?) -> Unit = {}, store: LocalUserStore? = null,
+                         framed: Boolean = true) {
     val context = LocalContext.current.applicationContext
     val account = checkNotNull(LocalAccountAccess.current)
     var bitmap by remember(path) { mutableStateOf<ImageBitmap?>(null) }
@@ -609,16 +538,20 @@ private fun GarmentPhoto(path: String, name: String, onLoaded: (ImageBitmap?) ->
         finally { loading = false }
         onLoaded(bitmap)
     }
-    PhotoFrame {
+    val content: @Composable BoxScope.() -> Unit = {
         bitmap?.let { Image(it, name, Modifier.fillMaxSize(), contentScale = ContentScale.Fit) }
-        if (loading) CircularProgressIndicator()
-        else if (bitmap == null) Text("사진을 불러오지 못했습니다.")
+        if (loading) CircularProgressIndicator(Modifier.size(if (framed) 40.dp else 24.dp))
+        else if (bitmap == null) Text("사진을 불러오지 못했습니다.",
+            style = if (framed) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.bodySmall,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center)
     }
+    if (framed) PhotoFrame(content)
+    else Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center, content = content)
 }
 
 @Composable
 private fun PhotoFrame(content: @Composable BoxScope.() -> Unit) {
-    Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainer,
+    Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainer,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
         Box(Modifier.fillMaxWidth().aspectRatio(1f), contentAlignment = Alignment.Center, content = content)
     }
@@ -628,14 +561,14 @@ private fun PhotoFrame(content: @Composable BoxScope.() -> Unit) {
 fun MeasurementSummary(values: List<Pair<String, String>>) {
     if (values.isEmpty()) return
     SectionTitle("추정 치수", "cm")
-    Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
+    Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainer) {
         Column {
             values.forEachIndexed { index, (label, value) ->
                 if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
                     Spacer(Modifier.width(8.dp))
-                    Surface(shape = RoundedCornerShape(50), color = MaterialTheme.colorScheme.surfaceVariant,
+                    Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceVariant,
                         contentColor = MaterialTheme.colorScheme.onSurface) {
                         Text("$value cm", Modifier.padding(horizontal = 14.dp, vertical = 6.dp), fontWeight = FontWeight.Bold)
                     }
