@@ -154,7 +154,7 @@ class WardrobeRedesignTest {
             }
         } }
         compose.onNodeWithText("등록하기").assertIsDisplayed().assertIsEnabled()
-        compose.onNodeWithText("내 옷장").assertIsDisplayed()
+        compose.onNodeWithText("옷장").assertIsDisplayed()
         capture("07-small-large-font")
         compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasText(items[3].name))
         compose.onNodeWithText(items[3].name).assertIsDisplayed()

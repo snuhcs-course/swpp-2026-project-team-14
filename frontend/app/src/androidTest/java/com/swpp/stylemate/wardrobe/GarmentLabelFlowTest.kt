@@ -53,7 +53,8 @@ class GarmentLabelFlowTest {
         val model = screen { 503 to """{"error":"UNAVAILABLE"}""" }
         compose.waitUntil(5000) { model.state.value.error != null }
         compose.onNodeWithText("옷장에 추가").assertIsNotEnabled()
-        compose.onNodeWithText("루즈").performScrollTo().performClick()
+        compose.onNodeWithText("핏:", substring = true).performScrollTo().performClick()
+            compose.onNodeWithText("루즈").performScrollTo().performClick()
         compose.onNodeWithText("옷장에 추가").assertIsNotEnabled()
         compose.onNodeWithText("수동 입력 완료").performScrollTo().performClick()
         compose.onNodeWithText("옷장에 추가").assertIsEnabled().performClick()
@@ -75,6 +76,7 @@ class GarmentLabelFlowTest {
         }
         try {
             compose.waitUntil(5000) { model.state.value.error != null }
+            compose.onNodeWithText("핏:", substring = true).performScrollTo().performClick()
             compose.onNodeWithText("루즈").performScrollTo().performClick()
             compose.onNodeWithText("다시 계산").performScrollTo().performClick()
             compose.waitUntil(5000) { model.state.value.loading }

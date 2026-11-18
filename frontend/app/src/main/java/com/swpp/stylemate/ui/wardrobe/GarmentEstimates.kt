@@ -1,14 +1,19 @@
 package com.swpp.stylemate.ui.wardrobe
 
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
-import com.swpp.stylemate.ui.components.SectionTitle
 import org.json.JSONObject
+import java.util.Locale
+
+/** Show one estimate per field. A representative value is not a second measurement. */
+internal fun estimatedMeasurementText(value: JSONObject): String? {
+    fun number(key: String) = value.optDouble(key, Double.NaN).takeIf { it.isFinite() && it > 0 }
+    fun format(number: Double) = String.format(Locale.KOREA, "%.2f", number).trimEnd('0').trimEnd('.')
+    val min = number("min")
+    val max = number("max")
+    if (min != null && max != null && min <= max) return if (min == max) "약 ${format(min)} cm"
+        else "${format(min)}–${format(max)} cm"
+    return number("value")?.let { "약 ${format(it)} cm" }
+}
 
 /** Never return estimates as the editor's actual dimensions or save payload. */
 internal fun matchingWornEstimates(record: JSONObject, attributes: JSONObject, labels: JSONObject?): JSONObject? {
@@ -29,22 +34,10 @@ internal fun GarmentEstimates(estimate: JSONObject?, attributes: JSONObject, cat
     val measurements = estimate.optJSONObject("measurements") ?: return
     val group = if (attributes.optString("category") == "bottom") "bottom" else "top"
     val definitions = catalog.optJSONObject("dimensions")?.optJSONObject(group) ?: return
-    val fields = measurements.keys().asSequence().filter { definitions.has(it) && measured?.has(it) != true }.toList()
-    if (fields.isEmpty()) return
-    SectionTitle("추정 치수", "사진·체형 기준")
-    Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainer) {
-        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            fields.forEach { field ->
-                val value = measurements.getJSONObject(field)
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(definitions.getJSONObject(field).getString("label"))
-                    Text("약 ${value.getInt("value")}cm · 추정", color = MaterialTheme.colorScheme.primary)
-                }
-                Text("예상 범위 ${value.getInt("min")}~${value.getInt("max")}cm", style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            Text("실측값이 아니에요. 체형과 착용 모습으로 계산한 대략적인 범위입니다.",
-                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-    }
+    val rows = measurements.keys().asSequence().filter { definitions.has(it) && measured?.has(it) != true }
+        .mapNotNull { field -> measurements.optJSONObject(field)?.let(::estimatedMeasurementText)?.let {
+            definitions.getJSONObject(field).getString("label") to it
+        } }.toList()
+    if (rows.isEmpty()) return
+    GarmentSection("추정 치수", "사진과 체형으로 추정한 범위예요. 실제 측정값과 다를 수 있어요.") { GarmentInfoRows(rows) }
 }

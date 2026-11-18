@@ -93,6 +93,18 @@ class UxHierarchyTest {
         compose.onNode(hasSetTextAction()).assertIsFocused()
     }
 
+    @Test fun garmentSelectorsKeepCodesLimitsAndSingleSelectionBehavior() {
+        var selected by mutableStateOf(emptyList<String>())
+        show { Column { GarmentChoiceField("스타일", listOf("minimal" to "미니멀", "casual" to "캐주얼", "classic" to "클래식"),
+            selected, 2, true) { selected = it } } }
+        compose.onNodeWithText("스타일:", substring = true).performClick()
+        compose.onNodeWithText("미니멀").performClick()
+        compose.onNodeWithText("캐주얼").performClick()
+        compose.onNodeWithText("클래식").assertIsNotEnabled()
+        compose.onNodeWithText("완료").performClick()
+        compose.runOnIdle { assertEquals(listOf("minimal", "casual"), selected) }
+    }
+
     @Test fun homeRatingStaysBelowThePhotoAndReasonsKeepTheirHierarchy() {
         show { HomeScreen(HomeState(outfits = listOf(outfit)), {}, {}, {}, {}, {}, {}, {},
             photo = { _, m -> Box(m.background(Color(0xFFE8E5E0))) }) }

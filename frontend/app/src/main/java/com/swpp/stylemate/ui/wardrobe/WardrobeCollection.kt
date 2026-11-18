@@ -36,6 +36,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.swpp.stylemate.R
+import com.swpp.stylemate.ui.components.PageHeader
+
+internal const val ANALYZE_BUTTON_TEXT = "옷장 분석"
 
 /** Presentation only: filtering, confirmation and all service state stay in WardrobeScreen/Route. */
 @Composable
@@ -72,19 +75,14 @@ internal fun WardrobeCollection(
             LazyVerticalGrid(
                 columns = GridCells.Fixed(columns),
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(horizontal = WardrobeStyle.PageInset, vertical = 24.dp),
+                contentPadding = PaddingValues(horizontal = WardrobeStyle.PageInset, vertical = 0.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalArrangement = Arrangement.spacedBy(24.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 item(key = "header", span = { GridItemSpan(maxLineSpan) }) {
                     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text("내 옷장", style = MaterialTheme.typography.headlineSmall,
-                                modifier = Modifier.semantics { heading() })
-                            if (!(total == 0 && (loading || onRetry != null))) {
-                                Text("총 ${total}벌", style = MaterialTheme.typography.bodySmall, color = WardrobeStyle.Muted)
-                            }
-                        }
+                        PageHeader("옷장", horizontalPadding = 0.dp,
+                            subtitle = if (total == 0 && (loading || onRetry != null)) null else "총 ${total}벌")
                         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             categories.forEach { (code, label) ->
@@ -186,10 +184,10 @@ private fun WardrobeGarmentCard(
                     }
                 }
             }
-            Column(Modifier.fillMaxWidth().padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(Modifier.fillMaxWidth().padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(garment.name, style = MaterialTheme.typography.labelLarge,
-                    minLines = 2, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Text(listOfNotNull(categoryLabel, garment.style?.takeIf { it.isNotBlank() }).joinToString(" · "),
+                    maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(categoryLabel.orEmpty(),
                     style = MaterialTheme.typography.bodySmall, color = WardrobeStyle.Muted,
                     maxLines = 1, overflow = TextOverflow.Ellipsis)
             }

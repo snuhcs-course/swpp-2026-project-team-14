@@ -59,21 +59,21 @@ class UxPhaseOneTest {
         } } }
         compose.onNodeWithText("이름").performScrollTo().performTextReplacement("수정한 이름")
         compose.onNodeWithText("가슴 단면").performScrollTo().performTextInput("53.25")
-        compose.onNodeWithText("메모").performScrollTo().performTextInput("찬물 세탁")
+        compose.onNodeWithContentDescription("메모").performScrollTo().performTextInput("찬물 세탁")
         compose.runOnIdle { tab = "home" }
         compose.onNodeWithText("다른 탭").assertExists()
         compose.runOnIdle { tab = "wardrobe" }
         compose.onNodeWithText("이름").performScrollTo().assertTextContains("수정한 이름")
         compose.onNodeWithText("가슴 단면").performScrollTo().assertTextContains("53.25")
-        compose.onNodeWithText("메모").performScrollTo().assertTextContains("찬물 세탁")
+        compose.onNodeWithContentDescription("메모").performScrollTo().assertTextContains("찬물 세탁")
         compose.onNodeWithContentDescription("뒤로").performClick()
         compose.onNodeWithText("변경 내용을 버릴까요?").assertIsDisplayed()
         compose.onNodeWithText("계속 편집").performClick()
-        compose.onNodeWithText("메모").assertTextContains("찬물 세탁")
+        compose.onNodeWithContentDescription("메모").assertTextContains("찬물 세탁")
         compose.runOnIdle { failure = "저장 연결 오류" }
         compose.onNodeWithText("저장하기").performClick()
         compose.runOnIdle { assertNull(saved) }
-        compose.onNodeWithText("메모").assertTextContains("찬물 세탁")
+        compose.onNodeWithContentDescription("메모").assertTextContains("찬물 세탁")
         compose.onNodeWithText("저장하기").performClick()
         compose.runOnIdle { assertEquals("수정한 이름", saved!!.getJSONObject("attributes").getString("name")) }
         compose.onNodeWithText("다시 편집").performClick()
