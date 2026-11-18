@@ -6,7 +6,7 @@
 swpp-2026-project-team-14/
 |-- frontend/app/src/
 |   |-- main/java/com/swpp/stylemate/
-|   |   |-- MainActivity.kt                       # 공통 앱 진입
+|   |   |-- MainActivity.kt                       # 공통 앱 진입·밝은 테마 시스템 바 아이콘 적용
 |   |   |-- data/
 |   |   |   |-- BodyMeasurements.kt              # 체형 치수·선호 정보 모델
 |   |   |   |-- LocalUserStore.kt                # 계정별 프로필·옷장 캐시·추천 취향·온보딩 초안
@@ -26,26 +26,33 @@ swpp-2026-project-team-14/
 |   |   |       |-- CaptureFiles.kt               # 옷 사진 임시 캐시·재개 중인 촬영 파일 보존
 |   |   |       `-- CaptureType.kt                # 측정 종류 → 하의 세부 종류 기본값
 |   |   `-- ui/
-|   |       |-- StyleMateApp.kt                   # 로그인 필수 진입·계정 온보딩/탭·수동 가져오기·만료 시 ViewModel 폐기
+|   |       |-- StyleMateApp.kt                   # 로그인 필수 진입·계정별 탭/편집 상태 보존·수동 가져오기·만료 시 상태 폐기
 |   |       |-- components/ScreenComponents.kt   # 체형·옷장 공통 상단바 교체 슬롯·하단 버튼·섹션 제목
-|   |       |-- theme/Theme.kt                    # 크림·테라코타 공통 테마
+|   |       |-- components/StarRating.kt         # 서버 값을 반별 단위·5개 별로 표시하는 읽기 전용 추천 별점
+|   |       |-- theme/Theme.kt                    # 앱 전체 흑백 팔레트·글자 위계·모서리·시스템 바 스타일
+|   |       |-- home/
+|   |       |   |-- HomeScreen.kt                # 압축 코디판·좌우 비교·행동/피드백 버튼·별점/추천 문장·재시도
+|   |       |   |-- HomeRoute.kt                 # 선택 코디의 채팅/피팅 연결·계정 저장소·의상 삭제 후 갱신
+|   |       |   `-- HomeViewModel.kt             # 추천 상태·요청 없는 코디 선택·저장/피드백·삭제 시 무효화
 |   |       |-- profile/
 |   |       |   |-- AuthScreens.kt               # 로그인 진입 화면·회원가입·비밀번호 표시·오류 안내
 |   |       |   |-- AuthViewModel.kt             # 중복 제출 방지·시도 제한 대기·포그라운드 검증·만료 안내
-|   |       |   |-- GuestImportViewModel.kt      # 수동 가져오기·읽기 취소·충돌 선택·저장/새로고침 재시도
+|   |       |   |-- GuestImportViewModel.kt      # 계정별 가져오기 대상 확인·수동 가져오기·충돌 선택·재시도
 |   |       |   |-- GuestImportDialog.kt         # 가져오기 확인·항목별 교체 선택·결과 팝업
 |   |       |   |-- BodyProfileViewModel.kt      # 체형 분석·온보딩 초안·핏/무드 서버 저장·완료·계정 연결
 |   |       |   |-- OnboardingScreen.kt          # 공통 상단바·8페이지·등록 개수 현황·선택적 분석·계정 옷 등록 반복·완료
-|   |       |   |-- PhotoInputScreen.kt          # 체형 사진·기본 정보 입력·온보딩 상단바 연결
+|   |       |   |-- PhotoInputScreen.kt          # 사진 박스 선택·교체·가이드 왕복·키보드 대응·기본 정보 입력
 |   |       |   |-- ReviewScreen.kt              # 체형 결과·치수 수정·온보딩 확인과 재분석 저장
 |   |       |   `-- MyProfileScreen.kt           # 핏·무드 즉시 저장·컬러 편집·계정 카드/로그아웃·기존 데이터 가져오기·체형 상세
 |   |       `-- wardrobe/
 |   |           |-- WardrobeScreen.kt            # 옷장 목록·등록 방식 선택 시트·옷 선택 메뉴·온보딩/사진/편집 연결
+|   |           |-- WardrobeCollection.kt        # 옷장 메인 전용 헤더·반응형 사진 그리드·필터·상태·등록 행동 표시
+|   |           |-- WardrobeStyle.kt             # 공통 팔레트를 참조하는 옷장 배치·모서리 별칭
 |   |           |-- WardrobeViewModel.kt         # 계정 목록·저장·삭제/중복 방지·외부 추천 상태
 |   |           |-- ExternalRecommendationDialog.kt # 선택 옷 메뉴·추천 속성·무신사 바로가기 팝업
 |   |           |-- GarmentAnalysisViewModel.kt  # 분석 진행·실패·초안 복원·사진 변경 시 이전 분석 취소
 |   |           |-- WardrobeColorField.kt       # 색상표·사진 좌표 변환·픽셀 색상 선택
-|   |           |-- GarmentEditor.kt             # 특징·실측·메모 편집·초안 복원·하단 고정 저장
+|   |           |-- GarmentEditor.kt             # 특징·실측·메모 편집·초안 복원·버리기 확인·하단 고정 저장
 |   |           |-- GarmentEstimates.kt          # 실측과 분리한 읽기 전용 추정값·범위 표시·편집 후 무효화
 |   |           |-- WornBatchRegistration.kt     # 사진 업로드 영역·후보 선택·원본 분석/생성·기존 편집과 승인 저장 연결
 |   |           |-- WornBatchReviewScreen.kt     # 서비스/미리보기 공용 카드·전체 선택·원본 비교·접이식 치수·처리 스피너
@@ -64,8 +71,11 @@ swpp-2026-project-team-14/
 |   |       |-- WornPreviewActivity.kt            # 개인 앱 파일의 기존 이미지·예시 값으로 UI만 체험, 네트워크/저장 없음
 |   |       `-- WornPreviewReviewScreen.kt        # 서비스 공용 확인 화면에 로컬 이미지·예시 상태/설정만 제공
 |   |-- main/res/drawable/ic_remove_garment.xml # 카드 우상단 의상 삭제 아이콘
+|   |-- main/res/values/themes.xml             # 흰 시작 화면·검정 기본 강조·밝은 시스템 바 기본 리소스
+|   |-- main/res/values-v27/themes.xml         # API 27 이상에서 어두운 내비게이션 바 아이콘 적용
 |   |-- main/res/drawable-nodpi/                # 생성한 온보딩 환영·6종 무드 사진
 |   |-- test/java/com/swpp/stylemate/             # 인증·만료·계정 캐시·추천 요청·재시도 검사
+|   |   |-- ui/components/StarRatingTest.kt        # 기존 반별 표시 규칙·경계값·문자열 검사
 |   |   |-- profile/
 |   |   |   |-- AuthViewModelTest.kt              # 세션 복원·가입/로그인·제한시간·중복 차단·만료·로그아웃 검사
 |   |   |   |-- GuestImportViewModelTest.kt       # 동의·충돌 결정·부분 실패·중복 저장 방지·재시도·취소 검사
@@ -77,7 +87,11 @@ swpp-2026-project-team-14/
 |   |       |-- WornGenerationViewModelTest.kt    # 생성 조회/재생성·이미지 승인/거절·작업 취소·임시 사진 수명 검사
 |   |       `-- WardrobeModelTestSupport.kt       # 가상 시간·ViewModel 정리·사진/생성 요청 대역
 |   `-- androidTest/java/com/swpp/stylemate/      # 로그인 차단·로그아웃/만료·계정 온보딩·옷장·측정점 검사
+|       |-- UxPhaseOneTest.kt                    # 탭/계정별 초안·저장/버리기·사진 취소/가이드·채팅 조건·가져오기 표시 회귀
+|       |-- GlobalThemeTest.kt                   # 실제 앱 탭·로그인/가입·편집/체형/채팅/피팅의 이전 테마 색상 검출·화면 촬영
+|       |-- home/HomeScreenTest.kt               # 작은 화면의 행동 노출·선택 상태·별점/추천 문장·실패 재시도 검사
 |       |-- wardrobe/WornRegistrationTest.kt      # 자동 후보 체크·슬라이더 없음·일괄 저장 조건·원본 크롭·기존 진입 검사
+|       |-- wardrobe/WardrobeRedesignTest.kt       # 동일 샘플 전후 촬영·로딩/오류 구분·필터 접근성·작은 화면/큰 글자 검사
 |       `-- wardrobe/WornPreviewTest.kt           # 계정/서버 없이 선택·실패 이유·등록 모의 동작·확대 원본 비교 검사
 |-- backend/
 |   |-- config/
@@ -154,7 +168,7 @@ swpp-2026-project-team-14/
 
 `로그인 → 옷장 → AR 촬영 → 자동 점 확인·수정 → cm 계산 → Gemini 분석 → 사용자 편집 → 계정 서버 저장`
 
-- Android: 체형·옷장은 같은 서버 주소와 공통 `StyleMateTheme`·화면 컴포넌트를 사용한다.
+- Android: 로그인·홈·옷장·코디북·프로필·체형·등록·편집·채팅·가상피팅은 같은 서버 주소와 공통 흑백 `StyleMateTheme`를 사용한다. 옷장 전용 테마는 제거했으며 공통 내비게이션·모달·시스템 바도 같은 팔레트를 사용한다. 사진·선호 색상 값·AR 측정 색과 기능 로직은 유지한다.
 - 측정: HRNet은 원본 사진의 2D 점을 제안하고, Android ARCore가 바닥 평면을 기준으로 cm를 계산한다.
 - 분석: 상의·아우터는 앞면 사진, 하의는 측정 사진을 보낸다. Gemini는 이름·분류·색상을 생성하고 세부 종류·스타일을 제안한다. 응답은 `id`·`model`·`attributes`와 추천용 `details`(무늬·넥라인·옷깃·디테일·겉으로 분명한 소재, 저장하지 않음)다.
 - 추천 라벨: 저장 전 `POST labels/`가 치수와 체형으로 핏·기장·소매·계절 등을 계산하고, 사용자가 확인·수정한 값을 `labels`로 함께 저장한다. 설계는 [추천 문서](../recommendation/README.md)를 따른다.

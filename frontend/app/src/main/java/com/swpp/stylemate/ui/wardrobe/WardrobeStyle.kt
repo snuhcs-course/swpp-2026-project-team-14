@@ -21,4 +21,3 @@ internal object WardrobeStyle {
     val ImageShape = RoundedCornerShape(4.dp)
     val FilterShape = RoundedCornerShape(10.dp)
 }
-
