@@ -29,8 +29,9 @@ The school exception does not encrypt passwords, tokens or photo uploads.
 
 CI checks the actual Android network policy against a non-debuggable release APK:
 the exact school host is allowed, while unrelated hosts, subdomains, IP addresses and
-localhost are blocked. Only that test copy is signed with the CI debug key; it is not
-uploaded as a store artifact. Normal release builds remain unsigned until store
+localhost are blocked. Both test APKs use a dedicated temporary CI key, independent
+of the runner's debug-key location. They are installed only on the CI emulator and
+are not uploaded as store artifacts. Normal release builds remain unsigned until store
 signing is configured. No certificate or public-port changes are required for this
 HTTP exception.
 
