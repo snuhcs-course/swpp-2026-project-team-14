@@ -1,0 +1,62 @@
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: letsencrypt-http
+  namespace: team14
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: letsencrypt-http-account
+    solvers:
+      - http01:
+          ingress:
+            ingressClassName: traefik
+            serviceType: ClusterIP
+            ingressTemplate:
+              metadata:
+                annotations:
+                  traefik.ingress.kubernetes.io/router.entrypoints: web
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: backend-tls
+  namespace: team14
+spec:
+  secretName: backend-tls
+  dnsNames:
+    - swpp26t14.147-46-242-169.sslip.io
+  issuerRef:
+    name: letsencrypt-http
+    kind: Issuer
+  privateKey:
+    rotationPolicy: Always
+    algorithm: RSA
+    size: 2048
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: backend-https
+  namespace: team14
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - swpp26t14.147-46-242-169.sslip.io
+      secretName: backend-tls
+  rules:
+    - host: swpp26t14.147-46-242-169.sslip.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: backend
+                port:
+                  number: 8000

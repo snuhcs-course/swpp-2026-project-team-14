@@ -16,9 +16,16 @@ Public API: `http://swpp26t14.147-46-242-169.sslip.io`.
 K3s Traefik receives school-forwarded HTTP on port 80 and routes the hostname to backend:8000.
 MySQL runs on the same A node and is reachable only through its ClusterIP Service.
 The school blocks direct A-to-B communication; B is not a database replica or failover node.
-Frontend CI builds debug APKs with this fixed API address. Local Android builds still read
-`frontend/local.properties`; set `stylemate.apiBaseUrl` there when building on the PC.
-The supplied school endpoint is HTTP; the current release app requires HTTPS.
+The HTTPS target is `https://swpp26t14.147-46-242-169.sslip.io`.
+Frontend CI and the Android release configuration use that HTTPS address; local debug
+builds still read `stylemate.apiBaseUrl` from `frontend/local.properties` and default to
+the emulator's `http://10.0.2.2:8000`. Release uses the separate
+`stylemate.releaseApiBaseUrl` setting and rejects HTTP.
+The existing HTTP ingress remains for older debug builds. Do not distribute the
+HTTPS-configured builds until public TLS/certificate checks pass: the observed school
+frontend currently refuses external 443 connections and ACME staging reported a
+redirect loop. See [HTTPS setup and rollout](https.md) for prerequisites, certificate
+management, validation and rollback.
 
 ## One-time prerequisites on the server
 

@@ -1,4 +1,5 @@
 // AI-generated with Claude Code (Dongkun Moon) and Codex (Hyeon U Jeong), 2026-09-24, reviewed by Dongkun Moon and Hyeon U Jeong
+import java.net.URI
 import java.util.Properties
 
 plugins {
@@ -6,12 +7,23 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
-// Shared body-analysis and wardrobe API. Default = the host PC as seen from the emulator.
-// For a real phone, add `stylemate.apiBaseUrl=http://<PC LAN IP>:8000` to local.properties.
+// Debug keeps local development; release uses its own HTTPS endpoint.
+// Set these properties in local.properties or override them with -P.
 val localProperties = Properties().apply {
     rootProject.file("local.properties").takeIf { it.exists() }?.inputStream()?.use { load(it) }
 }
-val apiBaseUrl = localProperties.getProperty("stylemate.apiBaseUrl", "http://10.0.2.2:8000")
+val debugApiBaseUrl = providers.gradleProperty("stylemate.apiBaseUrl")
+    .orElse(localProperties.getProperty("stylemate.apiBaseUrl", "http://10.0.2.2:8000")).get()
+val releaseApiBaseUrl = providers.gradleProperty("stylemate.releaseApiBaseUrl")
+    .orElse(localProperties.getProperty("stylemate.releaseApiBaseUrl", "https://swpp26t14.147-46-242-169.sslip.io"))
+    .get().trimEnd('/')
+val releaseApiUri = runCatching { URI(releaseApiBaseUrl) }.getOrNull()
+require(releaseApiUri != null && releaseApiUri.scheme.equals("https", ignoreCase = true)
+    && !releaseApiUri.host.isNullOrBlank() && releaseApiUri.rawUserInfo == null
+    && releaseApiUri.rawQuery == null && releaseApiUri.rawFragment == null
+    && (releaseApiUri.port == -1 || releaseApiUri.port in 1..65535)) {
+    "stylemate.releaseApiBaseUrl must be a valid HTTPS URL without credentials, query or fragment."
+}
 
 android {
     namespace = "com.swpp.stylemate"
@@ -24,11 +36,11 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         versionCode = 2
         versionName = "0.2.0"
-        buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrl\"")
     }
 
     buildTypes {
         debug {
+            buildConfigField("String", "API_BASE_URL", "\"$debugApiBaseUrl\"")
             // JaCoCo line/branch coverage: createDebugUnitTestCoverageReport (JVM unit tests).
             // Device-test coverage instruments the debug APK itself, so it is opt-in:
             // -PandroidTestCoverage createDebugAndroidTestCoverageReport, or createAggregatedCoverageReport
@@ -37,6 +49,7 @@ android {
             enableAndroidTestCoverage = project.hasProperty("androidTestCoverage")
         }
         release {
+            buildConfigField("String", "API_BASE_URL", "\"$releaseApiBaseUrl\"")
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),

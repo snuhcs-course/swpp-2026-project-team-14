@@ -36,7 +36,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Configure school API endpoint
-        run: printf '%s\n' 'stylemate.apiBaseUrl=http://swpp26t14.147-46-242-169.sslip.io' >> local.properties
+        run: printf '%s\n' 'stylemate.apiBaseUrl=https://swpp26t14.147-46-242-169.sslip.io' >> local.properties
 
       - name: Unit tests with coverage
         run: ./gradlew --no-daemon createDebugUnitTestCoverageReport
@@ -59,6 +59,9 @@ jobs:
 
       - name: Build debug APK
         run: ./gradlew --no-daemon assembleDebug
+
+      - name: Build release APK
+        run: ./gradlew --no-daemon assembleRelease
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
@@ -84,6 +87,9 @@ jobs:
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
+
+      - name: Configure school API endpoint
+        run: printf '%s\n' 'stylemate.apiBaseUrl=https://swpp26t14.147-46-242-169.sslip.io' >> local.properties
 
       - name: Enable emulator acceleration
         run: |
