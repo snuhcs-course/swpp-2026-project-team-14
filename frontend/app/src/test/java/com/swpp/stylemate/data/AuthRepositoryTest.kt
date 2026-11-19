@@ -275,4 +275,21 @@ class AuthRepositoryTest {
         override fun write(value: String) { this.value = value }
         override fun clear() { value = null }
     }
+
+    @Test fun apiRedirectDoesNotReplayLoginOrForwardCredentials() = runBlocking {
+        val destination = MockWebServer().apply { start() }
+        try {
+            server.enqueue(MockResponse().setResponseCode(302).addHeader("Location", destination.url("/unexpected/")))
+            try {
+                repository.authenticate("member_1", "password_123")
+                fail("The original API request must not follow redirects")
+            } catch (error: AuthException) { assertEquals("HTTP_302", error.code) }
+            val request = server.takeRequest()
+            assertEquals("POST", request.method)
+            assertEquals("password_123", JSONObject(request.body.readUtf8()).getString("password"))
+            assertEquals(1, server.requestCount)
+            assertEquals(0, destination.requestCount)
+            assertNull(repository.status.value.session)
+        } finally { destination.shutdown() }
+    }
 }

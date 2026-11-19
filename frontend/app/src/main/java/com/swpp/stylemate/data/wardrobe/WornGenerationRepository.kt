@@ -2,6 +2,7 @@ package com.swpp.stylemate.data.wardrobe
 
 import com.swpp.stylemate.BuildConfig
 import com.swpp.stylemate.data.AccountAccess
+import com.swpp.stylemate.data.network.SchoolGateway
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -24,8 +25,13 @@ object WornGenerationRepository {
 internal suspend fun wornRequest(account: AccountAccess, path: String, body: ByteArray? = null,
                                  contentType: String = "application/json"): JSONObject = withContext(Dispatchers.IO) {
         require(path.startsWith("/api/wardrobe/"))
-        val connection = URI("${BuildConfig.API_BASE_URL.trimEnd('/')}$path").toURL().openConnection() as HttpURLConnection
+        val url = "${BuildConfig.API_BASE_URL.trimEnd('/')}$path"
+        val method = if (body == null) "GET" else "POST"
+        var openedConnection: HttpURLConnection? = null
         try {
+            SchoolGateway.prepare(url, method)
+            currentCoroutineContext().ensureActive()
+            val connection = (URI(url).toURL().openConnection() as HttpURLConnection).also { openedConnection = it }
             connection.instanceFollowRedirects = false
             connection.connectTimeout = 5_000
             connection.readTimeout = 55_000
@@ -39,6 +45,7 @@ internal suspend fun wornRequest(account: AccountAccess, path: String, body: Byt
                 connection.outputStream.use { it.write(bytes) }
             }
             val status = connection.responseCode
+            SchoolGateway.onResponse(url, status)
             account.checkResponse(status)
             val input = if (status in 200..299) connection.inputStream else connection.errorStream
             val bytes = input?.use { it.readBytesLimited(64 * 1024) } ?: byteArrayOf()
@@ -53,7 +60,7 @@ internal suspend fun wornRequest(account: AccountAccess, path: String, body: Byt
             result
         } catch (_: java.io.IOException) {
             error("서버 응답을 확인하지 못했습니다. 결과 확인을 눌러 주세요. 자동으로 다시 생성하지 않아요.")
-        } finally { connection.disconnect() }
+        } finally { openedConnection?.disconnect() }
     }
 
 private fun java.io.InputStream.readBytesLimited(limit: Int): ByteArray {

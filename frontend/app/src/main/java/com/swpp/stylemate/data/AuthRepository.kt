@@ -1,6 +1,7 @@
 // AI-generated with Codex, 2026-10-16
 package com.swpp.stylemate.data
 
+import com.swpp.stylemate.data.network.SchoolGateway
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -178,7 +179,11 @@ class AuthRepository(
         val builder = Request.Builder().url(base + path).method(method, payload)
         session?.let { builder.header("Authorization", "Bearer ${it.token}") }
         val response = try {
+            SchoolGateway.prepare(base + path, method)
+            currentCoroutineContext().ensureActive()
+            session?.let(::check)
             client.newCall(builder.build()).execute().use { result ->
+                SchoolGateway.onResponse(base + path, result.code)
                 currentCoroutineContext().ensureActive()
                 if (session != null && result.code == 401) {
                     invalidate(session)

@@ -28,6 +28,23 @@ class RemoteBodyAnalyzerTest {
 
     private fun analyzer() = RemoteBodyAnalyzer(server.url("/").toString(), account = testAccount(server.url("/").toString()))
 
+    @Test fun apiRedirectDoesNotReplayPhotosOrForwardAuthorization() = runBlocking {
+        val destination = MockWebServer().apply { start() }
+        try {
+            server.enqueue(MockResponse().setResponseCode(302).addHeader("Location", destination.url("/unexpected/")))
+            try {
+                analyzer().analyze(input, photos)
+                fail("Photo POST must not follow API redirects")
+            } catch (_: BodyAnalysisException) { }
+            val request = server.takeRequest()
+            assertEquals("POST", request.method)
+            assertEquals("Bearer $TEST_TOKEN", request.getHeader("Authorization"))
+            assertTrue(request.body.readUtf8().contains("front_photo"))
+            assertEquals(1, server.requestCount)
+            assertEquals(0, destination.requestCount)
+        } finally { destination.shutdown() }
+    }
+
     private fun analyzeExpectingError(): BodyAnalysisException {
         try {
             runBlocking { analyzer().analyze(input, photos) }

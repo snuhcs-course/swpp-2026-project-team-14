@@ -5,10 +5,13 @@ import android.graphics.Bitmap
 import com.swpp.stylemate.BuildConfig
 import com.swpp.stylemate.data.AccountAccess
 import com.swpp.stylemate.data.AuthException
+import com.swpp.stylemate.data.network.SchoolGateway
 import java.io.ByteArrayOutputStream
 import java.net.HttpURLConnection
 import java.net.URI
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
@@ -24,8 +27,12 @@ object GarmentLandmarks {
         val reduced = Bitmap.createScaledBitmap(bitmap, maxOf(1, (bitmap.width * scale).toInt()), maxOf(1, (bitmap.height * scale).toInt()), true)
         val bytes = try { ByteArrayOutputStream().use { out -> check(reduced.compress(Bitmap.CompressFormat.JPEG, 85, out)); out.toByteArray() } }
                     finally { if (reduced !== bitmap) reduced.recycle() }
-        val connection = URI("${BuildConfig.API_BASE_URL.trimEnd('/')}/api/wardrobe/landmarks/?garment=$garment").toURL().openConnection() as HttpURLConnection
+        val url = "${BuildConfig.API_BASE_URL.trimEnd('/')}/api/wardrobe/landmarks/?garment=$garment"
+        var openedConnection: HttpURLConnection? = null
         try {
+            SchoolGateway.prepare(url, "POST")
+            currentCoroutineContext().ensureActive()
+            val connection = (URI(url).toURL().openConnection() as HttpURLConnection).also { openedConnection = it }
             connection.connectTimeout = 2_000
             connection.readTimeout = 8_000
             connection.instanceFollowRedirects = false
@@ -36,6 +43,7 @@ object GarmentLandmarks {
             connection.setFixedLengthStreamingMode(bytes.size)
             connection.outputStream.use { it.write(bytes) }
             val status = connection.responseCode
+            SchoolGateway.onResponse(url, status)
             account.checkResponse(status)
             check(status in 200..299) { "자동 점을 찾지 못했습니다. 직접 지정할 수 있습니다." }
             val body = connection.inputStream.bufferedReader().use { reader ->
@@ -56,7 +64,7 @@ object GarmentLandmarks {
             error("점 탐지 서버에 연결할 수 없습니다. 직접 지정할 수 있습니다.")
         } catch (_: Exception) {
             error("자동 점을 찾지 못했습니다. 직접 지정할 수 있습니다.")
-        } finally { connection.disconnect() }
+        } finally { openedConnection?.disconnect() }
     }
 
     internal fun parse(data: JSONObject, garment: String): LandmarkResult {

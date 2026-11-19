@@ -1,7 +1,10 @@
 // AI-generated with Claude Code (Claude Opus 5.5), 2026-09-24, reviewed by Dongkun Moon
 package com.swpp.stylemate.data
 
+import com.swpp.stylemate.data.network.SchoolGateway
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
@@ -40,7 +43,14 @@ class RemoteBodyAnalyzer(
             val request = Request.Builder().url(endpoint).header("Authorization", access.authorization()).post(body).build()
 
             val (status, text) = try {
-                client.newCall(request).execute().use { access.checkResponse(it.code); it.code to it.body?.string().orEmpty() }
+                SchoolGateway.prepare(endpoint, "POST")
+                currentCoroutineContext().ensureActive()
+                access.authorization()
+                client.newCall(request).execute().use {
+                    SchoolGateway.onResponse(endpoint, it.code)
+                    access.checkResponse(it.code)
+                    it.code to it.body?.string().orEmpty()
+                }
             } catch (e: IOException) {
                 throw BodyAnalysisException(NETWORK_ERROR, "network", e)
             }
@@ -55,6 +65,7 @@ class RemoteBodyAnalyzer(
             .connectTimeout(10, TimeUnit.SECONDS)
             .readTimeout(60, TimeUnit.SECONDS) // first request loads the pose model
             .writeTimeout(60, TimeUnit.SECONDS)
+            .followRedirects(false).followSslRedirects(false)
             .build()
 
         /** Maps an HTTP status + JSON body to a result, or throws with the server's Korean hint. */

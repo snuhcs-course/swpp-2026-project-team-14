@@ -26,6 +26,23 @@ class ChatRepositoryTest {
     @Before fun setup() { server = MockWebServer(); server.start(); val base = server.url("/").toString(); repository = ChatRepository(base, testAccount(base)) }
     @After fun close() { server.shutdown() }
 
+    @Test fun apiRedirectDoesNotReplayChatOrForwardAuthorization() = runBlocking {
+        val destination = MockWebServer().apply { start() }
+        try {
+            server.enqueue(MockResponse().setResponseCode(302).addHeader("Location", destination.url("/unexpected/")))
+            try {
+                repository.edit(ChatRequest(outfit, emptySet(), emptySet(), "밝게", JSONObject(), null, null, emptyList(), emptyList()))
+                fail("Chat POST must not follow API redirects")
+            } catch (error: OutfitApiException) { assertEquals("HTTP_302", error.code) }
+            val request = server.takeRequest()
+            assertEquals("POST", request.method)
+            assertEquals("Bearer $TEST_TOKEN", request.getHeader("Authorization"))
+            assertEquals("밝게", JSONObject(request.body.readUtf8()).getString("text"))
+            assertEquals(1, server.requestCount)
+            assertEquals(0, destination.requestCount)
+        } finally { destination.shutdown() }
+    }
+
     @Test fun freeTextAndLocksTravelTogetherAndUnlockIsExplicit() = runBlocking {
         server.enqueue(MockResponse().setBody("""{"status":"unlock","message":"바지 잠금을 풀까요?","outfit":null,"changed_ids":[],"locked_ids":["b"],"unlock_ids":["b"],"notes":[]}"""))
         val result = repository.edit(ChatRequest(outfit, setOf("b"), setOf("formal"), "바지도 바꿔줘",
