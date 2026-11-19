@@ -35,6 +35,22 @@ are not uploaded as store artifacts. Normal release builds remain unsigned until
 signing is configured. No certificate or public-port changes are required for this
 HTTP exception.
 
+### Public gateway redirects
+
+The school public path can return a 302 to a numeric-prefixed URL and then back to
+the original URL before allowing a request. These responses were not present in
+the team's Traefik/backend logs; the upstream device and its policy are unconfirmed.
+
+Android clients perform a separate, credential-free `GET /healthz/` verification
+for the exact school HTTP origin before API requests. The probe follows at most
+three same-origin redirects, restricted to the health path and its 12-digit-prefixed
+form, and requires the normal health JSON. It does not forward API authorization,
+cookies, photos, or request bodies. Concurrent checks are serialized; readiness is
+briefly cached for reads, while writes perform a fresh check. A later API 302 clears
+the readiness cache. API redirects remain disabled and mutating API calls are never
+automatically replayed. Other origins, including local debug servers, skip this
+school-specific verification.
+
 ## One-time prerequisites on the server
 
 - K3s and ArgoCD installed. The observed LXC kubelet needs

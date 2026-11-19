@@ -2,9 +2,12 @@ package com.swpp.stylemate.data.tryon
 
 import com.swpp.stylemate.BuildConfig
 import com.swpp.stylemate.data.AccountAccess
+import com.swpp.stylemate.data.network.SchoolGateway
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -109,8 +112,12 @@ class TryOnClient(private val account: AccountAccess, private val baseUrl: Strin
 
     private suspend fun request(method: String, path: String, token: String? = null,
                                 body: JSONObject? = null): ByteArray = withContext(Dispatchers.IO) {
-        val connection = URI("${baseUrl.trimEnd('/')}/api/fittings/$path").toURL().openConnection() as HttpURLConnection
+        val url = "${baseUrl.trimEnd('/')}/api/fittings/$path"
+        var openedConnection: HttpURLConnection? = null
         try {
+            SchoolGateway.prepare(url, method)
+            currentCoroutineContext().ensureActive()
+            val connection = (URI(url).toURL().openConnection() as HttpURLConnection).also { openedConnection = it }
             connection.requestMethod = method
             connection.connectTimeout = 5_000
             connection.readTimeout = 15_000
@@ -126,6 +133,7 @@ class TryOnClient(private val account: AccountAccess, private val baseUrl: Strin
                 connection.outputStream.use { stream -> stream.write(bytes) }
             }
             val status = connection.responseCode
+            SchoolGateway.onResponse(url, status)
             account.checkResponse(status)
             if (status in listOf(500, 502, 503, 504)) throw FittingUnavailable()
             check(status in 200..299) {
@@ -147,7 +155,7 @@ class TryOnClient(private val account: AccountAccess, private val baseUrl: Strin
                 }
                 output.toByteArray()
             }
-        } finally { connection.disconnect() }
+        } finally { openedConnection?.disconnect() }
     }
 
     companion object {

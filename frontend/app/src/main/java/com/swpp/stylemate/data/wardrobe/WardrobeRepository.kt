@@ -5,12 +5,15 @@ import android.graphics.BitmapFactory
 import android.content.Context
 import com.swpp.stylemate.data.LocalUserStore
 import com.swpp.stylemate.data.AccountAccess
+import com.swpp.stylemate.data.network.SchoolGateway
 import com.swpp.stylemate.BuildConfig
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import java.net.HttpURLConnection
 import java.net.URI
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
@@ -32,13 +35,18 @@ object WardrobeRepository {
     private suspend fun request(path: String, account: AccountAccess,
                                 baseUrl: String = BuildConfig.API_BASE_URL): ByteArray = withContext(Dispatchers.IO) {
         require(path.startsWith("/api/wardrobe/"))
-        val connection = URI("${baseUrl.trimEnd('/')}$path").toURL().openConnection() as HttpURLConnection
+        val url = "${baseUrl.trimEnd('/')}$path"
+        var openedConnection: HttpURLConnection? = null
         try {
+            SchoolGateway.prepare(url, "GET")
+            currentCoroutineContext().ensureActive()
+            val connection = (URI(url).toURL().openConnection() as HttpURLConnection).also { openedConnection = it }
             connection.connectTimeout = 5_000
             connection.readTimeout = 15_000
             connection.instanceFollowRedirects = false
             connection.setRequestProperty("Authorization", account.authorization())
             val status = connection.responseCode
+            SchoolGateway.onResponse(url, status)
             account.checkResponse(status)
             check(status in 200..299) {
                 when (status) {
@@ -62,7 +70,7 @@ object WardrobeRepository {
             }
         } catch (_: java.io.IOException) {
             error("서버에 연결할 수 없습니다. PC 서버와 USB 연결을 확인해 주세요.")
-        } finally { connection.disconnect() }
+        } finally { openedConnection?.disconnect() }
     }
 
     suspend fun json(path: String, body: JSONObject? = null, store: LocalUserStore, account: AccountAccess): JSONObject = withContext(Dispatchers.IO) {

@@ -4,6 +4,7 @@ package com.swpp.stylemate.data.wardrobe
 import android.content.Context
 import com.swpp.stylemate.BuildConfig
 import com.swpp.stylemate.data.AccountAccess
+import com.swpp.stylemate.data.network.SchoolGateway
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import java.net.HttpURLConnection
@@ -19,8 +20,12 @@ internal suspend fun requestAnalysis(context: Context, photo: String, garmentTyp
     val hint = targetCategory?.let { "?category=$it" + (requestId?.let { id -> "&request_id=$id" } ?: "") }
         ?: garmentType?.takeIf { it in landmarkTypes }?.let { "?garment=$it" }.orEmpty()
     val endpoint = if (targetCategory == null) "analyze" else "analyze-worn"
-    val connection = URI("${BuildConfig.API_BASE_URL.trimEnd('/')}/api/wardrobe/$endpoint/$hint").toURL().openConnection() as HttpURLConnection
+    val url = "${BuildConfig.API_BASE_URL.trimEnd('/')}/api/wardrobe/$endpoint/$hint"
+    var openedConnection: HttpURLConnection? = null
     try {
+        SchoolGateway.prepare(url, "POST")
+        currentCoroutineContext().ensureActive()
+        val connection = (URI(url).toURL().openConnection() as HttpURLConnection).also { openedConnection = it }
         val bytes = context.contentResolver.openInputStream(CaptureFiles(context).uri(photo))!!.use { input ->
             val buffer = ByteArray(5 * 1024 * 1024 + 1)
             var count = 0
@@ -42,6 +47,7 @@ internal suspend fun requestAnalysis(context: Context, photo: String, garmentTyp
         connection.setRequestProperty("Content-Type", "image/jpeg")
         connection.outputStream.use { it.write(bytes) }
         val status = connection.responseCode
+        SchoolGateway.onResponse(url, status)
         account.checkResponse(status)
         val stream = if (status in 200..299) connection.inputStream else connection.errorStream
         val text = stream?.bufferedReader(Charsets.UTF_8)?.use { reader ->
@@ -79,6 +85,6 @@ internal suspend fun requestAnalysis(context: Context, photo: String, garmentTyp
     } catch (_: java.io.IOException) {
         error("서버에 연결할 수 없습니다. PC 서버와 USB 연결을 확인해 주세요.")
     } finally {
-        connection.disconnect()
+        openedConnection?.disconnect()
     }
 }

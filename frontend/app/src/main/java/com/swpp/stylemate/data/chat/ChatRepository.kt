@@ -1,5 +1,6 @@
 package com.swpp.stylemate.data.chat
 
+import com.swpp.stylemate.data.network.SchoolGateway
 import com.swpp.stylemate.data.recommendation.ErrorMessages
 import com.swpp.stylemate.data.recommendation.Outfit
 import com.swpp.stylemate.data.recommendation.OutfitApiException
@@ -8,6 +9,8 @@ import com.swpp.stylemate.data.recommendation.Weather
 import com.swpp.stylemate.data.AccountAccess
 import com.swpp.stylemate.data.AuthException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -123,7 +126,15 @@ class ChatRepository(
             .header("Authorization", authorization)
             .method(method, body.toString().toRequestBody("application/json".toMediaType())).build()
         val (status, text) = try {
-            client.newCall(request).execute().use { it.code to it.body?.string().orEmpty() }
+            SchoolGateway.prepare(base + path, method)
+            currentCoroutineContext().ensureActive()
+            account.authorization()
+            client.newCall(request).execute().use {
+                SchoolGateway.onResponse(base + path, it.code)
+                it.code to it.body?.string().orEmpty()
+            }
+        } catch (e: AuthException) {
+            throw OutfitApiException(e.code, e.message.orEmpty())
         } catch (e: java.io.InterruptedIOException) {
             // The model call can take a while; a timeout is not the same as no connection.
             throw OutfitApiException("TIMEOUT", ErrorMessages.TIMEOUT)
