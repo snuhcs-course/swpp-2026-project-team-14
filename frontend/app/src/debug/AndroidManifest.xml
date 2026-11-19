@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Debug only: the local Django dev server has no HTTPS. Release builds keep cleartext disabled. -->
+    <!-- Debug permits local HTTP; release permits only the school API hostname. -->
     <application android:usesCleartextTraffic="true">
         <!-- Local UI fixtures only. This entry and its implementation do not exist in release.
              No launcher icon, so debug APKs given to testers show a single app; start it with adb. -->

@@ -16,9 +16,24 @@ Public API: `http://swpp26t14.147-46-242-169.sslip.io`.
 K3s Traefik receives school-forwarded HTTP on port 80 and routes the hostname to backend:8000.
 MySQL runs on the same A node and is reachable only through its ClusterIP Service.
 The school blocks direct A-to-B communication; B is not a database replica or failover node.
-Frontend CI builds debug APKs with this fixed API address. Local Android builds still read
-`frontend/local.properties`; set `stylemate.apiBaseUrl` there when building on the PC.
-The supplied school endpoint is HTTP; the current release app requires HTTPS.
+Frontend CI builds debug APKs with this fixed API address. Local debug builds read
+`stylemate.apiBaseUrl` from `frontend/local.properties` (default `http://10.0.2.2:8000`).
+Release uses the separate `stylemate.releaseApiBaseUrl`, defaulting to the school HTTP
+address above. Both properties can also be overridden with Gradle `-P`; `-P` wins.
+
+The release Network Security Config blocks cleartext by default and permits only
+`swpp26t14.147-46-242-169.sslip.io`, without subdomains. HTTPS keeps normal system
+certificate verification. The release URL validator accepts HTTPS or this exact HTTP
+host on the default/80 port; it rejects credentials, query, fragment and invalid URLs.
+The school exception does not encrypt passwords, tokens or photo uploads.
+
+CI checks the actual Android network policy against a non-debuggable release APK:
+the exact school host is allowed, while unrelated hosts, subdomains, IP addresses and
+localhost are blocked. Both test APKs use a dedicated temporary CI key, independent
+of the runner's debug-key location. They are installed only on the CI emulator and
+are not uploaded as store artifacts. Normal release builds remain unsigned until store
+signing is configured. No certificate or public-port changes are required for this
+HTTP exception.
 
 ## One-time prerequisites on the server
 

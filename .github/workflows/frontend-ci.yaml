@@ -60,6 +60,9 @@ jobs:
       - name: Build debug APK
         run: ./gradlew --no-daemon assembleDebug
 
+      - name: Build release APK
+        run: ./gradlew --no-daemon assembleRelease
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
@@ -104,6 +107,18 @@ jobs:
             adb install -r app/build/outputs/apk/debug/app-debug.apk
             adb shell pm grant com.swpp.stylemate android.permission.POST_NOTIFICATIONS
             ./gradlew --no-daemon -PandroidTestCoverage -Pandroid.testInstrumentationRunnerArguments.class=com.swpp.stylemate.home.PhotoFittingTest,com.swpp.stylemate.data.tryon.FittingWorkerTest,com.swpp.stylemate.data.tryon.FittingFlowTest createDebugAndroidTestCoverageReport createAggregatedCoverageReport
+            ./gradlew --no-daemon assembleRelease
+            keytool -genkeypair -keystore "$RUNNER_TEMP/release-policy-test.p12" -storetype PKCS12 -storepass android -keypass android -alias release-policy-test -keyalg RSA -keysize 2048 -validity 2 -dname 'CN=Release Policy Test' -noprompt
+            "$ANDROID_HOME/build-tools/36.0.0/apksigner" sign --ks "$RUNNER_TEMP/release-policy-test.p12" --ks-key-alias release-policy-test --ks-pass pass:android --key-pass pass:android --out app/build/outputs/apk/release/release-policy-check.apk app/build/outputs/apk/release/app-release-unsigned.apk
+            "$ANDROID_HOME/build-tools/36.0.0/apksigner" sign --ks "$RUNNER_TEMP/release-policy-test.p12" --ks-key-alias release-policy-test --ks-pass pass:android --key-pass pass:android --out app/build/outputs/apk/release/release-policy-instrumentation.apk app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+            if adb -e shell pm path com.swpp.stylemate.test | grep -q '^package:'; then adb -e uninstall com.swpp.stylemate.test; fi
+            if adb -e shell pm path com.swpp.stylemate | grep -q '^package:'; then adb -e uninstall com.swpp.stylemate; fi
+            adb -e install -r app/build/outputs/apk/release/release-policy-check.apk
+            adb -e install -r app/build/outputs/apk/release/release-policy-instrumentation.apk
+            mkdir -p app/build/reports/release-network-policy
+            adb -e shell am instrument -w -r -e verifyReleaseNetworkPolicy true -e class com.swpp.stylemate.network.ReleaseNetworkPolicyTest com.swpp.stylemate.test/androidx.test.runner.AndroidJUnitRunner | tee app/build/reports/release-network-policy/results.txt
+            grep -Fq 'OK (3 tests)' app/build/reports/release-network-policy/results.txt
+            ! grep -Eq 'INSTRUMENTATION_STATUS_CODE: -[1-4]' app/build/reports/release-network-policy/results.txt
 
       - name: Fitting coverage summary
         run: |
@@ -118,5 +133,6 @@ jobs:
           path: |
             frontend/app/build/reports/androidTests/connected/debug
             frontend/app/build/reports/coverage
+            frontend/app/build/reports/release-network-policy
             frontend/app/build/outputs/androidTest-results/connected/debug
             frontend/app/build/intermediates/aggregated_code_coverage_data/global/collectDebugAggregatedCoverage/debugAppAggregatedXmlReport.xml
