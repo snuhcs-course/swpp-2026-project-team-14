@@ -56,7 +56,7 @@ class OutfitRepositoryTest {
         val result = repo.recommend(body, weather, null, listOf("w:x+w:y"))
 
         val weatherRequest = server.takeRequest()
-        assertEquals("/api/weather/", weatherRequest.path)
+        assertEquals("/api/weather/?lat=37.5665&lon=126.9780", weatherRequest.path) // Seoul unless another region is picked
         assertEquals("Bearer $TEST_TOKEN", weatherRequest.getHeader("Authorization"))
         val request = server.takeRequest()
         assertEquals("POST", request.method)

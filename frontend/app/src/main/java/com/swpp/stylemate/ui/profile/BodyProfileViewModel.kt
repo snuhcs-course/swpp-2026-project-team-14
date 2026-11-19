@@ -82,6 +82,15 @@ class BodyProfileViewModel(
 ) : ViewModel() {
     private val analyzer: BodyAnalyzer = analyzer ?: RemoteBodyAnalyzer(BuildConfig.API_BASE_URL, account = account)
 
+    private val initialProgress = runCatching {
+        val progress = store.loadOnboarding()
+        val style = store.loadStyle()
+        val continuingDraft = progress.step > 1 && JSONObject(progress.draft).length() > 0
+        val established = !continuingDraft && (store.load() != null || style.preferredStyles.isNotEmpty() ||
+            style.favoriteColors.isNotEmpty() || style.preferredFits != listOf("regular"))
+        if (!progress.completed && established) OnboardingProgress(8, true).also(store::saveOnboarding) else progress
+    }.getOrDefault(OnboardingProgress())
+
     private fun loadAppState(): AppState = try {
         val progress = store.loadOnboarding()
         val draft = JSONObject(progress.draft)
@@ -95,7 +104,7 @@ class BodyProfileViewModel(
     }
     private val _app = MutableStateFlow(loadAppState())
     val app: StateFlow<AppState> = _app.asStateFlow()
-    private val _onboarding = MutableStateFlow(runCatching { store.loadOnboarding() }.getOrDefault(OnboardingProgress()))
+    private val _onboarding = MutableStateFlow(initialProgress)
     val onboarding = _onboarding.asStateFlow()
 
     private val _setup = MutableStateFlow(runCatching { restoreSetup() }.getOrDefault(SetupState()))

@@ -26,7 +26,7 @@ class GarmentEditorTest {
             GarmentEditor("minimal", attributes, null, "", fixture.getJSONObject("catalog"),
                 false, false, null, { submitted = it })
         } }
-        compose.onNodeWithText("종류: 미입력").performScrollTo().assertIsDisplayed() // the AI suggestion is reviewed up front
+        compose.onNodeWithText("종류: 선택 안 함").performScrollTo().assertIsDisplayed() // the AI suggestion is reviewed up front
         compose.onNodeWithText("바지형태:", substring = true).assertDoesNotExist() // the fit lives in the labels
         compose.onNodeWithText("허리 단면").performScrollTo().performTextInput("37.25")
         compose.onNodeWithText("옷장에 추가").assertIsDisplayed().performClick()
@@ -54,7 +54,7 @@ class GarmentEditorTest {
         compose.onNodeWithText("스타일:", substring = true).performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("이름").performScrollTo().performTextReplacement("내 흰 티셔츠")
         compose.onNodeWithText("가슴 단면").performScrollTo().performTextReplacement("56.78")
-        compose.onNodeWithText("메모").performScrollTo().performTextInput("찬물 세탁\n여행용")
+        compose.onNodeWithContentDescription("메모").performScrollTo().performTextInput("찬물 세탁\n여행용")
         compose.onNodeWithText("옷장에 추가").assertIsDisplayed().performClick()
         compose.runOnIdle {
             val payload = requireNotNull(submitted)

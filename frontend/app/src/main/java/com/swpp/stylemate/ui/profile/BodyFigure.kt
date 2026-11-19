@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.Icon
@@ -64,7 +63,6 @@ import com.swpp.stylemate.data.ReferenceMeasurements
 import com.swpp.stylemate.data.hotspotAt
 import com.swpp.stylemate.data.hotspotFor
 import com.swpp.stylemate.ui.theme.StyleMateTheme
-import com.swpp.stylemate.ui.theme.Terracotta
 
 private val SkinFill = Color(0xFFF6DCCB)
 private val SkinLine = Color(0xFFE3B79F)
@@ -119,7 +117,7 @@ fun BodyFigureCard(
     Column(
         modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(24.dp))
+            .clip(MaterialTheme.shapes.medium)
             .background(MaterialTheme.colorScheme.surfaceContainer)
             .padding(vertical = 16.dp, horizontal = 12.dp),
     ) {
@@ -183,6 +181,7 @@ private fun FigureCanvas(
     val density = LocalDensity.current
     val tapRadius = with(density) { 26.dp.toPx() }
     val chipWidth = with(density) { ChipWidth.toPx() }
+    val accent = MaterialTheme.colorScheme.primary
 
     Canvas(
         modifier.pointerInput(hotspots) {
@@ -204,16 +203,16 @@ private fun FigureCanvas(
         keyAnchors.forEach { (type, anchor) ->
             val end = p(anchor)
             val startX = if (type in KEY_ON_LEFT) chipWidth else size.width - chipWidth
-            drawLine(Terracotta.copy(alpha = 0.45f), Offset(startX, end.y), end, 1.5.dp.toPx())
+            drawLine(accent.copy(alpha = 0.45f), Offset(startX, end.y), end, 1.5.dp.toPx())
         }
 
         hotspots.forEach { h ->
             val isSelected = h.type == selected
             val isKey = h.type in KEY_MEASUREMENTS
             val color = when {
-                isSelected -> Terracotta
-                isKey -> Terracotta.copy(alpha = 0.75f)
-                else -> Terracotta.copy(alpha = pulse)
+                isSelected -> accent
+                isKey -> accent.copy(alpha = 0.75f)
+                else -> accent.copy(alpha = pulse)
             }
             when {
                 // other parts stay as small dots at their centre until tapped, so the body is not cluttered
@@ -361,9 +360,9 @@ private fun KeyChip(measurement: BodyMeasurement, selected: Boolean, onClick: ()
     Column(
         modifier
             .width(ChipWidth)
-            .clip(RoundedCornerShape(12.dp))
-            .background(if (selected) Terracotta else MaterialTheme.colorScheme.background)
-            .border(1.dp, Terracotta.copy(alpha = if (selected) 1f else 0.35f), RoundedCornerShape(12.dp))
+            .clip(MaterialTheme.shapes.medium)
+            .background(if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.background)
+            .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = if (selected) 1f else 0.35f), MaterialTheme.shapes.medium)
             .clickable(onClick = onClick)
             .padding(horizontal = 8.dp, vertical = 5.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -393,7 +392,7 @@ private fun DetailCard(
     Box(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
+            .clip(MaterialTheme.shapes.medium)
             .background(MaterialTheme.colorScheme.background)
             .padding(horizontal = 16.dp, vertical = 12.dp),
     ) {

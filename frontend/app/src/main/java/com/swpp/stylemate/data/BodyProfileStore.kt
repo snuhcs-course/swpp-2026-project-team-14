@@ -52,6 +52,14 @@ class LocalBodyProfileStore(private val store: LocalUserStore) : BodyProfileStor
 
 /** JSON form of [BodyProfile]. Measurement keys match the API (`MeasurementType.apiKey`). */
 object BodyProfileJson {
+    /**
+     * The "body" that recommendation and chat send: the profile, or, when body analysis was skipped in
+     * onboarding, only the preferred fit and styles (no height, so the server treats the body as unknown).
+     */
+    fun request(profile: BodyProfile?, style: StyleProfile): JSONObject = profile?.let { JSONObject(encode(it)) }
+        ?: JSONObject().put("preferred_fit", style.legacyFit().name.lowercase())
+            .put("preferred_styles", JSONArray(style.styleLabels().filter { it in STYLE_OPTIONS }))
+
     fun encode(profile: BodyProfile): String = JSONObject().apply {
         put("height_cm", profile.input.heightCm)
         put("weight_kg", profile.input.weightKg ?: JSONObject.NULL)

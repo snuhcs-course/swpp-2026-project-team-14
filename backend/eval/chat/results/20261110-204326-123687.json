@@ -1,0 +1,961 @@
+{
+  "run_at": "2026-11-10T11:43:26+00:00",
+  "model": "gemini-3.1-flash-lite",
+  "provider": "gemini",
+  "temperature": 0,
+  "cases_version": 1,
+  "summary": {
+    "cases": 34,
+    "scored": 34,
+    "passed": 33,
+    "pass_rate": 0.9706,
+    "critical_errors": 0,
+    "format_errors": 0,
+    "infra_errors": [],
+    "criteria": {
+      "pass_rate": 0.8,
+      "critical_errors": 0,
+      "format_errors": 0
+    },
+    "verdict": "PASS"
+  },
+  "results": [
+    {
+      "id": "dir-01",
+      "category": "direction",
+      "request": "좀 더 밝게 바꿔줘",
+      "passed": true,
+      "failed": [],
+      "critical": [],
+      "error": null,
+      "output": {
+        "action": "edit",
+        "change_slots": [
+          "top",
+          "bottom"
+        ],
+        "keep_slots": [],
+        "wants": [
+          {
+            "slot": "top",
+            "want": "brighter"
+          },
+          {
+            "slot": "bottom",
+            "want": "brighter"
+          }
+        ],
+        "avoid_colors": [],
+        "target_colors": [],
+        "target_garment_ids": [],
+        "remove_outerwear": false,
+        "question": ""
+      }
+    },
+    {
+      "id": "dir-02",
+      "category": "direction",
+      "request": "전체적으로 차분한 느낌으로 바꿔줘",
+      "passed": false,
+      "failed": [
+        "wants_include: wants=[]"
+      ],
+      "critical": [],
+      "error": null,
+      "output": {
+        "action": "edit",
+        "change_slots": [
+          "top",
+          "bottom"
+        ],
+        "keep_slots": [],
+        "wants": [],
+        "avoid_colors": [],
+        "target_colors": [
+          "그레이",
+          "네이비",
+          "브라운"
+        ],
+        "target_garment_ids": [
+          "g-gray-hoodie",
+          "g-black-slacks"
+        ],
+        "remove_outerwear": false,
+        "question": ""
+      }
+    },
+    {
+      "id": "dir-03",
+      "category": "direction",
+      "request": "오늘 추우니까 따뜻하게 입고 싶어",
+      "passed": true,
+      "failed": [],
+      "critical": [],
+      "error": null,
+      "output": {
+        "action": "edit",
+        "change_slots": [
+          "top",
+          "bottom",
+          "outerwear"
+        ],
+        "keep_slots": [],
+        "wants": [
+          {
+            "slot": "top",
+            "want": "warmer"
+          },
+          {
+            "slot": "bottom",
+            "want": "warmer"
+          },
+          {
+            "slot": "outerwear",
+            "want": "warmer"
+          }
+        ],
+        "avoid_colors": [],
+        "target_colors": [],
+        "target_garment_ids": [],
+        "remove_outerwear": false,
+        "question": ""
+      }
+    },
+    {
+      "id": "dir-04",
+      "category": "direction",
+      "request": "더워서 시원하게 입고 싶어",
+      "passed": true,
+      "failed": [],
+      "critical": [],
+      "error": null,
+      "output": {
+        "action": "edit",
+        "change_slots": [
+          "top",
+          "bottom",
+          "outerwear"
+        ],
+        "keep_slots": [],
+        "wants": [
+          {
+            "slot": "top",
+            "want": "cooler"
+          },
+          {
+            "slot": "bottom",
+            "want": "cooler"
+          },
+          {
+            "slot": "outerwear",
+            "want": "cooler"
+          }
+        ],
+        "avoid_colors": [],
+        "target_colors": [],
+        "target_garment_ids": [],
+        "remove_outerwear": true,
+        "question": ""
+      }
+    },
+    {
+      "id": "dir-05",
+      "category": "direction",
+      "request": "좀 더 단정하게 입고 싶어",
+      "passed": true,
+      "failed": [],
+      "critical": [],
+      "error": null,
+      "output": {
+        "action": "edit",
+        "change_slots": [
+          "top",
+          "bottom"
+        ],
+        "keep_slots": [],
+        "wants": [
+          {
+            "slot": "top",
+            "want": "formal"
+          },
+          {
+            "slot": "bottom",
+            "want": "formal"
+          }
+        ],
+        "avoid_colors": [],
+        "target_colors": [],
+        "target_garment_ids": [],
+        "remove_outerwear": false,
+        "question": ""
+      }
+    },
+    {
+      "id": "dir-06",
+      "category": "direction",
+      "request": "편하게 입을래",
+      "passed": true,
+      "failed": [],
+      "critical": [],
+      "error": null,
+      "output": {
+        "action": "edit",
+        "change_slots": [
+          "top",
+          "bottom"
+        ],
+        "keep_slots": [],
+        "wants": [
+          {
+            "slot": null,
+            "want": "casual"
+          }
+        ],
+        "avoid_colors": [],
+        "target_colors": [],
+        "target_garment_ids": [],
+        "remove_outerwear": false,
+        "question": ""
+      }
+    },
+    {
+      "id": "dir-07",
+      "category": "direction",
+      "request": "넉넉한 핏으로 바꿔줘",
+      "passed": true,
+      "failed": [],
+      "critical": [],
+      "error": null,
+      "output": {
+        "action": "edit",
+        "change_slots": [
+          "top",
+          "bottom"
+        ],
+        "keep_slots": [],
+        "wants": [
+          {
+            "slot": "top",
+            "want": "looser"
+          },
+          {
+            "slot": "bottom",
+            "want": "looser"
+          }
+        ],
+        "avoid_colors": [],
+        "target_colors": [],
+        "target_garment_ids": [],
+        "remove_outerwear": false,
+        "question": ""
+      }
+    },
+    {
+      "id": "dir-08",
+      "category": "direction",
+      "request": "몸에 딱 맞게 슬림한 느낌으로",
+      "passed": true,
+      "failed": [],
+      "critical": [],
+      "error": null,
+      "output": {
+        "action": "edit",
+        "change_slots": [
+          "top",
+          "bottom"
+        ],
+        "keep_slots": [],
+        "wants": [
+          {
+            "slot": "top",
+            "want": "fitted"
+          },
+          {
+            "slot": "bottom",
+            "want": "fitted"
+          }
+        ],
+        "avoid_colors": [],
+        "target_colors": [],
+        "target_garment_ids": [],
+        "remove_outerwear": false,
+        "question": ""
+      }
+    },
+    {
+      "id": "slot-01",
+      "category": "slot",
+      "request": "상의만 밝게 해줘",
+      "passed": true,
+      "failed": [],
+      "critical": [],
+      "error": null,
+      "output": {
+        "action": "edit",
+        "change_slots": [
+          "top"
+        ],
+        "keep_slots": [
+          "bottom"
+        ],
+        "wants": [
+          {
+            "slot": "top",
+            "want": "brighter"
+          }
+        ],
+        "avoid_colors": [],
+        "target_colors": [],
+        "target_garment_ids": [],
+        "remove_outerwear": false,
+        "question": ""
+      }
+    },
+    {
+      "id": "slot-02",
+      "category": "slot",
+      "request": "바지만 다른 걸로 바꿔줘",
+      "passed": true,
+      "failed": [],
+      "critical": [],
+      "error": null,
+      "output": {
+        "action": "edit",
+        "change_slots": [
+          "bottom"
+        ],
+        "keep_slots": [
+          "top"
+        ],
+        "wants": [],
+        "avoid_colors": [],
+        "target_colors": [],
+        "target_garment_ids": [],
+        "remove_outerwear": false,
+        "question": ""
+      }
+    },
+    {
+      "id": "slot-03",
+      "category": "slot",
+      "request": "아우터는 빼줘",
+      "passed": true,
+      "failed": [],
+      "critical": [],
+      "error": null,
+      "output": {
+        "action": "edit",
+        "change_slots": [],
+        "keep_slots": [],
+        "wants": [],
+        "avoid_colors": [],
+        "target_colors": [],
+        "target_garment_ids": [],
+        "remove_outerwear": true,
+        "question": ""
+      }
+    },
+    {
+      "id": "slot-04",
+      "category": "slot",
+      "request": "겉옷만 바꿔줘",
+      "passed": true,
+      "failed": [],
+      "critical": [],
+      "error": null,
+      "output": {
+        "action": "edit",
+        "change_slots": [
+          "outerwear"
+        ],
+        "keep_slots": [
+          "top",
+          "bottom"
+        ],
+        "wants": [],
+        "avoid_colors": [],
+        "target_colors": [],
+        "target_garment_ids": [],
+        "remove_outerwear": false,
+        "question": ""
+      }
+    },
+    {
+      "id": "slot-05",
+      "category": "slot",
+      "request": "상의랑 하의 둘 다 바꿔줘",
+      "passed": true,
+      "failed": [],
+      "critical": [],
+      "error": null,
+      "output": {
+        "action": "edit",
+        "change_slots": [
+          "top",
+          "bottom"
+        ],
+        "keep_slots": [],
+        "wants": [],
+        "avoid_colors": [],
+        "target_colors": [],
+        "target_garment_ids": [],
+        "remove_outerwear": false,
+        "question": ""
+      }
+    },
+    {
+      "id": "keep-01",
+      "category": "keep",
+      "request": "바지는 그대로 두고 출근용으로 바꿔줘",
+      "passed": true,
+      "failed": [],
+      "critical": [],
+      "error": null,
+      "output": {
+        "action": "edit",
+        "change_slots": [
+          "top"
+        ],
+        "keep_slots": [
+          "bottom"
+        ],
+        "wants": [
+          {
+            "slot": "top",
+            "want": "formal"
+          }
+        ],
+        "avoid_colors": [],
+        "target_colors": [],
+        "target_garment_ids": [],
+        "remove_outerwear": false,
+        "question": ""
+      }
+    },
+    {
+      "id": "keep-02",
+      "category": "keep",
+      "request": "티셔츠는 유지하고 하의만 어둡게",
+      "passed": true,
+      "failed": [],
+      "critical": [],
+      "error": null,
+      "output": {
+        "action": "edit",
+        "change_slots": [
+          "bottom"
+        ],
+        "keep_slots": [
+          "top"
+        ],
+        "wants": [
+          {
+            "slot": "bottom",
+            "want": "darker"
+          }
+        ],
+        "avoid_colors": [],
+        "target_colors": [],
+        "target_garment_ids": [
+          "g-white-tee"
+        ],
+        "remove_outerwear": false,
+        "question": ""
+      }
+    },
+    {
+      "id": "keep-03",
+      "category": "keep",
+      "request": "코트는 그대로 두고 나머지는 편하게",
+      "passed": true,
+      "failed": [],
+      "critical": [],
+      "error": null,
+      "output": {
+        "action": "edit",
+        "change_slots": [
+          "top",
+          "bottom"
+        ],
+        "keep_slots": [
+          "outerwear"
+        ],
+        "wants": [
+          {
+            "slot": "top",
+            "want": "casual"
+          },
+          {
+            "slot": "bottom",
+            "want": "casual"
+          }
+        ],
+        "avoid_colors": [],
+        "target_colors": [],
+        "target_garment_ids": [],
+        "remove_outerwear": false,
+        "question": ""
+      }
+    },
+    {
+      "id": "neg-01",
+      "category": "negation",
+      "request": "검정은 싫어",
+      "passed": true,
+      "failed": [],
+      "critical": [],
+      "error": null,
+      "output": {
+        "action": "edit",
+        "change_slots": [
+          "top"
+        ],
+        "keep_slots": [],
+        "wants": [],
+        "avoid_colors": [
+          "블랙"
+        ],
+        "target_colors": [],
+        "target_garment_ids": [],
+        "remove_outerwear": false,
+        "question": ""
+      }
+    },
+    {
+      "id": "neg-02",
+      "category": "negation",
+      "request": "밝게 하지 마",
+      "passed": true,
+      "failed": [],
+      "critical": [],
+      "error": null,
+      "output": {
+        "action": "edit",
+        "change_slots": [
+          "top",
+          "bottom"
+        ],
+        "keep_slots": [],
+        "wants": [
+          {
+            "slot": "top",
+            "want": "darker"
+          },
+          {
+            "slot": "bottom",
+            "want": "darker"
+          }
+        ],
+        "avoid_colors": [],
+        "target_colors": [],
+        "target_garment_ids": [],
+        "remove_outerwear": false,
+        "question": ""
+      }
+    },
+    {
+      "id": "neg-03",
+      "category": "negation",
+      "request": "상의를 흰색으로 바꿔줘",
+      "passed": true,
+      "failed": [],
+      "critical": [],
+      "error": null,
+      "output": {
+        "action": "edit",
+        "change_slots": [
+          "top"
+        ],
+        "keep_slots": [],
+        "wants": [],
+        "avoid_colors": [],
+        "target_colors": [
+          "화이트"
+        ],
+        "target_garment_ids": [
+          "g-white-tee"
+        ],
+        "remove_outerwear": false,
+        "question": ""
+      }
+    },
+    {
+      "id": "neg-04",
+      "category": "negation",
+      "request": "빨간색이나 핑크는 빼줘",
+      "passed": true,
+      "failed": [],
+      "critical": [],
+      "error": null,
+      "output": {
+        "action": "edit",
+        "change_slots": [
+          "top"
+        ],
+        "keep_slots": [
+          "bottom"
+        ],
+        "wants": [],
+        "avoid_colors": [
+          "레드",
+          "핑크"
+        ],
+        "target_colors": [],
+        "target_garment_ids": [],
+        "remove_outerwear": false,
+        "question": ""
+      }
+    },
+    {
+      "id": "occ-01",
+      "category": "occasion",
+      "request": "내일 면접 보러 가",
+      "passed": true,
+      "failed": [],
+      "critical": [],
+      "error": null,
+      "output": {
+        "action": "edit",
+        "change_slots": [
+          "top",
+          "bottom"
+        ],
+        "keep_slots": [],
+        "wants": [
+          {
+            "slot": "top",
+            "want": "formal"
+          },
+          {
+            "slot": "bottom",
+            "want": "formal"
+          }
+        ],
+        "avoid_colors": [],
+        "target_colors": [],
+        "target_garment_ids": [
+          "g-ivory-shirt",
+          "g-black-slacks"
+        ],
+        "remove_outerwear": false,
+        "question": ""
+      }
+    },
+    {
+      "id": "occ-02",
+      "category": "occasion",
+      "request": "동네 마실 나갈 거라 편하게 입을래",
+      "passed": true,
+      "failed": [],
+      "critical": [],
+      "error": null,
+      "output": {
+        "action": "edit",
+        "change_slots": [
+          "top",
+          "bottom"
+        ],
+        "keep_slots": [],
+        "wants": [
+          {
+            "slot": "top",
+            "want": "casual"
+          },
+          {
+            "slot": "bottom",
+            "want": "casual"
+          }
+        ],
+        "avoid_colors": [],
+        "target_colors": [],
+        "target_garment_ids": [],
+        "remove_outerwear": false,
+        "question": ""
+      }
+    },
+    {
+      "id": "occ-03",
+      "category": "occasion",
+      "request": "친구 결혼식 하객룩으로 바꿔줘",
+      "passed": true,
+      "failed": [],
+      "critical": [],
+      "error": null,
+      "output": {
+        "action": "edit",
+        "change_slots": [
+          "top",
+          "bottom"
+        ],
+        "keep_slots": [],
+        "wants": [
+          {
+            "slot": "top",
+            "want": "formal"
+          },
+          {
+            "slot": "bottom",
+            "want": "formal"
+          }
+        ],
+        "avoid_colors": [],
+        "target_colors": [],
+        "target_garment_ids": [],
+        "remove_outerwear": false,
+        "question": ""
+      }
+    },
+    {
+      "id": "occ-04",
+      "category": "occasion",
+      "request": "회사 출근용 코디로 해줘",
+      "passed": true,
+      "failed": [],
+      "critical": [],
+      "error": null,
+      "output": {
+        "action": "edit",
+        "change_slots": [
+          "top",
+          "bottom"
+        ],
+        "keep_slots": [],
+        "wants": [
+          {
+            "slot": "top",
+            "want": "formal"
+          },
+          {
+            "slot": "bottom",
+            "want": "formal"
+          }
+        ],
+        "avoid_colors": [],
+        "target_colors": [],
+        "target_garment_ids": [],
+        "remove_outerwear": false,
+        "question": ""
+      }
+    },
+    {
+      "id": "undo-01",
+      "category": "undo",
+      "request": "아까 코디로 돌려줘",
+      "passed": true,
+      "failed": [],
+      "critical": [],
+      "error": null,
+      "output": {
+        "action": "undo",
+        "change_slots": [],
+        "keep_slots": [],
+        "wants": [],
+        "avoid_colors": [],
+        "target_colors": [],
+        "target_garment_ids": [],
+        "remove_outerwear": false,
+        "question": ""
+      }
+    },
+    {
+      "id": "undo-02",
+      "category": "undo",
+      "request": "방금 바꾼 거 말고 이전 걸로 돌아가자",
+      "passed": true,
+      "failed": [],
+      "critical": [],
+      "error": null,
+      "output": {
+        "action": "undo",
+        "change_slots": [],
+        "keep_slots": [],
+        "wants": [],
+        "avoid_colors": [],
+        "target_colors": [],
+        "target_garment_ids": [],
+        "remove_outerwear": false,
+        "question": ""
+      }
+    },
+    {
+      "id": "item-01",
+      "category": "item",
+      "request": "청바지로 바꿔줘",
+      "passed": true,
+      "failed": [],
+      "critical": [],
+      "error": null,
+      "output": {
+        "action": "edit",
+        "change_slots": [
+          "bottom"
+        ],
+        "keep_slots": [],
+        "wants": [],
+        "avoid_colors": [],
+        "target_colors": [],
+        "target_garment_ids": [
+          "g-blue-jeans"
+        ],
+        "remove_outerwear": false,
+        "question": ""
+      }
+    },
+    {
+      "id": "item-02",
+      "category": "item",
+      "request": "니트 말고 블루 셔츠 입을래",
+      "passed": true,
+      "failed": [],
+      "critical": [],
+      "error": null,
+      "output": {
+        "action": "edit",
+        "change_slots": [
+          "top"
+        ],
+        "keep_slots": [],
+        "wants": [],
+        "avoid_colors": [],
+        "target_colors": [
+          "블루"
+        ],
+        "target_garment_ids": [
+          "g-blue-shirt"
+        ],
+        "remove_outerwear": false,
+        "question": ""
+      }
+    },
+    {
+      "id": "item-03",
+      "category": "item",
+      "request": "가죽 재킷으로 바꿔줘",
+      "passed": true,
+      "failed": [],
+      "critical": [],
+      "error": null,
+      "output": {
+        "action": "clarify",
+        "change_slots": [],
+        "keep_slots": [],
+        "wants": [],
+        "avoid_colors": [],
+        "target_colors": [],
+        "target_garment_ids": [],
+        "remove_outerwear": false,
+        "question": "죄송합니다. 현재 보유하신 옷 중에 가죽 재킷이 없습니다. 다른 아우터를 선택하시겠어요?"
+      }
+    },
+    {
+      "id": "unsup-01",
+      "category": "unsupported",
+      "request": "신발도 골라줘",
+      "passed": true,
+      "failed": [],
+      "critical": [],
+      "error": null,
+      "output": {
+        "action": "clarify",
+        "change_slots": [],
+        "keep_slots": [],
+        "wants": [],
+        "avoid_colors": [],
+        "target_colors": [],
+        "target_garment_ids": [],
+        "remove_outerwear": false,
+        "question": "죄송합니다. 현재 신발은 코디 서비스에서 지원하지 않습니다. 다른 의류를 변경해 드릴까요?"
+      }
+    },
+    {
+      "id": "unsup-02",
+      "category": "unsupported",
+      "request": "밝으면서 어둡게 해줘",
+      "passed": true,
+      "failed": [],
+      "critical": [],
+      "error": null,
+      "output": {
+        "action": "clarify",
+        "change_slots": [],
+        "keep_slots": [],
+        "wants": [],
+        "avoid_colors": [],
+        "target_colors": [],
+        "target_garment_ids": [],
+        "remove_outerwear": false,
+        "question": "밝게와 어둡게는 서로 상반된 요청입니다. 어떤 느낌을 원하시나요?"
+      }
+    },
+    {
+      "id": "unsup-03",
+      "category": "unsupported",
+      "request": "이 옷 얼마야? 살 수 있는 곳 알려줘",
+      "passed": true,
+      "failed": [],
+      "critical": [],
+      "error": null,
+      "output": {
+        "action": "clarify",
+        "change_slots": [],
+        "keep_slots": [],
+        "wants": [],
+        "avoid_colors": [],
+        "target_colors": [],
+        "target_garment_ids": [],
+        "remove_outerwear": false,
+        "question": "죄송합니다. 현재 의류의 가격 정보나 구매처는 제공해 드리지 않고 있습니다. 다른 코디 제안이 필요하신가요?"
+      }
+    },
+    {
+      "id": "lock-01",
+      "category": "lock",
+      "request": "바지도 바꿔줘",
+      "passed": true,
+      "failed": [],
+      "critical": [],
+      "error": null,
+      "output": {
+        "action": "edit",
+        "change_slots": [
+          "bottom"
+        ],
+        "keep_slots": [],
+        "wants": [],
+        "avoid_colors": [],
+        "target_colors": [],
+        "target_garment_ids": [],
+        "remove_outerwear": false,
+        "question": ""
+      }
+    },
+    {
+      "id": "lock-02",
+      "category": "lock",
+      "request": "좀 더 밝게 해줘",
+      "passed": true,
+      "failed": [],
+      "critical": [],
+      "error": null,
+      "output": {
+        "action": "edit",
+        "change_slots": [
+          "top",
+          "bottom"
+        ],
+        "keep_slots": [],
+        "wants": [
+          {
+            "slot": null,
+            "want": "brighter"
+          }
+        ],
+        "avoid_colors": [],
+        "target_colors": [],
+        "target_garment_ids": [],
+        "remove_outerwear": false,
+        "question": ""
+      }
+    }
+  ]
+}

@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
@@ -44,12 +43,13 @@ private val CAPTURE_TIPS = listOf(
 )
 
 @Composable
-fun CaptureGuideScreen(onStart: () -> Unit, onSkip: () -> Unit) {
+fun CaptureGuideScreen(onStart: () -> Unit, onSkip: () -> Unit, returnToInput: Boolean = false) {
     ScreenScaffold(
         title = "체형 촬영 가이드",
-        actionLabel = "건너뛰기",
+        actionLabel = if (returnToInput) null else "건너뛰기",
+        onBack = if (returnToInput) onSkip else null,
         onAction = onSkip,
-        primaryLabel = "사진 찍으러 가기",
+        primaryLabel = if (returnToInput) "사진 입력으로 돌아가기" else "사진 찍으러 가기",
         primaryEnabled = true,
         onPrimary = onStart,
     ) { padding ->
@@ -66,16 +66,14 @@ fun CaptureGuideScreen(onStart: () -> Unit, onSkip: () -> Unit) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(16.dp))
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(MaterialTheme.colorScheme.surfaceContainer)
-                    .padding(vertical = 20.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-            ) {
-                PoseIllustration("정면", side = false)
-                PoseIllustration("측면", side = true)
+            androidx.compose.foundation.Image(
+                androidx.compose.ui.res.painterResource(com.swpp.stylemate.R.drawable.body_capture_guide),
+                "촬영 자세 예시: 정면은 팔을 몸에서 살짝 떼고, 측면은 똑바로 서서 전신을 촬영해 주세요.",
+                Modifier.fillMaxWidth().clip(MaterialTheme.shapes.medium),
+                contentScale = androidx.compose.ui.layout.ContentScale.Fit)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceAround) {
+                Text("정면", style = MaterialTheme.typography.labelLarge)
+                Text("측면", style = MaterialTheme.typography.labelLarge)
             }
             Spacer(Modifier.height(20.dp))
             CAPTURE_TIPS.forEach { tip ->
@@ -102,7 +100,7 @@ fun PrivacyNote() {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(MaterialTheme.shapes.medium)
             .background(MaterialTheme.colorScheme.surfaceVariant)
             .padding(14.dp),
         verticalAlignment = Alignment.Top,
@@ -119,37 +117,6 @@ fun PrivacyNote() {
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-    }
-}
-
-/** Simple A-pose figure so users see the expected posture without a photo. */
-@Composable
-private fun PoseIllustration(label: String, side: Boolean) {
-    val color = MaterialTheme.colorScheme.primary
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Canvas(Modifier.size(width = 90.dp, height = 150.dp)) {
-            val w = size.width
-            val h = size.height
-            val stroke = 5.dp.toPx()
-            val cx = w / 2
-            drawCircle(color, radius = h * 0.07f, center = Offset(cx, h * 0.09f))
-            val neck = Offset(cx, h * 0.17f)
-            val hip = Offset(cx, h * 0.55f)
-            fun line(a: Offset, b: Offset) = drawLine(color, a, b, stroke, StrokeCap.Round)
-            line(neck, hip)
-            if (side) {
-                line(Offset(cx, h * 0.22f), Offset(cx + w * 0.05f, h * 0.52f))
-                line(hip, Offset(cx, h * 0.97f))
-            } else {
-                line(Offset(cx, h * 0.22f), Offset(cx - w * 0.32f, h * 0.52f))
-                line(Offset(cx, h * 0.22f), Offset(cx + w * 0.32f, h * 0.52f))
-                line(hip, Offset(cx - w * 0.16f, h * 0.97f))
-                line(hip, Offset(cx + w * 0.16f, h * 0.97f))
-            }
-            drawLine(Color.LightGray, Offset(0f, h), Offset(w, h), 2.dp.toPx())
-        }
-        Spacer(Modifier.height(8.dp))
-        Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
     }
 }
 

@@ -70,11 +70,15 @@ class ChatViewModelTest {
         viewModel.send()
     }
 
-    @Test fun openingWithoutABodyProfileDoesNothing() {
+    @Test fun openingWithoutABodyProfileSendsOnlyThePreferences() {
         val other = ChatViewModel(ChatRepository(server.baseUrl, testAccount(server.baseUrl)), InMemoryTasteStore())
-        other.open(start, null, null)
-        assertFalse(other.visible.value)
-        assertNull(other.state.value.current)
+        other.open(start, null, null, com.swpp.stylemate.data.StyleProfile(listOf("oversized"), listOf("minimal")))
+        assertTrue(other.visible.value)
+        assertEquals("o1", other.state.value.current?.id)
+        val body = other.state.value.body!!
+        assertEquals("loose", body.getString("preferred_fit"))
+        assertEquals("미니멀", body.getJSONArray("preferred_styles").getString(0))
+        assertFalse(body.has("height_cm"))
     }
 
     @Test fun openShowsTheOutfitAndReopeningRestoresTheSession() {
@@ -99,14 +103,15 @@ class ChatViewModelTest {
         assertEquals(400, viewModel.state.value.draft.length)
     }
 
-    @Test fun locksTogglePerGarmentAndAllLockedBlocksSending() {
+    @Test fun locksTogglePerGarmentAndAllLockedStillAllowsAddingAnOutfitItem() {
         viewModel.toggleLock("a")
         assertEquals(setOf("a"), viewModel.state.value.lockedIds)
         viewModel.setDraft("밝게")
         assertTrue(viewModel.state.value.canSend)
         viewModel.toggleLock("b")
         assertTrue(viewModel.state.value.allLocked)
-        assertFalse(viewModel.state.value.canSend)
+        viewModel.setDraft("아우터 추가해줘")
+        assertTrue(viewModel.state.value.canSend)
         viewModel.toggleLock("a")
         assertEquals(setOf("b"), viewModel.state.value.lockedIds)
     }
@@ -121,12 +126,58 @@ class ChatViewModelTest {
         assertEquals(setOf("formal"), viewModel.state.value.directions)
     }
 
+    @Test fun fitChoicesReplaceToggleAndCombineWithOtherGroups() {
+        viewModel.toggleDirection("warmer")
+        viewModel.toggleDirection("looser")
+        viewModel.toggleDirection("fitted")
+        assertEquals(setOf("warmer", "fitted"), viewModel.state.value.directions)
+        viewModel.toggleDirection("fitted")
+        assertEquals(setOf("warmer"), viewModel.state.value.directions)
+    }
+
+    @Test fun clarificationHistoryKeepsTheOriginalRequestWithinSixMessages() {
+        listOf("long sleeves", "just long sleeve", "anything", "what can I choose?").forEach { text ->
+            server.on("POST /api/outfits/chat/", chat("clarify", "어떤 상의를 원하세요?"))
+            send(text)
+            settled()
+        }
+        server.on("POST /api/outfits/chat/", chat("updated", "바꿨어요.", edited))
+        send("any kind")
+        settled()
+        val history = server.requests("POST /api/outfits/chat/").last().getJSONArray("history")
+        assertEquals(6, history.length())
+        assertEquals("long sleeves", history.getJSONObject(0).getString("text"))
+        assertEquals("what can I choose?", history.getJSONObject(4).getString("text"))
+    }
+
+    @Test fun aCompletedEditEndsThePendingClarificationChain() {
+        val request = com.swpp.stylemate.data.chat.ChatRequest(start, emptySet(), emptySet(), "long sleeves", JSONObject(), null, null, emptyList(), emptyList())
+        fun turn(text: String, status: String) = com.swpp.stylemate.ui.chat.ChatTurn(request = request.copy(text = text), loading = false,
+            result = com.swpp.stylemate.data.chat.ChatResult(status, "응답", null, emptySet(), emptySet(), emptySet(), emptyList()))
+        val turns = listOf(turn("long sleeves", "clarify"), turn("anything", "clarify"),
+            turn("knit", "updated"), turn("darker", "updated"))
+        assertFalse(ChatViewModel.conversationHistory(turns).any { it.second == "long sleeves" })
+    }
+
     @Test fun sendNeedsTextOrADirection() {
         assertFalse(viewModel.state.value.canSend)
         viewModel.send()
         assertTrue(viewModel.state.value.turns.isEmpty())
         viewModel.toggleDirection("brighter")
         assertTrue(viewModel.state.value.canSend)
+    }
+
+    @Test fun conditionsOnlyKeepTheTextEmptyForTheModelFreeServerPath() {
+        server.on("POST /api/outfits/chat/", chat("updated", "바꿨어요.", edited))
+        viewModel.toggleLock("b")
+        viewModel.toggleDirection("brighter")
+        viewModel.send()
+        val turn = settled().turns.single()
+        val sent = server.requests("POST /api/outfits/chat/").single()
+        assertEquals("", sent.getString("text"))
+        assertEquals("brighter", sent.getJSONArray("directions").getString(0))
+        assertEquals("밝게", ChatViewModel.conversationText(turn.request))
+        assertFalse(ChatViewModel.conversationText(turn.request).contains("유지:"))
     }
 
     @Test fun successfulEditReplacesTheOutfitAndKeepsThePreviousAsASnapshot() {
@@ -207,6 +258,37 @@ class ChatViewModelTest {
         assertNotNull(viewModel.state.value.turns.single().error)
     }
 
+    @Test fun editingAFailedRequestRestoresItsTextAndDirectionsButKeepsCurrentLocks() {
+        server.on("POST /api/outfits/chat/", failure(503, "CHAT_MODEL_UNAVAILABLE", "다시 시도해 주세요."))
+        viewModel.toggleLock("b")
+        viewModel.toggleDirection("brighter")
+        send("상의만 밝게")
+        val turn = settled().turns.single()
+        viewModel.toggleLock("b")
+        viewModel.toggleLock("a")
+        viewModel.editRequest(turn.id)
+        assertEquals("상의만 밝게", viewModel.state.value.draft)
+        assertEquals(setOf("brighter"), viewModel.state.value.directions)
+        assertEquals(setOf("a"), viewModel.state.value.lockedIds)
+        assertEquals(start.key, viewModel.state.value.current?.key)
+        assertEquals(1, server.requests("POST /api/outfits/chat/").size)
+        viewModel.close()
+        viewModel.open(start, profile, null)
+        assertEquals("상의만 밝게", viewModel.state.value.draft)
+    }
+
+    @Test fun aFailedRequestCannotBeLoadedIntoAnotherSession() {
+        server.on("POST /api/outfits/chat/", failure(503, "CHAT_MODEL_UNAVAILABLE", "다시 시도해 주세요."))
+        send("원래 요청")
+        val turn = settled().turns.single()
+        viewModel.open(outfit("other", "c", "d"), profile, null)
+        viewModel.setDraft("다른 코디의 초안")
+        viewModel.editRequest(turn.id)
+        assertEquals("다른 코디의 초안", viewModel.state.value.draft)
+        assertTrue(viewModel.state.value.turns.isEmpty())
+        assertEquals(1, server.requests("POST /api/outfits/chat/").size)
+    }
+
     @Test fun unlockAndRetryRemovesTheRequestedLocksAndResends() {
         server.on("POST /api/outfits/chat/", chat("unlock", "바지 잠금을 풀고 바꿀까요?", unlock = listOf("b")),
             chat("updated", "바꿨어요.", outfitJson("chat-2", "a", "d")))
@@ -250,7 +332,7 @@ class ChatViewModelTest {
 
     @Test fun savingMarksTheOutfitSaved() {
         server.on("POST /api/outfits/", json(outfitJson("saved-1", "a", "b", saved = true).toString()))
-        viewModel.save(start)
+        viewModel.toggleSave(start)
         val state = viewModel.state.await { start.key !in it.savingKeys }
         assertTrue(start.key in state.savedKeys)
         val sent = server.requests("POST /api/outfits/").single()
@@ -261,11 +343,11 @@ class ChatViewModelTest {
     @Test fun failedSaveShowsTheErrorAndRetryReusesTheSameToken() {
         server.on("POST /api/outfits/", failure(500, "SERVER_ERROR", "저장 서버 오류"),
             json(outfitJson("saved-1", "a", "b", saved = true).toString()))
-        viewModel.save(start)
+        viewModel.toggleSave(start)
         val failed = viewModel.state.await { start.key !in it.savingKeys }
         assertEquals("저장 서버 오류", failed.saveErrors[start.key])
         assertFalse(start.key in failed.savedKeys)
-        viewModel.save(start)
+        viewModel.toggleSave(start)
         val saved = viewModel.state.await { start.key in it.savedKeys }
         assertNull(saved.saveErrors[start.key])
         val tokens = server.requests("POST /api/outfits/").map { it.getJSONObject("context").getString("chat_save_id") }
@@ -273,11 +355,81 @@ class ChatViewModelTest {
         assertEquals(tokens[0], tokens[1]) // 재시도는 같은 토큰이라 서버가 중복 저장하지 않음
     }
 
-    @Test fun savingAnAlreadySavedOutfitDoesNothing() {
-        server.on("POST /api/outfits/", json(outfitJson("saved-1", "a", "b", saved = true).toString()))
-        viewModel.save(start)
-        viewModel.state.await { start.key in it.savedKeys }
-        viewModel.save(start)
+    @Test fun tappingSaveAgainWhileSavingDoesNothing() {
+        server.on("POST /api/outfits/", json(outfitJson("saved-1", "a", "b", saved = true).toString())
+            .setBodyDelay(200, java.util.concurrent.TimeUnit.MILLISECONDS))
+        viewModel.toggleSave(start)
+        assertTrue(start.key in viewModel.state.value.savingKeys)
+        viewModel.toggleSave(start)
+        viewModel.state.await { start.key in it.savedKeys && start.key !in it.savingKeys }
         assertEquals(1, server.requests("POST /api/outfits/").size)
+        assertTrue(server.requests("PUT /api/outfits/saved-1/").isEmpty())
+    }
+
+    @Test fun cancellingTheLastRequestRestoresTheOutfitLocksAndText() {
+        server.on("POST /api/outfits/chat/", chat("updated", "상의를 바꿨어요.", edited, changed = listOf("c")))
+        viewModel.toggleLock("b")
+        send("상의를 화려하게")
+        settled()
+        viewModel.toggleLock("c")
+        assertEquals("chat-1", viewModel.state.value.current?.id)
+        viewModel.cancelLast()
+        val state = viewModel.state.value
+        assertEquals("o1", state.current?.id)
+        assertEquals(setOf("b"), state.lockedIds)
+        assertTrue(state.turns.isEmpty())
+        assertTrue(state.snapshots.isEmpty())
+        assertEquals("상의를 화려하게", state.draft)  // the request comes back so it can be rewritten
+        assertFalse(state.canCancelLast)
+    }
+
+    @Test fun aCancelledRequestIsNotSentAsHistoryAgain() {
+        server.on("POST /api/outfits/chat/", chat("updated", "바꿨어요.", edited), chat("updated", "바꿨어요.", edited))
+        send("빨간색으로")
+        settled()
+        viewModel.cancelLast()
+        send("밝게")
+        settled()
+        val history = server.requests("POST /api/outfits/chat/").last().getJSONArray("history")
+        assertEquals(0, history.length())
+    }
+
+    @Test fun cancellingARunningRequestIgnoresItsLateResult() {
+        server.on("POST /api/outfits/chat/", chat("updated", "늦게 온 결과", edited, delayMs = 400))
+        send("밝게")
+        assertTrue(viewModel.state.value.busy)
+        viewModel.cancelLast()
+        assertFalse(viewModel.state.value.busy)
+        Thread.sleep(700)
+        assertEquals("o1", viewModel.state.value.current?.id)
+        assertTrue(viewModel.state.value.turns.isEmpty())
+    }
+
+    @Test fun tappingSaveAgainTakesTheOutfitOutOfTheCodiBookAndAllowsSavingAgain() {
+        server.on("POST /api/outfits/", json(outfitJson("saved-1", "a", "b", saved = true).toString()),
+            json(outfitJson("saved-1", "a", "b", saved = true).toString()))
+        server.on("PUT /api/outfits/saved-1/", json(outfitJson("saved-1", "a", "b").toString()))
+        viewModel.toggleSave(start)
+        val saved = viewModel.state.await { start.key in it.savedKeys && start.key !in it.savingKeys }
+        assertEquals("saved-1", saved.savedIds[start.key])
+        viewModel.toggleSave(start)
+        val undone = viewModel.state.await { start.key !in it.savedKeys && start.key !in it.savingKeys }
+        assertNull(undone.savedIds[start.key])
+        assertEquals(false, server.requests("PUT /api/outfits/saved-1/").single().getBoolean("saved"))
+        viewModel.toggleSave(start)
+        viewModel.state.await { start.key in it.savedKeys && start.key !in it.savingKeys }
+        val tokens = server.requests("POST /api/outfits/").map { it.getJSONObject("context").getString("chat_save_id") }
+        assertTrue(tokens[0] != tokens[1])  // a new token, so the server saves the outfit again
+    }
+
+    @Test fun failedUnsaveKeepsTheOutfitSaved() {
+        server.on("POST /api/outfits/", json(outfitJson("saved-1", "a", "b", saved = true).toString()))
+        server.on("PUT /api/outfits/saved-1/", failure(500, "SERVER_ERROR", "취소 서버 오류"))
+        viewModel.toggleSave(start)
+        viewModel.state.await { start.key in it.savedKeys && start.key !in it.savingKeys }
+        viewModel.toggleSave(start)
+        val state = viewModel.state.await { start.key !in it.savingKeys && it.saveErrors.isNotEmpty() }
+        assertTrue(start.key in state.savedKeys)
+        assertEquals("취소 서버 오류", state.saveErrors[start.key])
     }
 }

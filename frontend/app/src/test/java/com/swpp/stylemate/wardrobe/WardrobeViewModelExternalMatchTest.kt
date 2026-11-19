@@ -108,14 +108,14 @@ class WardrobeViewModelExternalMatchTest {
     }
 
     @Test fun serverErrorShowsTheAppsGenericMessageAndKeepsTheGarmentForRetry() {
-        // 앱은 5xx의 서버 hint 대신 공통 문구를 보여준다 (AuthRepository의 기존 정책)
+        // 앱은 5xx의 서버 hint 대신 원인과 다음 행동을 담은 공통 문구를 보여준다 (ErrorMessages)
         responses["garment-1"] = MockResponse().setResponseCode(503)
             .setBody("""{"error":"EXTERNAL_MODEL_UNAVAILABLE","hint":"서버 내부 안내"}""")
         viewModel.matchExternal("garment-1")
         val state = settled()
         assertEquals("garment-1", state.garmentId) // 다시 시도 버튼이 같은 옷으로 재요청할 수 있어야 함
         assertNull(state.result)
-        assertEquals("요청을 처리하지 못했어요. 잠시 후 다시 시도해 주세요.", state.error)
+        assertEquals(com.swpp.stylemate.data.recommendation.ErrorMessages.UNAVAILABLE, state.error)
     }
 
     @Test fun unsupportedGarmentShowsTheServerHint() {

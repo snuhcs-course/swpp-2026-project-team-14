@@ -127,7 +127,7 @@ class PhotoFittingTest {
                 !runBlocking { FittingRepository(LocalUserStore.inDirectory(directory, ACCOUNT_ID), account).notificationSettings().enabled }
             }
             bell.assertIsOff()
-            compose.onNodeWithText("닫기").performClick()
+            compose.onNodeWithContentDescription("뒤로").assertIsDisplayed().performClick()
             compose.onNodeWithText("다른 코디 피팅").performClick()
             compose.onNodeWithText("내 갤러리에서\n사진 고르기").assertIsDisplayed()
             bell.assertIsOff().performClick()
@@ -135,7 +135,7 @@ class PhotoFittingTest {
                 runBlocking { FittingRepository(LocalUserStore.inDirectory(directory, ACCOUNT_ID), account).notificationSettings().enabled }
             }
             bell.assertIsOn()
-            compose.onNodeWithText("닫기").performClick()
+            compose.onNodeWithContentDescription("뒤로").assertIsDisplayed().performClick()
             compose.onNodeWithText("첫 코디 피팅").performClick()
             compose.onNodeWithText("내 갤러리에서\n사진 고르기").assertIsDisplayed()
             bell.assertIsOn()
@@ -183,7 +183,7 @@ class PhotoFittingTest {
     }
 
     @Test @SdkSuppress(minSdkVersion = 33)
-    fun firstFittingRequestsPermissionAndKeepsNotificationsOnAfterGrant() = permissionChoiceSurvivesReopening(true)
+    fun explicitNotificationChoiceRequestsPermissionAndKeepsSettingAfterGrant() = permissionChoiceSurvivesReopening(true)
 
     @Test @SdkSuppress(minSdkVersion = 33)
     fun deniedPermissionIsSavedAsOffWithoutAnotherPromptForOtherOutfits() = permissionChoiceSurvivesReopening(false)
@@ -235,12 +235,15 @@ class PhotoFittingTest {
                 }
             } }
             compose.onNodeWithText("첫 피팅 권한 확인").performClick()
+            compose.onNodeWithText("내 갤러리에서\n사진 고르기").assertIsDisplayed()
+            assertEquals(0, requests.get())
+            compose.onNodeWithContentDescription("피팅 완료 알림").performClick()
             compose.waitUntil(5_000) {
                 requests.get() == 1 && store.get(FittingNotificationSettings.storageKey(ACCOUNT_ID))?.optBoolean("enabled") == grant
             }
             val bell = compose.onNodeWithContentDescription("피팅 완료 알림")
             if (grant) bell.assertIsOn() else bell.assertIsOff()
-            compose.onNodeWithText("닫기").performClick()
+            compose.onNodeWithContentDescription("뒤로").assertIsDisplayed().performClick()
             compose.onNodeWithText("다른 피팅 권한 확인").performClick()
             compose.onNodeWithText("내 갤러리에서\n사진 고르기").assertIsDisplayed()
             if (grant) bell.assertIsOn() else bell.assertIsOff()
@@ -403,6 +406,19 @@ class PhotoFittingTest {
         val directory = File(context.cacheDir, "fitting-reopen-${UUID.randomUUID()}")
         val outfit = Outfit("cached-outfit", "cached", null, emptyList(), emptyList(), true, "", null, "")
         val image = Bitmap.createBitmap(32, 48, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.BLUE) }
+        val permissionRequests = AtomicInteger()
+        val registry = object : ActivityResultRegistry() {
+            override fun <I, O> onLaunch(requestCode: Int, contract: ActivityResultContract<I, O>, input: I,
+                options: ActivityOptionsCompat?) { permissionRequests.incrementAndGet(); dispatchResult(requestCode, false) }
+        }
+        val owner = object : ActivityResultRegistryOwner { override val activityResultRegistry = registry }
+        val denied = object : ContextWrapper(context) {
+            override fun getApplicationContext(): Context = this
+            override fun checkPermission(permission: String, pid: Int, uid: Int): Int =
+                if (permission == Manifest.permission.POST_NOTIFICATIONS) PackageManager.PERMISSION_DENIED else super.checkPermission(permission, pid, uid)
+            override fun checkSelfPermission(permission: String): Int =
+                if (permission == Manifest.permission.POST_NOTIFICATIONS) PackageManager.PERMISSION_DENIED else super.checkSelfPermission(permission)
+        }
         try {
             val repository = FittingRepository(LocalUserStore.inDirectory(directory, ACCOUNT_ID), account)
             val bytes = ByteArrayOutputStream().use {
@@ -413,7 +429,9 @@ class PhotoFittingTest {
             compose.setContent { StyleMateTheme {
                 var visible by remember { mutableStateOf(false) }
                 Button(onClick = { visible = true }) { Text("피팅 열기") }
-                if (visible) FittingDialog(outfit, repository, account, onClose = { visible = false })
+                CompositionLocalProvider(LocalContext provides denied, LocalActivityResultRegistryOwner provides owner) {
+                    if (visible) FittingDialog(outfit, repository, account, onClose = { visible = false })
+                }
             } }
             repeat(2) {
                 compose.onNodeWithText("피팅 열기").performClick()
@@ -421,10 +439,12 @@ class PhotoFittingTest {
                     compose.onAllNodesWithContentDescription("생성된 피팅 이미지").fetchSemanticsNodes().isNotEmpty()
                 }
                 compose.onNodeWithContentDescription("생성된 피팅 이미지").assertIsDisplayed()
+                compose.onNodeWithContentDescription("피팅 완료 알림").assertDoesNotExist()
                 compose.onNodeWithText("내 갤러리에서\n사진 고르기").assertDoesNotExist()
                 compose.onNodeWithText("확인").performClick()
                 compose.onNodeWithContentDescription("생성된 피팅 이미지").assertDoesNotExist()
             }
+            assertEquals(0, permissionRequests.get())
         } finally {
             image.recycle()
             directory.deleteRecursively()
@@ -487,6 +507,10 @@ class PhotoFittingTest {
             compose.onNodeWithText("비슷한 가상 모델: 남성 170cm · 78kg 기준").assertIsDisplayed()
             compose.onNodeWithText("이 모델에게 입히기").assertIsEnabled()
             compose.onNodeWithText("사진 선택 방식으로 돌아가기").performScrollTo().performClick()
+            // The keyboard from the inputs may still be closing and squeezing the dialog for a moment.
+            compose.waitUntil(5_000) {
+                runCatching { compose.onNodeWithText("내 갤러리에서\n사진 고르기").assertIsDisplayed() }.isSuccess
+            }
             compose.onNodeWithText("내 갤러리에서\n사진 고르기").assertIsDisplayed()
         } finally { directory.deleteRecursively() }
     }

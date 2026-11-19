@@ -1,73 +1,35 @@
-// AI-generated with Claude Code (Dongkun Moon) and Codex (Hyeon U Jeong), 2026-09-24, reviewed by Dongkun Moon and Hyeon U Jeong
+// MY account overview and explicit preference editing.
 package com.swpp.stylemate.ui.profile
 
-import com.swpp.stylemate.ui.components.SectionTitle
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.Surface
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.graphics.vector.path
-import com.swpp.stylemate.data.StyleProfile
-import com.swpp.stylemate.ui.components.ScreenScaffold
-
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.launch
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalInspectionMode
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.swpp.stylemate.data.AnalysisInput
-import com.swpp.stylemate.data.BodyMeasurement
-import com.swpp.stylemate.data.BodyProfile
-import com.swpp.stylemate.data.DetectedClothing
-import com.swpp.stylemate.data.Confidence
-import com.swpp.stylemate.data.Gender
-import com.swpp.stylemate.data.MeasurementType
-import com.swpp.stylemate.data.PreferredFit
-import com.swpp.stylemate.data.buildInsights
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
+import com.swpp.stylemate.data.*
+import com.swpp.stylemate.ui.components.PageHeader
+import com.swpp.stylemate.ui.components.ScreenScaffold
 import com.swpp.stylemate.ui.theme.StyleMateTheme
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
 
 @Composable
 private fun BodyDetailsScreen(
@@ -84,36 +46,30 @@ private fun BodyDetailsScreen(
     val scope = rememberCoroutineScope()
     BackHandler(enabled = deleting) {}
 
+    ScreenScaffold("내 체형 정보", null, false, {}, modifier,
+        onBack = onBack, navigationEnabled = !deleting, contentWindowInsets = WindowInsets(0)) { padding ->
     Column(
-        modifier = modifier
+        modifier = Modifier
             .fillMaxSize()
+            .padding(padding)
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp),
     ) {
-        Spacer(Modifier.height(16.dp))
-        TextButton(onClick = onBack, enabled = !deleting) { Text("뒤로") }
-        Text("내 체형 정보", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(8.dp))
 
         if (profile == null) {
             EmptyProfile(onReanalyze)
             return@Column
         }
 
-        profile.reference?.let { ReferenceNote(it, profile.input.heightCm) }
+        InfoCard(profile)
         Spacer(Modifier.height(16.dp))
-        BodyFigureCard(
-            measurements = profile.measurements,
-            gender = profile.input.gender,
-            onEdit = null,
-            reference = profile.reference,
-        )
+        BodySummaryFigure(profile)
+        profile.reference?.let { ReferenceNote(it, profile.input.heightCm) }
 
         InsightSection(buildInsights(profile))
 
         AllMeasurementsSection(profile.measurements, onClick = null, reference = profile.reference)
-
-        SectionTitle("기본 정보")
-        InfoCard(profile)
 
         Spacer(Modifier.height(12.dp))
         Text(
@@ -122,14 +78,17 @@ private fun BodyDetailsScreen(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.height(20.dp))
-        Button(onClick = onReanalyze, shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth().height(52.dp)) {
+        Button(onClick = onReanalyze, enabled = !deleting, shape = MaterialTheme.shapes.medium,
+            modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) {
             Text("체형 다시 분석하기", fontWeight = FontWeight.Bold)
         }
         Spacer(Modifier.height(8.dp))
-        OutlinedButton(onClick = { confirmDelete = true }, shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
+        TextButton(onClick = { deleteError = null; confirmDelete = true }, enabled = !deleting,
+            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
             Text("체형 프로필 삭제")
         }
         Spacer(Modifier.height(24.dp))
+    }
     }
 
     if (confirmDelete) {
@@ -139,11 +98,14 @@ private fun BodyDetailsScreen(
             text = { Text(deleteError ?: "저장된 체형과 치수가 지워져요. 선호 핏·무드·컬러는 유지돼요.") },
             confirmButton = {
                 TextButton(enabled = !deleting, onClick = {
-                    if (onDeleteRemote == null) { confirmDelete = false; onDelete() }
+                    if (onDeleteRemote == null) { confirmDelete = false; onDelete(); onBack() }
                     else {
                         deleting = true
+                        deleteError = null
                         scope.launch {
-                            try { deleteError = onDeleteRemote(); if (deleteError == null) confirmDelete = false }
+                            try { deleteError = onDeleteRemote(); if (deleteError == null) { confirmDelete = false; onBack() } }
+                            catch (error: CancellationException) { throw error }
+                            catch (error: Exception) { deleteError = error.message ?: "삭제하지 못했어요. 다시 시도해 주세요." }
                             finally { deleting = false }
                         }
                     }
@@ -165,7 +127,7 @@ private fun EmptyProfile(onCreate: () -> Unit) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(20.dp))
-            Button(onClick = onCreate, shape = RoundedCornerShape(16.dp)) { Text("체형 분석 시작하기") }
+            Button(onClick = onCreate, shape = MaterialTheme.shapes.medium) { Text("체형 분석 시작하기") }
         }
     }
 }
@@ -175,20 +137,18 @@ private fun InfoCard(profile: BodyProfile) {
     val rows = listOf(
         "키" to "${profile.input.heightCm} cm",
         "몸무게" to (profile.input.weightKg?.let { "$it kg" } ?: "입력 안 함"),
-        "촬영 복장" to "자동 판단 · ${profile.clothing.label}",
     )
-    Column(
-        Modifier
-            .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainer)
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-    ) {
-        rows.forEach { (label, value) ->
-            Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(value, fontWeight = FontWeight.SemiBold)
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            rows.forEach { (label, value) ->
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                }
             }
         }
+        Text("촬영 복장: ${profile.clothing.label} · 자동 판단", style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -211,20 +171,7 @@ private fun MyProfilePreview() {
     StyleMateTheme { MyProfileScreen(profile, StyleProfile(), onSaveStyle = { null }, onReanalyze = {}, onDelete = {}) }
 }
 
-private enum class ProfilePage { MAIN, COLORS, BODY }
-private val FIT_LABELS = linkedMapOf("oversized" to "오버핏", "wide" to "와이드", "regular" to "레귤러", "tapered" to "테이퍼드", "slim" to "슬림")
-private val MOOD_LABELS = linkedMapOf("minimal" to "미니멀", "cityboy" to "시티보이", "casual" to "캐주얼", "street" to "스트릿", "classic" to "클래식 / 프레피", "sporty" to "스포티")
-private val PROFILE_COLORS = linkedMapOf("#202020" to "블랙", "#FFFFFF" to "화이트", "#888888" to "그레이", "#1F2A44" to "네이비",
-    "#C7B69A" to "베이지", "#F0E6D2" to "크림", "#795548" to "브라운", "#686B42" to "카키",
-    "#3975C6" to "블루", "#E9A2B3" to "핑크", "#B83232" to "레드", "#9464AA" to "퍼플")
-private val PROFILE_IMPORT_ICON = ImageVector.Builder(name = "ImportData", defaultWidth = 24.dp, defaultHeight = 24.dp,
-    viewportWidth = 24f, viewportHeight = 24f).apply {
-    path(fill = SolidColor(Color.Black)) {
-        moveTo(19f, 9f); lineTo(15f, 9f); lineTo(15f, 3f); lineTo(9f, 3f)
-        lineTo(9f, 9f); lineTo(5f, 9f); lineTo(12f, 16f); close()
-        moveTo(5f, 18f); lineTo(5f, 20f); lineTo(19f, 20f); lineTo(19f, 18f); close()
-    }
-}.build()
+private enum class ProfilePage { MAIN, BODY, CONNECTIONS, ACCOUNT }
 
 @Composable
 fun MyProfileScreen(
@@ -239,181 +186,110 @@ fun MyProfileScreen(
     authBusy: Boolean = false,
     onDeleteRemote: (suspend () -> String?)? = null,
     onImport: (() -> Unit)? = null,
+    connections: (@Composable () -> Unit)? = null,
+    connectionSummary: String = "연결 상태 확인",
 ) {
     var page by rememberSaveable { mutableStateOf(ProfilePage.MAIN) }
-    var inlineSaving by remember { mutableStateOf(false) }
-    var pendingStyle by remember { mutableStateOf<StyleProfile?>(null) }
-    var inlineError by remember { mutableStateOf<String?>(null) }
-    val scope = rememberCoroutineScope()
-    val shownStyle = pendingStyle ?: style
-    val saveInline: (StyleProfile) -> Unit = { value ->
-        if (!inlineSaving && !authBusy) {
-            inlineSaving = true
-            inlineError = null
-            pendingStyle = value
-            scope.launch {
-                try { inlineError = onSaveStyle(value) }
-                catch (cancelled: CancellationException) { throw cancelled }
-                catch (failure: Exception) { inlineError = failure.message ?: "저장하지 못했어요. 다시 선택해 주세요." }
-                finally { pendingStyle = null; inlineSaving = false }
+    val pages = rememberSaveableStateHolder()
+    val editor: ProfilePreferencesViewModel = if (LocalInspectionMode.current) remember { ProfilePreferencesViewModel() }
+        else viewModel(factory = viewModelFactory { initializer { ProfilePreferencesViewModel() } })
+    val editing by editor.state.collectAsState()
+    BackHandler(enabled = page != ProfilePage.MAIN && editing.section == null) { page = ProfilePage.MAIN }
+    if (editing.section != null) {
+        ProfilePreferenceEditor(editing, modifier, editor::select, editor::discard,
+            onFit = { if (editing.section == ProfilePreference.TASTE) editor.selectFit(it) else editor.select(it) },
+            onMood = { if (editing.section == ProfilePreference.TASTE) editor.toggleMood(it) else editor.select(it) }) {
+            if (editing.section == ProfilePreference.TASTE) editor.saveTaste { fits, moods ->
+                onSaveStyle(style.copy(preferredFits = fits, preferredStyles = moods))
+            } else editor.save { section, values ->
+                onSaveStyle(when (section) {
+                    ProfilePreference.FIT -> style.copy(preferredFits = values)
+                    ProfilePreference.MOOD -> style.copy(preferredStyles = values)
+                    ProfilePreference.COLORS -> style.copy(favoriteColors = values)
+                    ProfilePreference.TASTE -> style
+                })
             }
         }
+        return
     }
-    val back = { page = ProfilePage.MAIN }
-    BackHandler(enabled = page != ProfilePage.MAIN, onBack = back)
-    when (page) {
-        ProfilePage.BODY -> BodyDetailsScreen(profile, onReanalyze, onDelete, back, modifier, onDeleteRemote)
-        ProfilePage.COLORS -> ColorPreferenceEditor(style.favoriteColors, modifier, back) { onSaveStyle(style.copy(favoriteColors = it)) }
-        ProfilePage.MAIN -> Column(modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Spacer(Modifier.height(4.dp))
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("마이프로필", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                if (username != null) onImport?.let {
-                    IconButton(onClick = it, enabled = !authBusy && !inlineSaving) {
-                        Icon(PROFILE_IMPORT_ICON, contentDescription = "이 기기의 데이터 가져오기", tint = MaterialTheme.colorScheme.primary)
-                    }
-                }
-
-            }
-            Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.fillMaxWidth()) {
-                Row(Modifier.padding(horizontal = 16.dp, vertical = 18.dp).fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text(username.orEmpty(), fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text("로그인됨", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    OutlinedButton(onClick = onLogout, enabled = !authBusy && !inlineSaving, shape = RoundedCornerShape(12.dp)) {
-                        Text(if (authBusy) "처리 중…" else "로그아웃")
-                    }
+    pages.SaveableStateProvider(page.name) {
+        when (page) {
+            ProfilePage.BODY -> BodyDetailsScreen(profile, onReanalyze, onDelete,
+                { page = ProfilePage.MAIN }, modifier, onDeleteRemote)
+            ProfilePage.CONNECTIONS -> ScreenScaffold("캘린더 연동", null, false, {}, modifier,
+                onBack = { page = ProfilePage.MAIN }, contentWindowInsets = WindowInsets(0)) { padding ->
+                Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(20.dp)) {
+                    connections?.invoke()
                 }
             }
-            inlineError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-            ProfileCard {
-                Text("선호하는 핏", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                PreferenceChoices(FIT_LABELS, shownStyle.preferredFits, !inlineSaving && !authBusy) {
-                    saveInline(style.copy(preferredFits = it.ifEmpty { listOf("regular") }))
-                }
+            ProfilePage.ACCOUNT -> AccountSettingsScreen(username, authBusy, onLogout, { page = ProfilePage.MAIN }, modifier)
+            ProfilePage.MAIN -> Column(modifier.fillMaxSize().verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                PageHeader("MY", subtitle = "내 체형과 취향", horizontalPadding = 0.dp)
+                editing.notice?.let { Text(it, style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }) }
+                ProfileSummaryRow("내 체형 정보", profile?.let {
+                    listOfNotNull("키 ${it.input.heightCm} cm", it.input.weightKg?.let { kg -> "몸무게 $kg kg" }).joinToString(" · ")
+                } ?: "아직 등록된 체형 정보가 없어요") { page = ProfilePage.BODY }
+                ProfileHeading("스타일")
+                ProfileSummaryRow("나의 취향", listOf(FIT_LABELS[style.preferredFits.firstOrNull()] ?: "레귤러",
+                    style.preferredStyles.joinToString(" · ") { MOOD_LABELS[it] ?: it }.ifBlank { "선택한 무드 없음" }).joinToString(" · "),
+                    enabled = !authBusy) { editor.open(ProfilePreference.TASTE, style) }
+                ProfileSummaryRow("컬러 기록", style.favoriteColors.joinToString(" · ") { PROFILE_COLORS[it] ?: it }
+                    .ifBlank { "기록한 컬러가 없어요" }, enabled = !authBusy) { editor.open(ProfilePreference.COLORS, style) }
+                if (connections != null) { ProfileHeading("캘린더 연동"); connections() }
+                ProfileHeading("계정")
+                ProfileSummaryRow("계정 설정", "로그인 정보 · 로그아웃", enabled = !authBusy) { page = ProfilePage.ACCOUNT }
+                if (username != null && onImport != null) TextButton(onClick = onImport, enabled = !authBusy,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("이 기기의 기존 데이터 가져오기") }
             }
-            ProfileCard {
-                Text("선호하는 무드", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                PreferenceChoices(MOOD_LABELS, shownStyle.preferredStyles, !inlineSaving && !authBusy) {
-                    saveInline(style.copy(preferredStyles = it))
-                }
-            }
-            ProfileCard {
-                ProfileSectionHeader("자주 입는 컬러", "팔레트 관리", !inlineSaving && !authBusy) { page = ProfilePage.COLORS }
-                if (style.favoriteColors.isEmpty()) {
-                    Text("아직 저장한 컬러가 없어요", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                } else ColorTags(style.favoriteColors)
-            }
-            SectionTitle("체형 밸런스 참고")
-            Surface(onClick = { page = ProfilePage.BODY }, shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceVariant,
-                modifier = Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(if (profile == null) "내 체형 분석하기" else "내 체형 정보 보기", fontWeight = FontWeight.Bold)
-                }
-            }
-            Spacer(Modifier.height(12.dp))
         }
     }
 }
 
 @Composable
-private fun ProfileCard(content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
-    Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp), content = content)
-    }
+private fun ProfileHeading(title: String) {
+    Text(title, Modifier.padding(top = 12.dp).semantics { heading() },
+        style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
 }
 
 @Composable
-private fun ProfileSectionHeader(title: String, action: String, enabled: Boolean = true, onClick: () -> Unit) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-        TextButton(onClick = onClick, enabled = enabled) { Text(action, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-    }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun PreferenceChoices(options: Map<String, String>, selected: List<String>, enabled: Boolean, onChange: (List<String>) -> Unit) {
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        options.forEach { (code, label) ->
-            FilterChip(selected = code in selected, enabled = enabled, shape = RoundedCornerShape(50),
-                onClick = { onChange(if (code in selected) selected - code else selected + code) },
-                label = { Text(label, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium) })
-        }
-    }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun ColorTags(colors: List<String>) {
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        colors.forEach { hex -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Surface(Modifier.size(24.dp), shape = CircleShape, color = Color(android.graphics.Color.parseColor(hex)), border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {}
-            Text(PROFILE_COLORS[hex] ?: hex, style = MaterialTheme.typography.bodyMedium)
-        } }
-    }
-}
-
-@Composable
-private fun ColorPreferenceEditor(initial: List<String>,
-    modifier: Modifier, onBack: () -> Unit, onSave: suspend (List<String>) -> String?) {
-    val options = PROFILE_COLORS + initial.associateWith { PROFILE_COLORS[it] ?: it }
-    var selected by rememberSaveable { mutableStateOf(initial) }
-    var error by remember { mutableStateOf<String?>(null) }
-    var saving by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
-    BackHandler(enabled = saving) {}
-    ScreenScaffold("자주 입는 컬러", if (saving) "저장 중…" else "저장하기", !saving, {
-        if (!saving) {
-            saving = true
-            scope.launch {
-                try { error = onSave(selected); if (error == null) onBack() }
-                catch (cancelled: CancellationException) { throw cancelled }
-                catch (failure: Exception) { error = failure.message ?: "저장하지 못했어요. 다시 시도해 주세요." }
-                finally { saving = false }
-            }
-        }
-    }, modifier = modifier, onBack = onBack, navigationEnabled = !saving, contentWindowInsets = WindowInsets(0, 0, 0, 0)) { padding ->
-        Column(Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-            ProfileCard {
-                Text("선택한 컬러 ${selected.size}/8", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                if (selected.isEmpty()) Text("선택한 컬러가 없어요", color = MaterialTheme.colorScheme.onSurfaceVariant) else ColorTags(selected)
-            }
-            ProfileCard {
-                Text("컬러 선택", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                ColorChoices(options, selected, 8, !saving) { selected = it; error = null }
-            }
-            error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-        }
-    }
-}
-
-@Composable
-private fun ColorChoices(options: Map<String, String>, selected: List<String>, limit: Int, enabled: Boolean, onChange: (List<String>) -> Unit) {
-    options.entries.chunked(4).forEach { row ->
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            row.forEach { (hex, label) ->
-                val checked = hex in selected
-                Surface(onClick = { onChange(if (checked) selected - hex else selected + hex) },
-                    enabled = enabled && (checked || selected.size < limit), selected = checked,
-                    shape = RoundedCornerShape(12.dp), color = Color.Transparent, modifier = Modifier.weight(1f)) {
-                    Column(Modifier.padding(vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Surface(Modifier.size(48.dp), shape = CircleShape, color = Color(android.graphics.Color.parseColor(hex)),
-                            border = BorderStroke(if (checked) 2.dp else 1.dp, if (checked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant)) {
-                            Box(contentAlignment = Alignment.Center) {
-                                if (checked) Icon(Icons.Filled.Check, contentDescription = null,
-                                    tint = if (hex in setOf("#202020", "#1F2A44", "#795548", "#686B42", "#3975C6", "#B83232", "#9464AA")) Color.White else Color.Black)
-                            }
-                        }
-                        Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface)
-                    }
+private fun ProfileSummaryRow(title: String, summary: String, enabled: Boolean = true, onClick: () -> Unit) {
+    Surface(onClick = onClick, enabled = enabled, color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxWidth()) {
+        Column {
+            Row(Modifier.fillMaxWidth().heightIn(min = 72.dp).padding(vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+                    Text(summary, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
+                Icon(Icons.AutoMirrored.Filled.ArrowForward, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            repeat(4 - row.size) { Spacer(Modifier.weight(1f)) }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         }
     }
+}
+
+@Composable
+private fun AccountSettingsScreen(username: String?, busy: Boolean, onLogout: () -> Unit, onBack: () -> Unit, modifier: Modifier) {
+    var confirm by rememberSaveable { mutableStateOf(false) }
+    ScreenScaffold("계정 설정", null, false, {}, modifier, onBack = onBack, contentWindowInsets = WindowInsets(0)) { padding ->
+        Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp)) {
+            Text("로그인 정보", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                Text("아이디", Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(username.orEmpty(), Modifier.weight(2f))
+            }
+            HorizontalDivider()
+            TextButton(onClick = { confirm = true }, enabled = !busy,
+                contentPadding = PaddingValues(vertical = 8.dp), modifier = Modifier.heightIn(min = 48.dp)) {
+                Text(if (busy) "로그아웃 중…" else "로그아웃", color = MaterialTheme.colorScheme.error)
+            }
+        }
+    }
+    if (confirm) AlertDialog(onDismissRequest = { if (!busy) confirm = false }, title = { Text("로그아웃할까요?") },
+        text = { Text("옷장과 저장한 코디는 계정에 남아 있어요.") },
+        confirmButton = { TextButton(onClick = { confirm = false; onLogout() }, enabled = !busy) { Text("로그아웃") } },
+        dismissButton = { TextButton(onClick = { confirm = false }, enabled = !busy) { Text("취소") } })
 }

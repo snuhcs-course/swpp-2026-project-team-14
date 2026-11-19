@@ -114,7 +114,7 @@ class WornRegistrationTest {
         assertFalse(canSaveWornBatch(emptyList()))
     }
 
-    @Test fun estimatedDimensionsShowApproximateValueRangeAndAreReadOnly() {
+    @Test fun estimatedDimensionsShowOneReadOnlyRange() {
         val attrs = JSONObject().put("category", "top").put("subcategory", "tshirt")
         val estimate = JSONObject().put("category", "top").put("subcategory", "tshirt")
             .put("source", "body_photo_estimate").put("measurements", JSONObject().put("chest_width_half",
@@ -123,8 +123,9 @@ class WornRegistrationTest {
             JSONObject().put("label", "가슴 단면"))))
         compose.setContent { StyleMateTheme { Column { GarmentEstimates(estimate, attrs, catalog) } } }
         compose.onNodeWithText("추정 치수").assertIsDisplayed()
-        compose.onNodeWithText("약 53cm · 추정").assertIsDisplayed()
-        compose.onNodeWithText("예상 범위 49~57cm").assertIsDisplayed()
+        compose.onNodeWithText("49–57 cm").assertIsDisplayed()
+        compose.onNodeWithText("약 53cm · 추정").assertDoesNotExist()
+        compose.onNodeWithText("예상 범위 49~57cm").assertDoesNotExist()
         assertEquals(0, compose.onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsProperties.EditableText)).fetchSemanticsNodes().size)
     }
 

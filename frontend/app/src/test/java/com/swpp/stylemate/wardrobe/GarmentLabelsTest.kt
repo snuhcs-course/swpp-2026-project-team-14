@@ -3,6 +3,9 @@ package com.swpp.stylemate.wardrobe
 
 import com.swpp.stylemate.ui.wardrobe.GarmentLabels
 import com.swpp.stylemate.ui.wardrobe.LabelState
+import com.swpp.stylemate.ui.wardrobe.GarmentLabelsViewModel
+import com.swpp.stylemate.data.recommendation.OutfitRepository
+import com.swpp.stylemate.data.testAccount
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertFalse
@@ -12,6 +15,20 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class GarmentLabelsTest {
+    @Test fun tabReentryRetainsLabelEditsButDiscardSaveAndOtherItemsStartFresh() {
+        val model = GarmentLabelsViewModel(OutfitRepository(testAccount("http://127.0.0.1:1")))
+        model.start("first", JSONObject().put("fit", "노멀"), "input")
+        model.edit("fit", "루즈")
+        model.start("first", JSONObject().put("fit", "노멀"), "input")
+        assertEquals("루즈", model.state.value.edits["fit"])
+        model.reset()
+        model.start("first", JSONObject().put("fit", "노멀"), "input")
+        assertTrue(model.state.value.edits.isEmpty())
+        model.edit("fit", "루즈")
+        model.start("second", JSONObject().put("fit", "노멀"), "input")
+        assertTrue(model.state.value.edits.isEmpty())
+        assertEquals("second", model.state.value.garmentId)
+    }
     // shape of GET /api/wardrobe/options/ -> label_options
     private val options = JSONObject("""{
         "top": {"fit": ["타이트", "노멀", "루즈", "오버사이즈"], "length": ["크롭", "노멀", "롱"],

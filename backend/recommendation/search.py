@@ -29,7 +29,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from recommendation import explain, fit, preference, season, weather
-from recommendation.body import Body
+from recommendation.body import Body, UnknownBody
 from recommendation.catalog import Catalog, Item
 from recommendation.color import outfit_color
 from recommendation.compat import percentile
@@ -46,6 +46,16 @@ SEEN_OUTFIT_PENALTY = 0.5
 WEATHER_RELAX_PENALTY = 0.25
 MASKED_SHARE = 0.5
 MMR_LAMBDA = 0.5
+
+# 어울림 점수 shown in the app (0-100, drawn as stars). Ranking keeps the raw total; this only rescales what
+# people read. C is a percentile against real K-Fashion outfits, so a perfectly ordinary real outfit already
+# sits at 0.5 and raw totals bunch in the 60s. Knots are quantiles of raw totals of recommended outfits
+# (2 x 1,500 outfits from 600 random wardrobes of saved garments x 4 bodies x 6 temperatures x 4 style choices,
+# two seeds; quantiles agreed within 0.01 while the extremes moved by 0.07): the 5th, 25th, 50th, 75th and 95th
+# percentiles go to 70, 85, 90, 95 and 98, so a typical pick reads 4.5 stars, the top quarter 5 and only
+# the weakest tenth 3.5 or less. Quantile knots ignore extreme outfits, the map is
+# monotone (the order never changes), and beyond the outer knots it runs linearly to 0 and 100.
+DISPLAY_KNOTS = ((0.0, 0.0), (0.474, 70.0), (0.559, 85.0), (0.624, 90.0), (0.683, 95.0), (0.759, 98.0), (1.0, 100.0))
 
 
 @dataclass
@@ -67,6 +77,7 @@ class Request:
     jitter: float = 0.0  # random spread on the pick order (app refreshes vary); 0 keeps results deterministic
     fixed: dict[str, str] = field(default_factory=dict)  # chat: slot -> garment that must remain
     directions: dict[str, list[str]] = field(default_factory=dict)  # chat: requested changes by slot
+    required_slots: set[str] = field(default_factory=set)  # chat: include explicitly added slots without fixing an item
 
 
 @dataclass
@@ -175,12 +186,13 @@ def recommend(catalog: Catalog, req: Request) -> dict:
         pools[anchor.slot] = [a]
 
     templates = [(t, w) for t, w in band.templates if not (req.body.male and "원피스" in t)]
-    if req.fixed:
-        if any(not pools.get(s) for s in req.fixed):
-            raise RecommendError('유지할 옷으로 코디를 만들 수 없어요. 잠금을 풀거나 옷장 정보를 확인해 주세요.')
-        templates = [(t, w) for t, w in templates if set(req.fixed) <= set(t)]
+    required = set(req.fixed) | req.required_slots
+    if required:
+        if any(not pools.get(s) for s in required):
+            raise RecommendError('요청한 옷을 포함한 코디를 만들 수 없어요. 옷장 정보나 조건을 확인해 주세요.')
+        templates = [(t, w) for t, w in templates if required <= set(t)]
         if not templates:
-            templates = [((('아우터',) if '아우터' in req.fixed else ()) + ('상의', '하의'), 1.0)]
+            templates = [((('아우터',) if '아우터' in required else ()) + ('상의', '하의'), 1.0)]
     if anchor is not None:
         templates = [(t, w) for t, w in templates if anchor.slot in t] or [((anchor.slot,), 1.0)]
     cache: dict = {}
@@ -189,7 +201,7 @@ def recommend(catalog: Catalog, req: Request) -> dict:
         if any(not pools.get(s) for s in slots):
             continue
         scored += _score_template(catalog, band, slots, t_weight, [pools[s] for s in slots], context_style, cache)
-    if not scored and wardrobe_only and pools.get("상의") and pools.get("하의") and '아우터' not in req.fixed:
+    if not scored and wardrobe_only and pools.get("상의") and pools.get("하의") and '아우터' not in required:
         scored = _score_template(catalog, band, ("상의", "하의"), 1.0, [pools["상의"], pools["하의"]], context_style, cache)
         if band.outer in {"recommended", "required"}:
             notes.append("오늘은 아우터가 필요한 날씨인데 맞는 아우터가 없어 상의와 하의만 골랐어요.")
@@ -315,10 +327,26 @@ def _mmr(outfits: list[dict], count: int) -> list[dict]:
     return picked
 
 
+def display_score(raw: float) -> int:
+    """Raw total (0-1) to the 0-100 어울림 점수, piecewise linear through DISPLAY_KNOTS."""
+    xs, ys = zip(*DISPLAY_KNOTS)
+    return int(round(float(np.interp(max(0.0, min(1.0, raw)), xs, ys))))
+
+
+def _shown_total(components: dict, penalty: float, informative_taste: bool, informative_body: bool = True) -> float:
+    """The total people read. Taste with no feedback and no style choices is a flat 0.5 for every outfit:
+    it cannot tell outfits apart, so it is left out and the other weights are rescaled. The same goes for
+    body/fit without a body profile, so skipping body analysis does not read as a worse outfit."""
+    keys = [k for k in WEIGHTS if (k != "taste" or informative_taste) and (k != "body" or informative_body)]
+    weight = sum(WEIGHTS[k] for k in keys)
+    return sum(WEIGHTS[k] * components[k] for k in keys) / weight - penalty
+
+
 def _present(catalog: Catalog, req: Request, band: season.Band, o: dict, has_feedback: bool) -> dict:
     items = [c.item for c in o["cands"]]
     components = {"compat": o["compat"], "body": o["body"], "color": o["color"], "season": o["season"], "taste": o["taste"]}
-    total = sum(WEIGHTS[k] * v for k, v in components.items()) - o["penalty"]
+    raw = _shown_total(components, o["penalty"], has_feedback or bool(req.styles),
+                       informative_body=not isinstance(req.body, UnknownBody))
     reasons = [r for r in (
         explain.compat_reason(catalog, items),
         explain.body_reason(req.body, req.pref_fit, float(np.mean([c.fit for c in o["cands"]])),
@@ -341,7 +369,8 @@ def _present(catalog: Catalog, req: Request, band: season.Band, o: dict, has_fee
         "key": o["key"],
         "items": out_items,
         "template": "+".join(o["slots"]),
-        "total": round(100 * max(0.0, min(1.0, total))),
+        "total": display_score(raw),
+        "raw_total": round(raw, 4),
         "components": {k: round(100 * v) for k, v in components.items()},
         "reasons": reasons,
         "seen": o["seen"],

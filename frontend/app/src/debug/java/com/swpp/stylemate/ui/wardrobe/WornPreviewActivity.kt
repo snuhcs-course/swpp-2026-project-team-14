@@ -4,7 +4,7 @@ import android.graphics.BitmapFactory
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
+import com.swpp.stylemate.ui.theme.enableStyleMateEdgeToEdge
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -27,7 +27,7 @@ import java.io.File
 class WornPreviewActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        enableStyleMateEdgeToEdge()
         var fixture by mutableStateOf<WornUiFixture?>(null)
         var failed by mutableStateOf(false)
         lifecycleScope.launch {

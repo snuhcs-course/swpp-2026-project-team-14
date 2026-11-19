@@ -159,6 +159,21 @@ def test_own_garments_survive_the_weather_with_a_note(catalog, female):
     assert any("아우터" in n for n in cold["notes"])
 
 
+def test_explicitly_required_outerwear_is_in_every_result(catalog, female):
+    result = recommend(catalog, Request(body=female, temp=16, mode='wardrobe', wardrobe=WARDROBE,
+                                       required_slots={'아우터'}))
+    assert result['outfits']
+    assert all('아우터' in outfit['template'] for outfit in result['outfits'])
+    assert all('w:6' in outfit for outfit in ids(result))
+
+
+@pytest.mark.parametrize('temp', [0, 16, 30])
+def test_missing_required_outerwear_never_falls_back_to_two_pieces(catalog, female, temp):
+    with pytest.raises(RecommendError):
+        recommend(catalog, Request(body=female, temp=temp, mode='wardrobe', wardrobe=WARDROBE[:5],
+                                   required_slots={'아우터'}))
+
+
 def test_shipped_models_score_my_wardrobe(female):
     from recommendation.catalog import Catalog
 

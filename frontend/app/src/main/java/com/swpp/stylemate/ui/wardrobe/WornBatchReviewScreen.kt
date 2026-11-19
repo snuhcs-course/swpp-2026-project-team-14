@@ -47,9 +47,8 @@ internal fun WornBatchReviewScreen(state: WornBatchState, catalog: JSONObject?, 
     var comparisonId by remember { mutableStateOf<String?>(null) }
     CompositionLocalProvider(LocalTextStyle provides LocalTextStyle.current.copy(lineHeight = 18.sp, letterSpacing = 0.sp)) {
     Scaffold(containerColor = MaterialTheme.colorScheme.background,
-        topBar = { TopAppBar(title = { Text("등록할 옷 확인", fontSize = 20.sp, lineHeight = 26.sp, fontWeight = FontWeight.Bold) },
-            navigationIcon = { IconButton(onClick = onBack, enabled = enabled) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "뒤로") } },
-            actions = { previewActions() }, colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)) },
+        topBar = { com.swpp.stylemate.ui.components.PageHeader("등록할 옷 확인", onBack = onBack,
+            enabled = !state.busy, actions = { previewActions() }) },
         bottomBar = {
             Surface(color = MaterialTheme.colorScheme.background) {
                 Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 20.dp, vertical = 12.dp),
@@ -58,9 +57,8 @@ internal fun WornBatchReviewScreen(state: WornBatchState, catalog: JSONObject?, 
                     if (enabled) wornBatchSaveProblem(items)?.let { Text(it, color = MaterialTheme.colorScheme.error, fontSize = 12.sp) }
                     Button(onClick = onSave, enabled = enabled && catalog != null && canSaveWornBatch(items),
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = Color.White),
-                        shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp)) {
-                        if (state.busy) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-                        else Icon(Icons.Default.Check, null, Modifier.size(18.dp))
+                        shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp)) {
+                        if (!state.busy) Icon(Icons.Default.Check, null, Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
                         Text(if (state.busy) "처리 중" else "선택한 ${selected}벌 내 옷장에 등록", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                     }
@@ -70,7 +68,7 @@ internal fun WornBatchReviewScreen(state: WornBatchState, catalog: JSONObject?, 
         }) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            if (state.busy) WornProcessingIndicator(state.progress)
+            if (state.busy) WornBusyOverlay(state.progress)
             state.error?.let { Text(it, color = MaterialTheme.colorScheme.error, fontSize = 13.sp) }
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text("사진에서 ${items.size}벌의 옷을 찾았어요.", fontSize = 15.sp, fontWeight = FontWeight.Medium)
@@ -88,7 +86,7 @@ internal fun WornBatchReviewScreen(state: WornBatchState, catalog: JSONObject?, 
                     onEdit = { if (catalog != null) onEdit(item.id) }, onCompare = { comparisonId = item.id },
                     onRegenerate = { onRegenerate(item.id) }, onCrop = { onCrop(item.id) }, onRefresh = { onRefresh(item.id) })
             } }
-            Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
+            Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceVariant) {
                 Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Icon(Icons.Default.Edit, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
@@ -122,7 +120,7 @@ private fun WornReviewGarmentCard(item: WornBatchItem, catalog: JSONObject, enab
     val ready = item.generation.optString("status") == "ready"
     val path = if (item.imageChoice == "crop") original else if (ready) item.generation.optString("generated_url").takeIf { it.startsWith("/api/wardrobe/") } else null
     val processing = item.generation.optString("status") in setOf("pending", "running")
-    Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
+    Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainer) {
         Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Checkbox(item.included, onCheckedChange = onInclude, enabled = enabled,
@@ -142,25 +140,25 @@ private fun WornReviewGarmentCard(item: WornBatchItem, catalog: JSONObject, enab
                     Box(Modifier.weight(.34f).aspectRatio(1f).clip(RoundedCornerShape(8.dp))) {
                         if (path != null) photo("$name 표시 이미지", path, item.generation.optString("request_id"), Modifier.fillMaxSize(), ContentScale.Crop)
                         else Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
-                            if (processing && !enabled) CircularProgressIndicator(Modifier.size(26.dp))
+                            if (processing && !enabled) Text("처리 중", style = MaterialTheme.typography.bodySmall)
                             else Text(if (processing) "생성 대기" else "생성 실패", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         if (path != null) Surface(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(5.dp).clickable(enabled = enabled, onClick = onCompare),
-                            color = Color.White.copy(alpha = .94f), shape = RoundedCornerShape(5.dp)) {
+                            color = Color.White.copy(alpha = .94f), shape = MaterialTheme.shapes.medium) {
                             Text("원본 비교", Modifier.padding(vertical = 5.dp), fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
                                 textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                         }
                     }
                     Column(Modifier.weight(.66f), verticalArrangement = Arrangement.spacedBy(11.dp)) {
-                        ReviewInfoLine("핏", if (labels.isNull("fit")) "미정" else labels.optString("fit"))
-                        ReviewInfoLine("기장", if (labels.isNull("length")) "미정" else labels.optString("length"))
+                        ReviewInfoLine("핏", if (labels.isNull("fit")) "미정" else labelText(labels.optString("fit")))
+                        ReviewInfoLine("기장", if (labels.isNull("length")) "미정" else labelText(labels.optString("length")))
                         val colors = attrs.optJSONArray("colors")
                         val color = colors?.optString(0)?.takeIf { it.startsWith("#") }
                         val colorName = color?.let { catalog.optJSONObject("color_palette")?.optString(it, it) } ?: "미정"
                         ReviewInfoLine("색상", colorName, color)
                         val materials = labels.optJSONArray("materials")
                         ReviewInfoLine("소재", materials?.let { a -> (0 until a.length()).map { a.getString(it) }.joinToString(" · ").ifBlank { "미정" } } ?: "미정")
-                        Surface(shape = RoundedCornerShape(5.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
+                        Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceVariant) {
                             Text(if (item.imageChoice == "crop") "착용 사진 일부" else "AI 재구성 이미지", Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
                                 fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
@@ -191,7 +189,7 @@ private fun ReviewInfoLine(label: String, value: String, hex: String? = null) {
         Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
             if (hex != null) {
                 val swatch = runCatching { Color(android.graphics.Color.parseColor(hex)) }.getOrDefault(MaterialTheme.colorScheme.onSurfaceVariant)
-                Box(Modifier.size(9.dp).clip(RoundedCornerShape(50)).background(swatch))
+                Box(Modifier.size(9.dp).clip(MaterialTheme.shapes.large).background(swatch))
             }
             Text(value, fontSize = 12.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
         }
@@ -224,7 +222,7 @@ private fun ReviewEstimatePanel(estimate: JSONObject?, category: String, catalog
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         pair.forEach { field ->
                             val value = measures!!.getJSONObject(field)
-                            Surface(Modifier.weight(1f), shape = RoundedCornerShape(5.dp), color = Color.White) {
+                            Surface(Modifier.weight(1f), shape = MaterialTheme.shapes.medium, color = Color.White) {
                                 Column(Modifier.padding(9.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                     Text(definitions!!.getJSONObject(field).getString("label"), fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     Text("약 ${value.getInt("value")}cm", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
@@ -276,11 +274,20 @@ private fun WornReviewComparison(item: WornBatchItem, photo: WornReviewPhoto, en
 
 @Composable
 internal fun WornProcessingIndicator(message: String) {
-    Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
+    Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainer) {
         Row(Modifier.fillMaxWidth().padding(18.dp), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             CircularProgressIndicator(Modifier.size(28.dp).semantics { contentDescription = "처리 중" }, strokeWidth = 3.dp)
             Text(message.ifBlank { "처리하고 있어요" }, style = MaterialTheme.typography.bodyMedium)
         }
+    }
+}
+
+
+@Composable
+internal fun WornBusyOverlay(message: String) {
+    androidx.compose.ui.window.Dialog(onDismissRequest = {}, properties = androidx.compose.ui.window.DialogProperties(
+        dismissOnBackPress = false, dismissOnClickOutside = false)) {
+        WornProcessingIndicator(message)
     }
 }

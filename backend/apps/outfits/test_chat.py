@@ -1,4 +1,5 @@
 import json
+from datetime import datetime, timedelta
 from unittest.mock import patch
 
 from django.test import TestCase
@@ -6,12 +7,12 @@ from django.test import TestCase
 from apps.users.auth import issue_token
 from apps.users.models import User
 from apps.wardrobe.models import Garment
-from recommendation import chat_intent
+from recommendation import chat_intent, trip, weather
 from .models import Outfit
 from .tests import BODY, garment
 
 
-class ChatApiTests(TestCase):
+class ChatFixture(TestCase):
     def setUp(self):
         self.user = User.objects.create_user('chat_owner', 'test-password')
         _, token = issue_token(self.user)
@@ -27,6 +28,9 @@ class ChatApiTests(TestCase):
         payload = dict(body=BODY, temp=16, garment_ids=self.ids, locked_ids=[], directions=['brighter'])
         return self.client.post('/api/outfits/chat/', json.dumps(payload | changes), content_type='application/json')
 
+
+class ChatApiTests(ChatFixture):
+
     def test_button_locks_and_preview_do_not_save(self):
         with patch('recommendation.chat_intent.parse', side_effect=AssertionError('buttons must not call AI')):
             response = self.post(locked_ids=[str(self.bottom.id)])
@@ -36,6 +40,12 @@ class ChatApiTests(TestCase):
         self.assertEqual({i['garment_id'] for i in data['outfit']['items'] if i['slot'] == 'bottom'}, {str(self.bottom.id)})
         self.assertIn(str(self.bright.id), data['changed_ids'])
         self.assertFalse(Outfit.objects.exists())
+
+    def test_works_without_a_body_profile(self):
+        for body in (None, {'preferred_fit': 'regular', 'preferred_styles': []}):
+            response = self.post(body=body, locked_ids=[str(self.bottom.id)])
+            self.assertEqual(response.status_code, 200, body)
+            self.assertEqual(response.json()['status'], 'updated')
 
     def test_locked_outer_survives_hot_weather_with_complete_outfit(self):
         response = self.post(garment_ids=self.ids + [str(self.outer.id)], locked_ids=[str(self.outer.id), str(self.bottom.id)], temp=30)
@@ -53,6 +63,35 @@ class ChatApiTests(TestCase):
         self.assertEqual(data['unlock_ids'], [str(self.bottom.id)])
         self.assertIsNone(data['outfit'])
 
+    def test_clarification_answer_keeps_history_and_provides_confirmed_sleeve_options(self):
+        self.bright.labels = {'sleeve': '긴팔'}
+        self.bright.save(update_fields=['labels'])
+        history = [{'role': 'user', 'text': 'long sleeves'},
+                   {'role': 'assistant', 'text': '어떤 종류의 긴팔 상의를 원하세요?'}]
+        parsed = chat_intent.empty() | {'target_garment_ids': [str(self.bright.id)]}
+        with patch('recommendation.chat_intent.parse', return_value=(parsed, 'gemini', None)) as parse:
+            response = self.post(text='anything', directions=[], history=history,
+                                 locked_ids=[str(self.bottom.id)])
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['status'], 'updated')
+        self.assertEqual(response.json()['changed_ids'], [str(self.bright.id)])
+        text, context = parse.call_args.args
+        self.assertEqual(text, 'anything')
+        self.assertEqual(context['history'], history)
+        inventory = {row['id']: row for row in context['wardrobe']}
+        self.assertEqual(inventory[str(self.bright.id)]['sleeve'], '긴팔')
+        self.assertIsNone(inventory[str(self.top.id)]['sleeve'])
+        self.assertEqual(context['locked_slots'], ['bottom'])
+        self.assertFalse(Outfit.objects.exists())
+
+    def test_the_only_matching_current_garment_is_reported_as_unchanged(self):
+        parsed = chat_intent.empty() | {'target_garment_ids': [str(self.top.id)]}
+        with patch('recommendation.chat_intent.parse', return_value=(parsed, 'gemini', None)):
+            data = self.post(text='anything', directions=[], locked_ids=[str(self.bottom.id)]).json()
+        self.assertEqual(data['status'], 'unchanged')
+        self.assertIsNone(data['outfit'])
+        self.assertEqual(data['locked_ids'], [str(self.bottom.id)])
+
     def test_text_keep_applies_to_this_edit_without_creating_a_lock(self):
         parsed = chat_intent.empty() | {'change_slots': ['top'], 'keep_slots': ['bottom'],
                                       'wants': [{'slot': 'top', 'want': 'brighter'}]}
@@ -65,11 +104,35 @@ class ChatApiTests(TestCase):
 
     def test_all_locked_or_no_matching_clothes_never_unlock(self):
         data = self.post(locked_ids=self.ids).json()
-        self.assertEqual(data['status'], 'clarify')
+        self.assertEqual(data['status'], 'unlock')
+        self.assertEqual(data['unlock_ids'], self.ids)
+        self.assertEqual(data['locked_ids'], self.ids)
+        self.assertIsNone(data['outfit'])
         data = self.post(locked_ids=[str(self.bottom.id)], directions=['colorful']).json()
         self.assertEqual(data['status'], 'unchanged')
         self.assertIsNone(data['outfit'])
         self.assertEqual(data['locked_ids'], [str(self.bottom.id)])
+
+    def test_add_outerwear_keeps_all_locked_current_garments(self):
+        parsed = chat_intent.empty() | {'change_slots': ['outerwear']}
+        with patch('recommendation.chat_intent.parse', return_value=(parsed, 'gemini', None)):
+            data = self.post(text='아우터 추가해줘', directions=[], locked_ids=self.ids).json()
+        self.assertEqual(data['status'], 'updated')
+        self.assertEqual({item['garment_id'] for item in data['outfit']['items']},
+                         set(self.ids + [str(self.outer.id)]))
+        self.assertEqual(data['locked_ids'], self.ids)
+        self.assertEqual(data['changed_ids'], [str(self.outer.id)])
+        self.assertFalse(Outfit.objects.exists())
+
+    def test_add_outerwear_without_a_candidate_does_not_unlock_or_replace_current_garments(self):
+        self.outer.delete()
+        parsed = chat_intent.empty() | {'change_slots': ['outerwear']}
+        with patch('recommendation.chat_intent.parse', return_value=(parsed, 'gemini', None)):
+            data = self.post(text='아우터 추가해줘', directions=[], locked_ids=self.ids).json()
+        self.assertEqual(data['status'], 'unchanged')
+        self.assertEqual(data['locked_ids'], self.ids)
+        self.assertIsNone(data['outfit'])
+        self.assertFalse(Outfit.objects.exists())
 
     def test_missing_garment_and_invalid_requests(self):
         self.assertEqual(self.post(locked_ids=[str(self.bright.id)]).status_code, 400)
@@ -153,3 +216,60 @@ class ChatApiTests(TestCase):
         self.assertEqual(following['status'], 'updated')
         self.assertEqual(following['locked_ids'], [str(self.outer.id)])
         self.assertIn(str(self.jeans.id), following['changed_ids'])
+
+
+class ChatTripTests(ChatFixture):
+    """Days, places and plans named in chat ("내일 부산 여행")."""
+
+    def forecast(self, day, **changes):
+        values = dict(day=day.isoformat(), temp_min=6.0, temp_max=17.0, apparent_min=3.0, apparent_max=15.0,
+                      rain_chance=70, rain=True, snow=False, label='흐림')
+        return weather.DayForecast(**(values | changes))
+
+    def ask(self, text, parsed=None, **daily):
+        parsed = parsed or chat_intent.empty()
+        with patch('recommendation.chat_intent.parse', return_value=(parsed, 'gemini', None)), \
+                patch('recommendation.weather.daily', **daily) as lookup:
+            return self.post(text=text, directions=[]).json(), lookup
+
+    def test_named_place_and_day_use_that_forecast(self):
+        tomorrow = datetime.now(trip.KST).date() + timedelta(days=1)
+        data, lookup = self.ask('내일 부산 여행 가는데 뭐 입지?', return_value=self.forecast(tomorrow))
+        lookup.assert_called_once_with(*trip.PLACES['부산'], tomorrow.isoformat(), timeout=5)
+        self.assertEqual(data['status'], 'updated')
+        self.assertTrue(any('부산 최저 6° · 최고 17° · 비 70%' in n for n in data['notes']))
+        self.assertTrue(any('일교차가 11°' in n for n in data['notes']))
+        context = data['outfit']['context']
+        self.assertEqual((context['place'], context['day'], context['temp'], context['wet'], context['occasion']),
+                         ('부산', tomorrow.isoformat(), 9.0, '비', '여행'))
+
+    def test_day_without_place_uses_seoul_and_today_alone_keeps_current_weather(self):
+        later = datetime.now(trip.KST).date() + timedelta(days=2)
+        data, lookup = self.ask('모레 출근할 때 입을 거', return_value=self.forecast(later, rain=False, rain_chance=10))
+        lookup.assert_called_once_with(*weather.SEOUL, later.isoformat(), timeout=5)
+        self.assertEqual(data['outfit']['context']['place'], '서울')
+        _, lookup = self.ask('오늘 상의만 밝게', chat_intent.empty() | {'wants': [{'slot': 'top', 'want': 'brighter'}]})
+        lookup.assert_not_called()
+
+    def test_unavailable_or_too_far_forecast_keeps_current_weather_with_a_note(self):
+        data, _ = self.ask('내일 제주 여행', side_effect=weather.WeatherError('down'))
+        self.assertEqual(data['status'], 'updated')
+        self.assertIn('제주 예보를 가져오지 못해 지금 날씨로 골랐어요.', data['notes'][0])
+        self.assertEqual(data['outfit']['context']['temp'], 16)
+        data, lookup = self.ask('30일 뒤 결혼식 하객룩')
+        lookup.assert_not_called()
+        self.assertIn('예보는 아직 없어 지금 날씨로 골랐어요.', data['notes'][0])
+
+    def test_occasion_adds_a_direction_unless_the_request_says_the_opposite(self):
+        tomorrow = datetime.now(trip.KST).date() + timedelta(days=1)
+        data, _ = self.ask('내일 면접 보러 가', return_value=self.forecast(tomorrow, rain=False))
+        self.assertEqual(data['status'], 'updated')
+        self.assertIn(str(self.bright.id), {i['garment_id'] for i in data['outfit']['items']})
+        casual = chat_intent.empty() | {'wants': [{'slot': None, 'want': 'casual'}]}
+        data, _ = self.ask('결혼식인데 편하게', casual)
+        self.assertNotEqual(data['status'], 'clarify')
+
+    def test_buttons_never_look_up_a_forecast(self):
+        with patch('recommendation.weather.daily') as lookup:
+            self.post()
+        lookup.assert_not_called()
