@@ -108,7 +108,7 @@ def chat_view(request):
     try:
         return process(garments, *args)
     except chat_intent.ChatModelError:
-        return views._error('CHAT_MODEL_UNAVAILABLE', 503, '문장을 해석하는 AI가 잠시 응답하지 않아요. 아래 버튼(밝게·캐주얼 등)으로 바꿔 보거나 30초쯤 뒤에 다시 보내 주세요.')
+        return views._error('CHAT_MODEL_UNAVAILABLE', 503, '문장을 해석하는 AI가 잠시 응답하지 않아요. 입력창의 조건 선택으로 바꿔 보거나 30초쯤 뒤에 다시 보내 주세요.')
     finally:
         SLOTS_GATE.release()
 
@@ -126,7 +126,9 @@ def process(garments, body, current_ids, locked, directions, text, history, pref
         'current': [{'slot': slot, 'name': i.name} for slot, i in before.items()],
         'locked_slots': [slot for slot, gid in current.items() if gid in locked], 'history': history,
         'wardrobe': [{'id': i.id[2:], 'slot': views.SLOT_CODE[i.slot], 'name': i.name,
-                      'category': i.attrs.get('카테고리'), 'color': i.attrs.get('색상')}
+                      'category': i.attrs.get('카테고리'), 'color': i.attrs.get('색상'),
+                      'fit': i.attrs.get('핏'),
+                      'sleeve': (garments[i.id[2:]].labels or {}).get('sleeve')}
                      for i in items[:100]],
     }) if text else (chat_intent.empty(), 'buttons', None))
     notes = [notice] if notice else []
@@ -158,20 +160,26 @@ def process(garments, body, current_ids, locked, directions, text, history, pref
     conflict = [gid for slot, gid in current.items() if gid in locked and slot in requested]
     if conflict:
         names = ' · '.join(garments[gid].attributes['name'] for gid in conflict)
-        return response('unlock', f'{names}의 잠금을 풀고 바꿀까요?', unlock_ids=conflict)
+        return response('unlock', f'{names}도 다른 옷으로 바꿔 볼까요?', unlock_ids=conflict)
     kept = {slot for slot in extraction['keep_slots'] if slot in current}
     if requested & kept:
-        return response('clarify', '유지할 옷과 바꿀 옷을 다시 골라 주세요.')
+        return response('clarify', '그대로 입을 옷과 바꿀 옷을 다시 골라 주세요.')
+    if extraction['remove_outerwear'] and 'outerwear' not in current:
+        return response('unchanged', '지금 코디에는 아우터가 없어요.')
+    adding_slots = requested - set(current)
     # An explicit single-slot edit also fixes every unrequested slot for this turn.
     fixed_slots = {slot for slot, gid in current.items() if gid in locked} | kept
     if requested:
         fixed_slots |= set(current) - requested
     fixed = {WARDROBE_CATEGORY[slot]: 'w:' + current[slot] for slot in fixed_slots}
     fixed.update({WARDROBE_CATEGORY[slot]: 'w:' + gid for slot, gid in targets.items()})
-    if set(current) <= fixed_slots:
-        return response('clarify', '바꿀 옷의 잠금을 하나 이상 풀어 주세요.')
+    if set(current) <= fixed_slots and not adding_slots:
+        if locked:
+            return response('unlock', '지금 옷은 모두 그대로 입도록 선택되어 있어요. 다른 옷으로도 바꿔 볼까요?',
+                            unlock_ids=locked)
+        return response('clarify', '지금 입은 옷은 모두 유지하는 요청이에요. 추가할 옷이나 바꿀 부분을 알려 주세요.')
     if extraction['remove_outerwear'] and 'outerwear' in fixed_slots:
-        return response('unlock', '아우터 잠금을 풀고 뺄까요?', unlock_ids=[current['outerwear']])
+        return response('unlock', '선택한 아우터도 빼 볼까요?', unlock_ids=[current['outerwear']])
     # Textual keep constraints apply to this edit only. Persistent locks are user-owned.
     new_locked = list(locked)
     allowed = []
@@ -203,19 +211,22 @@ def process(garments, body, current_ids, locked, directions, text, history, pref
             positive = [i for i in by_slot[slot] if _want_score(want, i, before.get(views.SLOT_CODE[slot])) > 0]
             by_slot[slot] = positive
     allowed = [i for pool in by_slot.values() for i in pool]
+    if 'outerwear' in adding_slots and not by_slot.get(WARDROBE_CATEGORY['outerwear']):
+        return response('unchanged', '옷장에서 조건에 맞는 아우터를 찾지 못했어요. 아우터를 등록하거나 조건을 바꿔 주세요.')
     shift = 5 if 'warmer' in wants_set else -5 if 'cooler' in wants_set else 0
     try:
         result = recommend(views.models(), Request(body=body, pref_fit=pref_fit, styles=styles,
             temp=max(-40, min(50, temp - shift)), wet=wet, mode='wardrobe', wardrobe=allowed,
             preference=taste, seen_outfits=list(dict.fromkeys([*seen, '+'.join(sorted('w:' + gid for gid in current_ids))])),
-            count=5, fixed=fixed, directions={s: [w['want'] for w in extraction['wants']
+            count=5, fixed=fixed, required_slots={WARDROBE_CATEGORY[s] for s in adding_slots},
+            directions={s: [w['want'] for w in extraction['wants']
                     if w['slot'] in (None, views.SLOT_CODE[s])] for s in by_slot}))
     except RecommendError:
-        return response('unchanged', '지금 옷장에는 조건에 맞는 다른 조합이 없어요. 조건이나 잠금을 조금 바꿔 보세요.', locked_ids=new_locked)
+        return response('unchanged', '지금 옷장에는 조건에 맞는 다른 코디가 없어요. 조건이나 그대로 입을 옷의 선택을 바꿔 보세요.', locked_ids=new_locked)
     choices = [o for o in result['outfits'] if {'상의', '하의'} <= {i['slot'] for i in o['items']}
                and all(any(i['id'] == gid for i in o['items']) for gid in fixed.values())]
     if not choices:
-        return response('unchanged', '유지할 옷을 포함한 다른 코디를 찾지 못했어요. 잠금이나 조건을 바꿔 보세요.', locked_ids=new_locked)
+        return response('unchanged', '그대로 입을 옷을 포함한 다른 코디를 찾지 못했어요. 조건이나 선택한 옷을 바꿔 보세요.', locked_ids=new_locked)
     changed = next((o for o in choices if {i['id'][2:] for i in o['items']} != set(current_ids)), None)
     if changed is None:
         return response('unchanged', '현재 코디가 조건에 가장 가까워요. 다른 조건으로 바꿔 볼까요?', locked_ids=new_locked)

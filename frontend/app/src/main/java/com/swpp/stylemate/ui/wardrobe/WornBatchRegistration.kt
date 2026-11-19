@@ -10,7 +10,6 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.foundation.layout.*
@@ -19,6 +18,7 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -56,7 +56,7 @@ fun WornRegistration(account: AccountAccess, onBack: () -> Unit, onBatchSaved: (
     var reading by remember { mutableStateOf(false) }
     var photoError by remember { mutableStateOf<String?>(null) }
     var confirmation by remember { mutableStateOf<Pair<String, String>?>(null) }
-    var editing by remember { mutableStateOf<String?>(null) }
+    var editing by rememberSaveable { mutableStateOf<String?>(null) }
     var catalog by remember { mutableStateOf<JSONObject?>(null) }
     var catalogError by remember { mutableStateOf<String?>(null) }
     val store = remember(account.userId) { LocalUserStore.forContext(context, account.userId) }
@@ -134,7 +134,7 @@ fun WornRegistration(account: AccountAccess, onBack: () -> Unit, onBatchSaved: (
         photo = { label, path, requestId, modifier, scale ->
             ComparisonPhoto(label, path, account, requestId, modifier, contentScale = scale, framed = false)
         })
-    else ScreenScaffold(title = "착용 사진으로 등록",
+    else ScreenScaffold(title = "사진으로 등록",
         onBack = { model.reset(); onBack() }, navigationEnabled = !busy,
         primaryLabel = when {
             state.original == null -> null
@@ -147,8 +147,8 @@ fun WornRegistration(account: AccountAccess, onBack: () -> Unit, onBatchSaved: (
         onPrimary = model::generateSelected) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                if (busy) WornProcessingIndicator(state.progress.ifBlank { "사진 읽는 중" })
-                Text("본인이 옷을 입은 사진을 골라 주세요. 사진에서 옷을 찾고 핏·기장을 제안해요.")
+                if (busy) WornBusyOverlay(state.progress.ifBlank { "사진 읽는 중" })
+                Text("옷이 잘 보이는 사진을 골라 주세요. 옷만 찍은 사진도 가능하고, 두 명 이상 나온 사진은 사용할 수 없어요.")
                 WornPhotoUpload(hasPhoto = state.original != null, enabled = !busy, onPick = {
                     picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                 }, onCamera = ::takePhoto)
@@ -169,8 +169,8 @@ fun WornRegistration(account: AccountAccess, onBack: () -> Unit, onBatchSaved: (
                 else -> "이미지를 생성할까요?"
             }) },
             text = { Text(when (action) {
-                "generate" -> "선택한 ${state.selected.size}벌에 대해 이미지 생성 API를 각각 1회 호출합니다. 선택한 수만큼 사용료가 발생해요. 생성 후 원본과 비교할 수 있어요."
-                "regenerate" -> "이 옷의 이미지 생성 API를 추가로 1회 호출합니다. 추가 사용료가 발생해요."
+                "generate" -> "선택한 ${state.selected.size}벌의 사진을 만들어요. 옷마다 생성 비용이 발생하며, 완성 후 원본과 비교할 수 있어요."
+                "regenerate" -> "이 옷의 사진을 다시 만들어요. 추가 생성 비용이 발생해요."
                 "crop" -> "원본의 옷 영역을 저장합니다. 몸이나 다른 옷이 남을 수 있으며 펼친 옷 사진은 아닙니다."
                 else -> "아직 저장하지 않은 옷은 옷장에 추가되지 않아요. 이미 사용한 생성 비용은 되돌릴 수 없어요."
             }) },
@@ -254,7 +254,8 @@ private fun WornBatchEditor(item: WornBatchItem, catalog: JSONObject, account: A
         busy = false, saved = false, error = null, measurementsEnabled = false, saveLabel = "변경 확인",
         estimatedDimensions = matchingWornEstimates(item.record, item.payload.getJSONObject("attributes"),
             model.merged(item.payload.getJSONObject("attributes").optString("category"), options) ?: item.payload.optJSONObject("labels")),
-        onBack = onBack, image = original,
+        onBack = { model.reset(); onBack() }, image = original,
+        hasLabelChanges = labels.edits.isNotEmpty(),
         photo = { Text("정보는 원본에서 보이는 옷을 기준으로 확인해 주세요. 아직 옷장에 저장하지 않았어요.") },
         canSaveLabels = { attrs, _ -> valid(attrs) },
         labels = { attrs, _ -> GarmentLabelSection(model, item.id, attrs, null, null,
@@ -263,6 +264,7 @@ private fun WornBatchEditor(item: WornBatchItem, catalog: JSONObject, account: A
             payload.put("labels", merged)
             payload.getJSONObject("attributes").put("fit_type", JSONObject.NULL).put("leg_shape", JSONObject.NULL)
             onEdit(payload)
+            model.reset()
         } })
 }
 
@@ -271,21 +273,21 @@ private fun WornBatchEditor(item: WornBatchItem, catalog: JSONObject, account: A
 internal fun WornPhotoUpload(hasPhoto: Boolean, enabled: Boolean, onCamera: (() -> Unit)? = null, onPick: () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Surface(Modifier.fillMaxWidth().clickable(enabled = enabled, role = Role.Button, onClick = onPick)
-            .semantics { contentDescription = if (hasPhoto) "다른 착용 사진 업로드" else "착용 사진 업로드" },
-            shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainer,
+            .semantics { contentDescription = if (hasPhoto) "다른 옷 사진 업로드" else "옷 사진 업로드" },
+            shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainer,
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
             Column(Modifier.fillMaxWidth().heightIn(min = if (hasPhoto) 88.dp else 200.dp).padding(20.dp),
                 verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
                 Icon(Icons.Default.Add, null, Modifier.size(32.dp), tint = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.height(12.dp))
-                Text(if (hasPhoto) "다른 사진 올리기" else "착용 사진 올리기", style = MaterialTheme.typography.titleMedium)
+                Text(if (hasPhoto) "다른 사진 올리기" else "옷 사진 올리기", style = MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.height(6.dp))
                 Text("눌러서 앨범에서 선택", style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
         if (onCamera != null) OutlinedButton(onClick = onCamera, enabled = enabled, modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(14.dp)) {
+            shape = MaterialTheme.shapes.medium) {
             Text("카메라로 찍기")
         }
     }

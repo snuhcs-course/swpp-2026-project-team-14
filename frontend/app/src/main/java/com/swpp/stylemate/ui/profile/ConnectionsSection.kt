@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
@@ -43,13 +42,14 @@ import com.swpp.stylemate.data.calendar.DeviceCalendar
 
 /** 연동: the phone calendar for now. It reads the calendars already on the phone; there is no account sign-in. */
 @Composable
-fun CalendarConnectionCard(store: LocalUserStore) {
+fun CalendarConnectionCard(store: LocalUserStore, onConnectionChanged: (Boolean) -> Unit = {}) {
     val context = LocalContext.current
     var connected by remember { mutableStateOf(CalendarConnection.enabled(context, store)) }
     var denied by remember { mutableStateOf(false) }
     // Coming back from the system settings, or after the permission was revoked there.
     LifecycleResumeEffect(Unit) {
         connected = CalendarConnection.enabled(context, store)
+        onConnectionChanged(connected)
         if (connected) denied = false
         onPauseOrDispose { }
     }
@@ -57,6 +57,7 @@ fun CalendarConnectionCard(store: LocalUserStore) {
         denied = !granted
         if (granted) CalendarConnection.set(store, true)
         connected = granted
+        onConnectionChanged(connected)
     }
     fun change(on: Boolean) {
         if (!on) {
@@ -66,20 +67,16 @@ fun CalendarConnectionCard(store: LocalUserStore) {
             CalendarConnection.set(store, true)
             connected = true
         } else permission.launch(Manifest.permission.READ_CALENDAR)
+        onConnectionChanged(connected)
     }
-    Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Box(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(Modifier.fillMaxWidth().toggleable(value = connected, role = Role.Switch, onValueChange = ::change),
                 horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(40.dp), contentAlignment = Alignment.Center) {
-                    Surface(Modifier.size(40.dp), shape = CircleShape, color = MaterialTheme.colorScheme.secondaryContainer) {}
-                    Icon(Icons.Filled.DateRange, contentDescription = null, Modifier.size(20.dp),
-                        tint = MaterialTheme.colorScheme.primary)
-                }
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text("휴대폰 캘린더", fontWeight = FontWeight.Bold)
-                    Text(if (connected) "연결됨 · 출근·데이트·여행 같은 오늘 일정을 홈에 보여줘요"
-                         else "구글·삼성 캘린더 등 휴대폰에 있는 일정을 읽어요",
+                    Text(if (connected) "연결됨 · 오늘 일정을 홈에 표시해요"
+                         else "휴대폰의 오늘 일정을 홈에서 볼 수 있어요",
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Switch(checked = connected, onCheckedChange = null)

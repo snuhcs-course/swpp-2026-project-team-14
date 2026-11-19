@@ -84,7 +84,6 @@ class WornDetectionTests(SimpleTestCase):
         outside = candidates()
         outside[0]['bounds'] = [100, 100, 1001, 900]
         cases = [(self.result(people=2), 'IMAGE_MULTIPLE_PEOPLE'),
-                 (self.result(people=0), 'IMAGE_NO_PERSON'),
                  (self.result(duplicated), 'AI_INVALID_RESPONSE'),
                  (self.result(invalid), 'AI_INVALID_RESPONSE'),
                  (self.result(outside), 'AI_INVALID_RESPONSE'),
@@ -95,6 +94,17 @@ class WornDetectionTests(SimpleTestCase):
             with self.assertRaises(AnalysisError) as error:
                 worn_detection.detect(source(), 'test-key')
             self.assertEqual(error.exception.code, code)
+
+    @patch('apps.wardrobe.worn_detection._send_request')
+    def test_standalone_garments_are_detected_without_inventing_wearer_measurements(self, send):
+        send.return_value = self.result(people=0)
+        result = worn_detection.detect(source(), 'test-key')
+        self.assertEqual(len(result), 3)
+        self.assertTrue(all(item['wearing'] is None for item in result))
+        send.return_value = self.result([], people=0)
+        with self.assertRaises(AnalysisError) as error:
+            worn_detection.detect(source(), 'test-key')
+        self.assertEqual(error.exception.code, 'IMAGE_TARGET_UNCLEAR')
 
     @patch('apps.wardrobe.worn_detection._send_request')
     def test_visible_skirt_over_trousers_is_three_distinct_candidates(self, send):

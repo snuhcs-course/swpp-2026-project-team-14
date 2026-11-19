@@ -33,6 +33,10 @@ class FittingRepository(private val store: LocalUserStore, private val account: 
         store.fittingResult(resultKey(outfit, source))
     }
 
+    suspend fun hasResult(outfit: Outfit, source: String): Boolean = withContext(Dispatchers.IO) {
+        store.hasFittingResult(resultKey(outfit, source))
+    }
+
     suspend fun saveResult(outfit: Outfit, image: ByteArray, source: String = "gallery") = withContext(Dispatchers.IO) {
         store.saveFittingResult(resultKey(outfit, source), image)
         store.put("fitting-latest:${taskKey(outfit)}", org.json.JSONObject().put("source", source))

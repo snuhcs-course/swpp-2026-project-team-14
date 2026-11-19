@@ -63,6 +63,35 @@ class ChatApiTests(ChatFixture):
         self.assertEqual(data['unlock_ids'], [str(self.bottom.id)])
         self.assertIsNone(data['outfit'])
 
+    def test_clarification_answer_keeps_history_and_provides_confirmed_sleeve_options(self):
+        self.bright.labels = {'sleeve': '긴팔'}
+        self.bright.save(update_fields=['labels'])
+        history = [{'role': 'user', 'text': 'long sleeves'},
+                   {'role': 'assistant', 'text': '어떤 종류의 긴팔 상의를 원하세요?'}]
+        parsed = chat_intent.empty() | {'target_garment_ids': [str(self.bright.id)]}
+        with patch('recommendation.chat_intent.parse', return_value=(parsed, 'gemini', None)) as parse:
+            response = self.post(text='anything', directions=[], history=history,
+                                 locked_ids=[str(self.bottom.id)])
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['status'], 'updated')
+        self.assertEqual(response.json()['changed_ids'], [str(self.bright.id)])
+        text, context = parse.call_args.args
+        self.assertEqual(text, 'anything')
+        self.assertEqual(context['history'], history)
+        inventory = {row['id']: row for row in context['wardrobe']}
+        self.assertEqual(inventory[str(self.bright.id)]['sleeve'], '긴팔')
+        self.assertIsNone(inventory[str(self.top.id)]['sleeve'])
+        self.assertEqual(context['locked_slots'], ['bottom'])
+        self.assertFalse(Outfit.objects.exists())
+
+    def test_the_only_matching_current_garment_is_reported_as_unchanged(self):
+        parsed = chat_intent.empty() | {'target_garment_ids': [str(self.top.id)]}
+        with patch('recommendation.chat_intent.parse', return_value=(parsed, 'gemini', None)):
+            data = self.post(text='anything', directions=[], locked_ids=[str(self.bottom.id)]).json()
+        self.assertEqual(data['status'], 'unchanged')
+        self.assertIsNone(data['outfit'])
+        self.assertEqual(data['locked_ids'], [str(self.bottom.id)])
+
     def test_text_keep_applies_to_this_edit_without_creating_a_lock(self):
         parsed = chat_intent.empty() | {'change_slots': ['top'], 'keep_slots': ['bottom'],
                                       'wants': [{'slot': 'top', 'want': 'brighter'}]}
@@ -75,11 +104,35 @@ class ChatApiTests(ChatFixture):
 
     def test_all_locked_or_no_matching_clothes_never_unlock(self):
         data = self.post(locked_ids=self.ids).json()
-        self.assertEqual(data['status'], 'clarify')
+        self.assertEqual(data['status'], 'unlock')
+        self.assertEqual(data['unlock_ids'], self.ids)
+        self.assertEqual(data['locked_ids'], self.ids)
+        self.assertIsNone(data['outfit'])
         data = self.post(locked_ids=[str(self.bottom.id)], directions=['colorful']).json()
         self.assertEqual(data['status'], 'unchanged')
         self.assertIsNone(data['outfit'])
         self.assertEqual(data['locked_ids'], [str(self.bottom.id)])
+
+    def test_add_outerwear_keeps_all_locked_current_garments(self):
+        parsed = chat_intent.empty() | {'change_slots': ['outerwear']}
+        with patch('recommendation.chat_intent.parse', return_value=(parsed, 'gemini', None)):
+            data = self.post(text='아우터 추가해줘', directions=[], locked_ids=self.ids).json()
+        self.assertEqual(data['status'], 'updated')
+        self.assertEqual({item['garment_id'] for item in data['outfit']['items']},
+                         set(self.ids + [str(self.outer.id)]))
+        self.assertEqual(data['locked_ids'], self.ids)
+        self.assertEqual(data['changed_ids'], [str(self.outer.id)])
+        self.assertFalse(Outfit.objects.exists())
+
+    def test_add_outerwear_without_a_candidate_does_not_unlock_or_replace_current_garments(self):
+        self.outer.delete()
+        parsed = chat_intent.empty() | {'change_slots': ['outerwear']}
+        with patch('recommendation.chat_intent.parse', return_value=(parsed, 'gemini', None)):
+            data = self.post(text='아우터 추가해줘', directions=[], locked_ids=self.ids).json()
+        self.assertEqual(data['status'], 'unchanged')
+        self.assertEqual(data['locked_ids'], self.ids)
+        self.assertIsNone(data['outfit'])
+        self.assertFalse(Outfit.objects.exists())
 
     def test_missing_garment_and_invalid_requests(self):
         self.assertEqual(self.post(locked_ids=[str(self.bright.id)]).status_code, 400)

@@ -2,15 +2,48 @@
 package com.swpp.stylemate.ui.components
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.swpp.stylemate.ui.theme.StyleMateColors
+
+/** Prominent tab titles and a smaller navigation bar for child pages. */
+@Composable
+fun PageHeader(title: String, modifier: Modifier = Modifier, subtitle: String? = null,
+    onBack: (() -> Unit)? = null, enabled: Boolean = true, horizontalPadding: Dp = 20.dp,
+    backDescription: String = "뒤로", subtitleContent: (@Composable () -> Unit)? = null,
+    actions: @Composable RowScope.() -> Unit = {}) {
+    val childPage = onBack != null
+    val titleStyle = if (childPage) MaterialTheme.typography.titleMedium.copy(fontSize = 20.sp, lineHeight = 28.sp)
+        else MaterialTheme.typography.headlineSmall
+    // The 48dp target adds 12dp around the 24dp arrow; align the visible arrow with the content edge.
+    val startPadding = if (childPage) (horizontalPadding - 12.dp).coerceAtLeast(0.dp) else horizontalPadding
+    Row(modifier.fillMaxWidth().padding(start = startPadding, end = horizontalPadding)
+        .padding(vertical = if (childPage) 8.dp else 16.dp)
+        .heightIn(min = if (childPage) 48.dp else 0.dp),
+        verticalAlignment = if (childPage) Alignment.CenterVertically else Alignment.Top) {
+        if (onBack != null) IconButton(onClick = onBack, enabled = enabled, modifier = Modifier.size(48.dp)) {
+            Icon(Icons.AutoMirrored.Filled.ArrowBack, backDescription)
+        }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(title, style = titleStyle, fontWeight = if (childPage) FontWeight.SemiBold else FontWeight.Bold,
+                modifier = Modifier.semantics { heading() })
+            if (subtitleContent != null) subtitleContent()
+            else if (!subtitle.isNullOrBlank()) Text(subtitle, style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        actions()
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -26,6 +59,7 @@ fun ScreenScaffold(
     navigationEnabled: Boolean = true,
     contentWindowInsets: WindowInsets = ScaffoldDefaults.contentWindowInsets,
     topBar: (@Composable () -> Unit)? = null,
+    subtitle: String? = null,
     content: @Composable (PaddingValues) -> Unit,
 ) {
     Scaffold(
@@ -33,25 +67,16 @@ fun ScreenScaffold(
         contentWindowInsets = contentWindowInsets,
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            if (topBar != null) topBar() else TopAppBar(
-                title = { Text(title, fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    if (onBack != null) {
-                        IconButton(onClick = onBack, enabled = navigationEnabled) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "뒤로")
-                        }
-                    }
-                },
+            if (topBar != null) topBar() else PageHeader(title, subtitle = subtitle, onBack = onBack,
+                enabled = navigationEnabled,
+                modifier = Modifier.windowInsetsPadding(contentWindowInsets.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal)),
                 actions = {
                     if (actionLabel != null) {
                         TextButton(onClick = onAction, enabled = navigationEnabled) {
                             Text(actionLabel, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
-                },
-                windowInsets = contentWindowInsets.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
-            )
+                })
         },
         bottomBar = {
             if (primaryLabel != null) {
@@ -67,14 +92,22 @@ fun ScreenScaffold(
 
 @Composable
 fun PrimaryActionBar(label: String, enabled: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Box(modifier.padding(horizontal = 20.dp, vertical = 12.dp)) {
-        Button(
-            onClick = onClick,
-            enabled = enabled,
-            shape = RoundedCornerShape(16.dp),
-            modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
-        ) {
-            Text(label, fontWeight = FontWeight.Bold)
+    Surface(color = MaterialTheme.colorScheme.background) {
+        Column {
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Box(modifier.padding(horizontal = 20.dp, vertical = 12.dp)) {
+                Button(
+                    onClick = onClick,
+                    enabled = enabled,
+                    shape = MaterialTheme.shapes.medium,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                    colors = ButtonDefaults.buttonColors(disabledContainerColor = StyleMateColors.Disabled,
+                        disabledContentColor = StyleMateColors.DisabledInk),
+                ) {
+                    Text(label, fontWeight = FontWeight.Bold)
+                }
+            }
         }
     }
 }

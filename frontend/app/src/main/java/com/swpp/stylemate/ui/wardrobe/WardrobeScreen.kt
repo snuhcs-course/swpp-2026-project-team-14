@@ -28,33 +28,20 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.res.painterResource
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Delete
-import com.swpp.stylemate.R
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
-import com.swpp.stylemate.ui.components.PrimaryActionBar
 import com.swpp.stylemate.ui.components.ScreenScaffold
 import com.swpp.stylemate.ui.components.SectionTitle
 import androidx.compose.ui.unit.dp
@@ -65,8 +52,6 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-
-const val ANALYZE_BUTTON_TEXT = "옷장 분석"
 
 data class WardrobeItem(val id: String, val name: String, val category: String, val style: String? = null,
                         val thumbnail: ImageBitmap? = null, val imageUrl: String? = null)
@@ -114,12 +99,26 @@ fun WardrobeRoute(
         initializer { WardrobeViewModel(store, account) }
     })
     val wardrobe by wardrobeModel.state.collectAsStateWithLifecycle()
+    val wardrobePages = rememberSaveableStateHolder()
+    var pages by rememberSaveable(account.userId) { mutableStateOf(arrayListOf<String>()) }
+    var deletingDetailId by rememberSaveable(account.userId) { mutableStateOf<String?>(null) }
+    var linkError by rememberSaveable(account.userId) { mutableStateOf<String?>(null) }
+    fun popPage() {
+        pages = ArrayList(pages.dropLast(1))
+        linkError = null
+        if (pages.isEmpty()) wardrobeModel.closeExternalMatch()
+    }
     LaunchedEffect(wardrobe.deletedId) {
-        if (wardrobe.deletedId != null) { wardrobeModel.clearDeleted(); onDeleted() }
+        wardrobe.deletedId?.let { id ->
+            wardrobeModel.closeExternalMatch()
+            pages = ArrayList(pages.filterNot { it.substringAfter(":") == id })
+            deletingDetailId = null
+            wardrobeModel.clearDeleted()
+            onDeleted()
+        }
     }
     val externalMatch by wardrobeModel.externalMatch.collectAsStateWithLifecycle()
     val wardrobeAnalysis by wardrobeModel.wardrobeAnalysis.collectAsStateWithLifecycle()
-    var actionItemId by rememberSaveable { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) { wardrobeModel.refresh() }
     val labelsModel: GarmentLabelsViewModel = viewModel(factory = viewModelFactory {
         initializer { GarmentLabelsViewModel(OutfitRepository(account)) }
@@ -128,37 +127,6 @@ fun WardrobeRoute(
     // The body profile kept on the device (recommendation labels are computed on this body).
     val body = remember(store) { LocalBodyProfileStore(store).load()?.let { JSONObject(BodyProfileJson.encode(it)) } }
     var editingId by rememberSaveable { mutableStateOf(initialDraft?.optString("editing_id")?.takeIf { it.isNotBlank() }) }
-    val actionRecord = wardrobe.records.firstOrNull { it.optString("id") == actionItemId }
-    actionRecord?.let { record ->
-        val attributes = record.getJSONObject("attributes")
-        WardrobeItemActionsDialog(
-            item = WardrobeItem(record.getString("id"), attributes.getString("name"), attributes.getString("category")),
-            onEdit = { wardrobeModel.clearSaveState(); editingId = actionItemId; actionItemId = null },
-            onRecommend = {
-                actionItemId?.let(wardrobeModel::matchExternal)
-                actionItemId = null
-            },
-            onDismiss = { actionItemId = null },
-        )
-    }
-    if (externalMatch.garmentId != null) {
-        ExternalRecommendationDialog(externalMatch,
-            onRetry = { externalMatch.garmentId?.let(wardrobeModel::matchExternal) },
-            onOpenLink = { url ->
-                try { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
-                catch (_: ActivityNotFoundException) {
-                    wardrobeModel.closeExternalMatch()
-                    message = "검색 페이지를 열 수 있는 앱이 없어요."
-                }
-            },
-            onDismiss = wardrobeModel::closeExternalMatch,
-            wardrobe = wardrobe.records.map { record ->
-                val attrs = record.getJSONObject("attributes")
-                WardrobeItem(record.getString("id"), attrs.getString("name"), attrs.getString("category"),
-                    imageUrl = record.optString("image_url").ifBlank { null })
-            },
-        )
-    }
     if (wardrobeAnalysis.open) {
         WardrobeAnalysisDialog(wardrobeAnalysis,
             onRetry = wardrobeModel::analyzeWardrobe,
@@ -186,6 +154,8 @@ fun WardrobeRoute(
     }
     LaunchedEffect(wardrobe.savedId) {
         if (wardrobe.savedId != null) {
+            if (editingId == null) wardrobePages.removeState("collection")
+            wardrobeModel.closeExternalMatch()
             files.delete(selected)
             files.delete(frontPhoto)
             selected = null
@@ -195,6 +165,7 @@ fun WardrobeRoute(
             message = null
             wardrobeModel.clearSaveState()
             editorDraftText = null
+            labelsModel.reset()
             onSaved?.invoke()
         }
     }
@@ -227,9 +198,7 @@ fun WardrobeRoute(
             selected = name
             selectedMeasurements = result.data?.getStringExtra("measurements")
             message = null
-        } else {
-            message = "실측 촬영이 취소되었습니다. 기존 사진은 유지됩니다."
-        }
+        } else message = null
     }
     fun launchCamera() {
         if (measurementBusy) return
@@ -303,6 +272,7 @@ fun WardrobeRoute(
     fun discard() {
         files.delete(selected); files.delete(frontPhoto)
         selected = null; frontPhoto = null; selectedMeasurements = null; editorDraftText = null; message = null
+        labelsModel.reset()
     }
     BackHandler(selected != null || editingId != null) {
         if (!wardrobe.saving && !analysis.busy && !measurementBusy) {
@@ -332,9 +302,50 @@ fun WardrobeRoute(
     if (wornRegistration) {
         WornRegistration(account, onBack = { wornRegistration = false }, onBatchSaved = {
             wornRegistration = false
+            wardrobePages.removeState("collection")
             wardrobeModel.refresh()
             onSaved?.invoke()
         })
+        return
+    }
+    val page = pages.lastOrNull()
+    val pageId = page?.substringAfter(":")
+    val pageRecord = wardrobe.records.firstOrNull { it.optString("id") == pageId }
+    val deleteRecord = wardrobe.records.firstOrNull { it.optString("id") == deletingDetailId }
+    deleteRecord?.let { record ->
+        GarmentDeleteDialog(record, wardrobe.deletingId != null, wardrobe.deleteError,
+            onDelete = { wardrobeModel.delete(record.getString("id")) },
+            onDismiss = { deletingDetailId = null; wardrobeModel.clearDeleteError() })
+    }
+    if (selected == null && editingId == null && page != null) {
+        BackHandler { popPage() }
+        if (pageRecord == null) {
+            MissingGarmentScreen(wardrobe.loading, ::popPage, wardrobeModel::refresh)
+        } else if (page.startsWith("match:")) {
+            LaunchedEffect(page) {
+                linkError = null
+                if (externalMatch.garmentId != pageId) wardrobeModel.matchExternal(pageId!!)
+            }
+            wardrobePages.SaveableStateProvider(page) {
+                GarmentMatchScreen(pageRecord,
+                    if (externalMatch.garmentId == pageId) externalMatch else ExternalMatchState(pageId, loading = true),
+                    wardrobe.records, wardrobe.catalog, linkError, onBack = ::popPage,
+                    onRetry = { wardrobeModel.matchExternal(pageId!!) },
+                    onItem = { id -> pages = ArrayList(pages + "detail:$id") },
+                    onOpenLink = { url ->
+                        linkError = null
+                        try { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
+                        catch (_: ActivityNotFoundException) { linkError = "검색 페이지를 열 수 있는 앱이 없어요." }
+                    })
+            }
+        } else {
+            wardrobePages.SaveableStateProvider(page) {
+                GarmentDetailScreen(pageRecord, wardrobe.catalog, onBack = ::popPage,
+                    onEdit = { wardrobeModel.clearSaveState(); editingId = pageId },
+                    onMatch = { pages = ArrayList(pages + "match:$pageId") },
+                    onDelete = { wardrobeModel.clearDeleteError(); deletingDetailId = pageId })
+            }
+        }
         return
     }
     if (selected == null && editingId == null) {
@@ -366,16 +377,18 @@ fun WardrobeRoute(
             WardrobeItem(record.getString("id"), attrs.getString("name"), attrs.getString("category"),
                 style = style, imageUrl = record.getString("image_url"))
         }
+        wardrobePages.SaveableStateProvider("collection") {
         WardrobeScreen(items = items, message = message ?: wardrobe.error, cameraBusy = measurementBusy,
-            onWornPhoto = { wornRegistration = true },
+            onWornPhoto = { message = null; wornRegistration = true },
+            onInteraction = { message = null },
             onCapture = { wardrobeModel.clearSaveState(); takePhoto() },
-            onItemClick = { actionItemId = it.id },
+            onItemClick = { message = null; pages = arrayListOf("detail:${it.id}") },
             onAnalyze = wardrobeModel::analyzeWardrobe,
-            onDelete = { wardrobeModel.delete(it.id) },
             deletingId = wardrobe.deletingId, deleteError = wardrobe.deleteError,
             onDeleteDismiss = wardrobeModel::clearDeleteError,
             loading = wardrobe.loading,
             onRetry = if (wardrobe.error != null) ({ wardrobeModel.refresh() }) else null)
+        }
       }
     } else {
         val result = if (editingId == null) analysis.result else null
@@ -425,22 +438,27 @@ fun WardrobeRoute(
                     wardrobeModel.save(record.getString("id"), payload)
                 }, onBack = back,
                 image = if (generated) originalForColor else if (editing != null) savedPhoto else (if (needsFront) frontPreview else preview) ?: savedPhoto,
+                photoSource = if (editing != null) record.optString("image_source") else null,
                 photo = {
-                    if (worn) Text(if (generated) "AI가 재구성한 이미지입니다. 옷 정보는 원본에서 분석했어요. 가려진 부분은 실제와 다를 수 있습니다."
-                        else "착용 사진에서 가져온 이미지 · 펼친 옷 사진이 아닙니다. 다른 옷이나 가방의 특징이 섞이지 않았는지 확인해 주세요.", Modifier.padding(vertical = 12.dp))
-                    if (editing != null || generated) GarmentPhoto(record.getString("image_url"), record.getJSONObject("attributes").getString("name"),
-                        onLoaded = { savedPhoto = it }, store = store)
-                    else if ((if (needsFront) frontPreview else preview) == null && !record.optString("image_url").isBlank())
-                        GarmentPhoto(record.getString("image_url"), initialAttributes.optString("name"), onLoaded = { savedPhoto = it }, store = store)
+                    if (editing != null) GarmentPhoto(record.getString("image_url"), initialAttributes.optString("name"),
+                        onLoaded = { savedPhoto = it }, store = store, framed = false)
                     else {
-                        PhotoFrame {
-                            (if (needsFront) frontPreview else preview)?.let {
-                                Image(it, "촬영한 옷 사진", Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
+                        if (worn) Text(if (generated) "AI가 재구성한 이미지입니다. 옷 정보는 원본에서 분석했어요. 가려진 부분은 실제와 다를 수 있습니다."
+                            else "착용 사진에서 가져온 이미지 · 펼친 옷 사진이 아닙니다. 다른 옷이나 가방의 특징이 섞이지 않았는지 확인해 주세요.", Modifier.padding(vertical = 12.dp))
+                        if (generated) GarmentPhoto(record.getString("image_url"), record.getJSONObject("attributes").getString("name"),
+                            onLoaded = { savedPhoto = it }, store = store)
+                        else if ((if (needsFront) frontPreview else preview) == null && !record.optString("image_url").isBlank())
+                            GarmentPhoto(record.getString("image_url"), initialAttributes.optString("name"), onLoaded = { savedPhoto = it }, store = store)
+                        else {
+                            PhotoFrame {
+                                (if (needsFront) frontPreview else preview)?.let {
+                                    Image(it, "촬영한 옷 사진", Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
+                                }
+                                if (if (needsFront) frontLoading else previewLoading) CircularProgressIndicator()
                             }
-                            if (if (needsFront) frontLoading else previewLoading) CircularProgressIndicator()
+                            if (measurements != null && !sameCategory) Text("옷 종류가 달라 치수를 다시 입력해 주세요.",
+                                Modifier.padding(top = 12.dp), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
                         }
-                        if (measurements != null && !sameCategory) Text("옷 종류가 달라 치수를 다시 입력해 주세요.",
-                            Modifier.padding(top = 12.dp), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
                     }
                 },
                 labels = { attributes, dimensions ->
@@ -448,12 +466,15 @@ fun WardrobeRoute(
                     GarmentLabelSection(labelsModel, record.getString("id"), attributes, dimensions, labelBody,
                         GarmentLabels.details(result, stored), stored, catalog.optJSONObject("label_options"),
                         enabled = !(wardrobe.saving || wardrobe.loading), garmentType = if (editing == null) garmentType else null,
-                        manualFit = worn)
+                        manualFit = worn, sectionTitle = if (editing != null) "옷 특징" else "내 몸 기준 라벨")
                 },
-                topBar = topBar,
+                topBar = onboardingTopBar?.let { render -> { guardedBack ->
+                    render(guardedBack, !(wardrobe.saving || analysis.busy || measurementBusy))
+                } },
                 draft = editorDraftText?.let { JSONObject(it) },
                 onDraftChange = if (onDraftChange == null) null else { draft -> editorDraftText = draft.toString() },
                 measurementsEnabled = !worn,
+                hasLabelChanges = labelState.garmentId == record.getString("id") && labelState.edits.isNotEmpty(),
                 estimatedDimensions = matchingWornEstimates(record, initialAttributes,
                     labelsModel.merged(initialAttributes.optString("category"), catalog.optJSONObject("label_options")) ?: record.optJSONObject("labels")),
             )
@@ -510,7 +531,7 @@ fun WardrobeScreen(items: List<WardrobeItem>, message: String?, cameraBusy: Bool
                    onItemClick: (WardrobeItem) -> Unit = {}, loading: Boolean = false, onRetry: (() -> Unit)? = null,
                    onWornPhoto: (() -> Unit)? = null,
                    onDelete: ((WardrobeItem) -> Unit)? = null, deletingId: String? = null,
-                   deleteError: String? = null, onDeleteDismiss: () -> Unit = {},
+                   deleteError: String? = null, onDeleteDismiss: () -> Unit = {}, onInteraction: () -> Unit = {},
                    onAnalyze: (() -> Unit)? = null) {
     var pendingDeleteId by rememberSaveable { mutableStateOf<String?>(null) }
     val pendingDelete = items.firstOrNull { it.id == pendingDeleteId }
@@ -524,24 +545,17 @@ fun WardrobeScreen(items: List<WardrobeItem>, message: String?, cameraBusy: Bool
         }
         AlertDialog(
             onDismissRequest = ::dismissDelete,
-            icon = { Icon(Icons.Outlined.Delete, contentDescription = null) },
-            title = { Text("옷 삭제") },
+            title = { Text("의상 삭제") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("'${pendingDelete.name}'을(를) 옷장에서 삭제할까요?")
-                    Text("이 옷이 들어간 코디북 코디도 함께 삭제돼요.", style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("해당 의상을 삭제하시겠습니까?")
+                    Text("이 의상이 포함된 코디도 함께 삭제됩니다.", style = MaterialTheme.typography.bodyMedium)
                     deleteError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                     if (deleting) LinearProgressIndicator(Modifier.fillMaxWidth())
                 }
             },
-            confirmButton = {
-                TextButton(onClick = { onDelete(pendingDelete) }, enabled = !deleting,
-                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) {
-                    Text(if (deleting) "삭제 중…" else "삭제")
-                }
-            },
-            dismissButton = { TextButton(onClick = ::dismissDelete, enabled = !deleting) { Text("취소") } },
+            confirmButton = { TextButton(onClick = { onDelete(pendingDelete) }, enabled = !deleting) { Text("예") } },
+            dismissButton = { TextButton(onClick = ::dismissDelete, enabled = !deleting) { Text("아니요") } },
         )
     }
     var choosingMethod by rememberSaveable { mutableStateOf(false) }
@@ -549,94 +563,27 @@ fun WardrobeScreen(items: List<WardrobeItem>, message: String?, cameraBusy: Bool
         onWornPhoto = onWornPhoto?.let { { choosingMethod = false; it() } },
         onCapture = { choosingMethod = false; onCapture() })
     var category by rememberSaveable { mutableStateOf("all") }
-    val categories = listOf("all" to "전체", "top" to "상의", "bottom" to "하의", "outerwear" to "아우터", "shoes" to "신발")
-    val visible = items.filter { category == "all" || it.category == category }
-    // Newest first: a garment just added (or a new category) starts from the top instead of keeping the old first card in view.
-    val grid = rememberLazyGridState()
-    LaunchedEffect(visible.firstOrNull()?.id) { grid.scrollToItem(0) }
-    val configuration = LocalConfiguration.current
-    val columns = if (configuration.screenWidthDp < 352 || configuration.fontScale > 1.3f) 2 else 3
-    val nameStyle = MaterialTheme.typography.bodyMedium
-    val detailStyle = MaterialTheme.typography.bodySmall
-    val cardTextHeight = with(LocalDensity.current) { nameStyle.lineHeight.toDp() * 2 + detailStyle.lineHeight.toDp() } + 4.dp
-    Scaffold(
-        contentWindowInsets = WindowInsets(0),
-        bottomBar = {
-            PrimaryActionBar(if (cameraBusy) "촬영 중" else "등록하기", !cameraBusy, { choosingMethod = true })
-        },
-    ) { insets ->
-        Column(Modifier.fillMaxSize().padding(insets).padding(horizontal = 20.dp)) {
-            Spacer(Modifier.height(16.dp))
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text("내 옷장", Modifier.weight(1f), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                // 옷장 전체를 보고 부족한 옷을 추천받는다 (WardrobeAnalysisDialog)
-                if (onAnalyze != null) OutlinedButton(onClick = onAnalyze, enabled = !loading && deletingId == null,
-                    shape = RoundedCornerShape(50)) { Text(ANALYZE_BUTTON_TEXT) }
-            }
-            Text("총 ${items.size}벌", Modifier.padding(top = 4.dp, bottom = 8.dp),
-                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            if (loading) LinearProgressIndicator(Modifier.fillMaxWidth())
-            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                categories.forEach { (code, label) ->
-                    FilterChip(selected = category == code, onClick = { category = code }, label = { Text(label) },
-                        shape = RoundedCornerShape(50), colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = MaterialTheme.colorScheme.primary,
-                            selectedLabelColor = MaterialTheme.colorScheme.onPrimary))
-                }
-            }
-            message?.let { Text(it, Modifier.padding(vertical = 8.dp), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error) }
-            if (onRetry != null) TextButton(onClick = onRetry, enabled = !loading) { Text("다시 불러오기") }
-            Spacer(Modifier.height(8.dp))
-            if (visible.isEmpty()) {
-                Column(Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(if (items.isEmpty()) "아직 등록된 옷이 없습니다" else "이 카테고리에 등록된 옷이 없습니다", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(8.dp))
-                    Text("등록하기를 눌러 옷을 추가해 보세요.", style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            } else {
-                LazyVerticalGrid(columns = GridCells.Fixed(columns), modifier = Modifier.weight(1f), state = grid,
-                    contentPadding = PaddingValues(bottom = 12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    items(visible, key = { it.id }) { garment ->
-                        Card(onClick = { onItemClick(garment) }, enabled = deletingId == null, shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
-                            Box(Modifier.fillMaxWidth().aspectRatio(1f), contentAlignment = Alignment.Center) {
-                                if (garment.thumbnail != null) Image(garment.thumbnail, garment.name, Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
-                                else if (garment.imageUrl != null) GarmentPhoto(garment.imageUrl, garment.name)
-                                else Text("사진 없음", style = MaterialTheme.typography.labelSmall)
-                                // A trash can on a light badge: the earlier mark read as an edit pencil (HE).
-                                if (onDelete != null) IconButton(
-                                    onClick = { onDeleteDismiss(); pendingDeleteId = garment.id },
-                                    modifier = Modifier.align(Alignment.TopEnd).padding(4.dp).size(32.dp),
-                                    enabled = !loading && deletingId == null,
-                                    colors = IconButtonDefaults.iconButtonColors(
-                                        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
-                                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant),
-                                ) {
-                                    Icon(Icons.Outlined.Delete, "${garment.name} 삭제", Modifier.size(18.dp))
-                                }
-                            }
-                            Column(Modifier.fillMaxWidth().padding(12.dp).heightIn(min = cardTextHeight),
-                                verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically)) {
-                                Text(garment.name, style = nameStyle, fontWeight = FontWeight.SemiBold,
-                                    maxLines = 2, overflow = TextOverflow.Ellipsis)
-                                garment.style?.takeIf { it.isNotBlank() }?.let { style ->
-                                    Text(style, style = detailStyle, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
+    val categories = listOf("all" to "전체", "top" to "상의", "bottom" to "하의", "outerwear" to "아우터") +
+        if (items.any { it.category == "shoes" }) listOf("shoes" to "신발") else emptyList()
+    val activeCategory = category.takeIf { selected -> categories.any { it.first == selected } } ?: "all"
+    LaunchedEffect(activeCategory, loading) { if (!loading && category != activeCategory) category = activeCategory }
+    val visible = items.filter { activeCategory == "all" || it.category == activeCategory }
+    WardrobeCollection(
+        total = items.size, items = visible, categories = categories, category = activeCategory,
+        onCategory = { onInteraction(); category = it },
+        message = message, loading = loading, cameraBusy = cameraBusy,
+        onRegister = { onInteraction(); choosingMethod = true }, onRetry = onRetry,
+        onItemClick = onItemClick, deletingId = deletingId,
+        onDelete = onDelete?.let { { garment -> onDeleteDismiss(); pendingDeleteId = garment.id } },
+        onAnalyze = onAnalyze,
+        photo = { garment -> GarmentPhoto(checkNotNull(garment.imageUrl), garment.name, framed = false) },
+    )
 }
 
 
 @Composable
-private fun GarmentPhoto(path: String, name: String, onLoaded: (ImageBitmap?) -> Unit = {}, store: LocalUserStore? = null) {
+internal fun GarmentPhoto(path: String, name: String, onLoaded: (ImageBitmap?) -> Unit = {}, store: LocalUserStore? = null,
+                         framed: Boolean = true) {
     val context = LocalContext.current.applicationContext
     val account = checkNotNull(LocalAccountAccess.current)
     var bitmap by remember(path) { mutableStateOf<ImageBitmap?>(null) }
@@ -649,16 +596,20 @@ private fun GarmentPhoto(path: String, name: String, onLoaded: (ImageBitmap?) ->
         finally { loading = false }
         onLoaded(bitmap)
     }
-    PhotoFrame {
+    val content: @Composable BoxScope.() -> Unit = {
         bitmap?.let { Image(it, name, Modifier.fillMaxSize(), contentScale = ContentScale.Fit) }
-        if (loading) CircularProgressIndicator()
-        else if (bitmap == null) Text("사진을 불러오지 못했습니다.")
+        if (loading) CircularProgressIndicator(Modifier.size(if (framed) 40.dp else 24.dp))
+        else if (bitmap == null) Text("사진을 불러오지 못했습니다.",
+            style = if (framed) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.bodySmall,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center)
     }
+    if (framed) PhotoFrame(content)
+    else Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center, content = content)
 }
 
 @Composable
 private fun PhotoFrame(content: @Composable BoxScope.() -> Unit) {
-    Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainer,
+    Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainer,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
         Box(Modifier.fillMaxWidth().aspectRatio(1f), contentAlignment = Alignment.Center, content = content)
     }
@@ -668,14 +619,14 @@ private fun PhotoFrame(content: @Composable BoxScope.() -> Unit) {
 fun MeasurementSummary(values: List<Pair<String, String>>) {
     if (values.isEmpty()) return
     SectionTitle("추정 치수", "cm")
-    Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
+    Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainer) {
         Column {
             values.forEachIndexed { index, (label, value) ->
                 if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
                     Spacer(Modifier.width(8.dp))
-                    Surface(shape = RoundedCornerShape(50), color = MaterialTheme.colorScheme.surfaceVariant,
+                    Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceVariant,
                         contentColor = MaterialTheme.colorScheme.onSurface) {
                         Text("$value cm", Modifier.padding(horizontal = 14.dp, vertical = 6.dp), fontWeight = FontWeight.Bold)
                     }
@@ -692,15 +643,16 @@ internal fun RegistrationMethodSheet(onDismiss: () -> Unit, onWornPhoto: (() -> 
         Column(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, bottom = 28.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("어떻게 등록할까요?", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            onWornPhoto?.let { RegistrationMethodCard("착용 사진으로 등록", "내가 입은 사진에서 옷을 찾아요", it) }
-            RegistrationMethodCard("직접 촬영하기", "옷을 펼쳐 찍고 치수를 측정해요", onCapture)
+            onWornPhoto?.let { RegistrationMethodCard("사진으로 등록", "옷만 찍었거나 한 명이 입은 사진에서 옷을 찾아요", it) }
+            RegistrationMethodCard("직접 촬영하기", "옷을 평평하게 펼쳐 치수를 재요. 상의·아우터는 뒷면 측정 후 앞면 사진을 추가해요.", onCapture)
         }
     }
 }
 
 @Composable
 private fun RegistrationMethodCard(title: String, description: String, onClick: () -> Unit) {
-    Surface(onClick = onClick, shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
+    Surface(onClick = onClick, shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceVariant,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
         Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             Text(description, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)

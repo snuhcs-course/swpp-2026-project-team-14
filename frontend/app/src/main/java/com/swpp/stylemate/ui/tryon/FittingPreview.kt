@@ -21,7 +21,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
@@ -70,7 +69,7 @@ val LocalFittingNotificationKey = staticCompositionLocalOf<String?> { null }
 @Composable
 fun FittingPreview(onExpand: () -> Unit, modifier: Modifier = Modifier) {
     Button(onClick = onExpand, modifier = modifier.padding(top = 12.dp),
-        shape = RoundedCornerShape(16.dp)) { Text("가상 피팅") }
+        shape = MaterialTheme.shapes.medium) { Text("가상 피팅") }
 }
 
 @Composable
@@ -226,10 +225,6 @@ internal fun PhotoFitting(outfit: Outfit, repository: FittingRepository, account
         restoring = true
         try {
             notificationSettings = repository.notificationSettings()
-            if (notificationSettings.enabled && Build.VERSION.SDK_INT >= 33 &&
-                ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                requestNotificationPermission()
-            }
             do {
                 val task = work.state(repository.taskKey(outfit))
                 pending = task?.optString("state") in listOf("queued", "running")
@@ -247,15 +242,11 @@ internal fun PhotoFitting(outfit: Outfit, repository: FittingRepository, account
     }
 
     Column(Modifier.fillMaxSize().systemBarsPadding()) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-            if (result == null) TextButton(onClick = onClose) { Text("닫기") }
-            else Spacer(Modifier.size(64.dp, 48.dp))
-            Text("가상 피팅", Modifier.weight(1f), style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
-            FittingNotificationToggle(notificationSettings.enabled && FittingNotifications.allowed(context),
+        com.swpp.stylemate.ui.components.PageHeader("가상 피팅", onBack = onClose, actions = {
+            if (result == null && !restoring) FittingNotificationToggle(notificationSettings.enabled && FittingNotifications.allowed(context),
                 onCheckedChange = ::saveNotificationChoice,
-                enabled = !restoring && !changingNotification && !requestingNotificationPermission, modifier = Modifier.width(64.dp))
-        }
+                enabled = !changingNotification && !requestingNotificationPermission, modifier = Modifier.width(64.dp))
+        })
         when {
             restoring -> Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(Modifier.size(40.dp))
@@ -344,10 +335,10 @@ internal fun PhotoFittingContent(
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     OutlinedButton(onClick = onSaveResult, enabled = !saving && !saved,
                         modifier = Modifier.weight(1f).heightIn(min = 56.dp),
-                        shape = RoundedCornerShape(16.dp)) { Text(if (saving) "저장 중…" else "저장") }
+                        shape = MaterialTheme.shapes.medium) { Text(if (saving) "저장 중…" else "저장") }
                     Button(onClick = onConfirm, enabled = !saving,
                         modifier = Modifier.weight(1f).heightIn(min = 56.dp),
-                        shape = RoundedCornerShape(16.dp)) { Text("확인") }
+                        shape = MaterialTheme.shapes.medium) { Text("확인") }
                 }
             }
             else -> Column(Modifier.verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally,
@@ -356,11 +347,11 @@ internal fun PhotoFittingContent(
                 Text("어떤 사진으로 입혀볼까요?", style = MaterialTheme.typography.titleMedium)
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     OutlinedButton(onClick = onChoosePhoto, modifier = Modifier.weight(1f).heightIn(min = 136.dp),
-                        shape = RoundedCornerShape(16.dp)) {
+                        shape = MaterialTheme.shapes.medium) {
                         Text("내 갤러리에서\n사진 고르기", textAlign = TextAlign.Center)
                     }
                     Button(onClick = onChooseVirtual, modifier = Modifier.weight(1f).heightIn(min = 136.dp),
-                        shape = RoundedCornerShape(16.dp)) {
+                        shape = MaterialTheme.shapes.medium) {
                         Text("내 체형과 비슷한\n가상 모델에게 입히기", textAlign = TextAlign.Center)
                     }
                 }
@@ -421,7 +412,7 @@ private fun VirtualModelInput(initial: AnalysisInput?, onBack: () -> Unit,
         candidate?.let { Text("비슷한 가상 모델: ${it.label}", style = MaterialTheme.typography.bodyMedium) }
         Spacer(Modifier.height(12.dp))
         Button(onClick = { candidate?.let(onContinue) }, enabled = candidate != null,
-            modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp), shape = RoundedCornerShape(16.dp)) {
+            modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp), shape = MaterialTheme.shapes.medium) {
             Text("이 모델에게 입히기")
         }
         TextButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterHorizontally)) { Text("사진 선택 방식으로 돌아가기") }

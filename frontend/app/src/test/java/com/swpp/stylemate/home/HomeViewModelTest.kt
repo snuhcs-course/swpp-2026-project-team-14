@@ -217,6 +217,22 @@ class HomeViewModelTest {
         assertEquals(3, state.outfits.size)
     }
 
+    @Test fun selectingAnOutfitIsLocalAndSavingUsesTheSelectedId() {
+        loadThreeOutfits()
+        val preference = taste.load().toString()
+        viewModel.select(1)
+        viewModel.select(-1)
+        viewModel.select(3)
+        assertEquals("o2", viewModel.state.value.current?.id)
+        assertEquals(1, server.requests("POST /api/outfits/recommend/").size)
+        assertEquals(preference, taste.load().toString())
+        server.on("PUT /api/outfits/o2/", json(outfitJson("o2", "c", "d", saved = true).toString()))
+        viewModel.toggleSaved()
+        assertTrue(idle().current!!.saved)
+        assertEquals(1, server.requests("PUT /api/outfits/o2/").size)
+        assertTrue(server.requests("PUT /api/outfits/o1/").isEmpty())
+    }
+
     @Test fun likeStoresFeedbackAndTheUpdatedTaste() {
         loadThreeOutfits()
         server.on("POST /api/outfits/o1/feedback/", feedbackResult(outfitJson("o1", "a", "b", feedback = "liked"), 0.3))
@@ -270,6 +286,8 @@ class HomeViewModelTest {
         assertTrue(viewModel.state.value.acting)
         viewModel.toggleSaved()
         viewModel.feedback("disliked")
+        viewModel.select(1)
+        assertEquals("o1", viewModel.state.value.current?.id)
         idle()
         assertEquals(1, server.requests("POST /api/outfits/o1/feedback/").size)
         assertTrue(server.requests("PUT /api/outfits/o1/").isEmpty())
@@ -388,7 +406,28 @@ class CodiBookViewModelTest {
         val loaded = viewModel.state.await { !it.loading }
         server.on("PUT /api/outfits/o1/", failure(500, "SERVER_ERROR"))
         viewModel.remove(loaded.outfits.first())
-        val state = viewModel.state.await { it.error != null }
+        val state = viewModel.state.await { it.removeError != null }
         assertEquals(listOf("o1"), state.outfits.map { it.id })
+        assertEquals("o1", state.removeErrorId)
+        assertNull(state.error)
+        assertNull(state.removingId)
+        viewModel.clearRemoveError()
+        assertNull(viewModel.state.value.removeError)
+    }
+
+    @Test fun removalBlocksDuplicateRequestsAndRefreshUntilTheResponseArrives() {
+        server.on("GET /api/outfits/", page(outfitJson("o1", "a", "b", saved = true)))
+        viewModel.load()
+        val outfit = viewModel.state.await { !it.loading }.outfits.single()
+        server.on("PUT /api/outfits/o1/", json(outfitJson("o1", "a", "b").toString())
+            .setBodyDelay(200, java.util.concurrent.TimeUnit.MILLISECONDS))
+        viewModel.remove(outfit)
+        assertEquals("o1", viewModel.state.value.removingId)
+        viewModel.remove(outfit)
+        viewModel.load()
+        viewModel.state.await { it.removingId == null }
+        assertTrue(viewModel.state.value.outfits.isEmpty())
+        assertEquals(1, server.requests("PUT /api/outfits/o1/").size)
+        assertEquals(1, server.requests("GET /api/outfits/").size)
     }
 }

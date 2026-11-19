@@ -35,9 +35,9 @@ class AuthenticationFlowTest {
         val auth = authenticatedModel()
         val profile = BodyProfileViewModel(FakeBodyAnalyzer(0)).apply { skipSetup() }
         compose.setContent { StyleMateTheme { StyleMateApp(profile, auth) } }
-        compose.waitUntil(5_000) { compose.onAllNodesWithText("마이프로필").fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithText("마이프로필").performClick()
-        compose.onNodeWithText("로그아웃").performClick()
+        compose.waitUntil(5_000) { compose.onAllNodesWithText("MY").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("MY").performClick()
+        compose.onNodeWithText("로그아웃").performScrollTo().performClick()
         compose.waitUntil(5_000) { compose.onAllNodesWithText("나에게 맞는 스타일의 시작").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("옷장").assertDoesNotExist()
         compose.onNodeWithText("코디북").assertDoesNotExist()
@@ -48,10 +48,10 @@ class AuthenticationFlowTest {
         val auth = authenticatedModel { reject }
         val profile = BodyProfileViewModel(FakeBodyAnalyzer(0)).apply { skipSetup() }
         compose.setContent { StyleMateTheme { StyleMateApp(profile, auth) } }
-        compose.waitUntil(5_000) { compose.onAllNodesWithText("마이프로필").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(5_000) { compose.onAllNodesWithText("MY").fetchSemanticsNodes().isNotEmpty() }
         compose.runOnIdle { reject = true; auth.refreshSession() }
         compose.waitUntil(5_000) { compose.onAllNodesWithText("나에게 맞는 스타일의 시작").fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithText("마이프로필").assertDoesNotExist()
+        compose.onNodeWithText("MY").assertDoesNotExist()
         compose.onNodeWithText("코디북").assertDoesNotExist()
     }
 }

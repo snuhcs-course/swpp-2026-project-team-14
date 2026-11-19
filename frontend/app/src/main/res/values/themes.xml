@@ -1,3 +1,11 @@
 <resources>
-    <style name="Theme.StyleMate" parent="android:Theme.Material.Light.NoActionBar" />
+    <style name="Base.Theme.StyleMate" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:colorAccent">#000000</item>
+        <item name="android:colorBackground">#FFFFFF</item>
+        <item name="android:windowBackground">#FFFFFF</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">#FFFFFF</item>
+    </style>
+    <style name="Theme.StyleMate" parent="Base.Theme.StyleMate" />
 </resources>

@@ -254,6 +254,8 @@ class AuthViewModelTest {
         server.on("GET /api/users/me/", failure(401, "AUTHENTICATION_REQUIRED"))
         model.refreshSession()
         val state = model.state.await { it.session == null && it.notice == AuthRepository.EXPIRED }
+        // The expired UI state is published before storage cleanup on the IO thread.
+        storage.awaitCleared()
         assertNull(storage.value)
         assertTrue(state.returnToProfile)
         assertEquals(1, server.requests("GET /api/users/me/").size)

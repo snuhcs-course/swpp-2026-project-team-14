@@ -18,7 +18,8 @@ enum class GuestImportStage { HIDDEN, LOADING, CONSENT, CHECKING, CONFLICT, RUNN
 data class GuestImportState(val stage: GuestImportStage = GuestImportStage.HIDDEN,
     val snapshot: GuestImportSnapshot? = null, val plan: GuestImportPlan? = null,
     val done: Int = 0, val imported: Int = 0, val kept: Int = 0, val failed: Int = 0,
-    val errors: List<String> = emptyList(), val message: String? = null, val refreshFailed: Boolean = false) {
+    val errors: List<String> = emptyList(), val message: String? = null, val refreshFailed: Boolean = false,
+    val available: Boolean = false) {
     val busy get() = stage == GuestImportStage.CHECKING || stage == GuestImportStage.RUNNING
 }
 
@@ -34,25 +35,37 @@ class GuestImportViewModel internal constructor(
     private val mutableState = MutableStateFlow(GuestImportState())
     val state = mutableState.asStateFlow()
     private var loading: Job? = null
+    private var availability: Job? = null
+
+    fun checkAvailable() {
+        availability?.cancel()
+        availability = viewModelScope.launch {
+            try { mutableState.value = mutableState.value.copy(available = readSnapshot(true).records.isNotEmpty()) }
+            catch (error: CancellationException) { throw error }
+            // Keep a manual recovery entry when a legacy snapshot cannot be read.
+            catch (_: Exception) { mutableState.value = mutableState.value.copy(available = true) }
+        }
+    }
 
     fun open() {
         if (state.value.busy || loading?.isActive == true) return
-        mutableState.value = GuestImportState(stage = GuestImportStage.LOADING)
+        mutableState.value = GuestImportState(stage = GuestImportStage.LOADING, available = state.value.available)
         loading = viewModelScope.launch {
             try {
                 val snapshot = readSnapshot(true)
                 val stage = if (snapshot.records.isEmpty()) GuestImportStage.RESULT else GuestImportStage.CONSENT
-                mutableState.value = GuestImportState(stage, snapshot, message = if (snapshot.records.isEmpty()) "가져올 새로운 데이터가 없어요." else null)
+                mutableState.value = GuestImportState(stage, snapshot, message = if (snapshot.records.isEmpty()) "가져올 새로운 데이터가 없어요." else null,
+                    available = snapshot.records.isNotEmpty())
             } catch (error: CancellationException) { throw error }
             catch (error: Exception) { mutableState.value = GuestImportState(GuestImportStage.RESULT,
-                message = "기기 데이터를 읽지 못했어요. 다시 시도해 주세요.", errors = listOf(error.message ?: "로컬 저장소를 확인해 주세요.")) }
+                message = "기기 데이터를 읽지 못했어요. 다시 시도해 주세요.", errors = listOf(error.message ?: "로컬 저장소를 확인해 주세요."), available = true) }
         }
     }
 
     fun close() {
         if (state.value.busy) return
         loading?.cancel()
-        mutableState.value = GuestImportState()
+        mutableState.value = GuestImportState(available = state.value.available)
     }
 
     fun retry() {

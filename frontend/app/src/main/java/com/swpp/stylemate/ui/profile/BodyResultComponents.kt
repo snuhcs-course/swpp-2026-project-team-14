@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
@@ -46,7 +45,7 @@ fun ReferenceNote(reference: ReferenceMeasurements, enteredHeightCm: Int?) {
         Modifier
             .padding(top = 12.dp)
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(MaterialTheme.shapes.medium)
             .background(MaterialTheme.colorScheme.surfaceContainer)
             .padding(12.dp),
     ) {
@@ -79,7 +78,7 @@ private fun InsightCard(insight: Insight) {
         Modifier
             .padding(bottom = 8.dp)
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
+            .clip(MaterialTheme.shapes.medium)
             .background(
                 if (isNote) MaterialTheme.colorScheme.surfaceContainer
                 else MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
@@ -110,7 +109,7 @@ fun AllMeasurementsSection(
         modifier = Modifier
             .padding(top = 20.dp)
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(MaterialTheme.shapes.medium)
             .clickable { expanded = !expanded }
             .padding(vertical = 8.dp),
     ) {

@@ -20,11 +20,11 @@ import org.json.JSONObject
 import java.util.UUID
 
 val CHAT_DIRECTIONS = linkedMapOf(
-    "brighter" to "밝게", "darker" to "차분하게", "warmer" to "따뜻하게", "cooler" to "시원하게",
-    "formal" to "단정하게", "casual" to "편하게", "looser" to "넉넉하게", "different" to "다른 조합",
+    "brighter" to "밝게", "darker" to "어둡게", "warmer" to "따뜻하게", "cooler" to "시원하게",
+    "formal" to "단정하게", "casual" to "편하게", "looser" to "넉넉하게", "fitted" to "딱 맞게", "different" to "다른 조합",
 )
 private val OPPOSITES = mapOf("brighter" to "darker", "darker" to "brighter", "warmer" to "cooler",
-    "cooler" to "warmer", "formal" to "casual", "casual" to "formal")
+    "cooler" to "warmer", "formal" to "casual", "casual" to "formal", "looser" to "fitted", "fitted" to "looser")
 
 /** What the chat looked like just before a request, so a request the user regrets can be taken back. */
 data class ChatCheckpoint(val current: Outfit?, val lockedIds: Set<String>, val snapshots: List<Outfit>)
@@ -62,7 +62,7 @@ data class ChatState(
     val busy get() = turns.any { it.loading }
     val canCancelLast get() = turns.lastOrNull()?.before != null
     val allLocked get() = current?.items?.all { it.garmentId in lockedIds } == true
-    val canSend get() = !busy && !allLocked && (draft.isNotBlank() || directions.isNotEmpty())
+    val canSend get() = !busy && (draft.isNotBlank() || directions.isNotEmpty())
 }
 
 /** Sessions survive home navigation and configuration changes, scoped to the activity. */
@@ -114,9 +114,7 @@ class ChatViewModel(private val repository: ChatRepository, private val taste: T
         if (!s.canSend) return
         val current = s.current ?: return
         val body = s.body ?: return
-        val history = s.turns.flatMap { turn ->
-            listOf("user" to conversationText(turn.request)) + listOfNotNull(turn.result?.let { "assistant" to it.message })
-        }.takeLast(6)
+        val history = conversationHistory(s.turns)
         val request = ChatRequest(current, s.lockedIds, s.directions, s.draft.trim(), body, s.weather,
             taste.load(), history, (s.snapshots + current).map { it.key })
         val turn = ChatTurn(request = request, before = ChatCheckpoint(current, s.lockedIds, s.snapshots))
@@ -144,6 +142,14 @@ class ChatViewModel(private val repository: ChatRepository, private val taste: T
         update { it.copy(lockedIds = it.lockedIds - unlock,
             turns = it.turns.map { t -> if (t.id == id) pending else t }) }
         execute(activeId!!, pending)
+    }
+
+    /** Reuse a failed request without restoring stale outfit/locks or sending it automatically. */
+    fun editRequest(id: String) {
+        val state = mutableState.value
+        if (state.busy) return
+        val turn = state.turns.firstOrNull { it.id == id && it.error != null } ?: return
+        update { it.copy(draft = turn.request.text, directions = turn.request.directions, notice = null) }
     }
 
     private fun execute(sessionId: String, turn: ChatTurn) {
@@ -290,6 +296,17 @@ class ChatViewModel(private val repository: ChatRepository, private val taste: T
     }
 
     companion object {
+        /** Keep the unanswered request even after several clarification turns, within six messages. */
+        fun conversationHistory(turns: List<ChatTurn>): List<Pair<String, String>> {
+            val completed = turns.filter { it.result != null }
+            val pending = completed.takeLastWhile { it.result?.status == "clarify" }
+            val selected = if (pending.size > 3) listOf(pending.first()) + pending.takeLast(2)
+                else completed.takeLast(3)
+            return selected.flatMap { turn ->
+                listOf("user" to conversationText(turn.request), "assistant" to turn.result!!.message)
+            }
+        }
+
         // Lock annotations describe the UI at that moment, not words the user said.
         fun conversationText(request: ChatRequest): String = listOf(request.text,
             request.directions.mapNotNull(CHAT_DIRECTIONS::get).joinToString(" · "))

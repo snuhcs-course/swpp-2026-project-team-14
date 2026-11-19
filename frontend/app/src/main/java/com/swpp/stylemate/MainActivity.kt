@@ -9,15 +9,15 @@ import androidx.compose.runtime.setValue
 import com.swpp.stylemate.data.tryon.FittingNotifications
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
 import com.swpp.stylemate.ui.StyleMateApp
 import com.swpp.stylemate.ui.theme.StyleMateTheme
+import com.swpp.stylemate.ui.theme.enableStyleMateEdgeToEdge
 
 class MainActivity : ComponentActivity() {
     private var fittingTask by mutableStateOf<String?>(null)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        enableStyleMateEdgeToEdge()
         fittingTask = intent.getStringExtra(FittingNotifications.EXTRA_TASK)
         setContent {
             StyleMateTheme {

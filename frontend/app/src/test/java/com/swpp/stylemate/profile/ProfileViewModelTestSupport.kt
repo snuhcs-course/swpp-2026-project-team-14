@@ -48,12 +48,14 @@ internal class ProfileDispatcherRule(val dispatcher: TestDispatcher = Unconfined
 }
 
 internal class MemoryAuthStore : AuthSessionStore {
+    private val cleared = CountDownLatch(1)
     var value: String? = null
     var readFailure: Exception? = null
     var clearFailure: Exception? = null
     override fun read(): String? { readFailure?.let { throw it }; return value }
     override fun write(value: String) { this.value = value }
-    override fun clear() { clearFailure?.let { throw it }; value = null }
+    override fun clear() { clearFailure?.let { throw it }; value = null; cleared.countDown() }
+    fun awaitCleared() { assertTrue("Stored session was not cleared", cleared.await(5, TimeUnit.SECONDS)) }
 }
 
 internal class ProfileRequestGate(server: RoutedServer, method: String, path: String) {

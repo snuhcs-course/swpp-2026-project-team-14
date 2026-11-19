@@ -5,7 +5,6 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
@@ -69,7 +68,7 @@ fun RegistrationScreen(state: AuthUiState, onBack: () -> Unit, onSubmit: (String
                 style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             Text("아이디와 비밀번호만 입력하면 돼요.", modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center,
                 style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainer,
+            Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainer,
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     UsernameField(username, { username = it }, !state.busy)
@@ -90,7 +89,7 @@ fun RegistrationScreen(state: AuthUiState, onBack: () -> Unit, onSubmit: (String
 @Composable
 private fun UsernameField(value: String, onChange: (String) -> Unit, enabled: Boolean) {
     OutlinedTextField(value, onValueChange = { if (it.length <= 64) onChange(it) }, label = { Text("아이디") },
-        enabled = enabled, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp),
+        enabled = enabled, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium,
         leadingIcon = { Icon(Icons.Filled.Person, contentDescription = null) },
         textStyle = MaterialTheme.typography.bodyLarge,
         colors = OutlinedTextFieldDefaults.colors(unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant),
@@ -101,7 +100,7 @@ private fun UsernameField(value: String, onChange: (String) -> Unit, enabled: Bo
 private fun PasswordField(label: String, value: String, onChange: (String) -> Unit, enabled: Boolean) {
     var visible by remember { mutableStateOf(false) }
     OutlinedTextField(value, onValueChange = { if (it.length <= 256) onChange(it) }, label = { Text(label) }, enabled = enabled,
-        singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp),
+        singleLine = true, modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium,
         leadingIcon = { Icon(Icons.Filled.Lock, contentDescription = null) },
         textStyle = MaterialTheme.typography.bodyLarge,
         colors = OutlinedTextFieldDefaults.colors(unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant),

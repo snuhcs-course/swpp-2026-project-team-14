@@ -18,7 +18,6 @@ import android.os.SystemClock
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -227,7 +226,7 @@ class MeasurementActivity : ComponentActivity() {
         }
         Text("옷을 평평하게 펴세요. 상의는 뒷면을 촬영하세요.", Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
             style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Box(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 20.dp).clip(RoundedCornerShape(16.dp)), contentAlignment = Alignment.Center) {
+        Box(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 20.dp).clip(MaterialTheme.shapes.medium), contentAlignment = Alignment.Center) {
             AndroidView(factory = { surface }, modifier = Modifier.fillMaxSize())
             Canvas(Modifier.fillMaxSize()) {
                 livePairs.values.forEach { path ->
@@ -280,7 +279,7 @@ class MeasurementActivity : ComponentActivity() {
             Text(if (first == null) "시작점을 찍으세요." else "끝점을 찍으세요.",
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Box(Modifier.fillMaxWidth().aspectRatio(captured.bitmap.width.toFloat() / captured.bitmap.height)
-                .clip(RoundedCornerShape(16.dp))
+                .clip(MaterialTheme.shapes.medium)
                 .pointerInput(field.key, first, saving, landmarkBusy) {
                     detectTapGestures { position ->
                         if (!saving && !landmarkBusy) selectPoint(captured, Offset(position.x / size.width, position.y / size.height))
@@ -301,13 +300,13 @@ class MeasurementActivity : ComponentActivity() {
             MeasurementSummary(measurements.values.map { it.field.label to String.format(Locale.KOREA, "%.2f", it.cm) })
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = { first = null; measurements.remove(field.key) }, enabled = !saving && !landmarkBusy,
-                    shape = RoundedCornerShape(12.dp), modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("지우기") }
+                    shape = MaterialTheme.shapes.medium, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("지우기") }
                 OutlinedButton(onClick = {
                     landmarkEpoch++; first = null; fieldIndex = 0; measurements.clear(); snapshot = null; ready = false
                     landmarkBusy = false; landmarkStatus = ""; livePairs = emptyMap()
                     status = "바닥을 다시 인식해 주세요."
                     startAr()
-                }, enabled = !saving, shape = RoundedCornerShape(12.dp), modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("재촬영") }
+                }, enabled = !saving, shape = MaterialTheme.shapes.medium, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("재촬영") }
             }
             Spacer(Modifier.height(16.dp))
         }
@@ -316,7 +315,7 @@ class MeasurementActivity : ComponentActivity() {
     @Composable
     private fun CaptureChip(selected: Boolean, onClick: () -> Unit, enabled: Boolean = true, label: @Composable () -> Unit) {
         FilterChip(selected = selected, onClick = onClick, enabled = enabled, label = label,
-            shape = RoundedCornerShape(50), colors = FilterChipDefaults.filterChipColors(
+            shape = MaterialTheme.shapes.large, colors = FilterChipDefaults.filterChipColors(
                 selectedContainerColor = MaterialTheme.colorScheme.primary,
                 selectedLabelColor = MaterialTheme.colorScheme.onPrimary))
     }

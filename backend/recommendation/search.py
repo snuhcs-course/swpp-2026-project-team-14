@@ -77,6 +77,7 @@ class Request:
     jitter: float = 0.0  # random spread on the pick order (app refreshes vary); 0 keeps results deterministic
     fixed: dict[str, str] = field(default_factory=dict)  # chat: slot -> garment that must remain
     directions: dict[str, list[str]] = field(default_factory=dict)  # chat: requested changes by slot
+    required_slots: set[str] = field(default_factory=set)  # chat: include explicitly added slots without fixing an item
 
 
 @dataclass
@@ -185,12 +186,13 @@ def recommend(catalog: Catalog, req: Request) -> dict:
         pools[anchor.slot] = [a]
 
     templates = [(t, w) for t, w in band.templates if not (req.body.male and "원피스" in t)]
-    if req.fixed:
-        if any(not pools.get(s) for s in req.fixed):
-            raise RecommendError('유지할 옷으로 코디를 만들 수 없어요. 잠금을 풀거나 옷장 정보를 확인해 주세요.')
-        templates = [(t, w) for t, w in templates if set(req.fixed) <= set(t)]
+    required = set(req.fixed) | req.required_slots
+    if required:
+        if any(not pools.get(s) for s in required):
+            raise RecommendError('요청한 옷을 포함한 코디를 만들 수 없어요. 옷장 정보나 조건을 확인해 주세요.')
+        templates = [(t, w) for t, w in templates if required <= set(t)]
         if not templates:
-            templates = [((('아우터',) if '아우터' in req.fixed else ()) + ('상의', '하의'), 1.0)]
+            templates = [((('아우터',) if '아우터' in required else ()) + ('상의', '하의'), 1.0)]
     if anchor is not None:
         templates = [(t, w) for t, w in templates if anchor.slot in t] or [((anchor.slot,), 1.0)]
     cache: dict = {}
@@ -199,7 +201,7 @@ def recommend(catalog: Catalog, req: Request) -> dict:
         if any(not pools.get(s) for s in slots):
             continue
         scored += _score_template(catalog, band, slots, t_weight, [pools[s] for s in slots], context_style, cache)
-    if not scored and wardrobe_only and pools.get("상의") and pools.get("하의") and '아우터' not in req.fixed:
+    if not scored and wardrobe_only and pools.get("상의") and pools.get("하의") and '아우터' not in required:
         scored = _score_template(catalog, band, ("상의", "하의"), 1.0, [pools["상의"], pools["하의"]], context_style, cache)
         if band.outer in {"recommended", "required"}:
             notes.append("오늘은 아우터가 필요한 날씨인데 맞는 아우터가 없어 상의와 하의만 골랐어요.")

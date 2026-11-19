@@ -2,36 +2,40 @@ package com.swpp.stylemate.ui.chat
 
 import androidx.activity.compose.BackHandler
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
+import com.swpp.stylemate.R
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.swpp.stylemate.data.recommendation.Outfit
+import com.swpp.stylemate.data.recommendation.OutfitGarment
 import com.swpp.stylemate.ui.home.GarmentThumbnail
+import com.swpp.stylemate.ui.components.PageHeader
 import kotlinx.coroutines.launch
 
 @Composable
@@ -40,342 +44,203 @@ fun ChatRoute(model: ChatViewModel, modifier: Modifier = Modifier) {
     BackHandler { model.close() }
     ChatScreen(state, onBack = model::close, onDraft = model::setDraft, onLock = model::toggleLock,
         onDirection = model::toggleDirection, onSend = model::send, onRetry = model::retry,
-        onUnlock = model::unlockAndRetry, onRestore = model::restore, onUndo = model::cancelLast,
-        onSave = model::toggleSave, onFeedback = model::feedback, onLoadFeedback = model::loadFeedback, modifier = modifier)
+        onUnlock = model::unlockAndRetry, onRestore = model::restore, onUndo = model::undo,
+        onSave = model::toggleSave, onFeedback = model::feedback, onLoadFeedback = model::loadFeedback,
+        onEditRequest = model::editRequest, modifier = modifier)
 }
 
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatScreen(
-    state: ChatState,
-    onBack: () -> Unit,
-    onDraft: (String) -> Unit,
-    onLock: (String) -> Unit,
-    onDirection: (String) -> Unit,
-    onSend: () -> Unit,
-    onRetry: (String) -> Unit,
-    onUnlock: (String) -> Unit,
-    onRestore: (Outfit) -> Unit,
-    onUndo: () -> Unit,
-    onSave: (Outfit) -> Unit,
-    modifier: Modifier = Modifier,
-    onFeedback: (Outfit, String) -> Unit = { _, _ -> },
-    onLoadFeedback: (Outfit) -> Unit = {},
+    state: ChatState, onBack: () -> Unit, onDraft: (String) -> Unit, onLock: (String) -> Unit,
+    onDirection: (String) -> Unit, onSend: () -> Unit, onRetry: (String) -> Unit,
+    onUnlock: (String) -> Unit, onRestore: (Outfit) -> Unit, onUndo: () -> Unit, onSave: (Outfit) -> Unit,
+    modifier: Modifier = Modifier, onFeedback: (Outfit, String) -> Unit = { _, _ -> },
+    onLoadFeedback: (Outfit) -> Unit = {}, onEditRequest: (String) -> Unit = {},
+    photo: @Composable (OutfitGarment, Modifier) -> Unit = { item, m -> GarmentThumbnail(item.imageUrl, item.name, m) },
 ) {
     val outfit = state.current ?: return
-    var expanded by rememberSaveable(state.source?.id) { mutableStateOf(true) }
-    var confirmCancel by remember { mutableStateOf(false) }
-    val askCancel = { confirmCancel = true }
-    if (confirmCancel) AlertDialog(
-        onDismissRequest = { confirmCancel = false },
-        title = { Text("요청을 취소할까요?") },
-        text = { Text("이 요청을 보내기 전 코디와 잠금으로 돌아가요. 보낸 내용은 입력창에 다시 채워 둘게요.") },
-        confirmButton = {
-            TextButton(onClick = { confirmCancel = false; if (state.canCancelLast) onUndo() }) { Text("요청 취소") }
-        },
-        dismissButton = { TextButton(onClick = { confirmCancel = false }) { Text("계속 보기") } },
-    )
+    var choosingDirections by rememberSaveable(state.source?.id) { mutableStateOf(false) }
+    var photosExpanded by rememberSaveable(state.source?.id) { mutableStateOf(false) }
+    var showingHistory by rememberSaveable(state.source?.id) { mutableStateOf(false) }
+    var replacingDraft by remember { mutableStateOf<ChatTurn?>(null) }
     val list = rememberLazyListState()
     val scope = rememberCoroutineScope()
     val keyboard = LocalSoftwareKeyboardController.current
+    val focus = LocalFocusManager.current
+    val inputFocus = remember { FocusRequester() }
     var followLatest by remember { mutableStateOf(true) }
+    val dragging by list.interactionSource.collectIsDraggedAsState()
     val atBottom by remember { derivedStateOf { !list.canScrollForward } }
-    LaunchedEffect(list.isScrollInProgress, atBottom) {
-        if (list.isScrollInProgress) followLatest = atBottom
+    LaunchedEffect(dragging, atBottom) {
+        if (dragging) followLatest = atBottom
+        else if (atBottom) followLatest = true
     }
-    val scrollRevision = state.turns.map { Triple(it.id, it.loading, it.result?.status ?: it.error) }
-    LaunchedEffect(scrollRevision, state.notice) {
-        followLatest = true
-        list.animateScrollToItem((list.layoutInfo.totalItemsCount - 1).coerceAtLeast(0))
+    val revision = state.turns.map { Triple(it.id, it.loading, it.result?.status ?: it.error) }
+    val activeResult = state.turns.lastOrNull { it.result?.outfit?.key == outfit.key }?.result
+    val bottomIndex = state.turns.size + (if (state.turns.isEmpty()) 1 else 0) +
+        (if (state.notice != null) 1 else 0) + (if (outfit.key in state.saveErrors) 1 else 0) +
+        (if (activeResult != null) 1 else 0)
+    LaunchedEffect(revision, state.notice, state.saveErrors[outfit.key],
+        state.feedbackMessages[outfit.key], outfit.key in state.feedbackLoading, outfit.key in state.feedbackLoaded) {
+        // layoutInfo can still be empty when a restored session first composes.
+        if (followLatest) list.animateScrollToItem(bottomIndex)
     }
-    // Saving or rating grows the newest card; stay at the bottom unless the user scrolled up to read.
-    LaunchedEffect(state.savedKeys, state.savingKeys, state.saveErrors, state.feedbackMessages) {
-        if (followLatest) list.animateScrollToItem((list.layoutInfo.totalItemsCount - 1).coerceAtLeast(0))
-    }
-    LaunchedEffect(state.turns.size) { if (state.turns.isNotEmpty()) expanded = false }
+    LaunchedEffect(outfit.key, activeResult != null) { if (activeResult != null) onLoadFeedback(outfit) }
     fun send() {
         if (!state.canSend) return
         followLatest = true
-        keyboard?.hide()
-        onSend()
+        keyboard?.hide(); focus.clearFocus(); onSend()
     }
-    Scaffold(
-        modifier = modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding(),
-        containerColor = MaterialTheme.colorScheme.background,
-        contentWindowInsets = WindowInsets(0),
-        topBar = {
-            Surface(color = MaterialTheme.colorScheme.background) {
-                Column {
-                    Row(Modifier.fillMaxWidth().padding(end = 20.dp), verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "오늘의 코디로 돌아가기")
+    fun edit(turn: ChatTurn) {
+        onEditRequest(turn.id)
+        if (turn.request.text.isNotBlank()) { inputFocus.requestFocus(); keyboard?.show() }
+    }
+    val imeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
+    BoxWithConstraints(modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding()) {
+        val compact = imeVisible || maxHeight < 400.dp * LocalDensity.current.fontScale.coerceAtLeast(1f)
+        val photoViewport = if (compact) (maxHeight * .27f).coerceAtLeast(80.dp) else null
+        Scaffold(Modifier.fillMaxSize(), containerColor = MaterialTheme.colorScheme.background,
+            contentWindowInsets = WindowInsets(0), topBar = {
+                Surface(color = MaterialTheme.colorScheme.background) {
+                    Column {
+                        PageHeader("대화로 수정하기", onBack = onBack, backDescription = "오늘의 코디로 돌아가기") {
+                            IconButton(onClick = { focus.clearFocus(); keyboard?.hide(); showingHistory = true },
+                                enabled = !state.busy && outfitVersions(state).size > 1) {
+                                Icon(painterResource(R.drawable.ic_history), "수정 기록")
+                            }
+                            val saved = outfit.key in state.savedKeys
+                            val saving = outfit.key in state.savingKeys
+                            IconButton(onClick = { onSave(outfit) }, enabled = !state.busy && !saving,
+                                modifier = Modifier.testTag("chat-save-outfit").semantics {
+                                    contentDescription = if (saved) "코디북 저장 해제" else "코디북에 저장"
+                                    stateDescription = if (saving) "저장 중" else if (saved) "저장됨" else "저장 안 됨"
+                                }) {
+                                if (saving) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                                else if (saved) Icon(Icons.Filled.Star, null)
+                                else Icon(painterResource(R.drawable.ic_star_outline), null)
+                            }
                         }
-                        Column(Modifier.weight(1f)) {
-                            Text("코디 수정", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                            Text("옷을 눌러 잠그고, 원하는 방향을 골라요", style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
+                        CurrentOutfitHeader(state, activeResult?.changedIds.orEmpty(), compact, photosExpanded, onLock,
+                            onPreview = { photosExpanded = !photosExpanded }, photo = photo,
+                            photoViewport = photoViewport)
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     }
-                    Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text("현재 코디", Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
-                        Text("${state.lockedIds.size}벌 유지", style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.primary)
-                        TextButton(onClick = { expanded = !expanded }) { Text(if (expanded) "접기" else "펼치기") }
-                    }
-                    if (expanded) {
-                        OutfitItems(outfit, lockedIds = state.lockedIds, onLock = onLock, enabled = !state.busy,
-                            modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 12.dp))
-                    } else {
-                        Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, bottom = 10.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            outfit.items.forEach { item ->
-                                val locked = item.garmentId in state.lockedIds
-                                FilterChip(selected = locked, enabled = !state.busy,
-                                    onClick = { onLock(item.garmentId) },
-                                    label = { Text(slotName(item.slot)) },
-                                    leadingIcon = if (locked) {{ Icon(Icons.Filled.Lock, null, Modifier.size(14.dp)) }} else null,
-                                    modifier = Modifier.semantics { stateDescription = if (locked) "유지" else "변경 가능" })
+                }
+            }, bottomBar = {
+                Surface(color = MaterialTheme.colorScheme.background) {
+                    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        OutlinedTextField(value = state.draft, onValueChange = onDraft,
+                            modifier = Modifier.fillMaxWidth().focusRequester(inputFocus), shape = MaterialTheme.shapes.medium,
+                            placeholder = { Text("예: 하의만 치마로 바꿔줘") },
+                            label = { Text(if (state.directions.isEmpty()) "메시지" else "메시지 추가(선택)") }, maxLines = 3,
+                            leadingIcon = { IconButton(onClick = {
+                                focus.clearFocus(); keyboard?.hide(); choosingDirections = true
+                            }, enabled = !state.busy) {
+                                BadgedBox(badge = { if (state.directions.isNotEmpty()) Badge { Text("${state.directions.size}") } }) {
+                                    Icon(painterResource(R.drawable.ic_chat_conditions), "수정 조건 선택")
+                                }
+                            } },
+                            trailingIcon = { IconButton(onClick = ::send, enabled = state.canSend) {
+                                Icon(Icons.AutoMirrored.Filled.Send, "메시지 보내기")
+                            } })
+                        if (state.directions.isNotEmpty()) LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            items(state.directions.toList(), key = { it }) { code ->
+                                InputChip(selected = true, onClick = { onDirection(code) }, enabled = !state.busy,
+                                    label = { Text(CHAT_DIRECTIONS[code] ?: code) },
+                                    trailingIcon = { Icon(Icons.Filled.Close, null, Modifier.size(14.dp)) },
+                                    modifier = Modifier.semantics { contentDescription = "${CHAT_DIRECTIONS[code]} 조건 해제" })
                             }
                         }
                     }
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 }
-            }
-        },
-        bottomBar = {
-            Surface(color = MaterialTheme.colorScheme.surfaceContainer) {
-                Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp)) {
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        CHAT_DIRECTIONS.forEach { (code, label) ->
-                            FilterChip(selected = code in state.directions, onClick = { onDirection(code) },
-                                label = { Text(label) })
-                        }
+            }) { padding ->
+            Column(Modifier.fillMaxSize().padding(padding)) {
+                LazyColumn(Modifier.fillMaxWidth().weight(1f).testTag("chat-conversation"), state = list,
+                    contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    if (state.turns.isEmpty()) item("intro") {
+                        AssistantBubble("원하는 변화를 알려 주세요. 계속 입을 옷은 사진의 자물쇠를 눌러 잠가 주세요.")
                     }
-                    if (state.allLocked) Text("바꿀 옷의 잠금을 하나 이상 풀어 주세요.",
-                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
-                    OutlinedTextField(value = state.draft, onValueChange = onDraft,
-                        modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp),
-                        placeholder = { Text("예: 내일 부산 여행 가는데 뭐 입지?") },
-                        label = { Text("메시지") }, maxLines = 3,
-                        trailingIcon = {
-                            IconButton(onClick = ::send, enabled = state.canSend) {
-                                Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "메시지 보내기")
+                    items(state.turns, key = { it.id }) { turn ->
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                                Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.primary,
+                                    contentColor = MaterialTheme.colorScheme.onPrimary) {
+                                    Text(ChatViewModel.conversationText(turn.request), Modifier.padding(12.dp).widthIn(max = 280.dp),
+                                        style = MaterialTheme.typography.bodyMedium)
+                                }
                             }
-                        })
-                    if (state.directions.isNotEmpty()) {
-                        Button(onClick = ::send, enabled = state.canSend, modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
-                            shape = RoundedCornerShape(14.dp)) {
-                            Text(if (state.busy) "코디 수정 중…" else "선택한 조건으로 수정")
-                        }
-                    }
-                }
-            }
-        },
-    ) { padding ->
-        Box(Modifier.fillMaxSize().padding(padding)) {
-            LazyColumn(Modifier.fillMaxSize(), state = list,
-                contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
-                item(key = "intro") {
-                    AssistantBubble("유지할 옷은 눌러서 잠가 주세요. 아래 버튼을 고르거나, 원하는 내용을 메시지로 알려 주세요.")
-                }
-                items(state.turns, key = { it.id }) { turn ->
-                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                            Surface(shape = RoundedCornerShape(20.dp, 4.dp, 20.dp, 20.dp),
-                                color = MaterialTheme.colorScheme.surfaceVariant) {
-                                Text(ChatViewModel.summary(turn.request), Modifier.padding(14.dp).widthIn(max = 280.dp),
-                                    style = MaterialTheme.typography.bodyMedium)
-                            }
-                        }
-                        when {
-                            turn.loading -> Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
-                                Row(Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                    verticalAlignment = Alignment.CenterVertically) {
+                            when {
+                                turn.loading -> Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-                                    Text("잠근 옷을 유지하며 코디를 찾고 있어요", Modifier.weight(1f, fill = false),
-                                        style = MaterialTheme.typography.bodySmall)
-                                    if (state.canCancelLast && state.turns.lastOrNull()?.id == turn.id) TextButton(onClick = askCancel,
-                                        contentPadding = PaddingValues(horizontal = 8.dp)) { Text("취소") }
+                                    Text("코디를 수정하고 있어요", style = MaterialTheme.typography.bodyMedium)
                                 }
-                            }
-                            turn.error != null -> {
-                                AssistantBubble(turn.error)
-                                if (state.turns.lastOrNull()?.id == turn.id) {
-                                    val sameRequest = state.current?.key == turn.request.current.key && state.lockedIds == turn.request.lockedIds
-                                    OutlinedButton(onClick = { onRetry(turn.id) }, enabled = !state.busy && sameRequest) { Text("다시 시도") }
-                                    if (!sameRequest) Text("코디나 잠금이 바뀌었어요. 새 요청을 보내 주세요.",
-                                        style = MaterialTheme.typography.bodySmall)
+                                turn.error != null -> {
+                                    AssistantBubble(turn.error, "코디 수정 실패")
+                                    if (state.turns.lastOrNull()?.id == turn.id) {
+                                        val same = outfit.key == turn.request.current.key && state.lockedIds == turn.request.lockedIds
+                                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            OutlinedButton(onClick = { onRetry(turn.id) }, enabled = !state.busy && same,
+                                                shape = MaterialTheme.shapes.medium) { Text("다시 시도") }
+                                            OutlinedButton(onClick = {
+                                                if (state.draft.isNotBlank() || state.directions.isNotEmpty()) replacingDraft = turn else edit(turn)
+                                            }, enabled = !state.busy, shape = MaterialTheme.shapes.medium) { Text("요청 수정하기") }
+                                        }
+                                        if (!same) Text("코디나 그대로 입을 옷이 바뀌었어요. 요청을 수정해 다시 보내 주세요.",
+                                            style = MaterialTheme.typography.bodySmall)
+                                    }
                                 }
-                            }
-                            turn.result != null -> {
-                                val result = turn.result
-                                AssistantBubble(result.message)
-                                if (result.status == "unlock" && state.turns.lastOrNull()?.id == turn.id) {
-                                    OutlinedButton(onClick = { onUnlock(turn.id) },
-                                        enabled = !state.busy && state.current?.key == turn.request.current.key) { Text("잠금 풀고 수정") }
+                                turn.result != null -> {
+                                    val result = turn.result
+                                    AssistantBubble(changedOutfitMessage(turn), when (result.status) {
+                                        "unchanged" -> "변경 없음"
+                                        "clarify", "unlock" -> "확인이 필요해요"
+                                        "undo" -> "수정 취소"
+                                        else -> null
+                                    })
+                                    if (result.status == "unlock" && state.turns.lastOrNull()?.id == turn.id) {
+                                        OutlinedButton(onClick = { onUnlock(turn.id) },
+                                            enabled = !state.busy && outfit.key == turn.request.current.key,
+                                            shape = MaterialTheme.shapes.medium) { Text("이 옷도 바꾸기") }
+                                    }
+                                    result.notes.forEach { Text(it, style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant) }
                                 }
-                                result.outfit?.let { resultOutfit ->
-                                    ResultCard(resultOutfit, result.changedIds, result.lockedIds, state,
-                                        onRestore, onSave, onFeedback, onLoadFeedback,
-                                        onCancel = if (state.canCancelLast && state.turns.lastOrNull()?.id == turn.id) askCancel else null)
-                                }
-                                result.notes.forEach { note -> Text(note, style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                            }
-                        }
-                        // Answers without an outfit (a question back, an error) have no rating row to sit in.
-                        val noOutfit = turn.result?.outfit == null
-                        if (!turn.loading && noOutfit && state.canCancelLast && state.turns.lastOrNull()?.id == turn.id) {
-                            TextButton(onClick = askCancel, modifier = Modifier.align(Alignment.End),
-                                contentPadding = PaddingValues(horizontal = 8.dp)) {
-                                Text("요청 취소", style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                     }
+                    state.notice?.let { notice -> item("notice") { AssistantBubble(notice) } }
+                    state.saveErrors[outfit.key]?.let { error -> item("save-error") {
+                        Text("코디북에 저장하지 못했어요. $error", color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodyMedium)
+                    } }
+                    if (activeResult != null) item("current-feedback") { CurrentFeedback(outfit, state, onFeedback, onLoadFeedback) }
+                    item("bottom") { Spacer(Modifier.height(1.dp)) }
                 }
-                state.notice?.let { notice -> item(key = "notice") { AssistantBubble(notice) } }
-                item(key = "bottom") { Spacer(Modifier.height(1.dp)) }
-            }
-            if (!atBottom && state.turns.isNotEmpty()) {
-                FilledTonalButton(onClick = {
+                if (!atBottom && state.turns.isNotEmpty()) TextButton(onClick = {
                     followLatest = true
-                    scope.launch { list.animateScrollToItem(list.layoutInfo.totalItemsCount - 1) }
-                }, modifier = Modifier.align(Alignment.BottomCenter).padding(8.dp)) { Text("최신 대화로") }
+                    scope.launch { list.animateScrollToItem(bottomIndex) }
+                }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("최신 대화로") }
             }
         }
     }
+    if (choosingDirections) ChatDirectionsSheet(state, onDirection) { choosingDirections = false }
+    if (showingHistory) ChatHistorySheet(state, onRestore, { showingHistory = false }, photo)
+    replacingDraft?.let { turn -> AlertDialog(onDismissRequest = { replacingDraft = null },
+        title = { Text("작성 중인 요청을 바꿀까요?") }, text = { Text("실패한 요청의 메시지와 조건을 불러옵니다.") },
+        confirmButton = { TextButton(onClick = { replacingDraft = null; edit(turn) }) { Text("불러오기") } },
+        dismissButton = { TextButton(onClick = { replacingDraft = null }) { Text("계속 작성") } }) }
 }
 
 @Composable
-private fun AssistantBubble(message: String) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text("StyleMate", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary,
-            fontWeight = FontWeight.Bold)
-        Surface(shape = RoundedCornerShape(4.dp, 20.dp, 20.dp, 20.dp), color = MaterialTheme.colorScheme.secondaryContainer) {
-            Text(message, Modifier.padding(14.dp), style = MaterialTheme.typography.bodyMedium)
+private fun AssistantBubble(message: String, label: String? = null) {
+    Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceVariant,
+        contentColor = MaterialTheme.colorScheme.onSurface) {
+        Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            label?.let { Text(it, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold) }
+            Text(message, style = MaterialTheme.typography.bodyMedium)
         }
     }
-}
-
-private fun slotName(slot: String) = when (slot) { "top" -> "상의"; "bottom" -> "하의"; else -> "아우터" }
-
-@Composable
-private fun OutfitItems(
-    outfit: Outfit,
-    lockedIds: Set<String>,
-    modifier: Modifier = Modifier,
-    changedIds: Set<String> = emptySet(),
-    onLock: ((String) -> Unit)? = null,
-    enabled: Boolean = true,
-) {
-    Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        outfit.items.forEach { item ->
-            val locked = item.garmentId in lockedIds
-            Surface(modifier = Modifier.weight(1f).then(if (onLock != null) Modifier
-                .semantics { stateDescription = if (locked) "잠김, 유지" else "잠금 해제, 변경 가능" }
-                .clickable(enabled = enabled, role = Role.Button, onClickLabel = if (locked) "잠금 해제" else "옷 유지") {
-                    onLock(item.garmentId)
-                } else Modifier), shape = RoundedCornerShape(14.dp),
-                color = MaterialTheme.colorScheme.surfaceContainer,
-                border = BorderStroke(if (locked) 2.dp else 1.dp,
-                    if (locked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant)) {
-                Column(Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    GarmentThumbnail(item.imageUrl, item.name,
-                        Modifier.fillMaxWidth().height(86.dp).clip(RoundedCornerShape(10.dp)))
-                    Text(item.name, style = MaterialTheme.typography.labelSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                        if (locked) Icon(Icons.Filled.Lock, null, Modifier.size(12.dp), tint = MaterialTheme.colorScheme.primary)
-                        Text(when { locked -> "유지"; item.garmentId in changedIds -> "변경"; onLock != null -> "변경 가능"; else -> "그대로" },
-                            style = MaterialTheme.typography.labelSmall,
-                            color = if (locked || item.garmentId in changedIds) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ResultCard(outfit: Outfit, changedIds: Set<String>, lockedIds: Set<String>, state: ChatState,
-                       onRestore: (Outfit) -> Unit, onSave: (Outfit) -> Unit,
-                       onFeedback: (Outfit, String) -> Unit = { _, _ -> },
-                       onLoadFeedback: (Outfit) -> Unit = {},
-                       onCancel: (() -> Unit)? = null) {
-    LaunchedEffect(outfit.key) { onLoadFeedback(outfit) }
-    Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainer,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
-        Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(if (state.current?.key == outfit.key) "이 코디로 계속 수정 중" else "수정한 코디",
-                style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-            OutfitItems(outfit, lockedIds, changedIds = changedIds)
-            outfit.reasons.take(2).forEach { reason -> Text(reason.text, style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant) }
-            // 만족도: 홈 코디와 같은 좋아요/별로예요 (DB 저장 + 취향 학습)
-            val feedback = state.feedbacks[outfit.key]
-            val loaded = outfit.key in state.feedbackLoaded
-            val loading = outfit.key in state.feedbackLoading
-            val pending = state.feedbackPending.isNotEmpty() || loading || !loaded
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
-                TextButton(onClick = { onFeedback(outfit, "liked") }, enabled = !pending) {
-                    Icon(if (feedback == "liked") Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
-                        contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                    Spacer(Modifier.width(4.dp))
-                    Text(if (feedback == "liked") "좋아요 취소" else "좋아요")
-                }
-                TextButton(onClick = { onFeedback(outfit, "disliked") }, enabled = !pending) {
-                    Text(if (feedback == "disliked") "별로예요 취소" else "별로예요",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                // Quiet on purpose: next to the rating, for when the answer missed; it asks before undoing.
-                if (onCancel != null) {
-                    Spacer(Modifier.weight(1f))
-                    TextButton(onClick = onCancel, contentPadding = PaddingValues(horizontal = 8.dp)) {
-                        Text("요청 취소", style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-            }
-            state.feedbackMessages[outfit.key]?.let { Text(it, style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant) }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (state.current?.key != outfit.key) {
-                    TextButton(onClick = { onRestore(outfit) }, enabled = !state.busy, modifier = Modifier.weight(1f)) { Text("이 코디로 돌아가기") }
-                }
-                SaveToggle(saved = outfit.key in state.savedKeys, pending = outfit.key in state.savingKeys,
-                    failed = outfit.key in state.saveErrors, onClick = { onSave(outfit) }, modifier = Modifier.weight(1f))
-            }
-            if (outfit.key in state.savedKeys && outfit.key !in state.savingKeys) Text("코디북에 저장했어요. 다시 누르면 저장이 취소돼요.",
-                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            if (!loaded && !loading) {
-                TextButton(onClick = { onLoadFeedback(outfit) }) { Text("만족도 다시 불러오기") }
-            }
-            state.saveErrors[outfit.key]?.let { Text(it, style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error) }
-        }
-    }
-}
-
-/** Saved: a quiet outlined star button that takes the save back. Not saved: the primary action. */
-@Composable
-private fun SaveToggle(saved: Boolean, pending: Boolean, failed: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    val label = when {
-        pending && saved -> "저장 취소 중…"
-        pending -> "저장 중…"
-        saved -> "코디북에 저장됨"
-        failed -> "저장 다시 시도"
-        else -> "코디북에 저장"
-    }
-    val content: @Composable RowScope.() -> Unit = {
-        if (saved) {
-            Icon(Icons.Filled.Star, contentDescription = null, Modifier.size(18.dp))
-            Spacer(Modifier.width(6.dp))
-        }
-        Text(label)
-    }
-    val toggle = modifier.semantics { stateDescription = if (saved) "저장됨" else "저장 안 됨" }
-    if (saved) OutlinedButton(onClick = onClick, enabled = !pending, modifier = toggle, shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
-        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary), content = content)
-    else Button(onClick = onClick, enabled = !pending, modifier = toggle, shape = RoundedCornerShape(12.dp), content = content)
 }

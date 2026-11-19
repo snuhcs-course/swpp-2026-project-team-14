@@ -84,13 +84,13 @@ class WardrobeScreenTest {
     @Test fun categoryFiltersClothesWithoutChangingTotal() {
         val garments = listOf(WardrobeItem("1", "셔츠", "top"), WardrobeItem("2", "코트", "outerwear"))
         compose.setContent { StyleMateTheme { WardrobeScreen(garments, null, false, {}) } }
-        compose.onNodeWithText("아우터").performClick()
+        compose.onNode(hasText("아우터") and isSelectable()).performClick()
         compose.onNodeWithText("코트").assertIsDisplayed()
         compose.onNodeWithText("셔츠").assertDoesNotExist()
         compose.onNodeWithText("총 2벌").assertIsDisplayed()
-        compose.onNodeWithText("하의").performClick()
+        compose.onNode(hasText("하의") and isSelectable()).performClick()
         compose.onNodeWithText("이 카테고리에 등록된 옷이 없습니다").assertIsDisplayed()
-        compose.onNodeWithText("전체", useUnmergedTree = true).performClick()
+        compose.onNode(hasText("전체") and isSelectable()).performClick()
         compose.onNodeWithText("셔츠").assertIsDisplayed()
     }
 

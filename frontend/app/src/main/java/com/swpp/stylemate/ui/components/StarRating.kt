@@ -23,12 +23,12 @@ fun starsOf(score: Int): Double = (floor(score.coerceIn(0, 100) / 10.0 + 0.5) / 
 
 fun starsText(stars: Double): String = String.format(Locale.KOREA, "%.1f", stars)
 
-/** Five stars, filled up to [stars] with a half star where needed. Read out as "어울림 별점 4.5점". */
+/** Five stars, filled up to [stars] with a half star where needed. Read out as "추천 별점 4.5점". */
 @Composable
 fun StarRating(stars: Double, modifier: Modifier = Modifier, size: Dp = 16.dp) {
     val on = MaterialTheme.colorScheme.primary
     val off = MaterialTheme.colorScheme.outlineVariant
-    Row(modifier.semantics(mergeDescendants = true) { contentDescription = "어울림 별점 ${starsText(stars)}점 (5점 만점)" }) {
+    Row(modifier.semantics(mergeDescendants = true) { contentDescription = "추천 별점 ${starsText(stars)}점 (5점 만점)" }) {
         repeat(5) { i ->
             val fill = (stars - i).coerceIn(0.0, 1.0).toFloat()
             Box(Modifier.size(size)) {
