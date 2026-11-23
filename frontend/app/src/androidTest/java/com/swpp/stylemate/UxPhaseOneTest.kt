@@ -183,16 +183,10 @@ class UxPhaseOneTest {
         compose.onNodeWithContentDescription("메시지 보내기").assertIsEnabled()
     }
 
-    @Test fun profileOnlyOffersImportForAnEligibleSignedInUser() {
-        var eligible by mutableStateOf(false)
-        var requested = 0
-        compose.setContent { StyleMateTheme { MyProfileScreen(null, StyleProfile(), { null }, {}, {},
-            username = "member_1", onImport = if (eligible) ({ requested++ }) else null) } }
+    @Test fun profileHasNoGuestDataImport() {
+        // The app is login-only (issue #95): there is no guest data on the device to bring in.
+        compose.setContent { StyleMateTheme { MyProfileScreen(null, StyleProfile(), { null }, {}, {}, username = "member_1") } }
         compose.onNodeWithText("이 기기의 기존 데이터 가져오기").assertDoesNotExist()
-        compose.runOnIdle { eligible = true }
-        compose.onNodeWithContentDescription("이 기기의 데이터 가져오기").assertDoesNotExist()
-        compose.onNodeWithText("이 기기의 기존 데이터 가져오기").performScrollTo().performClick()
-        compose.runOnIdle { assertEquals(1, requested) }
     }
 
     @Test fun bodyInputKeepsFocusedErrorAndAnalysisActionAboveTheKeyboard() {

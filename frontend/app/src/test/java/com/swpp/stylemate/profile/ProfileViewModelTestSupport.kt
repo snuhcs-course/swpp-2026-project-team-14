@@ -5,9 +5,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.viewModelScope
 import com.swpp.stylemate.data.AuthSessionStore
-import com.swpp.stylemate.data.GuestImportPlan
-import com.swpp.stylemate.data.GuestImportRecord
-import com.swpp.stylemate.data.GuestImportSnapshot
 import com.swpp.stylemate.data.RoutedServer
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -75,34 +72,4 @@ internal class ProfileRequestGate(server: RoutedServer, method: String, path: St
         }
     }
     fun awaitRequest() { assertTrue("Expected request did not arrive", arrived.await(5, TimeUnit.SECONDS)) }
-}
-
-internal class FakeGuestImport {
-    data class ImportCall(val record: GuestImportRecord, val replace: Boolean)
-    var records = emptyList<GuestImportRecord>()
-    val snapshots = mutableListOf<Boolean>()
-    val previews = mutableListOf<GuestImportSnapshot>()
-    val imports = mutableListOf<ImportCall>()
-    var refreshes = 0
-    var snapshotReply: suspend (Boolean) -> GuestImportSnapshot = { GuestImportSnapshot(records) }
-    var previewReply: suspend (GuestImportSnapshot) -> GuestImportPlan = { snapshot ->
-        GuestImportPlan(snapshot, snapshot.records.associate { it.key to null }, emptyList())
-    }
-    var importReply: suspend (GuestImportRecord, Boolean) -> String = { _, _ -> "imported" }
-    var refreshReply: suspend () -> Unit = {}
-
-    suspend fun snapshot(includeKept: Boolean): GuestImportSnapshot {
-        snapshots += includeKept
-        return snapshotReply(includeKept)
-    }
-    suspend fun preview(snapshot: GuestImportSnapshot): GuestImportPlan {
-        previews += snapshot
-        return previewReply(snapshot)
-    }
-    suspend fun importRecord(record: GuestImportRecord, plan: GuestImportPlan, replace: Boolean): String {
-        check(record in plan.snapshot.records)
-        imports += ImportCall(record, replace)
-        return importReply(record, replace)
-    }
-    suspend fun refresh() { refreshes++; refreshReply() }
 }
