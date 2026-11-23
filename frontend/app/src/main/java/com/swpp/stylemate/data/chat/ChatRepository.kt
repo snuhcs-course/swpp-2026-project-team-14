@@ -42,7 +42,11 @@ data class ChatResult(
     val lockedIds: Set<String>,
     val unlockIds: Set<String>,
     val notes: List<String>,
+    val changes: List<ChatChange> = emptyList(),
 )
+
+/** Why one garment changed in a chat edit: before and after names (null when added or removed) and the reason. */
+data class ChatChange(val slot: String, val from: String?, val to: String?, val reason: String)
 
 class ChatRepository(
     baseUrl: String,
@@ -70,7 +74,7 @@ class ChatRepository(
             ChatResult(json.getString("status"), json.getString("message"),
                 json.optJSONObject("outfit")?.let(OutfitRepository::parseOutfit),
                 strings(json, "changed_ids").toSet(), input.lockedIds,
-                strings(json, "unlock_ids").toSet(), strings(json, "notes"))
+                strings(json, "unlock_ids").toSet(), strings(json, "notes"), changes(json))
         } catch (e: JSONException) {
             throw OutfitApiException("INVALID_RESPONSE", "응답을 읽지 못했어요. 다시 시도해 주세요.")
         }
@@ -153,6 +157,14 @@ class ChatRepository(
         }
         try { JSONObject(text) }
         catch (e: JSONException) { throw OutfitApiException("INVALID_RESPONSE", ErrorMessages.INVALID_RESPONSE) }
+    }
+
+    private fun changes(json: JSONObject): List<ChatChange> {
+        val rows = json.optJSONArray("changes") ?: return emptyList()  // older servers send none
+        return (0 until rows.length()).map { rows.getJSONObject(it) }.map { row ->
+            ChatChange(row.getString("slot"), row.optString("from").takeIf { !row.isNull("from") && it.isNotBlank() },
+                row.optString("to").takeIf { !row.isNull("to") && it.isNotBlank() }, row.getString("reason"))
+        }
     }
 
     private fun strings(json: JSONObject, key: String): List<String> =
