@@ -95,6 +95,7 @@ class FittingWorker internal constructor(context: Context, parameters: WorkerPar
             }
             TryOnClient(account, apiBaseUrl).fit(person, clothes, true, resumeJob = resumed,
                 onSubmitted = { tasks.submitted(key, it) }, keepForResume = true,
+                onProgress = { tasks.progress(key, it) },
                 onResult = { image ->
                     val bitmap = BitmapFactory.decodeByteArray(image, 0, image.size) ?: error("피팅 결과를 읽지 못했어요.")
                     bitmap.recycle()

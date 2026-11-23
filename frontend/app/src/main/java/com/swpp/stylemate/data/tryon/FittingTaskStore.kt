@@ -47,6 +47,12 @@ class FittingTaskStore(private val directory: File) {
         write(key, data.put("job_id", job.id).put("job_token", job.token).put("state", "running"))
         deletePerson(key)
     }
+    /** The latest progress of a running fitting, read by the fitting screen while it waits. */
+    fun progress(key: String, progress: FittingProgress) = synchronized(lock) {
+        val data = read(key) ?: return@synchronized
+        if (data.optString("state") !in listOf("queued", "running")) return@synchronized
+        write(key, data.put("stage", progress.stage).put("progress", progress.fraction.toDouble()).put("status", progress.text))
+    }
     fun finish(key: String, error: String? = null) = synchronized(lock) {
         val data = checkNotNull(read(key))
         data.remove("job_id"); data.remove("job_token")
@@ -56,6 +62,8 @@ class FittingTaskStore(private val directory: File) {
     companion object {
         private val lock = Any()
         fun outfit(data: JSONObject): Outfit = OutfitRepository.parseOutfit(data.getJSONObject("outfit"))
+        fun progress(data: JSONObject): FittingProgress? = if (!data.has("stage")) null else
+            FittingProgress(data.getString("stage"), data.optDouble("progress").toFloat(), data.optString("status"))
         fun job(data: JSONObject): TryOnJob? = if (data.has("job_id")) TryOnJob(data.getString("job_id"), data.getString("job_token")) else null
     }
 }
