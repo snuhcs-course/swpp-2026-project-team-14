@@ -290,6 +290,16 @@ class OutfitApiTests(TestCase):
         self.assertEqual([o["id"] for o in self.client.get("/api/outfits/").json()["outfits"]], [str(new.id)])
         self.assertTrue(Outfit.objects.filter(pk=old.pk, saved=True).exists())
 
+    def test_unsaving_the_newest_copy_does_not_bring_back_an_older_duplicate(self):
+        members = [("top", self.tee, ""), ("bottom", self.slacks, "")]
+        old = views._create(Outfit.Source.RECOMMENDED, members, user=self.user, saved=True)
+        new = views._create(Outfit.Source.CHAT, members, user=self.user, saved=True)
+        Outfit.objects.filter(pk=old.pk).update(updated_at=new.updated_at - timedelta(minutes=5))
+        response = self.client.put(f"/api/outfits/{new.id}/", {"saved": False}, content_type="application/json")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.client.get("/api/outfits/").json()["outfits"], [])
+        self.assertEqual(Outfit.objects.filter(pk__in=[old.pk, new.pk]).count(), 2)
+
     def test_create_outfit_from_garment_ids(self):
         ids = [str(self.tee.id), str(self.jeans.id), str(self.coat.id)]
         response = self.post("/api/outfits/", {"garment_ids": ids, "source": "chat", "name": "채팅 코디"})

@@ -420,6 +420,10 @@ def outfit_view(request, outfit_id):
             outfit.save(update_fields=["saved", "name", "updated_at"])
             if outfit.saved:
                 _only_saved_copy(outfit)
+            else:
+                # Copies saved before one-entry-per-combination would reappear in the 코디북 once the
+                # entry hiding them is unsaved, so unsaving takes the whole combination out (rows are kept).
+                Outfit.objects.filter(user=request.user, key=outfit.key, saved=True).update(saved=False)
     return _json(serialize(outfit))
 
 
