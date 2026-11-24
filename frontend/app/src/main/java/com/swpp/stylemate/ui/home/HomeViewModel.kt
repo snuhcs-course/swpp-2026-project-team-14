@@ -175,6 +175,29 @@ class HomeViewModel(private val repository: OutfitRepository, private val taste:
         }
     }
 
+    /**
+     * Brings each card's saved state in line with the 코디북 when 홈 is shown again: an outfit removed there (or saved
+     * from chat) would otherwise keep its old 저장 button, and a tap would repeat the change instead of reversing it.
+     * Matched by garment combination, since the 코디북 keeps one entry per combination. A failed check changes nothing.
+     */
+    fun syncSaved() {
+        if (mutableState.value.outfits.isEmpty() || mutableState.value.acting) return
+        viewModelScope.launch {
+            val keys = try { repository.saved().map { it.key }.toSet() }
+                catch (e: CancellationException) { throw e }
+                catch (e: OutfitApiException) { return@launch }
+            val state = mutableState.value
+            if (state.acting) return@launch  // a tap on 저장 meanwhile has the newer answer
+            val outfits = state.outfits.map { outfit ->
+                val saved = outfit.key in keys
+                if (outfit.saved == saved) outfit else outfit.copy(saved = saved)
+            }
+            if (outfits == state.outfits) return@launch
+            // A "저장했어요" not yet shown before leaving 홈 would now contradict the button, so it is dropped.
+            mutableState.value = state.copy(outfits = outfits, message = null)
+        }
+    }
+
     fun messageShown() {
         mutableState.value = mutableState.value.copy(message = null)
     }
