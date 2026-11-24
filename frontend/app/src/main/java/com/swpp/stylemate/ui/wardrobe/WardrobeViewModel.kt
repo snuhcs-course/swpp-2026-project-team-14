@@ -4,6 +4,8 @@ package com.swpp.stylemate.ui.wardrobe
 import com.swpp.stylemate.data.wardrobe.WardrobeRepository
 import com.swpp.stylemate.data.LocalUserStore
 import com.swpp.stylemate.data.AccountAccess
+import com.swpp.stylemate.data.usage.UsageTracker
+import com.swpp.stylemate.data.usage.usageErrorCode
 import com.swpp.stylemate.data.recommendation.ExternalRecommendation
 import com.swpp.stylemate.data.recommendation.OutfitRepository
 import com.swpp.stylemate.data.recommendation.WardrobeAnalysis
@@ -29,7 +31,7 @@ data class WardrobeState(val records: List<JSONObject> = emptyList(), val catalo
                          val loading: Boolean = false, val saving: Boolean = false,
                          val error: String? = null, val saveError: String? = null, val savedId: String? = null,
                          val deletingId: String? = null, val deleteError: String? = null,
-                         val deletedId: String? = null)
+                         val deletedId: String? = null, val registrationCheckpoint: String? = null)
 
 data class ExternalMatchState(val garmentId: String? = null, val loading: Boolean = false,
                               val result: ExternalRecommendation? = null, val error: String? = null)
@@ -38,7 +40,37 @@ data class ExternalMatchState(val garmentId: String? = null, val loading: Boolea
 data class WardrobeAnalysisState(val open: Boolean = false, val loading: Boolean = false,
                                  val result: WardrobeAnalysis? = null, val error: String? = null)
 
-class WardrobeViewModel(private val store: LocalUserStore, private val account: AccountAccess) : ViewModel() {
+class WardrobeViewModel(private val store: LocalUserStore, private val account: AccountAccess,
+                        private val usage: UsageTracker = UsageTracker.NONE) : ViewModel() {
+    private var registration: UsageTracker.Attempt? = null
+    private var registrationSource = "wardrobe"
+
+    fun beginRegistration(source: String = registrationSource) {
+        registrationSource = source
+        if (registration == null) {
+            registration = usage.start("garment_registration", source)
+            mutableState.value = mutableState.value.copy(registrationCheckpoint = registration!!.checkpoint.toString())
+        }
+    }
+    fun restoreRegistration(checkpoint: String?) {
+        if (registration != null || checkpoint == null) return
+        runCatching {
+            val data = JSONObject(checkpoint)
+            require(data.getString("name") == "garment_registration")
+            registration = usage.resume(data)
+            registrationSource = data.getString("source")
+            mutableState.value = mutableState.value.copy(registrationCheckpoint = checkpoint)
+        }
+    }
+    private fun clearRegistration() {
+        registration = null
+        mutableState.value = mutableState.value.copy(registrationCheckpoint = null)
+    }
+    fun completeRegistration() { registration?.success(); clearRegistration() }
+    fun failRegistration(code: String) { registration?.failure(code); clearRegistration() }
+    fun cancelRegistration() { registration?.cancel(); clearRegistration() }
+
+    override fun onCleared() { cancelRegistration() }
     private val mutableState = MutableStateFlow(WardrobeState())
     val state = mutableState.asStateFlow()
     private val mutableExternalMatch = MutableStateFlow(ExternalMatchState())
@@ -69,18 +101,29 @@ class WardrobeViewModel(private val store: LocalUserStore, private val account: 
         }
     }
 
-    fun save(id: String, payload: JSONObject) {
+    fun save(id: String, payload: JSONObject, registering: Boolean = false) {
         if (mutableState.value.saving || mutableState.value.loading || mutableState.value.deletingId != null) return
+        if (registering) beginRegistration()
+        val attempt = if (registering) registration else null
         mutableState.value = mutableState.value.copy(saving = true, saveError = null)
         viewModelScope.launch {
             try {
                 val record = WardrobeRepository.json("/api/wardrobe/items/$id/", payload, store, account)
+                attempt?.success()
+                if (registration === attempt) clearRegistration()
                 val records = mutableState.value.records
                 mutableState.value = mutableState.value.copy(saving = false, savedId = id,
                     records = if (records.any { it.getString("id") == id }) records.map { if (it.getString("id") == id) record else it }
                               else listOf(record) + records)
-            } catch (error: CancellationException) { throw error }
-            catch (error: Exception) { mutableState.value = mutableState.value.copy(saving = false, saveError = error.message ?: "저장하지 못했습니다.") }
+            } catch (error: CancellationException) {
+                attempt?.cancel()
+                if (registration === attempt) clearRegistration()
+                throw error
+            } catch (error: Exception) {
+                attempt?.failure(usageErrorCode(error))
+                if (registration === attempt) clearRegistration()
+                mutableState.value = mutableState.value.copy(saving = false, saveError = error.message ?: "저장하지 못했습니다.")
+            }
         }
     }
 

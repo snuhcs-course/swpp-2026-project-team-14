@@ -50,7 +50,8 @@ import org.json.JSONObject
 import kotlin.math.min
 
 @Composable
-fun WornRegistration(account: AccountAccess, onBack: () -> Unit, onBatchSaved: () -> Unit) {
+fun WornRegistration(account: AccountAccess, onBack: () -> Unit, onBatchSaved: () -> Unit,
+                     onAttempt: () -> Unit = {}, onFailure: (String) -> Unit = {}) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var reading by remember { mutableStateOf(false) }
@@ -61,10 +62,14 @@ fun WornRegistration(account: AccountAccess, onBack: () -> Unit, onBatchSaved: (
     var catalogError by remember { mutableStateOf<String?>(null) }
     val store = remember(account.userId) { LocalUserStore.forContext(context, account.userId) }
     val model: WornBatchViewModel = viewModel(key = "worn-batch", factory = viewModelFactory {
-        initializer { WornBatchViewModel(account) }
+        initializer { WornBatchViewModel(account, onAttempt, onFailure) }
     })
     val state by model.state.collectAsStateWithLifecycle()
     val busy = state.busy || reading
+    LaunchedEffect(Unit) { onAttempt() }
+    LaunchedEffect(photoError) {
+        if (photoError != null) onFailure("INVALID_IMAGE")
+    }
     LaunchedEffect(Unit) {
         try { catalog = WardrobeRepository.json("/api/wardrobe/options/", store = store, account = account) }
         catch (cancelled: CancellationException) { throw cancelled }

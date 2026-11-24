@@ -6,6 +6,7 @@ import com.swpp.stylemate.data.BodyProfile
 import com.swpp.stylemate.data.BodyProfileJson
 import com.swpp.stylemate.data.StyleProfile
 import com.swpp.stylemate.data.chat.ChatRepository
+import com.swpp.stylemate.data.usage.UsageTracker
 import com.swpp.stylemate.data.chat.ChatRequest
 import com.swpp.stylemate.data.chat.ChatResult
 import com.swpp.stylemate.data.recommendation.Outfit
@@ -66,7 +67,8 @@ data class ChatState(
 }
 
 /** Sessions survive home navigation and configuration changes, scoped to the activity. */
-class ChatViewModel(private val repository: ChatRepository, private val taste: TasteStore) : ViewModel() {
+class ChatViewModel(private val repository: ChatRepository, private val taste: TasteStore,
+                    private val usage: UsageTracker = UsageTracker.NONE) : ViewModel() {
     private val sessions = mutableMapOf<String, ChatState>()
     private val saveIds = mutableMapOf<String, String>()
     private val jobs = mutableMapOf<String, kotlinx.coroutines.Job>()
@@ -154,8 +156,16 @@ class ChatViewModel(private val repository: ChatRepository, private val taste: T
 
     private fun execute(sessionId: String, turn: ChatTurn) {
         jobs[turn.id] = viewModelScope.launch {
+            val attempt = usage.start("chat_request", "chat")
             try {
                 val result = repository.edit(turn.request)
+                when (result.status) {
+                    "updated" -> if (result.outfit == null || result.outfit.items.map { it.garmentId }.toSet() ==
+                        turn.request.current.items.map { it.garmentId }.toSet()) attempt.failure("OUTFIT_EDIT_FAILED") else attempt.success("updated")
+                    "unchanged" -> attempt.failure("OUTFIT_EDIT_FAILED", "unchanged")
+                    "clarify", "unlock", "undo" -> attempt.success(result.status)
+                    else -> attempt.failure("INVALID_RESPONSE")
+                }
                 update(sessionId) { s ->
                     if (s.turns.none { it.id == turn.id }) return@update s  // the user took this request back
                     val undo = result.status == "undo"
@@ -169,10 +179,14 @@ class ChatViewModel(private val repository: ChatRepository, private val taste: T
                         turns = s.turns.map { t -> if (t.id == turn.id) turn.copy(loading = false,
                             result = if (undo && s.snapshots.isEmpty()) result.copy(message = "되돌릴 이전 코디가 없어요.") else result) else t })
                 }
-            } catch (e: CancellationException) { throw e }
+            } catch (e: CancellationException) { attempt.cancel(); throw e }
             catch (e: OutfitApiException) {
+                attempt.failure(e.code)
                 update(sessionId) { s -> s.copy(turns = s.turns.map { t ->
                     if (t.id == turn.id) turn.copy(loading = false, error = e.message) else t }) }
+            } catch (e: Exception) {
+                attempt.failure("UNEXPECTED_ERROR")
+                throw e
             } finally {
                 jobs.remove(turn.id)
             }

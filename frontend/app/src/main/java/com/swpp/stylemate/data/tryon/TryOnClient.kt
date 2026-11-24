@@ -25,6 +25,8 @@ data class TryOnJob(val id: String, val token: String) {
     init { require(id.matches(Regex("[0-9a-f-]{36}")) && token.isNotBlank()) }
 }
 
+class FittingApiException(val code: String, message: String) : IllegalStateException(message)
+
 /** Photos and the retrieved image remain in memory; completed server jobs are deleted. */
 class TryOnClient(private val account: AccountAccess, private val baseUrl: String = BuildConfig.API_BASE_URL) {
     suspend fun fit(person: ByteArray, garments: List<TryOnGarment>, consent: Boolean,
@@ -67,7 +69,9 @@ class TryOnClient(private val account: AccountAccess, private val baseUrl: Strin
                         onResult(image)
                         return image
                     }
-                    "failed", "cancelled" -> error(when (state.optString("error")) {
+                    "failed", "cancelled" -> throw FittingApiException(
+                        if (state.getString("status") == "cancelled") "FITTING_CANCELLED" else state.optString("error").ifBlank { "FITTING_FAILED" },
+                        when (state.optString("error")) {
                         "FITTING_PROVIDER_REJECTED" -> "이미지 생성 서비스가 요청을 거절했어요. 다른 사진으로 시도해 주세요."
                         "FITTING_CREDITS_REQUIRED" -> "피팅 서비스의 이용 한도가 소진됐어요. 잠시 후 다시 시도해 주세요."
                         "FITTING_RATE_LIMITED" -> "이미지 생성 요청이 많아요. 잠시 후 다시 시도해 주세요."
@@ -81,7 +85,7 @@ class TryOnClient(private val account: AccountAccess, private val baseUrl: Strin
                 }
                 delay(1_000)
             }
-            error("대기 시간이 길어졌어요. 잠시 후 다시 시도해 주세요.")
+            throw FittingApiException("FITTING_TIMEOUT", "대기 시간이 길어졌어요. 잠시 후 다시 시도해 주세요.")
         } catch (error: CancellationException) {
             preserveJob = keepForResume
             throw error

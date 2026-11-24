@@ -8,6 +8,8 @@ import com.swpp.stylemate.data.AuthSessionStore
 import com.swpp.stylemate.data.AccountAccess
 import com.swpp.stylemate.data.KeystoreSessionStore
 import com.swpp.stylemate.data.LocalUserStore
+import com.swpp.stylemate.data.usage.UsageMetrics
+import com.swpp.stylemate.data.usage.usageErrorCode
 import com.swpp.stylemate.data.recommendation.Outfit
 import com.swpp.stylemate.data.wardrobe.WardrobeRepository
 import kotlinx.coroutines.CancellationException
@@ -27,12 +29,19 @@ class FittingWork(private val context: Context) {
             val key = repository.taskKey(outfit)
             val manager = WorkManager.getInstance(context)
             if (manager.getWorkInfosForUniqueWork("fitting:$key").get().any { !it.state.isFinished }) return@withLock false
-            tasks.create(key, owner, source, outfit, person())
+            val attempt = UsageMetrics.forAccount(context, owner).start("virtual_fitting", if (source == "gallery") "gallery" else "virtual")
             val work = OneTimeWorkRequestBuilder<FittingWorker>().setInputData(workDataOf("key" to key))
                 .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
                 .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST).build()
-            try { manager.enqueueUniqueWork("fitting:$key", ExistingWorkPolicy.KEEP, work).result.get() }
-            catch (error: Exception) { tasks.finish(key, "작업을 시작하지 못했어요. 다시 시도해 주세요."); throw error }
+            try {
+                tasks.create(key, owner, source, outfit, person(), attempt.checkpoint)
+                manager.enqueueUniqueWork("fitting:$key", ExistingWorkPolicy.KEEP, work).result.get()
+            } catch (error: CancellationException) { attempt.cancel(); throw error }
+            catch (error: Exception) {
+                attempt.failure(usageErrorCode(error))
+                if (tasks.read(key)?.optString("state") == "queued") tasks.finish(key, "작업을 시작하지 못했어요. 다시 시도해 주세요.")
+                throw error
+            }
             true
         }
     }
@@ -42,11 +51,17 @@ class FittingWork(private val context: Context) {
             if (data.optString("state") in listOf("queued", "running")) {
                 val active = WorkManager.getInstance(context).getWorkInfosForUniqueWork("fitting:$key").get().any { !it.state.isFinished }
                 if (!active && tasks.read(key)?.optString("state") in listOf("queued", "running")) {
+                    data.optJSONObject("usage")?.let { UsageMetrics.forAccount(context, data.getString("owner")).resume(it).cancel() }
                     tasks.finish(key, "피팅 작업이 중단됐어요. 사진을 다시 선택해 주세요.")
                 }
             } else tasks.deletePerson(key)
             tasks.read(key)
         }
+    }
+    suspend fun displayed(key: String, owner: String, source: String) = withContext(Dispatchers.IO) {
+        val data = tasks.read(key) ?: return@withContext
+        if (data.optString("owner") != owner || data.optString("source") != source || data.optString("state") != "completed") return@withContext
+        data.optJSONObject("usage")?.let { UsageMetrics.forAccount(context, owner).resume(it).success() }
     }
     companion object { private val enqueueLock = Mutex() }
 }
@@ -63,6 +78,7 @@ class FittingWorker internal constructor(context: Context, parameters: WorkerPar
         val tasks = FittingWork(applicationContext).tasks
         val data = tasks.read(key) ?: return@withContext Result.failure()
         val owner = data.getString("owner")
+        val usage = data.optJSONObject("usage")?.let { UsageMetrics.forAccount(applicationContext, owner).resume(it) }
         try {
             val account = checkNotNull(currentAccount()) { "로그인 후 피팅을 다시 시도해 주세요." }
             check(account.userId == owner) { "계정이 변경되어 피팅을 중단했어요." }
@@ -100,6 +116,7 @@ class FittingWorker internal constructor(context: Context, parameters: WorkerPar
                     bitmap.recycle()
                     check(currentAccount()?.userId == owner) { "계정이 변경되어 피팅을 중단했어요." }
                     repository.saveResult(outfit, image, source)
+                    usage?.generated()
                     tasks.finish(key)
                     FittingNotifications.finished(applicationContext, key, owner)
                 }) {}
@@ -112,6 +129,8 @@ class FittingWorker internal constructor(context: Context, parameters: WorkerPar
             }
             val message = if (error is java.io.IOException) "피팅 작업을 완료하지 못했어요. 사진을 다시 선택해 주세요."
                 else error.message ?: "피팅 생성에 실패했어요. 다시 시도해 주세요."
+            if (error is FittingApiException && error.code == "FITTING_CANCELLED") usage?.cancel()
+            else usage?.failure(usageErrorCode(error))
             tasks.finish(key, message)
             if (currentAccount()?.userId == owner) FittingNotifications.finished(applicationContext, key, owner, failed = true)
             Result.failure()

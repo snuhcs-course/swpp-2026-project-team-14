@@ -66,6 +66,7 @@ class ChatRepository(
             }))
         if (input.weather != null) body.put("weather", input.weather.json) else body.put("temp", 18)
         val json = post("/api/outfits/chat/", body)
+        currentCoroutineContext().ensureActive()
         return try {
             ChatResult(json.getString("status"), json.getString("message"),
                 json.optJSONObject("outfit")?.let(OutfitRepository::parseOutfit),

@@ -1,6 +1,7 @@
 """Stateless chat previews. Only the existing POST /outfits/ saves a result."""
 from __future__ import annotations
 
+import json
 import uuid
 from datetime import datetime
 from threading import BoundedSemaphore
@@ -10,6 +11,7 @@ from django.views.decorators.http import require_POST
 
 from apps.body_profiles.profile import body_or_unknown
 from apps.users.auth import require_auth
+from apps.usage.recording import record_recommendations
 from apps.wardrobe.models import Garment
 from recommendation import chat_intent, intent, season, trip, weather
 from recommendation.search import RecommendError, Request, recommend
@@ -106,7 +108,11 @@ def chat_view(request):
     if not SLOTS_GATE.acquire(blocking=False):
         return views._error('CHAT_BUSY', 429, '지금 대화 요청이 많아요. 30초쯤 뒤에 다시 보내 주세요.')
     try:
-        return process(garments, *args)
+        response = process(garments, *args)
+        payload = json.loads(response.content)
+        if payload.get('status') == 'updated' and payload.get('outfit'):
+            record_recommendations(request.user, [payload['outfit']['key']], data.get('seen_keys'), 'chat')
+        return response
     except chat_intent.ChatModelError:
         return views._error('CHAT_MODEL_UNAVAILABLE', 503, '문장을 해석하는 AI가 잠시 응답하지 않아요. 입력창의 조건 선택으로 바꿔 보거나 30초쯤 뒤에 다시 보내 주세요.')
     finally:
