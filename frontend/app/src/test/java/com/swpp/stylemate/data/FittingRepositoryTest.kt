@@ -100,16 +100,33 @@ class FittingRepositoryTest {
         assertEquals("gallery", repository().latestSource(outfit()))
         assertEquals(0, server.requestCount)
     }
-    @Test fun changedOutfitsGarmentsAndSourcesNeverReuseAnotherResult() = runBlocking {
+    @Test fun theSameGarmentsShareAResultButChangedGarmentsAndSourcesNeverReuseIt() = runBlocking {
         val fitting = repository()
         fitting.saveResult(outfit(), byteArrayOf(1))
-        assertNull(fitting.result(outfit().copy(id = "another")))
+        // 홈 recommends the same garments again under a new outfit id, and they can be saved to 코디북 twice:
+        // the fitting depends only on the garments and the person, so it is the same result.
+        assertArrayEquals(byteArrayOf(1), fitting.result(outfit().copy(id = "another")))
+        assertTrue(fitting.hasResult(outfit().copy(id = "another"), "gallery"))
+        assertEquals("gallery", fitting.latestSource(outfit().copy(id = "another")))
+        assertEquals(fitting.taskKey(outfit()), fitting.taskKey(outfit().copy(id = "another")))
         assertNull(fitting.result(outfit(listOf(UUID.randomUUID().toString()))))
         assertNull(fitting.result(outfit().copy(items = outfit().items.map { it.copy(imageUrl = "replacement") })))
         fitting.saveResult(outfit(), byteArrayOf(2), "virtual:male_170_regular:v1")
         assertArrayEquals(byteArrayOf(1), fitting.result(outfit()))
         assertArrayEquals(byteArrayOf(2), fitting.result(outfit(), "virtual:male_170_regular:v1"))
         assertNull(fitting.result(outfit(), "virtual:female_170_regular:v1"))
+    }
+    @Test fun resultsSavedPerOutfitIdBeforeAreStillFoundForThatOutfit() = runBlocking {
+        val fitting = repository()
+        // As saved before results were shared by garment combination.
+        store.saveFittingResult(fitting.legacyKey(outfit(), "gallery"), byteArrayOf(7))
+        store.put("fitting-latest:${fitting.legacyKey(outfit(), "background-job")}", org.json.JSONObject().put("source", "gallery"))
+        assertArrayEquals(byteArrayOf(7), fitting.result(outfit()))
+        assertTrue(fitting.hasResult(outfit(), "gallery"))
+        assertEquals("gallery", fitting.latestSource(outfit()))
+        assertNull("the old key held the outfit id, so another outfit does not see it", fitting.result(outfit().copy(id = "another")))
+        fitting.saveResult(outfit(), byteArrayOf(8))
+        assertArrayEquals("a new fitting wins over the old result", byteArrayOf(8), fitting.result(outfit()))
     }
     @Test fun accountSwitchIsolatesResultsAndPreferencesAndRejectsStaleAccess() = runBlocking {
         val now = Instant.parse("2026-11-04T00:00:00Z")
