@@ -1,0 +1,242 @@
+{
+ "female_150_fuller": {
+  "ankleY": 0.8634,
+  "hipL": 0.3403,
+  "hipR": 0.6562,
+  "neckY": 0.2153,
+  "shoulderL": 0.3177,
+  "shoulderR": 0.6806,
+  "shoulderY": 0.2041,
+  "waistY": 0.4468
+ },
+ "female_150_regular": {
+  "ankleY": 0.8588,
+  "hipL": 0.3559,
+  "hipR": 0.6372,
+  "neckY": 0.2083,
+  "shoulderL": 0.3264,
+  "shoulderR": 0.6719,
+  "shoulderY": 0.1958,
+  "waistY": 0.441
+ },
+ "female_150_slim": {
+  "ankleY": 0.8484,
+  "hipL": 0.3681,
+  "hipR": 0.6285,
+  "neckY": 0.2164,
+  "shoulderL": 0.3403,
+  "shoulderR": 0.6528,
+  "shoulderY": 0.2017,
+  "waistY": 0.4352
+ },
+ "female_160_fuller": {
+  "ankleY": 0.8623,
+  "hipL": 0.3385,
+  "hipR": 0.658,
+  "neckY": 0.2199,
+  "shoulderL": 0.3142,
+  "shoulderR": 0.6719,
+  "shoulderY": 0.2052,
+  "waistY": 0.4421
+ },
+ "female_160_regular": {
+  "ankleY": 0.8681,
+  "hipL": 0.3524,
+  "hipR": 0.6424,
+  "neckY": 0.2037,
+  "shoulderL": 0.3281,
+  "shoulderR": 0.6632,
+  "shoulderY": 0.1985,
+  "waistY": 0.4352
+ },
+ "female_160_slim": {
+  "ankleY": 0.8646,
+  "hipL": 0.3472,
+  "hipR": 0.6337,
+  "neckY": 0.2037,
+  "shoulderL": 0.3229,
+  "shoulderR": 0.658,
+  "shoulderY": 0.2009,
+  "waistY": 0.4352
+ },
+ "female_170_fuller": {
+  "ankleY": 0.8634,
+  "hipL": 0.3385,
+  "hipR": 0.6562,
+  "neckY": 0.2141,
+  "shoulderL": 0.3125,
+  "shoulderR": 0.6806,
+  "shoulderY": 0.2006,
+  "waistY": 0.441
+ },
+ "female_170_regular": {
+  "ankleY": 0.8623,
+  "hipL": 0.3507,
+  "hipR": 0.6302,
+  "neckY": 0.2095,
+  "shoulderL": 0.3212,
+  "shoulderR": 0.6597,
+  "shoulderY": 0.1985,
+  "waistY": 0.4329
+ },
+ "female_170_slim": {
+  "ankleY": 0.8472,
+  "hipL": 0.375,
+  "hipR": 0.6233,
+  "neckY": 0.2049,
+  "shoulderL": 0.342,
+  "shoulderR": 0.6597,
+  "shoulderY": 0.1986,
+  "waistY": 0.4155
+ },
+ "female_180_fuller": {
+  "ankleY": 0.8692,
+  "hipL": 0.3472,
+  "hipR": 0.6545,
+  "neckY": 0.2083,
+  "shoulderL": 0.3125,
+  "shoulderR": 0.6667,
+  "shoulderY": 0.1919,
+  "waistY": 0.4201
+ },
+ "female_180_regular": {
+  "ankleY": 0.8472,
+  "hipL": 0.3628,
+  "hipR": 0.3958,
+  "neckY": 0.2072,
+  "shoulderL": 0.3299,
+  "shoulderR": 0.6597,
+  "shoulderY": 0.1956,
+  "waistY": 0.4236
+ },
+ "female_180_slim": {
+  "ankleY": 0.8542,
+  "hipL": 0.3698,
+  "hipR": 0.6372,
+  "neckY": 0.2002,
+  "shoulderL": 0.3403,
+  "shoulderR": 0.6649,
+  "shoulderY": 0.1934,
+  "waistY": 0.4225
+ },
+ "male_160_fuller": {
+  "ankleY": 0.8588,
+  "hipL": 0.3368,
+  "hipR": 0.6441,
+  "neckY": 0.2118,
+  "shoulderL": 0.2986,
+  "shoulderR": 0.6788,
+  "shoulderY": 0.2009,
+  "waistY": 0.4688
+ },
+ "male_160_regular": {
+  "ankleY": 0.8438,
+  "hipL": 0.3576,
+  "hipR": 0.6372,
+  "neckY": 0.2072,
+  "shoulderL": 0.3177,
+  "shoulderR": 0.6736,
+  "shoulderY": 0.2079,
+  "waistY": 0.4861
+ },
+ "male_160_slim": {
+  "ankleY": 0.8565,
+  "hipL": 0.3576,
+  "hipR": 0.6285,
+  "neckY": 0.2025,
+  "shoulderL": 0.3194,
+  "shoulderR": 0.6684,
+  "shoulderY": 0.1994,
+  "waistY": 0.4745
+ },
+ "male_170_fuller": {
+  "ankleY": 0.8646,
+  "hipL": 0.3368,
+  "hipR": 0.6476,
+  "neckY": 0.1956,
+  "shoulderL": 0.2951,
+  "shoulderR": 0.684,
+  "shoulderY": 0.1909,
+  "waistY": 0.4676
+ },
+ "male_170_regular": {
+  "ankleY": 0.8681,
+  "hipL": 0.3559,
+  "hipR": 0.6302,
+  "neckY": 0.1991,
+  "shoulderL": 0.3108,
+  "shoulderR": 0.6806,
+  "shoulderY": 0.1996,
+  "waistY": 0.4873
+ },
+ "male_170_slim": {
+  "ankleY": 0.8507,
+  "hipL": 0.3542,
+  "hipR": 0.6302,
+  "neckY": 0.206,
+  "shoulderL": 0.3194,
+  "shoulderR": 0.6684,
+  "shoulderY": 0.2015,
+  "waistY": 0.4873
+ },
+ "male_180_fuller": {
+  "ankleY": 0.8553,
+  "hipL": 0.3403,
+  "hipR": 0.6476,
+  "neckY": 0.1968,
+  "shoulderL": 0.2934,
+  "shoulderR": 0.6858,
+  "shoulderY": 0.19,
+  "waistY": 0.4722
+ },
+ "male_180_regular": {
+  "ankleY": 0.8553,
+  "hipL": 0.3524,
+  "hipR": 0.6181,
+  "neckY": 0.1956,
+  "shoulderL": 0.3142,
+  "shoulderR": 0.6753,
+  "shoulderY": 0.1936,
+  "waistY": 0.4711
+ },
+ "male_180_slim": {
+  "ankleY": 0.8576,
+  "hipL": 0.3681,
+  "hipR": 0.6372,
+  "neckY": 0.2049,
+  "shoulderL": 0.3333,
+  "shoulderR": 0.6684,
+  "shoulderY": 0.2038,
+  "waistY": 0.4745
+ },
+ "male_190_fuller": {
+  "ankleY": 0.8519,
+  "hipL": 0.3368,
+  "hipR": 0.651,
+  "neckY": 0.2014,
+  "shoulderL": 0.2934,
+  "shoulderR": 0.6823,
+  "shoulderY": 0.1946,
+  "waistY": 0.4803
+ },
+ "male_190_regular": {
+  "ankleY": 0.8588,
+  "hipL": 0.349,
+  "hipR": 0.6285,
+  "neckY": 0.1979,
+  "shoulderL": 0.3108,
+  "shoulderR": 0.6701,
+  "shoulderY": 0.1909,
+  "waistY": 0.4757
+ },
+ "male_190_slim": {
+  "ankleY": 0.8646,
+  "hipL": 0.3646,
+  "hipR": 0.6389,
+  "neckY": 0.1852,
+  "shoulderL": 0.3177,
+  "shoulderR": 0.6701,
+  "shoulderY": 0.1848,
+  "waistY": 0.4653
+ }
+}

@@ -8,6 +8,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -93,6 +96,8 @@ fun HomeRoute(profile: BodyProfile?, onSetupProfile: () -> Unit, onOpenWardrobe:
     LaunchedEffect(body?.toString(), wardrobeRevision) { model.ensureLoaded(body, wardrobeRevision) }
     // Each return to 홈 (from 코디북, chat or another tab) re-checks which cards are saved.
     LaunchedEffect(Unit) { model.syncSaved() }
+    // The same fitting state as 코디북 (results are kept per outfit id, which saving keeps).
+    val fittingStatuses = rememberFittingStatuses(state.outfits, fitting, account.userId, selected)
     HomeScreen(
         state = state,
         onRefresh = { model.load(body) },
@@ -107,7 +112,9 @@ fun HomeRoute(profile: BodyProfile?, onSetupProfile: () -> Unit, onOpenWardrobe:
         modifier = modifier,
         fitting = { outfit, previewModifier, enabled ->
             Button(onClick = { selected = outfit }, enabled = enabled,
-                modifier = previewModifier.heightIn(min = 52.dp), shape = MaterialTheme.shapes.medium) { Text("가상 피팅") }
+                modifier = previewModifier.heightIn(min = 52.dp), shape = MaterialTheme.shapes.medium) {
+                FittingButtonLabel(fittingStatuses[outfit.id] ?: CodiBookFittingStatus.NONE)
+            }
         },
         todayPlan = if (events.isEmpty()) null else {{ TodayPlan(events) }},
         hint = if (profile == null) {{ BodyHint(onSetupProfile) }} else null,
@@ -166,15 +173,31 @@ fun CodiBookRoute(modifier: Modifier = Modifier, wardrobeRevision: Int = 0, prof
     val state by model.state.collectAsStateWithLifecycle()
     LaunchedEffect(wardrobeRevision) { model.invalidateWardrobe(wardrobeRevision); model.load() }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
+    val fittingStatuses = rememberFittingStatuses(state.outfits, fitting, account.userId, selected)
+    CodiBookScreen(state, onRemove = model::remove, onRetry = model::load, modifier = modifier,
+        onTryOn = { selected = it }, fittingStatuses = fittingStatuses, onClearRemoveError = model::clearRemoveError)
+    selected?.let { FittingDialog(it, fitting, account, onClose = { selected = null }, profile = profile) }
+}
+
+/**
+ * The fitting state of each outfit, shared by 홈 and 코디북: in progress, failed, a result kept on this
+ * device, or none. Re-read whenever [refresh] changes (the fitting screen opens or closes) and every 1.5 s
+ * while a fitting is being made.
+ */
+@Composable
+internal fun rememberFittingStatuses(outfits: List<Outfit>, fitting: FittingRepository, owner: String,
+                                     refresh: Any?): Map<String, CodiBookFittingStatus> {
+    val context = LocalContext.current.applicationContext
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
     val work = remember(context) { FittingWork(context) }
-    var fittingStatuses by remember(account.userId) { mutableStateOf<Map<String, CodiBookFittingStatus>>(emptyMap()) }
-    LaunchedEffect(fitting, state.outfits, selected, lifecycle) {
+    var statuses by remember(owner) { mutableStateOf<Map<String, CodiBookFittingStatus>>(emptyMap()) }
+    LaunchedEffect(fitting, outfits, refresh, lifecycle) {
         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
             do {
-                val statuses = buildMap {
-                    for (outfit in state.outfits) {
+                val next = buildMap {
+                    for (outfit in outfits) {
                         try {
-                            val task = work.state(fitting.taskKey(outfit))?.takeIf { it.optString("owner") == account.userId }
+                            val task = work.state(fitting.taskKey(outfit))?.takeIf { it.optString("owner") == owner }
                             val source = fitting.latestSource(outfit)
                             put(outfit.id, when {
                                 task?.optString("state") in listOf("queued", "running") -> CodiBookFittingStatus.GENERATING
@@ -186,13 +209,26 @@ fun CodiBookRoute(modifier: Modifier = Modifier, wardrobeRevision: Int = 0, prof
                         catch (_: Exception) { /* Leave unknown local state unlabelled; opening fitting can retry. */ }
                     }
                 }
-                fittingStatuses = statuses
-                if (statuses.values.none { it == CodiBookFittingStatus.GENERATING }) break
-                delay(1_500)
+                statuses = next
+                // Keep watching while one is being made, including one that finishes in the background.
+                delay(if (next.values.any { it == CodiBookFittingStatus.GENERATING }) 1_500 else 4_000)
             } while (isActive)
         }
     }
-    CodiBookScreen(state, onRemove = model::remove, onRetry = model::load, modifier = modifier,
-        onTryOn = { selected = it }, fittingStatuses = fittingStatuses, onClearRemoveError = model::clearRemoveError)
-    selected?.let { FittingDialog(it, fitting, account, onClose = { selected = null }, profile = profile) }
+    return statuses
+}
+
+/** The fitting button's label: a check once a result is kept, a small spinner while one is being made. */
+@Composable
+internal fun FittingButtonLabel(status: CodiBookFittingStatus) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+        when (status) {
+            CodiBookFittingStatus.READY -> Icon(Icons.Filled.CheckCircle, null, Modifier.size(18.dp))
+            CodiBookFittingStatus.GENERATING -> androidx.compose.material3.CircularProgressIndicator(Modifier.size(14.dp),
+                color = LocalContentColor.current, strokeWidth = 2.dp)
+            else -> Unit
+        }
+        if (status == CodiBookFittingStatus.READY || status == CodiBookFittingStatus.GENERATING) Spacer(Modifier.width(8.dp))
+        Text(status.action)
+    }
 }

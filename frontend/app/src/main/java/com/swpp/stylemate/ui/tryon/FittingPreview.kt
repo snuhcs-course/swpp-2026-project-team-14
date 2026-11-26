@@ -108,7 +108,7 @@ internal fun PhotoFitting(outfit: Outfit, repository: FittingRepository, account
     var pending by remember { mutableStateOf(false) }
     var progress by remember { mutableStateOf<com.swpp.stylemate.data.tryon.FittingProgress?>(null) }
     // The photo being dressed, shown by the loading screen; restarts the task polling after a new request.
-    var personPreview by remember { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
+    var personPreview by remember { mutableStateOf<FittingPerson?>(null) }
     var watch by remember { mutableStateOf(0) }
     var notificationSettings by remember { mutableStateOf(FittingNotificationSettings()) }
     var changingNotification by remember { mutableStateOf(false) }
@@ -159,7 +159,7 @@ internal fun PhotoFitting(outfit: Outfit, repository: FittingRepository, account
         scope.launch(Dispatchers.Main.immediate) {
             try {
                 work.enqueue(outfit, repository, account.userId, source) {
-                    person().also { bytes -> personPreview = previewOf(bytes) }
+                    person().also { bytes -> personPreview = virtualModelPreview(context, source) ?: previewOf(bytes)?.let { FittingPerson(it) } }
                 }
                 // Stay on the fitting screen and show the loading screen until it is closed or done.
                 pending = true
@@ -328,7 +328,7 @@ internal fun PhotoFittingContent(
     progress: com.swpp.stylemate.data.tryon.FittingProgress? = null,
     notificationsEnabled: Boolean = true,
     outfit: Outfit? = null,
-    person: androidx.compose.ui.graphics.ImageBitmap? = null,
+    person: FittingPerson? = null,
 ) {
     Box(modifier.fillMaxWidth().padding(20.dp), contentAlignment = Alignment.Center) {
         when {

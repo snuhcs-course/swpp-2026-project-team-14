@@ -17,6 +17,14 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.offset
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.platform.LocalDensity
+import com.swpp.stylemate.ui.wardrobe.GarmentHangingShape
+import com.swpp.stylemate.ui.wardrobe.defaultShape
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -86,69 +94,139 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
+/** Where a bundled model's body is, as fractions of its photo (computed once from the photos, see anchors.json). */
+internal data class BodyAnchors(
+    val shoulderY: Float, val shoulderL: Float, val shoulderR: Float,
+    val waistY: Float, val hipL: Float, val hipR: Float, val ankleY: Float,
+    val neckY: Float = shoulderY,
+)
+
+/** The photo being dressed, and where its body is when it is a bundled virtual model. */
+internal data class FittingPerson(val image: ImageBitmap, val anchors: BodyAnchors? = null)
+
 /**
- * The fitting screen while a fitting is made (design A, scan reveal): the photo being dressed is clear and
- * in colour above a scan line at the real progress, faded below it. Without the photo (a gallery photo is
- * removed after upload) the outfit itself is revealed. Closing it keeps the fitting going; the floating
- * [FittingProgressCard] then follows it over the tabs.
+ * Where each garment cut-out goes on the person shown in [photo] (the photo's on-screen rect): tops and
+ * outerwear hang from the shoulders by their own shoulder points, bottoms from the waist by their waistband,
+ * so the outfit reads as worn while the real fitting is being made. Outerwear is a little wider to sit over
+ * the top; a bottom never runs past the ankles.
+ */
+/** A dressed top or outerwear is at most this many shoulder widths wide, sleeves included. */
+internal const val MAX_SPREAD = 1.45f
+
+internal fun dressOnBody(anchors: BodyAnchors, photo: Rect, shapes: Map<String, GarmentHangingShape>): Map<String, Rect> {
+    fun x(f: Float) = photo.left + f * photo.width
+    fun y(f: Float) = photo.top + f * photo.height
+    val shoulders = (anchors.shoulderR - anchors.shoulderL) * photo.width
+    val middle = (x(anchors.shoulderL) + x(anchors.shoulderR)) / 2
+    // A crooked hip reading (one leg only) falls back to the usual hip-to-shoulder ratio, centred under the shoulders.
+    val hipsRead = anchors.hipR - anchors.hipL > (anchors.shoulderR - anchors.shoulderL) * .6f
+    val hipSpan = if (hipsRead) (anchors.hipR - anchors.hipL) * photo.width else shoulders * .82f
+    val hipMiddle = if (hipsRead) (x(anchors.hipL) + x(anchors.hipR)) / 2 else middle
+    return buildMap {
+        for ((slot, shape) in shapes) {
+            val anchorSpan = (shape.right - shape.left).coerceAtLeast(.2f)
+            val anchorMiddle = (shape.left + shape.right) / 2
+            when (slot) {
+                "top", "outerwear" -> {
+                    // Flat-lay sleeves spread out, so the whole piece is capped near the body's width.
+                    val over = if (slot == "outerwear") 1.1f else 1f
+                    val width = minOf(shoulders * over / anchorSpan, shoulders * over * MAX_SPREAD)
+                    val height = width / shape.aspectRatio
+                    val left = middle - anchorMiddle * width
+                    // A collar sits at the neck, never over the chin.
+                    val top = maxOf(y(anchors.shoulderY) - shape.supportY * height, y(anchors.neckY) - .012f * photo.height)
+                    put(slot, Rect(left, top, left + width, top + height))
+                }
+                "bottom" -> {
+                    var width = hipSpan / anchorSpan
+                    var height = width / shape.aspectRatio
+                    val legs = (y(anchors.ankleY) - y(anchors.waistY)) * 1.04f
+                    if (height > legs) { width *= legs / height; height = legs }
+                    val left = hipMiddle - anchorMiddle * width
+                    val top = y(anchors.waistY) - shape.supportY * height
+                    put(slot, Rect(left, top, left + width, top + height))
+                }
+            }
+        }
+    }
+}
+
+/**
+ * The fitting screen while a fitting is made (design A, scan reveal). A scan line comes down at the real
+ * progress; above it the person is in colour and, for a bundled model, already wears the outfit's cut-outs,
+ * so the clothes go on as the line passes. Below it the person is soft and grey. Without the photo (a gallery
+ * photo is removed after upload) the outfit itself is revealed. The AI dresses the whole outfit at once, so
+ * the text only says how far along it is. Closing keeps the fitting going under [FittingProgressCard].
  */
 @Composable
 internal fun FittingScanLoading(
     outfit: Outfit?,
-    person: ImageBitmap?,
+    person: FittingPerson?,
     progress: FittingProgress?,
     notificationsEnabled: Boolean,
     onConfirm: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val target = progress?.fraction ?: .05f
-    val fraction by animateFloatAsState(target, tween(600), label = "fitting")
-    val breathe by rememberInfiniteTransition(label = "scan").animateFloat(-.01f, .01f,
+    val fraction by animateFloatAsState(target, tween(900), label = "fitting")
+    val breathe by rememberInfiniteTransition(label = "scan").animateFloat(-.008f, .008f,
         infiniteRepeatable(tween(1400, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "line")
     val line = (fraction + breathe).coerceIn(0f, 1f)
     val panel = MaterialTheme.colorScheme.surfaceContainerLow
     val ink = MaterialTheme.colorScheme.primary
     val items = outfit?.items.orEmpty()
-    val done = if (progress?.stage == "done") items.size else (fraction * items.size).toInt().coerceAtMost(items.size)
     Column(modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
-        Box(Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(24.dp)).background(panel)
+        BoxWithConstraints(Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(24.dp)).background(panel)
             .semantics { contentDescription = "가상 피팅 진행 ${(fraction * 100).toInt()}%, ${progress?.text ?: "준비 중"}" }) {
-            val revealed = Modifier.fillMaxSize().padding(18.dp).drawWithContent {
-                clipRect(bottom = size.height * line) { this@drawWithContent.drawContent() }
+            val density = LocalDensity.current
+            val inset = with(density) { 18.dp.toPx() }
+            val boxW = with(density) { maxWidth.toPx() }
+            val boxH = with(density) { maxHeight.toPx() }
+            val lineY = boxH * line
+            val revealed = Modifier.fillMaxSize().drawWithContent {
+                clipRect(bottom = lineY) { this@drawWithContent.drawContent() }
             }
             if (person != null) {
                 val grey = remember { ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(0f) }) }
-                Image(person, null, Modifier.fillMaxSize().padding(18.dp).blur(10.dp), contentScale = ContentScale.Fit,
+                Image(person.image, null, Modifier.fillMaxSize().padding(18.dp).blur(10.dp), contentScale = ContentScale.Fit,
                     colorFilter = grey, alpha = .5f)
-                Image(person, null, revealed, contentScale = ContentScale.Fit)
-            } else if (items.isNotEmpty()) {
-                OutfitDressed(items, Modifier.fillMaxSize().padding(18.dp).alpha(.22f))
-                OutfitDressed(items, revealed)
-            }
-            Canvas(Modifier.fillMaxSize()) {
-                val y = size.height * line
-                val glow = 56.dp.toPx()
-                drawRect(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0f), Color.White.copy(alpha = .65f)),
-                    startY = y - glow, endY = y), Offset(0f, y - glow), Size(size.width, glow))
-                drawLine(ink, Offset(0f, y), Offset(size.width, y), 1.5.dp.toPx())
-            }
-        }
-        Spacer(Modifier.height(16.dp))
-        if (items.isNotEmpty()) {
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                items.forEachIndexed { index, garment ->
-                    Box(Modifier.size(52.dp).clip(RoundedCornerShape(14.dp)).background(panel), contentAlignment = Alignment.Center) {
-                        HangingGarmentImage(garment.asWardrobeItem(), Modifier.fillMaxSize().padding(6.dp)
-                            .alpha(if (index < done) 1f else .4f), alignment = Alignment.Center)
-                        if (index < done) Box(Modifier.align(Alignment.TopEnd).padding(3.dp).size(14.dp).clip(CircleShape)
-                            .background(ink), contentAlignment = Alignment.Center) {
-                            Icon(Icons.Filled.Check, null, Modifier.size(10.dp), tint = MaterialTheme.colorScheme.onPrimary)
+                Box(revealed) {
+                    Image(person.image, null, Modifier.fillMaxSize().padding(18.dp), contentScale = ContentScale.Fit)
+                    val anchors = person.anchors
+                    if (anchors != null && items.isNotEmpty()) {
+                        // The photo's rect inside the panel (ContentScale.Fit, centred).
+                        val availW = boxW - 2 * inset
+                        val availH = boxH - 2 * inset
+                        val scale = minOf(availW / person.image.width, availH / person.image.height)
+                        val w = person.image.width * scale
+                        val h = person.image.height * scale
+                        val photo = Rect(inset + (availW - w) / 2, inset + (availH - h) / 2,
+                            inset + (availW + w) / 2, inset + (availH + h) / 2)
+                        val shapes = remember(items) { mutableStateMapOf<String, GarmentHangingShape>() }
+                        val placed = dressOnBody(anchors, photo, items.associate { it.slot to (shapes[it.slot] ?: defaultShape(it.slot)) })
+                        // Bottom first, then the top, then the outerwear worn over it.
+                        items.sortedBy { listOf("bottom", "top", "outerwear").indexOf(it.slot) }.forEach { garment ->
+                            val rect = placed[garment.slot] ?: return@forEach
+                            key(garment.garmentId) {
+                                HangingGarmentImage(garment.asWardrobeItem(), with(density) {
+                                    Modifier.offset(rect.left.toDp(), rect.top.toDp()).size(rect.width.toDp(), rect.height.toDp())
+                                }, onHangingShape = { shapes[garment.slot] = it }, alignment = Alignment.TopCenter)
+                            }
                         }
                     }
                 }
+            } else if (items.isNotEmpty()) {
+                OutfitDressed(items, Modifier.fillMaxSize().padding(18.dp).alpha(.22f))
+                OutfitDressed(items, revealed.padding(18.dp))
             }
-            Spacer(Modifier.height(14.dp))
+            Canvas(Modifier.fillMaxSize()) {
+                val glow = 56.dp.toPx()
+                drawRect(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0f), Color.White.copy(alpha = .55f)),
+                    startY = lineY - glow, endY = lineY), Offset(0f, lineY - glow), Size(size.width, glow))
+                drawLine(ink, Offset(0f, lineY), Offset(size.width, lineY), 1.5.dp.toPx())
+            }
         }
+        Spacer(Modifier.height(20.dp))
         Text("가상 피팅을 만드는 중입니다.", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(12.dp))
         LinearProgressIndicator(progress = { fraction }, Modifier.fillMaxWidth().height(3.dp), color = ink,
@@ -167,11 +245,21 @@ internal fun FittingScanLoading(
     }
 }
 
-/** The bundled model photo of a virtual-model fitting source (`virtual:<id>:v<n>`), or null for a gallery photo. */
-internal suspend fun virtualModelPreview(context: Context, source: String?): ImageBitmap? {
+/** The bundled model photo and its body anchors for a virtual-model source (`virtual:<id>:v<n>`); null for a gallery photo. */
+internal suspend fun virtualModelPreview(context: Context, source: String?): FittingPerson? {
     val model = VirtualFittingModels.all.firstOrNull { it.sourceKey == source } ?: return null
     return withContext(Dispatchers.IO) {
-        runCatching { context.assets.open(model.assetPath).use { BitmapFactory.decodeStream(it) }?.asImageBitmap() }.getOrNull()
+        val image = runCatching { context.assets.open(model.assetPath).use { BitmapFactory.decodeStream(it) }?.asImageBitmap() }
+            .getOrNull() ?: return@withContext null
+        val anchors = runCatching {
+            val all = org.json.JSONObject(context.assets.open("tryon/models/v1/anchors.json").bufferedReader().use { it.readText() })
+            all.optJSONObject(model.id)?.let { a ->
+                fun f(name: String) = a.getDouble(name).toFloat()
+                BodyAnchors(f("shoulderY"), f("shoulderL"), f("shoulderR"), f("waistY"), f("hipL"), f("hipR"), f("ankleY"),
+                    a.optDouble("neckY", a.getDouble("shoulderY")).toFloat())
+            }
+        }.getOrNull()
+        FittingPerson(image, anchors)
     }
 }
 
@@ -184,7 +272,7 @@ internal fun FittingProgressCard(owner: String, onOpen: (String) -> Unit, modifi
     val context = LocalContext.current.applicationContext
     val work = remember(context) { FittingWork(context) }
     var card by remember(owner) { mutableStateOf<Pair<String, org.json.JSONObject>?>(null) }
-    var avatar by remember(owner) { mutableStateOf<Pair<String, ImageBitmap?>?>(null) }
+    var avatar by remember(owner) { mutableStateOf<Pair<String, FittingPerson?>?>(null) }
     var resumed by remember { mutableStateOf(false) }
     LifecycleResumeEffect(Unit) { resumed = true; onPauseOrDispose { resumed = false } }
     LaunchedEffect(owner, resumed) {
@@ -228,7 +316,7 @@ internal fun FittingProgressCard(owner: String, onOpen: (String) -> Unit, modifi
                 CircularProgressIndicator(progress = { fraction }, Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.primary,
                     strokeWidth = 2.5.dp, trackColor = MaterialTheme.colorScheme.outlineVariant, gapSize = 0.dp)
             }
-            val face = avatar?.second
+            val face = avatar?.second?.image
             val inner = Modifier.size(38.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceContainerLow)
             // The full-body model photo, zoomed in on the face.
             if (face != null) Box(inner) {

@@ -170,7 +170,7 @@ fun CodiBookScreen(
                             Button(onClick = { onTryOn(current) },
                                 enabled = enabled && !pager.isScrollInProgress && pager.settledPage == index,
                                 shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
-                                Text((fittingStatuses[current.id] ?: CodiBookFittingStatus.NONE).action)
+                                FittingButtonLabel(fittingStatuses[current.id] ?: CodiBookFittingStatus.NONE)
                             }
 
                         }
