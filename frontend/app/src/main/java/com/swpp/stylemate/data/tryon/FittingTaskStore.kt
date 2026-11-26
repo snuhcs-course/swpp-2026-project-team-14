@@ -26,7 +26,8 @@ class FittingTaskStore(private val directory: File) {
             Files.move(temporary.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING)
         } finally { temporary.delete() }
     }
-    fun create(key: String, owner: String, source: String, outfit: Outfit, photo: ByteArray) = synchronized(lock) {
+    fun create(key: String, owner: String, source: String, outfit: Outfit, photo: ByteArray,
+               usage: JSONObject? = null) = synchronized(lock) {
         require(photo.isNotEmpty())
         directory.mkdirs()
         try {
@@ -34,7 +35,8 @@ class FittingTaskStore(private val directory: File) {
             val snapshot = JSONObject().put("id", outfit.id).put("key", outfit.key).put("name", outfit.name)
                 .put("items", JSONArray(outfit.items.map { item -> JSONObject().put("garment_id", item.garmentId)
                     .put("slot", item.slot).put("name", item.name).put("image_url", item.imageUrl).put("note", item.note) }))
-            write(key, JSONObject().put("owner", owner).put("source", source).put("outfit", snapshot).put("state", "queued"))
+            write(key, JSONObject().put("owner", owner).put("source", source).put("outfit", snapshot).put("state", "queued")
+                .put("usage", usage ?: JSONObject.NULL))
         } catch (error: Exception) {
             deletePerson(key)
             throw error

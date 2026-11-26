@@ -73,6 +73,7 @@ fun WardrobeRoute(
     val files = remember { CaptureFiles(context.applicationContext) }
     val preferences = remember { context.getSharedPreferences("camera-permission", 0) }
     val initialDraft = remember { onboardingDraft }
+    var registrationCheckpoint by rememberSaveable { mutableStateOf(initialDraft?.optString("usage_registration")?.takeIf { it.isNotBlank() }) }
     val initialCategory = initialDraft?.optString("category")
     var selected by rememberSaveable { mutableStateOf(initialDraft?.optString("capture")?.takeIf { it.isNotBlank() }) }
     var message by rememberSaveable { mutableStateOf<String?>(null) }
@@ -96,9 +97,12 @@ fun WardrobeRoute(
     val analysisModel: GarmentAnalysisViewModel = viewModel(factory = viewModelFactory { initializer { GarmentAnalysisViewModel(account) } })
     val analysis by analysisModel.state.collectAsStateWithLifecycle()
     val wardrobeModel: WardrobeViewModel = viewModel(factory = viewModelFactory {
-        initializer { WardrobeViewModel(store, account) }
+        initializer { WardrobeViewModel(store, account, com.swpp.stylemate.data.usage.UsageMetrics.forAccount(context, account.userId))
+            .apply { restoreRegistration(registrationCheckpoint) } }
     })
     val wardrobe by wardrobeModel.state.collectAsStateWithLifecycle()
+    LaunchedEffect(wardrobe.registrationCheckpoint) { registrationCheckpoint = wardrobe.registrationCheckpoint }
+    LaunchedEffect(analysis.error) { if (analysis.error != null) wardrobeModel.failRegistration("ANALYSIS_FAILED") }
     val wardrobePages = rememberSaveableStateHolder()
     var pages by rememberSaveable(account.userId) { mutableStateOf(arrayListOf<String>()) }
     var deletingDetailId by rememberSaveable(account.userId) { mutableStateOf<String?>(null) }
@@ -143,13 +147,14 @@ fun WardrobeRoute(
     var savedPhoto by remember(editingId) { mutableStateOf<ImageBitmap?>(null) }
     LaunchedEffect(analysisPhoto) { analysisModel.select(analysisPhoto,
         initialDraft?.optJSONObject("result")?.takeIf { initialDraft.optString("analysis_photo") == analysisPhoto }) }
-    LaunchedEffect(selected, frontPhoto, selectedMeasurements, editingId, analysis.result?.toString(), editorDraftText) {
+    LaunchedEffect(selected, frontPhoto, selectedMeasurements, editingId, analysis.result?.toString(), editorDraftText, registrationCheckpoint) {
         onDraftChange?.invoke(JSONObject().put("category", initialCategory ?: "top").apply {
             selected?.let { put("capture", it) }; frontPhoto?.let { put("front", it) }
             selectedMeasurements?.let { put("measurements", JSONObject(it)) }
             editingId?.let { put("editing_id", it) }
             if (analysis.photo == analysisPhoto) analysis.result?.let { put("result", it); put("analysis_photo", analysisPhoto) }
             editorDraftText?.let { put("editor", JSONObject(it)) }
+            registrationCheckpoint?.let { put("usage_registration", it) }
         })
     }
     LaunchedEffect(wardrobe.savedId) {
@@ -198,7 +203,7 @@ fun WardrobeRoute(
             selected = name
             selectedMeasurements = result.data?.getStringExtra("measurements")
             message = null
-        } else message = null
+        } else { if (selected == null) wardrobeModel.cancelRegistration(); message = null }
     }
     fun launchCamera() {
         if (measurementBusy) return
@@ -206,12 +211,13 @@ fun WardrobeRoute(
         try { measurementCamera.launch(Intent(context, MeasurementActivity::class.java).apply {
             initialCategory?.let { putExtra("initial_category", it) }
         }) }
-        catch (_: Exception) { measurementBusy = false; message = "카메라를 열지 못했습니다." }
+        catch (_: Exception) { wardrobeModel.failRegistration("CAMERA_UNAVAILABLE"); measurementBusy = false; message = "카메라를 열지 못했습니다." }
     }
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         val blocked = !granted && !ActivityCompat.shouldShowRequestPermissionRationale(activity, Manifest.permission.CAMERA)
         preferences.edit().putBoolean("blocked", blocked).apply()
         if (granted) launchCamera() else {
+            wardrobeModel.failRegistration("PERMISSION_DENIED")
             message = "카메라 권한을 허용해야 촬영할 수 있습니다. 옷장 조회는 계속 사용할 수 있습니다."
             if (blocked) {
                 permissionDialog = "settings"
@@ -222,6 +228,7 @@ fun WardrobeRoute(
         permission.launch(Manifest.permission.CAMERA)
     }
     fun takePhoto() {
+        wardrobeModel.beginRegistration(if (onboardingTopBar == null) "wardrobe" else "onboarding")
         message = null
         when {
             ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED -> {
@@ -241,18 +248,22 @@ fun WardrobeRoute(
             else { files.delete(frontPhoto); frontPhoto = name }
             message = null
         }
-        else files.delete(name)
+        else { files.delete(name); if (initialCategory == "shoes" && selected == null) wardrobeModel.cancelRegistration() }
     }
     fun captureFront() {
         val name = files.create()
         pendingFront = name
         try { frontCamera.launch(files.uri(name)) }
-        catch (_: Exception) { files.delete(name); pendingFront = null; message = "카메라를 열지 못했습니다." }
+        catch (_: Exception) { wardrobeModel.failRegistration("CAMERA_UNAVAILABLE"); files.delete(name); pendingFront = null; message = "카메라를 열지 못했습니다." }
     }
     val frontPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) captureFront() else message = "카메라 권한을 허용하거나 갤러리에서 앞면 사진을 골라 주세요."
+        if (granted) captureFront() else {
+            wardrobeModel.failRegistration("PERMISSION_DENIED")
+            message = "카메라 권한을 허용하거나 갤러리에서 앞면 사진을 골라 주세요."
+        }
     }
     fun takeFront() {
+        if (initialCategory == "shoes") wardrobeModel.beginRegistration("onboarding")
         message = null
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) captureFront()
         else frontPermission.launch(Manifest.permission.CAMERA)
@@ -261,15 +272,17 @@ fun WardrobeRoute(
         if (uri != null) scope.launch {
             val bitmap = decodeDownscaled(context, uri, maxSide = 1536)
             val name = bitmap?.let { withContext(Dispatchers.IO) { runCatching { files.create().also { n -> files.write(n, it) } }.getOrNull() } }
-            if (name == null) message = "사진을 읽을 수 없습니다. 다른 사진을 골라 주세요."
+            if (name == null) { wardrobeModel.failRegistration("INVALID_IMAGE"); message = "사진을 읽을 수 없습니다. 다른 사진을 골라 주세요." }
             else {
                 if (initialCategory == "shoes") { files.delete(selected); selected = name }
                 else { files.delete(frontPhoto); frontPhoto = name }
                 message = null
             }
         }
+        else if (initialCategory == "shoes" && selected == null) wardrobeModel.cancelRegistration()
     }
     fun discard() {
+        wardrobeModel.cancelRegistration()
         files.delete(selected); files.delete(frontPhoto)
         selected = null; frontPhoto = null; selectedMeasurements = null; editorDraftText = null; message = null
         labelsModel.reset()
@@ -283,7 +296,7 @@ fun WardrobeRoute(
     if (permissionDialog != null) {
         val settings = permissionDialog == "settings"
         AlertDialog(
-            onDismissRequest = { permissionDialog = null },
+            onDismissRequest = { permissionDialog = null; wardrobeModel.cancelRegistration() },
             title = { Text("카메라 권한") },
             text = { Text(if (settings) "기기 설정에서 카메라 권한을 허용한 후 촬영 버튼을 다시 눌러 주세요."
                          else "옷 사진을 촬영하려면 카메라 권한이 필요합니다. 촬영한 사진은 확인 전 서버로 전송되지 않습니다.") },
@@ -294,18 +307,19 @@ fun WardrobeRoute(
                     catch (_: ActivityNotFoundException) { message = "기기의 앱 설정에서 카메라 권한을 변경해 주세요." }
                 } else requestPermission()
             }) { Text(if (settings) "설정 열기" else "권한 요청") } },
-            dismissButton = { TextButton(onClick = { permissionDialog = null }) { Text("나중에") } },
+            dismissButton = { TextButton(onClick = { permissionDialog = null; wardrobeModel.cancelRegistration() }) { Text("나중에") } },
         )
     }
 
     val editing = wardrobe.records.find { it.getString("id") == editingId }
     if (wornRegistration) {
-        WornRegistration(account, onBack = { wornRegistration = false }, onBatchSaved = {
+        WornRegistration(account, onBack = { wardrobeModel.cancelRegistration(); wornRegistration = false }, onBatchSaved = {
+            wardrobeModel.completeRegistration()
             wornRegistration = false
             wardrobePages.removeState("collection")
             wardrobeModel.refresh()
             onSaved?.invoke()
-        })
+        }, onAttempt = { wardrobeModel.beginRegistration("worn") }, onFailure = wardrobeModel::failRegistration)
         return
     }
     val page = pages.lastOrNull()
@@ -363,6 +377,7 @@ fun WardrobeRoute(
                 Text(if (initialCategory == "shoes") "사진을 확인한 뒤 이름과 종류를 저장해요." else "옷을 촬영하고 치수를 확인한 뒤 옷장에 추가해요.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 message?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                 if (initialCategory == "shoes") OutlinedButton(onClick = {
+                    wardrobeModel.beginRegistration("onboarding")
                     frontGallery.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                 }) { Text("앨범에서 선택") }
             }
@@ -435,7 +450,7 @@ fun WardrobeRoute(
                             // the fit is kept only in the labels, so the old attribute fields do not disagree with it
                             payload.getJSONObject("attributes").put("fit_type", JSONObject.NULL).put("leg_shape", JSONObject.NULL)
                         }
-                    wardrobeModel.save(record.getString("id"), payload)
+                    wardrobeModel.save(record.getString("id"), payload, registering = editing == null)
                 }, onBack = back,
                 image = if (generated) originalForColor else if (editing != null) savedPhoto else (if (needsFront) frontPreview else preview) ?: savedPhoto,
                 photoSource = if (editing != null) record.optString("image_source") else null,
@@ -483,7 +498,7 @@ fun WardrobeRoute(
                 title = if (editingId != null) "옷 정보" else "촬영한 옷",
                 primaryLabel = if (editingId != null || result != null) null else if (analysis.busy) "분석 중" else "분석하기",
                 primaryEnabled = !analysis.busy && !measurementBusy && preview != null && (!needsFront || frontPreview != null),
-                onPrimary = { analysisPhoto?.let { analysisModel.analyze(context, it, garmentType) } },
+                onPrimary = { analysisPhoto?.let { wardrobeModel.beginRegistration(); analysisModel.analyze(context, it, garmentType) } },
                 onBack = back,
                 actionLabel = if (editingId == null && result == null) "다시 촬영" else null,
                 onAction = { takePhoto() },

@@ -33,6 +33,7 @@ from apps.body_profiles.profile import body_or_unknown
 from apps.wardrobe.models import Garment
 from apps.users.auth import require_auth
 from apps.users.models import User
+from apps.usage.recording import record_outfit_event, record_recommendations
 from apps.users.pagination import account_page
 from recommendation import preference, season, weather
 from recommendation.body import UnknownBody
@@ -254,6 +255,7 @@ def recommend_view(request):
             members = [(SLOT_CODE[i["slot"]], garments[i["id"][2:]], i.get("size", "")) for i in o["items"]]
             outfits.append(_create(Outfit.Source.RECOMMENDED, members, user=request.user, score=o["total"], components=o["components"],
                                    reasons=o["reasons"], context=context))
+    record_recommendations(request.user, [outfit.key for outfit in outfits], data.get('seen_keys'), 'home')
     return _json({"outfits": [serialize(o) for o in outfits], "notes": result["notes"], "band": result["band"],
                   "context": context})
 
@@ -370,6 +372,7 @@ def outfits_view(request):
                     return _json(serialize(existing))
             members = _members(request.user, ids)
             key = '+'.join(sorted(f'w:{gid}' for gid in ids))
+            already_saved = Outfit.objects.filter(user=request.user, key=key, saved=True).exists()
             outfit = Outfit.objects.filter(user=request.user, source=source, key=key).order_by('-saved', 'created_at').first() \
                 if source == Outfit.Source.CHAT else None
             if outfit is not None:
@@ -392,6 +395,9 @@ def outfits_view(request):
         return _error("JSON_REQUIRED", 415)
     except (ValueError, TypeError, UnicodeDecodeError, OverflowError) as error:
         return _error("INVALID_OUTFIT", 400, str(error))
+    record_outfit_event(request.user, 'outfit_save', source=source,
+                       already_saved=already_saved, total_count=1,
+                       duplicate_count=max(0, Outfit.objects.filter(user=request.user, key=key, saved=True).count() - 1))
     return _json(serialize(outfit), 201)
 
 
@@ -415,6 +421,7 @@ def outfit_view(request, outfit_id):
             return _error("INVALID_OUTFIT", 400, str(error))
         with transaction.atomic():
             User.objects.select_for_update().get(pk=request.user.pk)
+            already_saved = Outfit.objects.filter(user=request.user, key=outfit.key, saved=True).exists()
             outfit.saved = data.get("saved", outfit.saved)
             outfit.name = name.strip()
             outfit.save(update_fields=["saved", "name", "updated_at"])
@@ -424,6 +431,10 @@ def outfit_view(request, outfit_id):
                 # Copies saved before one-entry-per-combination would reappear in the 코디북 once the
                 # entry hiding them is unsaved, so unsaving takes the whole combination out (rows are kept).
                 Outfit.objects.filter(user=request.user, key=outfit.key, saved=True).update(saved=False)
+            if data.get('saved') is True:
+                record_outfit_event(request.user, 'outfit_save', source='home' if outfit.source == 'recommended' else outfit.source,
+                                   already_saved=already_saved, total_count=1,
+                                   duplicate_count=max(0, Outfit.objects.filter(user=request.user, key=outfit.key, saved=True).count() - 1))
     return _json(serialize(outfit))
 
 

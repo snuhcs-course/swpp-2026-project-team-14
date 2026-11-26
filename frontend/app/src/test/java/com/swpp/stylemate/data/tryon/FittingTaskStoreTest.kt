@@ -63,4 +63,12 @@ class FittingTaskStoreTest {
         try { FittingTaskStore(temporary.root).read("../auth-session"); fail("Expected invalid task key") }
         catch (_: IllegalArgumentException) {}
     }
+
+    @Test fun usageCheckpointSurvivesBackgroundCompletion() {
+        val checkpoint = com.swpp.stylemate.data.usage.UsageTracker().start("virtual_fitting", "virtual").checkpoint
+        val store = FittingTaskStore(temporary.root)
+        store.create(key, "owner", "virtual:model", outfit, byteArrayOf(1), checkpoint)
+        store.finish(key)
+        assertEquals(checkpoint.toString(), FittingTaskStore(temporary.root).read(key)!!.getJSONObject("usage").toString())
+    }
 }

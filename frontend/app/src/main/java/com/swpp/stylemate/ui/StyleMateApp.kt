@@ -130,6 +130,10 @@ fun StyleMateApp(viewModel: BodyProfileViewModel? = null, authModel: AuthViewMod
         }
     } else {
         val scope = account.userId
+        androidx.lifecycle.compose.LifecycleResumeEffect(scope) {
+            com.swpp.stylemate.data.usage.UsageMetrics.schedule(context, scope)
+            onPauseOrDispose { }
+        }
         val owner = remember(scope) { object : ViewModelStoreOwner { override val viewModelStore = ViewModelStore() } }
         DisposableEffect(owner) { onDispose { owner.viewModelStore.clear() } }
         CompositionLocalProvider(LocalViewModelStoreOwner provides owner, LocalAccountAccess provides account,
@@ -227,7 +231,7 @@ private fun MainTabs(viewModel: BodyProfileViewModel, authModel: AuthViewModel) 
     }
     val chat: ChatViewModel = viewModel(factory = viewModelFactory {
         initializer { ChatViewModel(ChatRepository(BuildConfig.API_BASE_URL, account = account),
-            LocalTasteStore(context, account.userId)) }
+            LocalTasteStore(context, account.userId), com.swpp.stylemate.data.usage.UsageMetrics.forAccount(context, account.userId)) }
     })
     val chatting by chat.visible.collectAsStateWithLifecycle()
 

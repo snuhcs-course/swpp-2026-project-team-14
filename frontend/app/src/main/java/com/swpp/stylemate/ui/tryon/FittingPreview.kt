@@ -30,6 +30,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.StrokeCap
@@ -98,6 +99,7 @@ internal fun PhotoFitting(outfit: Outfit, repository: FittingRepository, account
     val work = remember(context) { FittingWork(context) }
     val virtualModel = remember(profile) { VirtualFittingModels.closest(profile?.input) }
     var result by remember { mutableStateOf<Bitmap?>(null) }
+    var resultSource by remember { mutableStateOf<String?>(null) }
     var consent by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     var restoring by remember { mutableStateOf(false) }
@@ -151,6 +153,7 @@ internal fun PhotoFitting(outfit: Outfit, repository: FittingRepository, account
         if (busy) return
         busy = true
         result = null
+        resultSource = null
         failure = null
         saved = false
         scope.launch(Dispatchers.Main.immediate) {
@@ -204,7 +207,7 @@ internal fun PhotoFitting(outfit: Outfit, repository: FittingRepository, account
             try {
                 val output = try { repository.result(outfit, source) } catch (_: IOException) { null }
                 val cached = output?.let { decodeFitting(it) }
-                if (cached != null) { result = cached; saved = false }
+                if (cached != null) { resultSource = source; result = cached; saved = false }
                 else onMissing()
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (error: Exception) { failure = error.message ?: "피팅 결과를 읽지 못했어요." }
@@ -233,7 +236,10 @@ internal fun PhotoFitting(outfit: Outfit, repository: FittingRepository, account
                 if (task?.optString("state") == "failed") failure = task.optString("error")
                 if (!pending && task?.optString("state") != "failed") {
                     val source = initialSource ?: repository.latestSource(outfit)
-                    if (source != null) result = repository.result(outfit, source)?.let { decodeFitting(it) }
+                    if (source != null) {
+                        resultSource = source
+                        result = repository.result(outfit, source)?.let { decodeFitting(it) }
+                    }
                 }
                 restoring = false
                 if (pending) delay(1_000)
@@ -267,7 +273,10 @@ internal fun PhotoFitting(outfit: Outfit, repository: FittingRepository, account
                 else saveDocument.launch("StyleMate-${UUID.randomUUID()}.png")
             }, onConfirm = onClose, modifier = Modifier.weight(1f), saving = saving, saved = saved,
                 virtualModelLabel = virtualModel?.label, pending = pending, progress = progress,
-                notificationsEnabled = notificationSettings.enabled && FittingNotifications.allowed(context))
+                notificationsEnabled = notificationSettings.enabled && FittingNotifications.allowed(context),
+                onResultDisplayed = { resultSource?.let { source -> scope.launch {
+                    runCatching { work.displayed(repository.taskKey(outfit), account.userId, source) }
+                } } })
         }
     }
 }
@@ -317,7 +326,9 @@ internal fun PhotoFittingContent(
     pending: Boolean = false,
     progress: com.swpp.stylemate.data.tryon.FittingProgress? = null,
     notificationsEnabled: Boolean = true,
+    onResultDisplayed: () -> Unit = {},
 ) {
+    val displayed = remember(result) { java.util.concurrent.atomic.AtomicBoolean(false) }
     Box(modifier.fillMaxWidth().padding(20.dp), contentAlignment = Alignment.Center) {
         when {
             pending -> Column(horizontalAlignment = Alignment.CenterHorizontally,
@@ -335,7 +346,10 @@ internal fun PhotoFittingContent(
             }
             result != null -> Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(20.dp)) {
                 Image(result.asImageBitmap(), "생성된 피팅 이미지",
-                    Modifier.fillMaxWidth().weight(1f), contentScale = ContentScale.Fit)
+                    Modifier.fillMaxWidth().weight(1f).drawWithContent {
+                        drawContent()
+                        if (displayed.compareAndSet(false, true)) onResultDisplayed()
+                    }, contentScale = ContentScale.Fit)
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     OutlinedButton(onClick = onSaveResult, enabled = !saving && !saved,
                         modifier = Modifier.weight(1f).heightIn(min = 56.dp),
