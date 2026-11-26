@@ -34,7 +34,9 @@ class FittingWork(private val context: Context) {
                 manager.getWorkInfosForUniqueWork("fitting:$other").get().any { !it.state.isFinished }
             }
             if (active >= FittingTaskStore.MAX_ACTIVE) throw TooManyFittings()
-            tasks.create(key, owner, source, outfit, person())
+            val photo = person()
+            tasks.create(key, owner, source, outfit, photo)
+            if (VirtualFittingModels.all.none { it.sourceKey == source }) runCatching { smallJpeg(photo)?.let { tasks.savePreview(key, it) } }
             val work = OneTimeWorkRequestBuilder<FittingWorker>().setInputData(workDataOf("key" to key))
                 .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
                 .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST).build()
@@ -54,6 +56,20 @@ class FittingWork(private val context: Context) {
             } else tasks.deletePerson(key)
             tasks.read(key)
         }
+    }
+    /** The photo downscaled to about 720 px for the on-device preview. */
+    private fun smallJpeg(photo: ByteArray): ByteArray? {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(photo, 0, photo.size, bounds)
+        var sample = 1
+        while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= 720) sample *= 2
+        val bitmap = BitmapFactory.decodeByteArray(photo, 0, photo.size, BitmapFactory.Options().apply { inSampleSize = sample })
+            ?: return null
+        return try {
+            java.io.ByteArrayOutputStream().use { out ->
+                bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 85, out); out.toByteArray()
+            }
+        } finally { bitmap.recycle() }
     }
     companion object { private val enqueueLock = Mutex() }
 }

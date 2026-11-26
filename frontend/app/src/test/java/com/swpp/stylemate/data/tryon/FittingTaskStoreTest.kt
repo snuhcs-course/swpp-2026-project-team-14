@@ -102,4 +102,30 @@ class FittingTaskStoreTest {
         val old = org.json.JSONObject().put("owner", "me").put("state", "completed")
         assertNull(FittingTaskStore.cardTask(listOf(key to old), System.currentTimeMillis()))
     }
+
+    @Test fun theGalleryPreviewStaysOnlyUntilTheFittingIsSeen() {
+        val store = FittingTaskStore(temporary.root)
+        store.create(key, "me", "gallery", outfit, byteArrayOf(1, 2))
+        store.savePreview(key, byteArrayOf(9))
+        store.submitted(key, TryOnJob("12345678-1234-1234-1234-123456789012", "secret-token"))
+        assertFalse("the uploaded photo is still removed", temporary.root.resolve("$key.photo").exists())
+        assertArrayEquals("the small preview is kept for the loading screen and the card", byteArrayOf(9), store.preview(key))
+        store.finish(key)
+        store.pruneStalePreviews(System.currentTimeMillis())
+        assertArrayEquals("still there while the card offers the result", byteArrayOf(9), store.preview(key))
+        store.dismissCard(key)
+        assertNull("gone once the result has been seen", store.preview(key))
+    }
+
+    @Test fun stalePreviewsAndThoseOfANewFittingAreRemoved() {
+        val store = FittingTaskStore(temporary.root)
+        store.create(key, "me", "gallery", outfit, byteArrayOf(1))
+        store.savePreview(key, byteArrayOf(9))
+        store.create(key, "me", "gallery", outfit, byteArrayOf(2))
+        assertNull("a new fitting of the outfit replaces the earlier photo", store.preview(key))
+        store.savePreview(key, byteArrayOf(9))
+        store.finish(key)
+        store.pruneStalePreviews(System.currentTimeMillis() + FittingTaskStore.CARD_RECENT_MS + 60_000)
+        assertNull("not kept after the card stops offering the result", store.preview(key))
+    }
 }

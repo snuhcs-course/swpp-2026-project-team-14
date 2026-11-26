@@ -35,6 +35,7 @@ class FittingTaskStore(private val directory: File) {
     fun create(key: String, owner: String, source: String, outfit: Outfit, photo: ByteArray) = synchronized(lock) {
         require(photo.isNotEmpty())
         directory.mkdirs()
+        deletePreview(key)  // a new fitting of the same outfit replaces the earlier photo
         try {
             file(key, "photo").writeBytes(photo)
             val snapshot = JSONObject().put("id", outfit.id).put("key", outfit.key).put("name", outfit.name)
@@ -48,6 +49,22 @@ class FittingTaskStore(private val directory: File) {
         }
     }
     fun person(key: String): ByteArray = synchronized(lock) { file(key, "photo").readBytes() }
+    /**
+     * A small copy of a gallery photo being dressed, kept on this device only until that fitting has been
+     * seen, so the loading screen, the reveal and the card can show the person after the full photo is
+     * uploaded and deleted. Virtual models need none.
+     */
+    fun savePreview(key: String, jpeg: ByteArray) = synchronized(lock) { directory.mkdirs(); file(key, "preview").writeBytes(jpeg) }
+    fun preview(key: String): ByteArray? = synchronized(lock) { file(key, "preview").takeIf { it.isFile }?.readBytes() }
+    fun deletePreview(key: String) = synchronized(lock) { file(key, "preview").delete(); Unit }
+    /** Previews of fittings that finished longer ago than the card shows them are removed. */
+    fun pruneStalePreviews(now: Long) = synchronized(lock) {
+        directory.listFiles { f -> f.name.endsWith(".preview") }.orEmpty().forEach { preview ->
+            val data = read(preview.name.removeSuffix(".preview"))
+            val finished = data?.optString("state") in listOf("completed", "failed")
+            if (data == null || finished && (!data.has("finished_at") || now - data.getLong("finished_at") > CARD_RECENT_MS)) preview.delete()
+        }
+    }
     fun deletePerson(key: String) = synchronized(lock) { file(key, "photo").delete(); Unit }
     fun submitted(key: String, job: TryOnJob) = synchronized(lock) {
         val data = checkNotNull(read(key))
@@ -76,6 +93,7 @@ class FittingTaskStore(private val directory: File) {
     }
     /** The finished task's card was opened or closed, so it is not shown again. */
     fun dismissCard(key: String) = synchronized(lock) {
+        deletePreview(key)
         val data = read(key) ?: return@synchronized
         write(key, data.put("card_dismissed", true))
     }

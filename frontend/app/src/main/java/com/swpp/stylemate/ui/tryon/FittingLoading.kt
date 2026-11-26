@@ -104,7 +104,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
 /** The photo being dressed: the bundled virtual model, or the gallery photo while this screen keeps it. */
-internal data class FittingPerson(val image: ImageBitmap)
+internal data class FittingPerson(val image: ImageBitmap, val isModel: Boolean = false)
 
 /** easeInOutSine: the sweep slows gently at each end instead of snapping round. */
 private val SineInOut = CubicBezierEasing(.37f, 0f, .63f, 1f)
@@ -214,9 +214,16 @@ internal suspend fun virtualModelPreview(context: Context, source: String?): Fit
     val model = VirtualFittingModels.all.firstOrNull { it.sourceKey == source } ?: return null
     return withContext(Dispatchers.IO) {
         runCatching { context.assets.open(model.assetPath).use { BitmapFactory.decodeStream(it) }?.asImageBitmap() }
-            .getOrNull()?.let { FittingPerson(it) }
+            .getOrNull()?.let { FittingPerson(it, isModel = true) }
     }
 }
+
+/** The person of a fitting task: its virtual model, or the device-only preview of its gallery photo. */
+internal suspend fun fittingPerson(context: Context, tasks: FittingTaskStore, key: String, source: String?): FittingPerson? =
+    virtualModelPreview(context, source) ?: withContext(Dispatchers.IO) {
+        runCatching { tasks.preview(key)?.let { BitmapFactory.decodeByteArray(it, 0, it.size) }?.asImageBitmap() }
+            .getOrNull()?.let { FittingPerson(it) }
+    }
 
 /**
  * Design C: while a fitting of [owner] is being made, a small card over the tabs shows its real progress, and
@@ -237,16 +244,21 @@ internal fun FittingProgressCard(owner: String, onOpen: (String) -> Unit, modifi
         while (resumed) {
             try {
                 // state() also closes a task whose background work died, so every running one is checked first.
-                val tasks = withContext(Dispatchers.IO) { work.tasks.all(owner) }
+                val tasks = withContext(Dispatchers.IO) { work.tasks.pruneStalePreviews(System.currentTimeMillis()); work.tasks.all(owner) }
                 FittingTaskStore.running(tasks).forEach { (key, _) -> work.state(key) }
                 summary = withContext(Dispatchers.IO) {
                     FittingTaskStore.cardSummary(work.tasks.all(owner), System.currentTimeMillis())
                 }
-                val source = summary?.shown?.second?.optString("source")
-                if (source != null && avatar?.first != source) avatar = source to virtualModelPreview(context, source)
+                summary?.shown?.let { (shownKey, data) ->
+                    // Keyed by this fitting (an outfit can be fitted again on someone else), and read again
+                    // until the gallery preview, saved just after the task, is there.
+                    val id = "$shownKey:${data.optLong("created_at")}"
+                    if (avatar?.first != id || avatar?.second == null) avatar = id to fittingPerson(context, work.tasks, shownKey, data.optString("source"))
+                }
                 val shown = summary?.shown
-                if (shown != null && shown.second.optString("state") == "completed" && thumbnail?.first != shown.first && account != null)
-                    thumbnail = shown.first to resultThumbnail(context, account, shown.second)
+                val done = shown?.let { "${it.first}:${it.second.optLong("finished_at")}" }
+                if (shown != null && shown.second.optString("state") == "completed" && thumbnail?.first != done && account != null)
+                    thumbnail = done!! to resultThumbnail(context, account, shown.second)
             } catch (error: CancellationException) { throw error }
             catch (_: Exception) { summary = null }
             delay(1_000)
@@ -307,15 +319,18 @@ internal fun FittingProgressCard(owner: String, onOpen: (String) -> Unit, modifi
                 CircularProgressIndicator(progress = { fraction }, Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.primary,
                     strokeWidth = 2.5.dp, trackColor = MaterialTheme.colorScheme.outlineVariant, gapSize = 0.dp)
             }
-            val picture = thumbnail?.takeIf { it.first == key && state == "completed" }?.second
-            val face = avatar?.second?.image
+            val picture = thumbnail?.takeIf { it.first == "$key:${data.optLong("finished_at")}" && state == "completed" }?.second
+            val person = avatar?.takeIf { it.first == "$key:${data.optLong("created_at")}" }?.second
+            val face = person?.image
             val inner = Modifier.size(38.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceContainerLow)
             // A finished fitting shows its own picture; while one is made, the model's face.
             if (picture != null) Image(picture, "완성된 피팅 이미지", Modifier.size(36.dp, 48.dp).clip(RoundedCornerShape(8.dp))
                 .background(MaterialTheme.colorScheme.surfaceContainerLow), contentScale = ContentScale.Crop, alignment = Alignment.TopCenter)
             else if (face != null) Box(inner) {
+                // A model photo is full length, so it is zoomed in on the face; a gallery photo is shown as it is.
+                val zoom = if (person.isModel) 2.4f else 1.3f
                 Image(face, null, Modifier.fillMaxSize().graphicsLayer {
-                    scaleX = 2.4f; scaleY = 2.4f; transformOrigin = TransformOrigin(.5f, .12f)
+                    scaleX = zoom; scaleY = zoom; transformOrigin = TransformOrigin(.5f, .12f)
                 }, contentScale = ContentScale.Crop, alignment = Alignment.TopCenter)
             } else Box(inner, contentAlignment = Alignment.Center) {
                 Icon(if (state == "completed") Icons.Filled.Check else Icons.Filled.Person, null, Modifier.size(20.dp))

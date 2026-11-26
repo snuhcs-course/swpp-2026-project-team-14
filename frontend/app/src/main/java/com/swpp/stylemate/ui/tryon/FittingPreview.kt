@@ -112,6 +112,8 @@ internal fun PhotoFitting(outfit: Outfit, repository: FittingRepository, account
     var watch by remember { mutableStateOf(0) }
     // A result that has just been made is revealed from the top over the photo before fitting.
     var revealing by remember { mutableStateOf(false) }
+    // Trying the outfit again on another photo or person: the choice skips the result already kept.
+    var retrying by remember { mutableStateOf(false) }
     var notificationSettings by remember { mutableStateOf(FittingNotificationSettings()) }
     var changingNotification by remember { mutableStateOf(false) }
     var requestingNotificationPermission by remember { mutableStateOf(false) }
@@ -164,6 +166,7 @@ internal fun PhotoFitting(outfit: Outfit, repository: FittingRepository, account
                     person().also { bytes -> personPreview = virtualModelPreview(context, source) ?: previewOf(bytes)?.let { FittingPerson(it) } }
                 }
                 // Stay on the fitting screen and show the loading screen until it is closed or done.
+                retrying = false
                 pending = true
                 progress = null
                 watch++
@@ -209,7 +212,7 @@ internal fun PhotoFitting(outfit: Outfit, repository: FittingRepository, account
         failure = null
         scope.launch(Dispatchers.Main.immediate) {
             try {
-                val output = try { repository.result(outfit, source) } catch (_: IOException) { null }
+                val output = if (retrying) null else try { repository.result(outfit, source) } catch (_: IOException) { null }
                 val cached = output?.let { decodeFitting(it) }
                 if (cached != null) { result = cached; saved = false }
                 else onMissing()
@@ -240,7 +243,7 @@ internal fun PhotoFitting(outfit: Outfit, repository: FittingRepository, account
                 val running = task?.optString("state") in listOf("queued", "running")
                 if (running) { pending = true; waited = true }
                 progress = task?.let(com.swpp.stylemate.data.tryon.FittingTaskStore::progress)
-                if (running && personPreview == null) personPreview = virtualModelPreview(context, task?.optString("source"))
+                if (running && personPreview == null) personPreview = fittingPerson(context, work.tasks, key, task?.optString("source"))
                 if (task?.optString("state") == "failed") {
                     failure = task.optString("error")
                     runCatching { work.tasks.dismissCard(key) }  // seen here, as for a result
@@ -251,7 +254,7 @@ internal fun PhotoFitting(outfit: Outfit, repository: FittingRepository, account
                     // Opened from the card or the notification: the fitting has just been made, so it is revealed too.
                     val fresh = waited || (initialSource != null && task?.optString("state") == "completed" &&
                         !task.optBoolean("card_dismissed"))
-                    if (fresh && personPreview == null) personPreview = virtualModelPreview(context, source)
+                    if (fresh && personPreview == null) personPreview = fittingPerson(context, work.tasks, key, task?.optString("source") ?: source)
                     if (source != null) result = repository.result(outfit, source)?.let { decodeFitting(it) }
                     revealing = fresh && result != null
                     // Seen here, so the floating card over the tabs does not offer it again.
@@ -284,14 +287,25 @@ internal fun PhotoFitting(outfit: Outfit, repository: FittingRepository, account
                     picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                 }
             }, onChooseVirtual = {
-                if (virtualModel == null) needsBody = true else useVirtual(virtualModel)
+                // Trying again lets any body be chosen, not only the one closest to the profile.
+                if (virtualModel == null || retrying) needsBody = true else useVirtual(virtualModel)
             }, onSaveResult = {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) saveResult()
                 else saveDocument.launch("StyleMate-${UUID.randomUUID()}.png")
             }, onConfirm = onClose, modifier = Modifier.weight(1f), saving = saving, saved = saved,
                 virtualModelLabel = virtualModel?.label, pending = pending, progress = progress,
                 notificationsEnabled = notificationSettings.enabled && FittingNotifications.allowed(context),
-                outfit = outfit, person = personPreview, revealing = revealing, onRevealed = { revealing = false })
+                outfit = outfit, person = personPreview, revealing = revealing, onRevealed = { revealing = false },
+                onRetry = {
+                    retrying = true; result = null; revealing = false; personPreview = null; failure = null; saved = false
+                },
+                onBackToResult = if (!retrying) null else {{
+                    retrying = false
+                    scope.launch {
+                        val source = repository.latestSource(outfit)
+                        result = source?.let { repository.result(outfit, it) }?.let { decodeFitting(it) }
+                    }
+                }}, retrying = retrying)
         }
     }
 }
@@ -345,6 +359,9 @@ internal fun PhotoFittingContent(
     person: FittingPerson? = null,
     revealing: Boolean = false,
     onRevealed: () -> Unit = {},
+    onRetry: (() -> Unit)? = null,
+    onBackToResult: (() -> Unit)? = null,
+    retrying: Boolean = false,
 ) {
     val image = remember(result) { result?.asImageBitmap() }
     // Waiting, the reveal and the result are one panel that carries on, so nothing jumps between them.
@@ -359,6 +376,7 @@ internal fun PhotoFittingContent(
         when {
             shown == "panel" -> FittingScanLoading(outfit, person, progress, notificationsEnabled, onConfirm,
                 result = if (pending) null else image, reveal = revealing, onRevealed = onRevealed, resultActions = {
+                    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         OutlinedButton(onClick = onSaveResult, enabled = !saving && !saved,
                             modifier = Modifier.weight(1f).heightIn(min = 56.dp),
@@ -366,6 +384,8 @@ internal fun PhotoFittingContent(
                         Button(onClick = onConfirm, enabled = !saving,
                             modifier = Modifier.weight(1f).heightIn(min = 56.dp),
                             shape = MaterialTheme.shapes.medium) { Text("확인") }
+                    }
+                    if (onRetry != null) TextButton(onClick = onRetry, enabled = !saving) { Text("다른 사진이나 모델로 입혀보기") }
                     }
                 })
             shown == "busy" -> Column(horizontalAlignment = Alignment.CenterHorizontally,
@@ -376,7 +396,7 @@ internal fun PhotoFittingContent(
             else -> Column(Modifier.verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(20.dp)) {
                 failure?.let { Text(it, textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.error) }
-                Text("어떤 사진으로 입혀볼까요?", style = MaterialTheme.typography.titleMedium)
+                Text(if (retrying) "이번에는 누구에게 입혀볼까요?" else "어떤 사진으로 입혀볼까요?", style = MaterialTheme.typography.titleMedium)
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     OutlinedButton(onClick = onChoosePhoto, modifier = Modifier.weight(1f).heightIn(min = 136.dp),
                         shape = MaterialTheme.shapes.medium) {
@@ -384,9 +404,10 @@ internal fun PhotoFittingContent(
                     }
                     Button(onClick = onChooseVirtual, modifier = Modifier.weight(1f).heightIn(min = 136.dp),
                         shape = MaterialTheme.shapes.medium) {
-                        Text("내 체형과 비슷한\n가상 모델에게 입히기", textAlign = TextAlign.Center)
+                        Text(if (retrying) "다른 가상 모델\n고르기" else "내 체형과 비슷한\n가상 모델에게 입히기", textAlign = TextAlign.Center)
                     }
                 }
+                if (onBackToResult != null) TextButton(onClick = onBackToResult) { Text("이전 결과 보기") }
                 Text(if (virtualModelLabel == null) "가상 모델은 성별·키·몸무게만 입력해도 이용할 수 있어요."
                     else "가상 모델: $virtualModelLabel", textAlign = TextAlign.Center,
                     style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
