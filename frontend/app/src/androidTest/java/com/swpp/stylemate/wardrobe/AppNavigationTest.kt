@@ -61,12 +61,12 @@ class AppNavigationTest {
     @Test fun profileHasLogoutAndNoGuestLoginActions() {
         var loggedOut = false
         compose.setContent { StyleMateTheme {
-            MyProfileScreen(null, StyleProfile(), { null }, {}, {}, username = "member_1", onLogout = { loggedOut = true }, onImport = {})
+            MyProfileScreen(null, StyleProfile(), { null }, {}, {}, username = "member_1", onLogout = { loggedOut = true })
         } }
         compose.onNodeWithText("member_1").assertDoesNotExist()
         compose.onNodeWithText("MY").assertIsDisplayed()
         compose.onNodeWithContentDescription("이 기기의 데이터 가져오기").assertDoesNotExist()
-        compose.onNodeWithText("이 기기의 기존 데이터 가져오기").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("이 기기의 기존 데이터 가져오기").assertDoesNotExist()  // login-only: no guest import (#95)
         compose.onNodeWithText("계정 설정").performScrollTo().performClick()
         compose.onNodeWithText("member_1").assertIsDisplayed()
         compose.onNodeWithText("내 정보를 계정에 보관하세요").assertDoesNotExist()
