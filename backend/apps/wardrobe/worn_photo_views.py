@@ -13,6 +13,8 @@ from django.views.decorators.http import require_GET, require_POST
 
 from apps.users.auth import require_auth
 from apps.users.models import User
+from apps.usage.models import RatingTask
+from apps.usage.ratings import should_prompt
 from recommendation.labeling import label
 from .analysis import AnalysisError, MAX_IMAGE_BYTES, model_name, prepare_image
 from .editor import validate_record
@@ -236,4 +238,5 @@ def save(request, photo_id):
                 garment.saved = True
                 garment.save(update_fields=[*record, 'image', 'image_source', 'estimated_dimensions', 'saved', 'updated_at'])
             items.append(serialize(garment))
-    return private_json({'items': items})
+    # 착용 사진 배치 등록이 끝났을 때 별점 팝업 여부 (배치 전체에 한 번)
+    return private_json({'items': items, 'rating_prompt': should_prompt(request.user, RatingTask.GARMENT_REGISTRATION)})

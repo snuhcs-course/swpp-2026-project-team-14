@@ -73,12 +73,14 @@ class WornBatchViewModel internal constructor(
     private val requestGeneration: suspend (String, String, JSONObject?) -> JSONObject,
     private val onAttempt: () -> Unit = {},
     private val onFailure: (String) -> Unit = {},
+    private val onRatingPrompt: () -> Unit = {},
 ) : ViewModel() {
-    constructor(account: AccountAccess, onAttempt: () -> Unit = {}, onFailure: (String) -> Unit = {}) : this(
+    constructor(account: AccountAccess, onAttempt: () -> Unit = {}, onFailure: (String) -> Unit = {},
+                onRatingPrompt: () -> Unit = {}) : this(
         { bytes, id -> WornPhotoRepository.upload(account, bytes, id) },
         { id, action, body -> WornPhotoRepository.request(account, id, action, body) },
         { id, action, body -> WornGenerationRepository.request(account, id, action, body) },
-        onAttempt, onFailure,
+        onAttempt, onFailure, onRatingPrompt,
     )
     private val mutable = MutableStateFlow(WornBatchState())
     val state = mutable.asStateFlow()
@@ -241,6 +243,8 @@ class WornBatchViewModel internal constructor(
         val result = requestPhoto(state.photo!!.getString("id"), "save",
             JSONObject().put("items", JSONArray(rows)))
         mutable.value = mutable.value.copy(savedCount = result.getJSONArray("items").length())
+        // 배치 전체에 한 번만 묻는다.
+        if (result.optBoolean("rating_prompt")) onRatingPrompt()
     }
 
     fun reset() {

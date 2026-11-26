@@ -51,7 +51,7 @@ import kotlin.math.min
 
 @Composable
 fun WornRegistration(account: AccountAccess, onBack: () -> Unit, onBatchSaved: () -> Unit,
-                     onAttempt: () -> Unit = {}, onFailure: (String) -> Unit = {}) {
+                     onAttempt: () -> Unit = {}, onFailure: (String) -> Unit = {}, onRatingPrompt: () -> Unit = {}) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var reading by remember { mutableStateOf(false) }
@@ -62,7 +62,7 @@ fun WornRegistration(account: AccountAccess, onBack: () -> Unit, onBatchSaved: (
     var catalogError by remember { mutableStateOf<String?>(null) }
     val store = remember(account.userId) { LocalUserStore.forContext(context, account.userId) }
     val model: WornBatchViewModel = viewModel(key = "worn-batch", factory = viewModelFactory {
-        initializer { WornBatchViewModel(account, onAttempt, onFailure) }
+        initializer { WornBatchViewModel(account, onAttempt, onFailure, onRatingPrompt) }
     })
     val state by model.state.collectAsStateWithLifecycle()
     val busy = state.busy || reading

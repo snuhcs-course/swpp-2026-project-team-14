@@ -431,6 +431,8 @@ class WardrobePersistenceTests(AnalysisEndpointTests):
         response = self.client.put(url, json.dumps(payload), content_type='application/json')
         self.assertEqual(response.status_code, 200)
         record = response.json()
+        # 저장 응답에만 붙는 별점 팝업 여부를 떼면 나머지는 조회 결과와 같은 옷 레코드다.
+        self.assertIsInstance(record.pop('rating_prompt'), bool)
         self.assertTrue(record['saved'])
         self.assertEqual(record['attributes']['colors'], ['#FFFFFF', '#A12B3C'])
         self.assertEqual(Garment.objects.get(pk=item_id).attributes['colors'], ['#FFFFFF', '#A12B3C'])

@@ -12,6 +12,7 @@ from django.views.decorators.http import require_POST
 from apps.users.auth import require_auth
 
 from .models import UsageEvent
+from .ratings import save_rating, validate_rating
 
 MAX_BATCH = 25
 MAX_BYTES = 32 * 1024
@@ -31,6 +32,12 @@ def validate_event(data):
         raise ValueError('Invalid event fields')
     for key in ('id', 'attempt_id', 'session_id'):
         _uuid(data[key])
+    if data['name'] == 'task_rating':
+        stamp = parse_datetime(data['occurred_at']) if isinstance(data['occurred_at'], str) else None
+        if stamp is None or timezone.is_naive(stamp) or stamp > timezone.now() + timedelta(minutes=10):
+            raise ValueError('Invalid event time')
+        # 별점은 측정 이벤트가 아니라 metrics/no_seen에 저장하므로 검사도 따로 한다.
+        return validate_rating(data, stamp)
     if data['name'] not in NAMES or data['phase'] not in ('started', 'generated', 'finished'):
         raise ValueError('Invalid event type')
     phase = data['phase']
@@ -85,6 +92,9 @@ def collect(request):
     with transaction.atomic():
         # An event id and an attempt phase are immutable, even if a client retries after losing a response.
         for event in events:
+            if event['name'] == 'task_rating':
+                save_rating(request.user, event)
+                continue
             if UsageEvent.objects.filter(pk=event['id']).exists():
                 continue
             UsageEvent.objects.get_or_create(user=request.user, attempt_id=event['attempt_id'], phase=event['phase'], defaults={

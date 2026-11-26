@@ -55,6 +55,10 @@ class FittingTaskStore(private val directory: File) {
         if (data.optString("state") !in listOf("queued", "running")) return@synchronized
         write(key, data.put("stage", progress.stage).put("progress", progress.fraction.toDouble()).put("status", progress.text))
     }
+    /** 서버가 준 별점 팝업 여부. 결과를 처음 보여 줄 때 한 번 쓰고 false로 바꾼다. */
+    fun ratingPrompt(key: String, value: Boolean) = synchronized(lock) {
+        read(key)?.let { write(key, it.put("rating_prompt", value)) }
+    }
     fun finish(key: String, error: String? = null) = synchronized(lock) {
         val data = checkNotNull(read(key))
         data.remove("job_id"); data.remove("job_token")

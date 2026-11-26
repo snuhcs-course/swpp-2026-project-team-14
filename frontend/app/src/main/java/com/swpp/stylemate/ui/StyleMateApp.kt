@@ -299,6 +299,7 @@ private fun MainTabs(viewModel: BodyProfileViewModel, authModel: AuthViewModel) 
         } }
     }
     if (chatting) ChatRoute(chat)
+    com.swpp.stylemate.ui.components.RatingPromptHost(account.userId)
     }
 }
 

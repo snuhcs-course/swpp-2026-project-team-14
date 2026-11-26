@@ -26,7 +26,8 @@ data class Outfit(
     val createdAt: String,
 )
 
-data class Recommendation(val outfits: List<Outfit>, val notes: List<String>, val band: String)
+data class Recommendation(val outfits: List<Outfit>, val notes: List<String>, val band: String,
+                          val ratingPrompt: Boolean = false)
 
 data class ExternalAttributes(val category: String, val color: String, val fit: String)
 
@@ -236,6 +237,7 @@ class OutfitRepository(private val account: AccountAccess) {
                 outfits = (0 until outfits.length()).map { parseOutfit(outfits.getJSONObject(it)) },
                 notes = (0 until notes.length()).map { notes.getString(it) },
                 band = json.optJSONObject("band")?.optString("label").orEmpty(),
+                ratingPrompt = json.optBoolean("rating_prompt"),
             )
         }
 
