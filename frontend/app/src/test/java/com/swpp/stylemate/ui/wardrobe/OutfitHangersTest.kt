@@ -50,12 +50,22 @@ class OutfitHangersTest {
     }
 
     @Test fun garmentsShareOneRealScaleWhateverTheirPhotos() {
-        // A long-sleeved top (narrow shoulders in a wide photo) and wide trousers.
-        val longSleeve = GarmentHangingShape(aspectRatio = 1.3f, left = .3f, right = .7f)
-        val wideLegs = GarmentHangingShape(aspectRatio = .6f, left = .2f, right = .8f, supportY = .02f)
-        val layout = dressedLayout(400f, 2000f, null, longSleeve, wideLegs)
-        val shoulders = layout.getValue("top").width * .4f
-        val waist = layout.getValue("bottom").width * .6f
-        assertEquals("shoulders : waist = 44 : 38", TOP_SHOULDER_CM / WAIST_CM, shoulders / waist, .01f)
+        // A wide long-sleeved top and long trousers: their drawn heights keep the real 68 : 100 ratio.
+        val longSleeve = GarmentHangingShape(aspectRatio = 1.4f)
+        val trousers = GarmentHangingShape(aspectRatio = .45f, supportY = .02f)
+        val layout = dressedLayout(400f, 2000f, null, longSleeve, trousers, topCm = 68f, bottomCm = 100f)
+        assertEquals(68f / 100f, layout.getValue("top").height / layout.getValue("bottom").height, .01f)
+    }
+
+    @Test fun aShortJacketIsNeverNarrowerThanTheShirtUnderIt() {
+        val slimJacket = GarmentHangingShape(aspectRatio = .8f)
+        val wideShirt = GarmentHangingShape(aspectRatio = 1.3f)
+        val layout = dressedLayout(400f, 2000f, slimJacket, wideShirt, jeans, outerCm = 62f, topCm = 74f, bottomCm = 100f)
+        assertTrue(layout.getValue("outerwear").width >= layout.getValue("top").width * OUTER_OVER_TOP - .5f)
+    }
+
+    @Test fun aCoatIsDrawnLongerThanATee() {
+        val layout = dressedLayout(400f, 2000f, jacket, tee, jeans, outerCm = 100f, topCm = 68f, bottomCm = 100f)
+        assertTrue(layout.getValue("outerwear").height > layout.getValue("top").height * 1.4f)
     }
 }

@@ -46,21 +46,20 @@ internal fun defaultShape(slot: String) = when (slot) {
     else -> GarmentHangingShape(aspectRatio = 1.05f)
 }
 
-/** Real widths (cm) the figure is built from, so a tee, a coat and trousers keep their true proportions. */
-internal const val TOP_SHOULDER_CM = 44f
-internal const val OUTER_SHOULDER_CM = 48f
-internal const val WAIST_CM = 38f
-
-/** The anchor width of a garment as a share of its photo: shoulders for tops, waistband for bottoms. */
-private fun anchorShare(shape: GarmentHangingShape) = (shape.right - shape.left).coerceIn(.2f, .95f)
+/** Lengths (cm) used when the server sends none: an ordinary top, jacket and full-length trousers. */
+internal fun fallbackLengthCm(slot: String) = when (slot) {
+    "bottom" -> 98f
+    "outerwear" -> 66f
+    else -> 67f
+}
 
 /**
  * Where each garment of an outfit sits in design B (홈 and 코디북), in px inside a [width] × [height]
- * figure. Every garment is sized at one shared scale from its real anchor width (shoulders, waistband)
- * measured on its own cutout, so long sleeves or wide legs no longer make one garment look too big or
- * small. It is a styled flat-lay: the outerwear lies behind on the left (tilted by [OUTER_TILT]), the top
- * overlaps it in front on the right, and the bottom's waist sits just under the top's hem. The figure is
- * scaled to fit and centred.
+ * figure. Every garment is drawn at one shared scale from its real length (cm, from the server: measured,
+ * length label or typical for its kind), and its width follows from its own photo's proportions, so a coat
+ * stays longer than a tee and trousers keep a real length next to them. It is a styled flat-lay: the
+ * outerwear lies behind on the left (tilted by [OUTER_TILT]), the top overlaps it in front on the right,
+ * and the bottom's waist sits just under the top's hem. The figure is scaled to fit and centred.
  */
 internal fun dressedLayout(
     width: Float,
@@ -68,20 +67,28 @@ internal fun dressedLayout(
     outer: GarmentHangingShape?,
     top: GarmentHangingShape?,
     bottom: GarmentHangingShape?,
+    outerCm: Float = fallbackLengthCm("outerwear"),
+    topCm: Float = fallbackLengthCm("top"),
+    bottomCm: Float = fallbackLengthCm("bottom"),
 ): Map<String, Rect> {
     val layered = outer != null && top != null
-    // Sizes in cm: photo width = real anchor width / the anchor's share of the photo.
-    val outerW = outer?.let { OUTER_SHOULDER_CM / anchorShare(it) } ?: 0f
-    val topW = top?.let { TOP_SHOULDER_CM / anchorShare(it) } ?: 0f
-    val bottomW = bottom?.let { WAIST_CM / anchorShare(it) } ?: 0f
-    val outerH = outer?.let { outerW / it.aspectRatio } ?: 0f
-    val topH = top?.let { topW / it.aspectRatio } ?: 0f
-    val bottomH = bottom?.let { bottomW / it.aspectRatio } ?: 0f
+    // Sizes in cm: real length, and the width the photo's proportions give at that length.
+    var outerH = if (outer != null) outerCm else 0f
+    val topH = if (top != null) topCm else 0f
+    val bottomH = if (bottom != null) bottomCm else 0f
+    var outerW = outer?.let { outerH * it.aspectRatio } ?: 0f
+    val topW = top?.let { topH * it.aspectRatio } ?: 0f
+    // Outerwear is worn over the top, so it is never drawn narrower than it.
+    if (layered && outerW < topW * OUTER_OVER_TOP) {
+        val grow = topW * OUTER_OVER_TOP / outerW
+        outerW *= grow; outerH *= grow
+    }
+    val bottomW = bottom?.let { bottomH * it.aspectRatio } ?: 0f
     // Neck/waist centre lines in cm from the figure's middle.
-    val outerX = if (layered) -13f else 0f
-    val topX = if (layered) 11f else 0f
+    val outerX = if (layered) -12f else 0f
+    val topX = if (layered) 12f else 0f
     val bottomX = if (top != null) topX - 3f else outerX
-    val topY = if (layered) outerH * .1f else 0f
+    val topY = if (layered) 6f else 0f  // a top shows a little below the jacket's collar
     val waistY = when {
         top != null -> topY + topH * .86f
         outer != null -> outerH * .62f
@@ -104,6 +111,9 @@ internal fun dressedLayout(
         Rect(Offset(shiftX + r.left * scale, shiftY + r.top * scale), Size(r.width * scale, r.height * scale))
     }
 }
+
+/** How much wider than the top a layered outerwear is drawn at least. */
+internal const val OUTER_OVER_TOP = 1.05f
 
 /** The outerwear lies back at a slight angle when a top is laid over it. */
 internal const val OUTER_TILT = -5f
@@ -189,7 +199,9 @@ internal fun OutfitDressed(
             val density = LocalDensity.current
             val widthPx = with(density) { maxWidth.toPx() }
             val heightPx = with(density) { (maxHeight - 14.dp).toPx() }
-            val layout = dressedLayout(widthPx, heightPx, shapeOf(outer), shapeOf(top), shapeOf(bottom))
+            fun cm(garment: OutfitGarment?, slot: String) = garment?.lengthCm ?: fallbackLengthCm(slot)
+            val layout = dressedLayout(widthPx, heightPx, shapeOf(outer), shapeOf(top), shapeOf(bottom),
+                cm(outer, "outerwear"), cm(top, "top"), cm(bottom, "bottom"))
             val shadowBrush = remember { Brush.radialGradient(listOf(Color.Black.copy(alpha = .08f), Color.Transparent)) }
             val lowest = layout.values.maxOfOrNull { it.bottom } ?: heightPx
             Canvas(Modifier.fillMaxSize()) {
