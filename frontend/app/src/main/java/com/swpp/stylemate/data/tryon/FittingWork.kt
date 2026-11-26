@@ -12,6 +12,8 @@ import com.swpp.stylemate.data.usage.UsageMetrics
 import com.swpp.stylemate.data.usage.usageErrorCode
 import com.swpp.stylemate.data.recommendation.Outfit
 import com.swpp.stylemate.data.wardrobe.WardrobeRepository
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.async
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
@@ -99,18 +101,24 @@ class FittingWorker internal constructor(context: Context, parameters: WorkerPar
                 check(outfit.items.none { it.slot == "outerwear" } || slots.all { slot -> outfit.items.any { it.slot == slot } }) {
                     "아우터 피팅에는 상의와 하의가 모두 필요해요."
                 }
-                for (slot in slots) {
-                    val item = outfit.items.firstOrNull { it.slot == slot } ?: continue
+                // The garment photos are independent downloads: fetch them together, keep the slot order.
+                val picked = slots.mapNotNull { slot -> outfit.items.firstOrNull { it.slot == slot }?.let { slot to it } }
+                val images = kotlinx.coroutines.coroutineScope {
+                    picked.map { (_, item) -> async {
+                        WardrobeRepository.fittingImage(records.getValue(item.garmentId).getString("image_url"), account, apiBaseUrl)
+                    } }.awaitAll()
+                }
+                picked.forEachIndexed { index, (slot, item) ->
                     val record = records.getValue(item.garmentId)
-                    val image = WardrobeRepository.fittingImage(record.getString("image_url"), account, apiBaseUrl)
                     clothes.add(TryOnGarment(
                         when (slot) { "top" -> "tops"; "bottom" -> "bottoms"; else -> "outerwear" },
-                        image, if (record.optString("image_source") == "worn_crop") "model" else "flat-lay",
+                        images[index], if (record.optString("image_source") == "worn_crop") "model" else "flat-lay",
                     ))
                 }
             }
             TryOnClient(account, apiBaseUrl).fit(person, clothes, true, resumeJob = resumed,
                 onSubmitted = { tasks.submitted(key, it) }, keepForResume = true,
+                onProgress = { tasks.progress(key, it) },
                 onResult = { image ->
                     val bitmap = BitmapFactory.decodeByteArray(image, 0, image.size) ?: error("피팅 결과를 읽지 못했어요.")
                     bitmap.recycle()

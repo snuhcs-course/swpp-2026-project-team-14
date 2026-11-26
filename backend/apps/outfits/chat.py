@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from threading import BoundedSemaphore
 
 from django.utils import timezone
@@ -13,7 +13,7 @@ from apps.body_profiles.profile import body_or_unknown
 from apps.users.auth import require_auth
 from apps.usage.recording import record_recommendations
 from apps.wardrobe.models import Garment
-from recommendation import chat_intent, intent, season, trip, weather
+from recommendation import chat_intent, chat_reasons, intent, season, trip, weather
 from recommendation.search import RecommendError, Request, recommend
 from recommendation.stylist import _want_score
 from recommendation.vocab import WARDROBE_CATEGORY
@@ -246,7 +246,14 @@ def process(garments, body, current_ids, locked, directions, text, history, pref
         message += ' 아우터는 뺐어요.'
     if new_locked:
         message += ' 잠근 옷은 그대로 유지했어요.'
+    planned = None
+    if context.get('place') and context.get('day'):
+        today = datetime.now(trip.KST).date()
+        planned = f"{trip.day_label(date.fromisoformat(context['day']), today)} {context['place']}"
+    changes = chat_reasons.reasons(before, selected, extraction['wants'], target_colors=extraction['target_colors'],
+                                   avoid_colors=extraction['avoid_colors'], targets=targets, requested=requested,
+                                   removed_outerwear=bool(removed), plan_label=planned)
     context = {**context, 'pref_fit': pref_fit, 'styles': styles}
     out = preview(garments, selected, context, changed['reasons'], changed['key'])
     return response('updated', message, outfit=out, changed_ids=changed_ids, locked_ids=new_locked,
-                    notes=notes + result['notes'])
+                    notes=notes + result['notes'], changes=changes)

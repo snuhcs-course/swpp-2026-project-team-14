@@ -49,13 +49,10 @@ import com.swpp.stylemate.data.LocalBodyProfileStore
 import com.swpp.stylemate.data.AccountAccess
 import com.swpp.stylemate.data.AuthRepository
 import com.swpp.stylemate.data.KeystoreSessionStore
-import com.swpp.stylemate.data.GuestImportRepository
 import com.swpp.stylemate.data.chat.ChatRepository
 import com.swpp.stylemate.data.recommendation.LocalTasteStore
 import com.swpp.stylemate.ui.chat.ChatRoute
 import com.swpp.stylemate.ui.chat.ChatViewModel
-import com.swpp.stylemate.ui.profile.GuestImportViewModel
-import com.swpp.stylemate.ui.profile.GuestImportDialog
 import com.swpp.stylemate.data.LocalUserStore
 import com.swpp.stylemate.BuildConfig
 import com.swpp.stylemate.ui.profile.AuthViewModel
@@ -144,12 +141,7 @@ fun StyleMateApp(viewModel: BodyProfileViewModel? = null, authModel: AuthViewMod
             key(scope) {
                 val profileModel = viewModel ?: defaultBodyProfileViewModel(account)
                 LaunchedEffect(auth.session?.user?.json()?.toString()) { profileModel.refreshAccountProfile() }
-                val importModel: GuestImportViewModel = viewModel(factory = viewModelFactory {
-                    initializer { GuestImportViewModel(GuestImportRepository(LocalUserStore.legacyGuestForContext(context), account)) }
-                })
-                AppContent(profileModel, authModel, importModel)
-                val importing by importModel.state.collectAsStateWithLifecycle()
-                GuestImportDialog(importing, importModel::confirm, importModel::decide, importModel::retry, importModel::close)
+                AppContent(profileModel, authModel)
                 com.swpp.stylemate.ui.tryon.FittingNotificationResult(fittingTask, account, onFittingHandled)
             }
         }
@@ -161,7 +153,7 @@ fun StyleMateApp(viewModel: BodyProfileViewModel? = null, authModel: AuthViewMod
 }
 
 @Composable
-private fun AppContent(viewModel: BodyProfileViewModel, authModel: AuthViewModel, importModel: GuestImportViewModel) {
+private fun AppContent(viewModel: BodyProfileViewModel, authModel: AuthViewModel) {
     val app by viewModel.app.collectAsStateWithLifecycle()
     val onboarding by viewModel.onboarding.collectAsStateWithLifecycle()
     if (app.storageError != null) {
@@ -178,7 +170,7 @@ private fun AppContent(viewModel: BodyProfileViewModel, authModel: AuthViewModel
     } else if (app.setupVisible) {
         ProfileSetupFlow(viewModel, canCancel = true)
     } else {
-        MainTabs(viewModel, authModel, importModel)
+        MainTabs(viewModel, authModel)
     }
 }
 
@@ -222,7 +214,7 @@ private fun ProfileSetupFlow(viewModel: BodyProfileViewModel, canCancel: Boolean
 }
 
 @Composable
-private fun MainTabs(viewModel: BodyProfileViewModel, authModel: AuthViewModel, importModel: GuestImportViewModel) {
+private fun MainTabs(viewModel: BodyProfileViewModel, authModel: AuthViewModel) {
     var wardrobeRevision by rememberSaveable { mutableStateOf(0) }
     val app by viewModel.app.collectAsStateWithLifecycle()
     val auth by authModel.state.collectAsStateWithLifecycle()
@@ -242,10 +234,6 @@ private fun MainTabs(viewModel: BodyProfileViewModel, authModel: AuthViewModel, 
             LocalTasteStore(context, account.userId), com.swpp.stylemate.data.usage.UsageMetrics.forAccount(context, account.userId)) }
     })
     val chatting by chat.visible.collectAsStateWithLifecycle()
-    val importing by importModel.state.collectAsStateWithLifecycle()
-    LaunchedEffect(tab, importing.stage) {
-        if (tab == Tab.PROFILE && importing.stage == com.swpp.stylemate.ui.profile.GuestImportStage.HIDDEN) importModel.checkAvailable()
-    }
 
     Box(Modifier.fillMaxSize()) {
     Scaffold(
@@ -301,7 +289,6 @@ private fun MainTabs(viewModel: BodyProfileViewModel, authModel: AuthViewModel, 
                 modifier = Modifier.padding(padding),
                 username = auth.session?.user?.username,
                 onLogout = authModel::logout,
-                onImport = if (importing.available) importModel::open else null,
                 authBusy = auth.busy,
                 onDeleteRemote = viewModel::deleteAccountProfile,
                 connections = {

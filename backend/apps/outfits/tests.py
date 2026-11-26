@@ -1,4 +1,5 @@
 # AI-generated with Claude Code (Claude Opus 5.5), 2026-10-12, reviewed by Dongkun Moon
+from datetime import timedelta
 """Outfit API tests on the in-memory database with the shipped models; no network, photos or AI key."""
 import json
 import base64
@@ -13,6 +14,7 @@ from apps.users.auth import issue_token
 from apps.users.models import User
 from recommendation import weather
 
+from . import views
 from .models import Outfit
 
 BODY = {"height_cm": 162, "gender": "female", "preferred_fit": "loose", "preferred_styles": ["미니멀"],
@@ -55,8 +57,8 @@ class OutfitApiTests(TestCase):
         for change in ({'name': '수정'}, {'saved': False}):
             with self.subTest(change=change):
                 Outfit.objects.filter(user=self.user).delete()
-                for _ in range(23):
-                    self.assertEqual(self.post('/api/outfits/', {'garment_ids': [str(self.tee.pk), str(self.jeans.pk)]}).status_code, 201)
+                for top in self.distinct_tops(23):  # one 코디북 entry per combination, so 23 combinations
+                    self.assertEqual(self.post('/api/outfits/', {'garment_ids': [str(top.pk), str(self.jeans.pk)]}).status_code, 201)
                 first = self.client.get('/api/outfits/').json()
                 first_ids = {row['id'] for row in first['outfits']}
                 remaining = {str(pk) for pk in Outfit.objects.filter(user=self.user).exclude(pk__in=first_ids).values_list('pk', flat=True)}
@@ -121,8 +123,8 @@ class OutfitApiTests(TestCase):
         for cursor in ('bad-id', str(hidden.pk), str(uuid.uuid4())):
             self.assertEqual(self.client.get('/api/wardrobe/items/', {'after': cursor}).status_code, 400)
 
-        for _ in range(23):
-            self.assertEqual(self.post('/api/outfits/', {'garment_ids': [str(self.tee.pk), str(self.jeans.pk)]}).status_code, 201)
+        for top in self.distinct_tops(23):  # one 코디북 entry per combination, so 23 combinations
+            self.assertEqual(self.post('/api/outfits/', {'garment_ids': [str(top.pk), str(self.jeans.pk)]}).status_code, 201)
         first = self.client.get('/api/outfits/').json()
         self.assertEqual(len(first['outfits']), 20)
         second = self.client.get('/api/outfits/', {'after': first['next']}).json()
@@ -149,6 +151,9 @@ class OutfitApiTests(TestCase):
         self.coat = garment(self.user, "갈색 코트", "outerwear", "coat", "#795548", chest_width_half=54, total_length=95, sleeve_length=60)
         self.draft = garment(self.user, "저장 안 한 옷", "top", "tshirt", "#202020", saved=False)
         self.shoes = garment(self.user, "운동화", "shoes", "sneakers", "#FFFFFF")
+
+    def distinct_tops(self, count):
+        return [garment(self.user, f"티 {n}", "top", "tshirt", "#FFFFFF", chest_width_half=50) for n in range(count)]
 
     def post(self, url, data):
         return self.client.post(url, json.dumps(data), content_type="application/json")
@@ -256,6 +261,44 @@ class OutfitApiTests(TestCase):
         self.assertTrue(all(disliked["preference"]["weights"].get(k, 0) < v for k, v in weights.items()))
         self.assertEqual(self.post(url + "feedback/", {"feedback": "meh"}).status_code, 400)
         self.assertEqual(self.client.put(url, json.dumps({"extra": 1}), content_type="application/json").status_code, 400)
+
+    def test_the_same_combination_is_saved_once(self):
+        members = [("top", self.tee, ""), ("bottom", self.jeans, "")]
+        first = views._create(Outfit.Source.RECOMMENDED, members, user=self.user, score=80)
+        second = views._create(Outfit.Source.RECOMMENDED, members, user=self.user, score=81)
+        put = lambda o, data: self.client.put(f"/api/outfits/{o.id}/", json.dumps(data), content_type="application/json")
+        self.assertEqual(put(first, {"saved": True, "name": "월요일"}).status_code, 200)
+        self.assertEqual(put(second, {"saved": True}).status_code, 200)
+        listed = self.client.get("/api/outfits/").json()["outfits"]
+        # one entry, the latest save, keeping the name given before
+        self.assertEqual([(o["id"], o["name"]) for o in listed], [(str(second.id), "월요일")])
+        first.refresh_from_db()
+        self.assertFalse(first.saved)
+        # saving the same garments from chat moves the entry instead of adding a copy
+        chat = self.post("/api/outfits/", {"garment_ids": [str(self.jeans.id), str(self.tee.id)], "source": "chat"})
+        self.assertEqual(chat.status_code, 201)
+        self.assertEqual([o["id"] for o in self.client.get("/api/outfits/").json()["outfits"]], [chat.json()["id"]])
+        # a different combination is a different entry
+        self.post("/api/outfits/", {"garment_ids": [str(self.knit.id), str(self.jeans.id)], "source": "user"})
+        self.assertEqual(len(self.client.get("/api/outfits/").json()["outfits"]), 2)
+
+    def test_duplicates_saved_earlier_are_hidden_not_deleted(self):
+        members = [("top", self.tee, ""), ("bottom", self.slacks, "")]
+        old = views._create(Outfit.Source.RECOMMENDED, members, user=self.user, saved=True)
+        new = views._create(Outfit.Source.CHAT, members, user=self.user, saved=True)
+        Outfit.objects.filter(pk=old.pk).update(updated_at=new.updated_at - timedelta(minutes=5))
+        self.assertEqual([o["id"] for o in self.client.get("/api/outfits/").json()["outfits"]], [str(new.id)])
+        self.assertTrue(Outfit.objects.filter(pk=old.pk, saved=True).exists())
+
+    def test_unsaving_the_newest_copy_does_not_bring_back_an_older_duplicate(self):
+        members = [("top", self.tee, ""), ("bottom", self.slacks, "")]
+        old = views._create(Outfit.Source.RECOMMENDED, members, user=self.user, saved=True)
+        new = views._create(Outfit.Source.CHAT, members, user=self.user, saved=True)
+        Outfit.objects.filter(pk=old.pk).update(updated_at=new.updated_at - timedelta(minutes=5))
+        response = self.client.put(f"/api/outfits/{new.id}/", {"saved": False}, content_type="application/json")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.client.get("/api/outfits/").json()["outfits"], [])
+        self.assertEqual(Outfit.objects.filter(pk__in=[old.pk, new.pk]).count(), 2)
 
     def test_create_outfit_from_garment_ids(self):
         ids = [str(self.tee.id), str(self.jeans.id), str(self.coat.id)]

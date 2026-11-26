@@ -69,6 +69,9 @@ When a specific garment or concrete type (셔츠, 청바지; not generic 상의/
 resolve matching IDs from the supplied wardrobe
 in target_garment_ids (one per slot). Never invent IDs. If none match, action=clarify.
 Map 출근/면접/하객 to formal, 편하게 to casual. Remove outerwear only when explicitly asked.
+"차분하게", "차분한 느낌", "톤 다운" describe colour, not formality: want darker (not formal, never brighter).
+A colour for a slot ("상의를 흰색으로") is an edit: change that slot with target_colors; do not ask which
+garment, even when several registered garments have that colour.
 Days, places and plans (내일 부산 여행, 토요일 데이트, 결혼식 하객) are supported: the server reads them and
 uses that day's forecast. Treat such a request as an edit of all unlocked slots unless slots are named.
 "I want outer", "I want outter" and similar minor misspellings ask to add/change outerwear:

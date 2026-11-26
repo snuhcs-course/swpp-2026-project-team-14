@@ -20,6 +20,7 @@ Use only successful, non-null `duration_ms` values for completion-time median an
 
 - Recommendation duplicate rate: sum(`duplicate_count`) / sum(`total_count`) for `outfit_recommendation`.
 - Save overlap rate: count(`outfit_save` with `already_saved=true`) / count(`outfit_save`). Report the post-save extra-row count separately.
+- The one-entry-per-combination behavior on `develop` keeps repeated saves at `already_saved=true`, `duplicate_count=0`. Collection preserves that deduplication behavior.
 - Task completion rate: successful finished attempts / started attempts, joined by account and attempt ID. Show incomplete attempts alongside failure and cancellation counts.
 - Chat technical failure rate: failed requests excluding `OUTFIT_EDIT_FAILED` / finished requests excluding cancellations. Report edit failures and clarification responses separately.
 

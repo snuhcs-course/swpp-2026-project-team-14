@@ -131,7 +131,8 @@ class OutfitUsageTests(UsageFixture):
         self.assertEqual(self.save_outfit(self.ids[::-1]).status_code, 201)
         events = list(UsageEvent.objects.filter(name='outfit_save').order_by('received_at'))
         self.assertEqual([e.details['already_saved'] for e in events], [False, True])
-        self.assertEqual(events[-1].details['duplicate_count'], 1)
+        self.assertEqual(events[-1].details['duplicate_count'], 0)
+        self.assertEqual(Outfit.objects.filter(user=self.user, saved=True).count(), 1)
         another = Garment.objects.create(user=self.user, image='garments/top2.jpg', saved=True,
                                          attributes={'name': 'same name', 'category': 'top'})
         self.save_outfit([str(another.id), self.ids[1]])
@@ -147,6 +148,17 @@ class OutfitUsageTests(UsageFixture):
         self.assertEqual(UsageEvent.objects.filter(name='outfit_save').count(), 1)
         self.client.put(f'/api/outfits/{row["id"]}/', json.dumps({'saved': True}), content_type='application/json')
         self.assertFalse(UsageEvent.objects.filter(name='outfit_save').latest('received_at').details['already_saved'])
+
+    def test_home_save_keeps_deduplication_and_records_existing_combination(self):
+        first = self.save_outfit().json()
+        second = self.save_outfit(self.ids[::-1]).json()
+        response = self.client.put(f'/api/outfits/{first["id"]}/', json.dumps({'saved': True}), content_type='application/json')
+        self.assertEqual(response.status_code, 200)
+        saved_ids = list(Outfit.objects.filter(user=self.user, saved=True).values_list('id', flat=True))
+        self.assertEqual(saved_ids, [uuid.UUID(first['id'])])
+        self.assertFalse(Outfit.objects.get(pk=second['id']).saved)
+        event = UsageEvent.objects.filter(name='outfit_save').latest('received_at')
+        self.assertEqual(event.details, {'source': 'user', 'already_saved': True, 'total_count': 1, 'duplicate_count': 0})
 
     def test_recommendation_duplicates_include_previous_and_same_batch_combinations(self):
         candidate = {'items': [{'id': f'w:{self.top.id}', 'slot': '상의'}, {'id': f'w:{self.bottom.id}', 'slot': '하의'}],

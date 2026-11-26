@@ -39,6 +39,9 @@ class ChatApiTests(ChatFixture):
         self.assertEqual(data['status'], 'updated')
         self.assertEqual({i['garment_id'] for i in data['outfit']['items'] if i['slot'] == 'bottom'}, {str(self.bottom.id)})
         self.assertIn(str(self.bright.id), data['changed_ids'])
+        # why it changed: the requested direction and the colour that moved
+        self.assertEqual(data['changes'], [{'slot': 'top', 'from': '검정 티', 'to': '흰 셔츠',
+                                            'reason': '요청하신 더 밝은 색으로 바꿨어요 (블랙 → 화이트).'}])
         self.assertFalse(Outfit.objects.exists())
 
     def test_works_without_a_body_profile(self):

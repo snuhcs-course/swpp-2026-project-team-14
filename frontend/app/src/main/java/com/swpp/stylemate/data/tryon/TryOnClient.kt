@@ -21,6 +21,34 @@ import java.io.IOException
 data class TryOnGarment(val category: String, val image: ByteArray, val photoType: String = "flat-lay",
                         val openFront: Boolean = true)
 
+/**
+ * How far a fitting has got: [stage] is uploading, waiting, generating or done; [fraction] (0–1) is the
+ * server's estimate from recent generation times (older servers send none, so the app estimates).
+ */
+data class FittingProgress(val stage: String, val fraction: Float, val text: String) {
+    companion object {
+        const val DEFAULT_EXPECTED_SECONDS = 40.0
+
+        /** From one status reply of `GET /api/fittings/jobs/{id}/`. */
+        fun of(state: JSONObject): FittingProgress {
+            val expected = state.optDouble("expected_seconds", DEFAULT_EXPECTED_SECONDS).takeIf { it > 0 } ?: DEFAULT_EXPECTED_SECONDS
+            val elapsed = state.optDouble("elapsed_seconds", 0.0)
+            return when (state.optString("status")) {
+                "running" -> {
+                    val fraction = if (state.has("progress")) state.getDouble("progress")
+                        else minOf(0.95, 0.1 + 0.85 * elapsed / expected)
+                    val left = (expected * (1 - fraction) / 0.85).toInt().coerceAtLeast(1)
+                    FittingProgress("generating", fraction.toFloat(),
+                        if (fraction >= 0.95) "거의 다 됐어요 · 마무리하고 있어요" else "옷을 입히고 있어요 · 약 ${left}초 남음")
+                }
+                "completed" -> FittingProgress("done", 1f, "완료됐어요")
+                else -> FittingProgress("waiting", state.optDouble("progress", 0.05).toFloat(),
+                    state.optInt("queue_position").let { if (it > 0) "대기 중 · 앞선 요청 ${it}개" else "곧 시작해요" })
+            }
+        }
+    }
+}
+
 data class TryOnJob(val id: String, val token: String) {
     init { require(id.matches(Regex("[0-9a-f-]{36}")) && token.isNotBlank()) }
 }
@@ -33,7 +61,8 @@ class TryOnClient(private val account: AccountAccess, private val baseUrl: Strin
                     resumeJob: TryOnJob? = null,
                     onSubmitted: suspend (TryOnJob) -> Unit = {},
                     onResult: suspend (ByteArray) -> Unit = {},
-                    keepForResume: Boolean = false, onStatus: (String) -> Unit): ByteArray {
+                    keepForResume: Boolean = false, onProgress: (FittingProgress) -> Unit = {},
+                    onStatus: (String) -> Unit): ByteArray {
         require(consent) { "사진 처리에 동의해 주세요." }
         require(resumeJob != null || (person.size in 1..MAX_IMAGE && garments.size in 1..3))
         require(garments.all { it.image.size in 1..MAX_IMAGE })
@@ -53,6 +82,7 @@ class TryOnClient(private val account: AccountAccess, private val baseUrl: Strin
                 .put("person", Base64.getEncoder().encodeToString(person)).put("garments", rows)
             if (job == null) {
                 onStatus("사진을 전송하고 있어요…")
+                onProgress(FittingProgress("uploading", 0.02f, "사진을 전송하고 있어요"))
                 job = JSONObject(String(request("POST", "jobs/", body = payload), Charsets.UTF_8))
                 onSubmitted(TryOnJob(job.getString("id"), job.getString("token")))
                 checkpointed = true
@@ -62,6 +92,7 @@ class TryOnClient(private val account: AccountAccess, private val baseUrl: Strin
             val token = job.getString("token")
             repeat(900) {
                 val state = JSONObject(String(retrieve("jobs/$id/", token), Charsets.UTF_8))
+                if (state.optString("status") in listOf("queued", "running", "completed")) onProgress(FittingProgress.of(state))
                 when (state.getString("status")) {
                     "completed" -> {
                         check(state.optBoolean("inputs_deleted")) { "서버의 입력 사진 삭제 상태를 확인하지 못했어요." }

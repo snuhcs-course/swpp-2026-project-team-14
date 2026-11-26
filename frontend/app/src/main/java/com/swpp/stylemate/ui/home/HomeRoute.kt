@@ -91,6 +91,8 @@ fun HomeRoute(profile: BodyProfile?, onSetupProfile: () -> Unit, onOpenWardrobe:
         model.setOccasion(EventOccasion.of(events))
     }
     LaunchedEffect(body?.toString(), wardrobeRevision) { model.ensureLoaded(body, wardrobeRevision) }
+    // Each return to 홈 (from 코디북, chat or another tab) re-checks which cards are saved.
+    LaunchedEffect(Unit) { model.syncSaved() }
     HomeScreen(
         state = state,
         onRefresh = { model.load(body) },
