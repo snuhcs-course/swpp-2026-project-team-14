@@ -41,7 +41,7 @@ import com.swpp.stylemate.data.recommendation.OutfitGarment
 import com.swpp.stylemate.data.wardrobe.WardrobeRepository
 import com.swpp.stylemate.ui.components.OutfitFeedbackButtons
 import com.swpp.stylemate.ui.components.PageHeader
-import com.swpp.stylemate.ui.wardrobe.OutfitRail
+import com.swpp.stylemate.ui.wardrobe.OutfitDressed
 import com.swpp.stylemate.ui.components.OutfitSaveButton
 import com.swpp.stylemate.ui.components.StarRating
 import com.swpp.stylemate.ui.components.starsOf
@@ -162,7 +162,7 @@ private fun OutfitCarousel(state: HomeState, pager: PagerState, height: Dp, onSe
         Box(Modifier.fillMaxWidth().height(height).semantics {
             contentDescription = "코디 ${page + 1} / ${state.outfits.size}"
         }) {
-            OutfitRail(state.outfits[page].items, photo = photo)
+            OutfitDressed(state.outfits[page].items, photo = photo)
             if (state.loading) CircularProgressIndicator(Modifier.align(Alignment.Center))
         }
     }

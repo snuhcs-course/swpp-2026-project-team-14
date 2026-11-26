@@ -188,7 +188,7 @@ fun CodiBookScreen(
                             color = MaterialTheme.colorScheme.surfaceContainerLow,
                             modifier = Modifier.fillMaxWidth().semantics { contentDescription = "${outfit.displayName()} 크게 보기" }) {
                             Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                OutfitHanger(outfit.items, Modifier.fillMaxWidth().height(200.dp), photo = photo)
+                                OutfitHanger(outfit.items, Modifier.fillMaxWidth().height(250.dp).padding(top = 4.dp), photo = photo)
                                 Text(outfit.displayName(), style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
                                 fittingStatuses[outfit.id]?.label?.let {
@@ -210,7 +210,7 @@ fun CodiBookScreen(
             title = { Text("코디북에서 뺄까요?") },
             text = {
                 Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OutfitHanger(outfit.items, Modifier.fillMaxWidth().height(140.dp), photo = photo)
+                    OutfitHanger(outfit.items, Modifier.fillMaxWidth().height(180.dp), photo = photo)
                     Text(outfit.displayName(), fontWeight = FontWeight.SemiBold)
                     Text("옷장에 등록된 옷은 그대로 유지돼요.")
                     if (state.removeErrorId == outfit.id) state.removeError?.let {
