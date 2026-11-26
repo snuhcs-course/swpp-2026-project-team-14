@@ -24,6 +24,16 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.foundation.layout.offset
+import androidx.compose.animation.core.spring
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
+import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -218,6 +228,9 @@ internal fun FittingProgressCard(owner: String, onOpen: (String) -> Unit, modifi
     val work = remember(context) { FittingWork(context) }
     var summary by remember(owner) { mutableStateOf<com.swpp.stylemate.data.tryon.CardSummary?>(null) }
     var avatar by remember(owner) { mutableStateOf<Pair<String, FittingPerson?>?>(null) }
+    // The finished picture itself, shown small on the card once a fitting is done (task key and image).
+    var thumbnail by remember(owner) { mutableStateOf<Pair<String, ImageBitmap?>?>(null) }
+    val account = com.swpp.stylemate.ui.LocalAccountAccess.current
     var resumed by remember { mutableStateOf(false) }
     LifecycleResumeEffect(Unit) { resumed = true; onPauseOrDispose { resumed = false } }
     LaunchedEffect(owner, resumed) {
@@ -231,6 +244,9 @@ internal fun FittingProgressCard(owner: String, onOpen: (String) -> Unit, modifi
                 }
                 val source = summary?.shown?.second?.optString("source")
                 if (source != null && avatar?.first != source) avatar = source to virtualModelPreview(context, source)
+                val shown = summary?.shown
+                if (shown != null && shown.second.optString("state") == "completed" && thumbnail?.first != shown.first && account != null)
+                    thumbnail = shown.first to resultThumbnail(context, account, shown.second)
             } catch (error: CancellationException) { throw error }
             catch (_: Exception) { summary = null }
             delay(1_000)
@@ -263,7 +279,23 @@ internal fun FittingProgressCard(owner: String, onOpen: (String) -> Unit, modifi
         }
     }
     val shape = RoundedCornerShape(20.dp)
-    Row(modifier.fillMaxWidth().clip(shape).background(MaterialTheme.colorScheme.surface)
+    val finished = state == "completed" || state == "failed"
+    // A finished card can be swiped down to put it away, like a notification; it follows the finger and fades.
+    val drag = remember(key) { Animatable(0f) }
+    val scope = rememberCoroutineScope()
+    val density = LocalDensity.current
+    val away = with(density) { 56.dp.toPx() }
+    Row(modifier.fillMaxWidth()
+        .offset { IntOffset(0, drag.value.roundToInt()) }
+        .graphicsLayer { alpha = 1f - (drag.value / (away * 2.5f)).coerceIn(0f, .9f) }
+        .draggable(rememberDraggableState { delta -> scope.launch { drag.snapTo((drag.value + delta).coerceAtLeast(0f)) } },
+            Orientation.Vertical, enabled = finished, onDragStopped = { velocity ->
+                if (drag.value > away || velocity > 1_200f) {
+                    drag.animateTo(away * 4, tween(180))
+                    dismiss()
+                } else drag.animateTo(0f, spring())
+            })
+        .clip(shape).background(MaterialTheme.colorScheme.surface)
         .border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape)
         .clickable { summary = null; onOpen(key) }  // the fitting screen marks it seen once it shows it
         .padding(start = 12.dp, top = 10.dp, bottom = 10.dp, end = 4.dp)
@@ -275,10 +307,13 @@ internal fun FittingProgressCard(owner: String, onOpen: (String) -> Unit, modifi
                 CircularProgressIndicator(progress = { fraction }, Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.primary,
                     strokeWidth = 2.5.dp, trackColor = MaterialTheme.colorScheme.outlineVariant, gapSize = 0.dp)
             }
+            val picture = thumbnail?.takeIf { it.first == key && state == "completed" }?.second
             val face = avatar?.second?.image
             val inner = Modifier.size(38.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceContainerLow)
-            // The full-body model photo, zoomed in on the face.
-            if (face != null) Box(inner) {
+            // A finished fitting shows its own picture; while one is made, the model's face.
+            if (picture != null) Image(picture, "완성된 피팅 이미지", Modifier.size(36.dp, 48.dp).clip(RoundedCornerShape(8.dp))
+                .background(MaterialTheme.colorScheme.surfaceContainerLow), contentScale = ContentScale.Crop, alignment = Alignment.TopCenter)
+            else if (face != null) Box(inner) {
                 Image(face, null, Modifier.fillMaxSize().graphicsLayer {
                     scaleX = 2.4f; scaleY = 2.4f; transformOrigin = TransformOrigin(.5f, .12f)
                 }, contentScale = ContentScale.Crop, alignment = Alignment.TopCenter)
@@ -299,3 +334,18 @@ internal fun FittingProgressCard(owner: String, onOpen: (String) -> Unit, modifi
             tint = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
+
+/** A small copy of a finished fitting's picture, read from this device, for the card. */
+private suspend fun resultThumbnail(context: Context, account: com.swpp.stylemate.data.AccountAccess, task: org.json.JSONObject): ImageBitmap? =
+    withContext(Dispatchers.IO) {
+        runCatching {
+            val repository = com.swpp.stylemate.data.tryon.FittingRepository(
+                com.swpp.stylemate.data.LocalUserStore.forContext(context, account.userId), account)
+            val bytes = repository.result(FittingTaskStore.outfit(task), task.getString("source")) ?: return@runCatching null
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+            var sample = 1
+            while (bounds.outHeight / (sample * 2) >= 200) sample *= 2
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size, BitmapFactory.Options().apply { inSampleSize = sample })?.asImageBitmap()
+        }.getOrNull()
+    }
