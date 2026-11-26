@@ -110,6 +110,8 @@ internal fun PhotoFitting(outfit: Outfit, repository: FittingRepository, account
     // The photo being dressed, shown by the loading screen; restarts the task polling after a new request.
     var personPreview by remember { mutableStateOf<FittingPerson?>(null) }
     var watch by remember { mutableStateOf(0) }
+    // A result that has just been made is revealed from the top over the photo before fitting.
+    var revealing by remember { mutableStateOf(false) }
     var notificationSettings by remember { mutableStateOf(FittingNotificationSettings()) }
     var changingNotification by remember { mutableStateOf(false) }
     var requestingNotificationPermission by remember { mutableStateOf(false) }
@@ -232,15 +234,22 @@ internal fun PhotoFitting(outfit: Outfit, repository: FittingRepository, account
         try {
             notificationSettings = repository.notificationSettings()
             val key = repository.taskKey(outfit)
+            var waited = false
             do {
                 val task = work.state(key)
                 pending = task?.optString("state") in listOf("queued", "running")
+                if (pending) waited = true
                 progress = task?.let(com.swpp.stylemate.data.tryon.FittingTaskStore::progress)
                 if (pending && personPreview == null) personPreview = virtualModelPreview(context, task?.optString("source"))
                 if (task?.optString("state") == "failed") failure = task.optString("error")
                 if (!pending && task?.optString("state") != "failed") {
                     val source = initialSource ?: repository.latestSource(outfit)
+                    // Opened from the card or the notification: the fitting has just been made, so it is revealed too.
+                    val fresh = waited || (initialSource != null && task?.optString("state") == "completed" &&
+                        !task.optBoolean("card_dismissed"))
+                    if (fresh && personPreview == null) personPreview = virtualModelPreview(context, source)
                     if (source != null) result = repository.result(outfit, source)?.let { decodeFitting(it) }
+                    revealing = fresh && result != null
                     // Seen here, so the floating card over the tabs does not offer it again.
                     if (result != null && task != null) runCatching { work.tasks.dismissCard(key) }
                 }
@@ -277,7 +286,7 @@ internal fun PhotoFitting(outfit: Outfit, repository: FittingRepository, account
             }, onConfirm = onClose, modifier = Modifier.weight(1f), saving = saving, saved = saved,
                 virtualModelLabel = virtualModel?.label, pending = pending, progress = progress,
                 notificationsEnabled = notificationSettings.enabled && FittingNotifications.allowed(context),
-                outfit = outfit, person = personPreview)
+                outfit = outfit, person = personPreview, revealing = revealing, onRevealed = { revealing = false })
         }
     }
 }
@@ -329,6 +338,8 @@ internal fun PhotoFittingContent(
     notificationsEnabled: Boolean = true,
     outfit: Outfit? = null,
     person: FittingPerson? = null,
+    revealing: Boolean = false,
+    onRevealed: () -> Unit = {},
 ) {
     Box(modifier.fillMaxWidth().padding(20.dp), contentAlignment = Alignment.Center) {
         when {
@@ -339,8 +350,10 @@ internal fun PhotoFittingContent(
                 Text("사진을 준비하고 있습니다.", style = MaterialTheme.typography.bodyLarge)
             }
             result != null -> Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-                Image(result.asImageBitmap(), "생성된 피팅 이미지",
-                    Modifier.fillMaxWidth().weight(1f), contentScale = ContentScale.Fit)
+                val image = remember(result) { result.asImageBitmap() }
+                if (revealing) FittingWipe(person?.image, image, onRevealed,
+                    Modifier.fillMaxWidth().weight(1f).semantics { contentDescription = "생성된 피팅 이미지" })
+                else Image(image, "생성된 피팅 이미지", Modifier.fillMaxWidth().weight(1f), contentScale = ContentScale.Fit)
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     OutlinedButton(onClick = onSaveResult, enabled = !saving && !saved,
                         modifier = Modifier.weight(1f).heightIn(min = 56.dp),
