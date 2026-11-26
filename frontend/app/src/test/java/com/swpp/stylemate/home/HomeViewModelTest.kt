@@ -318,6 +318,40 @@ class HomeViewModelTest {
         assertEquals(OutfitRepository.SERVER_ERROR, state.message)
     }
 
+    @Test fun returningToHomeMatchesTheSaveButtonsToTheCodiBook() {
+        loadThreeOutfits()
+        server.on("PUT /api/outfits/o1/", json(outfitJson("o1", "a", "b", saved = true).toString()))
+        viewModel.toggleSaved()
+        assertTrue(idle().current!!.saved)
+        // o1 was removed in 코디북; o2's combination was saved from chat under another id.
+        server.on("GET /api/outfits/", json(JSONObject().put("outfits", JSONArray().put(outfitJson("chat1", "c", "d", saved = true)))
+            .put("next", JSONObject.NULL).toString()))
+        viewModel.syncSaved()
+        val synced = viewModel.state.await { state -> state.outfits.none { it.id == "o1" && it.saved } }
+        assertEquals(listOf(false, true, false), synced.outfits.map { it.saved })
+        assertNull("the old 저장했어요 would contradict the button", synced.message)
+        assertEquals(1, server.requests("GET /api/outfits/").size)
+    }
+
+    @Test fun aFailedCodiBookCheckKeepsTheSaveButtons() {
+        loadThreeOutfits()
+        server.on("PUT /api/outfits/o1/", json(outfitJson("o1", "a", "b", saved = true).toString()))
+        viewModel.toggleSaved()
+        idle()
+        server.on("GET /api/outfits/", failure(500, "SERVER_ERROR"))
+        viewModel.syncSaved()
+        val deadline = System.currentTimeMillis() + 5_000
+        while (server.requests("GET /api/outfits/").isEmpty() && System.currentTimeMillis() < deadline) Thread.sleep(20)
+        Thread.sleep(200)  // let the failed check finish
+        assertEquals(listOf(true, false, false), viewModel.state.value.outfits.map { it.saved })
+        assertEquals("코디북에 저장했어요.", viewModel.state.value.message)  // no error is shown for the check
+    }
+
+    @Test fun nothingIsCheckedBeforeOutfitsLoad() {
+        viewModel.syncSaved()
+        assertTrue(server.requests("GET /api/outfits/").isEmpty())
+    }
+
     @Test fun shownMessageIsCleared() {
         loadThreeOutfits()
         server.on("PUT /api/outfits/o1/", json(outfitJson("o1", "a", "b", saved = true).toString()))
