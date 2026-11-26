@@ -5,10 +5,14 @@ import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.content.ContentResolver
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.media.AudioAttributes
+import android.net.Uri
 import android.os.Build
+import com.swpp.stylemate.R
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
@@ -17,16 +21,33 @@ import com.swpp.stylemate.data.LocalUserStore
 
 object FittingNotifications {
     const val EXTRA_TASK = "fitting_task"
-    private const val CHANNEL = "fitting-results"
+    // A channel's sound cannot change once created, so the soft chime comes with a new channel id.
+    private const val CHANNEL = "fitting-results-v2"
+    private const val OLD_CHANNEL = "fitting-results"
+
+    /** The fitting channel with the app's own soft chime; a user who turned the old channel off keeps it off. */
+    private fun ensureChannel(context: Context) {
+        val manager = context.getSystemService(NotificationManager::class.java)
+        if (manager.getNotificationChannel(CHANNEL) != null) return
+        val old = manager.getNotificationChannel(OLD_CHANNEL)
+        val importance = if (old?.importance == NotificationManager.IMPORTANCE_NONE) NotificationManager.IMPORTANCE_NONE
+            else NotificationManager.IMPORTANCE_DEFAULT
+        val chime = Uri.parse("${ContentResolver.SCHEME_ANDROID_RESOURCE}://${context.packageName}/${R.raw.fitting_chime}")
+        manager.createNotificationChannel(NotificationChannel(CHANNEL, "가상 피팅", importance).apply {
+            setSound(chime, AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build())
+        })
+        if (old != null) manager.deleteNotificationChannel(OLD_CHANNEL)
+    }
     fun allowed(context: Context): Boolean {
         if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(context,
                 Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return false
+        ensureChannel(context)
         val channel = context.getSystemService(NotificationManager::class.java).getNotificationChannel(CHANNEL)
         return NotificationManagerCompat.from(context).areNotificationsEnabled() && channel?.importance != NotificationManager.IMPORTANCE_NONE
     }
     fun notification(context: Context, key: String, completed: Boolean, failed: Boolean = false): Notification {
-        context.getSystemService(NotificationManager::class.java).createNotificationChannel(
-            NotificationChannel(CHANNEL, "가상 피팅", NotificationManager.IMPORTANCE_DEFAULT))
+        ensureChannel(context)
         val intent = Intent(context, MainActivity::class.java).putExtra(EXTRA_TASK, key)
             .setAction("com.swpp.stylemate.FITTING.$key")
             .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
