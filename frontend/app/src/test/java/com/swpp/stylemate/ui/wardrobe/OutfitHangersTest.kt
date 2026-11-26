@@ -43,15 +43,19 @@ class OutfitHangersTest {
 
     @Test fun theFigureIsScaledToFitAndCentred() {
         val layout = dressedLayout(400f, 300f, jacket, tee, jeans)
-        val lowest = layout.values.maxOf { it.bottom }; val highest = layout.values.minOf { it.top }
-        assertTrue("fits the height", lowest <= 300.5f && highest >= -.5f)
-        assertTrue("roughly centred", layout.values.minOf { it.left } > 0f && layout.values.maxOf { it.right } < 400f)
+        assertTrue("fits", layout.values.maxOf { it.bottom } <= 300.5f && layout.values.minOf { it.top } >= -.5f)
+        assertTrue("inside the width", layout.values.minOf { it.left } >= 0f && layout.values.maxOf { it.right } <= 400.5f)
+        val middle = (layout.values.minOf { it.left } + layout.values.maxOf { it.right }) / 2
+        assertEquals("centred", 200f, middle, 1f)
     }
 
-    @Test fun anOutfitWithoutOuterwearShowsAWiderTop() {
-        val withOuter = dressedLayout(400f, 2000f, jacket, tee, jeans).getValue("top")
-        val alone = dressedLayout(400f, 2000f, null, tee, jeans)
-        assertTrue(alone.getValue("top").width > withOuter.width)
-        assertTrue("outerwear" !in alone)
+    @Test fun garmentsShareOneRealScaleWhateverTheirPhotos() {
+        // A long-sleeved top (narrow shoulders in a wide photo) and wide trousers.
+        val longSleeve = GarmentHangingShape(aspectRatio = 1.3f, left = .3f, right = .7f)
+        val wideLegs = GarmentHangingShape(aspectRatio = .6f, left = .2f, right = .8f, supportY = .02f)
+        val layout = dressedLayout(400f, 2000f, null, longSleeve, wideLegs)
+        val shoulders = layout.getValue("top").width * .4f
+        val waist = layout.getValue("bottom").width * .6f
+        assertEquals("shoulders : waist = 44 : 38", TOP_SHOULDER_CM / WAIST_CM, shoulders / waist, .01f)
     }
 }

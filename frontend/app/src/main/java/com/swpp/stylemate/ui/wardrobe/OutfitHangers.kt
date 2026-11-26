@@ -46,11 +46,21 @@ internal fun defaultShape(slot: String) = when (slot) {
     else -> GarmentHangingShape(aspectRatio = 1.05f)
 }
 
+/** Real widths (cm) the figure is built from, so a tee, a coat and trousers keep their true proportions. */
+internal const val TOP_SHOULDER_CM = 44f
+internal const val OUTER_SHOULDER_CM = 48f
+internal const val WAIST_CM = 38f
+
+/** The anchor width of a garment as a share of its photo: shoulders for tops, waistband for bottoms. */
+private fun anchorShare(shape: GarmentHangingShape) = (shape.right - shape.left).coerceIn(.2f, .95f)
+
 /**
- * Where each garment of an outfit sits in home design B, in px inside a [width] × [height] figure. It is
- * a styled flat-lay: the outerwear lies behind on the left (tilted by [OUTER_TILT]), the top overlaps it
- * in front on the right, and the bottom's waist sits just under the top's hem. This reads naturally
- * whether the jacket photo is open or closed. The figure is scaled down to fit and centred.
+ * Where each garment of an outfit sits in design B (홈 and 코디북), in px inside a [width] × [height]
+ * figure. Every garment is sized at one shared scale from its real anchor width (shoulders, waistband)
+ * measured on its own cutout, so long sleeves or wide legs no longer make one garment look too big or
+ * small. It is a styled flat-lay: the outerwear lies behind on the left (tilted by [OUTER_TILT]), the top
+ * overlaps it in front on the right, and the bottom's waist sits just under the top's hem. The figure is
+ * scaled to fit and centred.
  */
 internal fun dressedLayout(
     width: Float,
@@ -60,31 +70,38 @@ internal fun dressedLayout(
     bottom: GarmentHangingShape?,
 ): Map<String, Rect> {
     val layered = outer != null && top != null
-    val outerW = width * (if (top != null) .6f else .7f)
-    val topW = width * (if (outer != null) .52f else .62f)
-    val bottomW = width * .46f
+    // Sizes in cm: photo width = real anchor width / the anchor's share of the photo.
+    val outerW = outer?.let { OUTER_SHOULDER_CM / anchorShare(it) } ?: 0f
+    val topW = top?.let { TOP_SHOULDER_CM / anchorShare(it) } ?: 0f
+    val bottomW = bottom?.let { WAIST_CM / anchorShare(it) } ?: 0f
     val outerH = outer?.let { outerW / it.aspectRatio } ?: 0f
     val topH = top?.let { topW / it.aspectRatio } ?: 0f
     val bottomH = bottom?.let { bottomW / it.aspectRatio } ?: 0f
-    val outerX = if (layered) .38f else .5f  // centre line of each garment, as a share of the width
-    val topX = if (layered) .6f else .5f
+    // Neck/waist centre lines in cm from the figure's middle.
+    val outerX = if (layered) -13f else 0f
+    val topX = if (layered) 11f else 0f
+    val bottomX = if (top != null) topX - 3f else outerX
     val topY = if (layered) outerH * .1f else 0f
     val waistY = when {
-        top != null -> topY + topH * .84f
+        top != null -> topY + topH * .86f
         outer != null -> outerH * .62f
         else -> 0f
     }
-    val bottomX = if (top != null) topX - .04f else outerX
     val bottomY = waistY - bottomH * (bottom?.supportY ?: 0f)
-    val total = maxOf(outerH, topY + topH, if (bottom != null) bottomY + bottomH else 0f).coerceAtLeast(1f)
-    val scale = minOf(1f, height / total)
-    val shiftY = (height - total * scale) * .45f
-    fun place(w: Float, h: Float, y: Float, centreX: Float, anchorX: Float) =
-        Rect(Offset(width * centreX - w * scale * anchorX, shiftY + y * scale), Size(w * scale, h * scale))
-    return buildMap {
-        if (outer != null) put("outerwear", place(outerW, outerH, 0f, outerX, outer.neckX))
-        if (top != null) put("top", place(topW, topH, topY, topX, top.neckX))
-        if (bottom != null) put("bottom", place(bottomW, bottomH, bottomY, bottomX, (bottom.left + bottom.right) / 2))
+    val pieces = buildMap {
+        if (outer != null) put("outerwear", Rect(Offset(outerX - outerW * outer.neckX, 0f), Size(outerW, outerH)))
+        if (top != null) put("top", Rect(Offset(topX - topW * top.neckX, topY), Size(topW, topH)))
+        if (bottom != null) put("bottom",
+            Rect(Offset(bottomX - bottomW * (bottom.left + bottom.right) / 2, bottomY), Size(bottomW, bottomH)))
+    }
+    if (pieces.isEmpty()) return emptyMap()
+    val left = pieces.values.minOf { it.left }; val right = pieces.values.maxOf { it.right }
+    val upper = pieces.values.minOf { it.top }; val lower = pieces.values.maxOf { it.bottom }
+    val scale = minOf(width * .94f / (right - left), height / (lower - upper))
+    val shiftX = (width - (right - left) * scale) / 2 - left * scale
+    val shiftY = (height - (lower - upper) * scale) * .45f - upper * scale
+    return pieces.mapValues { (_, r) ->
+        Rect(Offset(shiftX + r.left * scale, shiftY + r.top * scale), Size(r.width * scale, r.height * scale))
     }
 }
 
