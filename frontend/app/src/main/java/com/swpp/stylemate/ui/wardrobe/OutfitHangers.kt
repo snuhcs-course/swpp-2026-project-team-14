@@ -74,16 +74,23 @@ internal fun dressedLayout(
     val layered = outer != null && top != null
     // Sizes in cm: real length, and the width the photo's proportions give at that length.
     var outerH = if (outer != null) outerCm else 0f
-    val topH = if (top != null) topCm else 0f
+    var topH = if (top != null) topCm else 0f
     val bottomH = if (bottom != null) bottomCm else 0f
     var outerW = outer?.let { outerH * it.aspectRatio } ?: 0f
-    val topW = top?.let { topH * it.aspectRatio } ?: 0f
+    var topW = top?.let { topH * it.aspectRatio } ?: 0f
+    val bottomW = bottom?.let { bottomH * it.aspectRatio } ?: 0f
+    // Balance each outfit on its own: spread sleeves make a top's photo far wider than the body, so the
+    // top is kept within a believable width of the bottom it is worn with.
+    if (top != null && bottom != null && bottomW > 0f) {
+        val ratio = topW / bottomW
+        val fit = ratio.coerceIn(TOP_OVER_BOTTOM_MIN, TOP_OVER_BOTTOM_MAX) / ratio
+        topW *= fit; topH *= fit
+    }
     // Outerwear is worn over the top, so it is never drawn narrower than it.
     if (layered && outerW < topW * OUTER_OVER_TOP) {
         val grow = topW * OUTER_OVER_TOP / outerW
         outerW *= grow; outerH *= grow
     }
-    val bottomW = bottom?.let { bottomH * it.aspectRatio } ?: 0f
     // Neck/waist centre lines in cm from the figure's middle.
     val outerX = if (layered) -12f else 0f
     val topX = if (layered) 12f else 0f
@@ -111,6 +118,10 @@ internal fun dressedLayout(
         Rect(Offset(shiftX + r.left * scale, shiftY + r.top * scale), Size(r.width * scale, r.height * scale))
     }
 }
+
+/** A top is drawn this many times as wide as the bottom it is worn with (sleeves included). */
+internal const val TOP_OVER_BOTTOM_MIN = 1.15f
+internal const val TOP_OVER_BOTTOM_MAX = 1.6f
 
 /** How much wider than the top a layered outerwear is drawn at least. */
 internal const val OUTER_OVER_TOP = 1.05f

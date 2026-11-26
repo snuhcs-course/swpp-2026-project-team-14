@@ -50,11 +50,19 @@ class OutfitHangersTest {
     }
 
     @Test fun garmentsShareOneRealScaleWhateverTheirPhotos() {
-        // A wide long-sleeved top and long trousers: their drawn heights keep the real 68 : 100 ratio.
-        val longSleeve = GarmentHangingShape(aspectRatio = 1.4f)
-        val trousers = GarmentHangingShape(aspectRatio = .45f, supportY = .02f)
+        // A top and trousers already in balance: their drawn heights keep the real 68 : 100 ratio.
+        val longSleeve = GarmentHangingShape(aspectRatio = 1f)
+        val trousers = GarmentHangingShape(aspectRatio = .5f, supportY = .02f)
         val layout = dressedLayout(400f, 2000f, null, longSleeve, trousers, topCm = 68f, bottomCm = 100f)
         assertEquals(68f / 100f, layout.getValue("top").height / layout.getValue("bottom").height, .01f)
+    }
+
+    @Test fun aSpreadSleevedTopIsBalancedAgainstTheBottomOfItsOutfit() {
+        val spread = GarmentHangingShape(aspectRatio = 1.6f)
+        val slimSlacks = GarmentHangingShape(aspectRatio = .38f, supportY = .02f)
+        val layout = dressedLayout(400f, 2000f, null, spread, slimSlacks, topCm = 74f, bottomCm = 100f)
+        val ratio = layout.getValue("top").width / layout.getValue("bottom").width
+        assertEquals(TOP_OVER_BOTTOM_MAX, ratio, .01f)
     }
 
     @Test fun aShortJacketIsNeverNarrowerThanTheShirtUnderIt() {
