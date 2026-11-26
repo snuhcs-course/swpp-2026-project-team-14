@@ -34,7 +34,8 @@ class FittingTaskStore(private val directory: File) {
             val snapshot = JSONObject().put("id", outfit.id).put("key", outfit.key).put("name", outfit.name)
                 .put("items", JSONArray(outfit.items.map { item -> JSONObject().put("garment_id", item.garmentId)
                     .put("slot", item.slot).put("name", item.name).put("image_url", item.imageUrl).put("note", item.note) }))
-            write(key, JSONObject().put("owner", owner).put("source", source).put("outfit", snapshot).put("state", "queued"))
+            write(key, JSONObject().put("owner", owner).put("source", source).put("outfit", snapshot).put("state", "queued")
+                .put("created_at", System.currentTimeMillis()))
         } catch (error: Exception) {
             deletePerson(key)
             throw error
@@ -57,13 +58,39 @@ class FittingTaskStore(private val directory: File) {
         val data = checkNotNull(read(key))
         data.remove("job_id"); data.remove("job_token")
         deletePerson(key)
-        write(key, data.put("state", if (error == null) "completed" else "failed").put("error", error ?: JSONObject.NULL))
+        write(key, data.put("state", if (error == null) "completed" else "failed").put("error", error ?: JSONObject.NULL)
+            .put("finished_at", System.currentTimeMillis()))
+    }
+    /** Every task of [owner] with its key, for the progress card shown over the tabs. */
+    fun all(owner: String): List<Pair<String, JSONObject>> = synchronized(lock) {
+        directory.listFiles { file -> file.name.endsWith(".json") }.orEmpty().mapNotNull { file ->
+            val key = file.name.removeSuffix(".json")
+            runCatching { JSONObject(file.readText()) }.getOrNull()?.takeIf { it.optString("owner") == owner }?.let { key to it }
+        }
+    }
+    /** The finished task's card was opened or closed, so it is not shown again. */
+    fun dismissCard(key: String) = synchronized(lock) {
+        val data = read(key) ?: return@synchronized
+        write(key, data.put("card_dismissed", true))
     }
     companion object {
         private val lock = Any()
         fun outfit(data: JSONObject): Outfit = OutfitRepository.parseOutfit(data.getJSONObject("outfit"))
         fun progress(data: JSONObject): FittingProgress? = if (!data.has("stage")) null else
             FittingProgress(data.getString("stage"), data.optDouble("progress").toFloat(), data.optString("status"))
+        const val CARD_RECENT_MS = 10 * 60_000L
+
+        /**
+         * The fitting the floating card follows: the newest one still in progress, otherwise the newest one
+         * finished in the last [recentMs] whose card was not opened or closed yet. Tasks from before this
+         * card existed carry no finish time and never show.
+         */
+        fun cardTask(tasks: List<Pair<String, JSONObject>>, now: Long, recentMs: Long = CARD_RECENT_MS): Pair<String, JSONObject>? =
+            tasks.filter { it.second.optString("state") in listOf("queued", "running") }.maxByOrNull { it.second.optLong("created_at") }
+                ?: tasks.filter { (_, data) ->
+                    data.optString("state") in listOf("completed", "failed") && !data.optBoolean("card_dismissed") &&
+                        data.has("finished_at") && now - data.getLong("finished_at") in 0..recentMs
+                }.maxByOrNull { it.second.optLong("finished_at") }
         fun job(data: JSONObject): TryOnJob? = if (data.has("job_id")) TryOnJob(data.getString("job_id"), data.getString("job_token")) else null
     }
 }

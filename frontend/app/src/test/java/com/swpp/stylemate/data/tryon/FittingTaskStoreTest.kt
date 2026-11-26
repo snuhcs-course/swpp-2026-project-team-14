@@ -63,4 +63,26 @@ class FittingTaskStoreTest {
         try { FittingTaskStore(temporary.root).read("../auth-session"); fail("Expected invalid task key") }
         catch (_: IllegalArgumentException) {}
     }
+
+    @Test fun theCardFollowsTheRunningFittingThenARecentUnopenedResult() {
+        val store = FittingTaskStore(temporary.root)
+        val first = "b".repeat(64); val second = "c".repeat(64)
+        store.create(first, "me", "gallery", outfit, byteArrayOf(1))
+        store.create(second, "me", "gallery", outfit, byteArrayOf(1))
+        store.create(key, "someone else", "gallery", outfit, byteArrayOf(1))
+        val now = System.currentTimeMillis()
+        assertEquals("only my tasks", 2, store.all("me").size)
+        store.finish(first)
+        assertEquals("a running fitting comes first", second, FittingTaskStore.cardTask(store.all("me"), now)?.first)
+        store.finish(second, "실패")
+        assertEquals("then the newest finished one", second, FittingTaskStore.cardTask(store.all("me"), now + 1_000)?.first)
+        store.dismissCard(second)
+        assertEquals(first, FittingTaskStore.cardTask(store.all("me"), now + 1_000)?.first)
+        assertNull("a result opened long ago is not offered", FittingTaskStore.cardTask(store.all("me"), now + FittingTaskStore.CARD_RECENT_MS + 60_000))
+    }
+
+    @Test fun tasksFromBeforeTheCardNeverShow() {
+        val old = org.json.JSONObject().put("owner", "me").put("state", "completed")
+        assertNull(FittingTaskStore.cardTask(listOf(key to old), System.currentTimeMillis()))
+    }
 }
