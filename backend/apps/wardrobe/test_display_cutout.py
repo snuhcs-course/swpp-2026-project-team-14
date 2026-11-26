@@ -168,3 +168,20 @@ class DisplayCutoutPixelsTests(SimpleTestCase):
             worn = Image.open(BytesIO(cutouts.render(source, dict(attributes(), _display_source='worn_crop'))))
         self.assertEqual(flat.getpixel((7, 7))[3], 255)
         self.assertEqual(worn.getpixel((7, 7))[3], 0)
+
+    def test_a_light_garment_on_a_plain_backdrop_is_recovered_where_the_model_missed_it(self):
+        # Ivory jacket on white: SegFormer found only its left half.
+        source = np.full((120, 120, 3), 247, dtype=np.uint8)
+        source[25:95, 30:90] = (226, 216, 196)
+        seed = Image.new('L', (120, 120))
+        seed.paste(255, (30, 25, 55, 95))
+        refined = np.asarray(cutouts.refine_on_plain_backdrop(Image.fromarray(source), seed)) > 0
+        self.assertTrue(refined[30:90, 35:85].mean() > .95)
+        self.assertFalse(refined[:15].any())
+
+    def test_a_busy_background_keeps_the_model_mask(self):
+        rng = np.random.default_rng(3)
+        source = rng.integers(0, 255, (80, 80, 3), dtype=np.uint8)  # a floor or room, not a backdrop
+        seed = Image.new('L', (80, 80))
+        seed.paste(255, (20, 20, 40, 60))
+        self.assertIs(cutouts.refine_on_plain_backdrop(Image.fromarray(source), seed), seed)
