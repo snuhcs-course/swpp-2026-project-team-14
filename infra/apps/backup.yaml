@@ -21,8 +21,9 @@ metadata:
   name: mysql-backup
   namespace: team14
 spec:
-  # 매일 04:00 KST (= 19:00 UTC). timeZone 필드는 클러스터 버전에 따라 없을 수 있어 UTC로 적는다.
-  schedule: "0 19 * * *"
+  # 매일 04:00 KST. 서버 OS 시간대와 관계없이 KST로 고정한다.
+  timeZone: Asia/Seoul
+  schedule: "0 4 * * *"
   concurrencyPolicy: Forbid
   startingDeadlineSeconds: 3600
   successfulJobsHistoryLimit: 1
@@ -106,8 +107,9 @@ metadata:
   name: media-backup
   namespace: team14
 spec:
-  # 매일 04:30 KST (= 19:30 UTC). DB 백업과 겹치지 않게 30분 늦춘다.
-  schedule: "30 19 * * *"
+  # 매일 04:30 KST. DB 백업과 겹치지 않게 30분 늦춘다.
+  timeZone: Asia/Seoul
+  schedule: "30 4 * * *"
   concurrencyPolicy: Forbid
   startingDeadlineSeconds: 3600
   successfulJobsHistoryLimit: 1

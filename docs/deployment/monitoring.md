@@ -33,6 +33,7 @@ exporters ──▶ Prometheus (1 hour, emptyDir) ──▶ Alertmanager ──�
 | BackendRestarting | more than 2 backend restarts in 15m | warning |
 | NodeDiskLow | less than 15 % free on the node root filesystem for 10m | critical |
 | BackupFailed | a backup CronJob has not succeeded for 2 days | warning |
+| BackupJobFailed | a backup Job failed (until the next run replaces it) | warning |
 
 Alerts are grouped by name and repeated every 4 hours; a resolved message is sent on recovery.
 

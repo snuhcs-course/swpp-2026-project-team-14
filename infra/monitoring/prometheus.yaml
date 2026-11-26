@@ -170,6 +170,14 @@ data:
             labels: {severity: warning}
             annotations:
               summary: "{{ $labels.cronjob }}가 2일 넘게 성공하지 못했습니다."
+
+          # 첫 성공 전에는 last_successful_time 메트릭이 없어 위 rule이 평가되지 않으므로,
+          # 실패한 Job을 직접 본다. 실패 Job은 다음 실행 전까지 남아 있다 (failedJobsHistoryLimit: 1).
+          - alert: BackupJobFailed
+            expr: kube_job_status_failed{namespace="team14",job_name=~"(mysql|media)-backup-.*"} > 0
+            labels: {severity: warning}
+            annotations:
+              summary: "백업 Job {{ $labels.job_name }}이 실패했습니다."
 ---
 apiVersion: apps/v1
 kind: Deployment

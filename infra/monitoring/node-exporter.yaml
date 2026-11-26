@@ -1,6 +1,7 @@
 # AI-generated with Claude Code (Claude Opus 5.5), 2026-11-26, review pending (Kihwan Kim)
 # 노드 디스크 여유 공간(NodeDiskLow)만 쓰므로 filesystem collector만 켠다.
 # hostNetwork·hostPID 없이 노드 루트 파일시스템만 읽기 전용으로 마운트한다.
+# 루트 용량만 보므로 mountPropagation은 두지 않는다 (LXC의 private 마운트에서 컨테이너 생성 실패 방지).
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
@@ -45,7 +46,6 @@ spec:
             - name: root
               mountPath: /host/root
               readOnly: true
-              mountPropagation: HostToContainer
       volumes:
         - name: root
           hostPath:
