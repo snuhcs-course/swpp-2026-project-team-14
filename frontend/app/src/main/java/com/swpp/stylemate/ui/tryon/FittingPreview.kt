@@ -237,12 +237,13 @@ internal fun PhotoFitting(outfit: Outfit, repository: FittingRepository, account
             var waited = false
             do {
                 val task = work.state(key)
-                pending = task?.optString("state") in listOf("queued", "running")
-                if (pending) waited = true
+                val running = task?.optString("state") in listOf("queued", "running")
+                if (running) { pending = true; waited = true }
                 progress = task?.let(com.swpp.stylemate.data.tryon.FittingTaskStore::progress)
-                if (pending && personPreview == null) personPreview = virtualModelPreview(context, task?.optString("source"))
+                if (running && personPreview == null) personPreview = virtualModelPreview(context, task?.optString("source"))
                 if (task?.optString("state") == "failed") failure = task.optString("error")
-                if (!pending && task?.optString("state") != "failed") {
+                // The loading screen stays up until the result is in hand, so it hands over without a blank frame.
+                if (!running && task?.optString("state") != "failed") {
                     val source = initialSource ?: repository.latestSource(outfit)
                     // Opened from the card or the notification: the fitting has just been made, so it is revealed too.
                     val fresh = waited || (initialSource != null && task?.optString("state") == "completed" &&
@@ -253,6 +254,7 @@ internal fun PhotoFitting(outfit: Outfit, repository: FittingRepository, account
                     // Seen here, so the floating card over the tabs does not offer it again.
                     if (result != null && task != null) runCatching { work.tasks.dismissCard(key) }
                 }
+                if (!running) pending = false
                 restoring = false
                 if (pending) delay(1_000)
             } while (pending)
@@ -341,27 +343,32 @@ internal fun PhotoFittingContent(
     revealing: Boolean = false,
     onRevealed: () -> Unit = {},
 ) {
-    Box(modifier.fillMaxWidth().padding(20.dp), contentAlignment = Alignment.Center) {
+    val image = remember(result) { result?.asImageBitmap() }
+    // Waiting, the reveal and the result are one panel that carries on, so nothing jumps between them.
+    val stage = when {
+        pending || image != null && (revealing || !busy) -> "panel"
+        busy -> "busy"
+        else -> "choose"
+    }
+    androidx.compose.animation.Crossfade(stage, modifier.fillMaxWidth(),
+        animationSpec = tween(450), label = "fitting stage") { shown ->
+    Box(Modifier.fillMaxSize().padding(20.dp), contentAlignment = Alignment.Center) {
         when {
-            pending -> FittingScanLoading(outfit, person, progress, notificationsEnabled, onConfirm)
-            busy -> Column(horizontalAlignment = Alignment.CenterHorizontally,
+            shown == "panel" -> FittingScanLoading(outfit, person, progress, notificationsEnabled, onConfirm,
+                result = if (pending) null else image, reveal = revealing, onRevealed = onRevealed, resultActions = {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        OutlinedButton(onClick = onSaveResult, enabled = !saving && !saved,
+                            modifier = Modifier.weight(1f).heightIn(min = 56.dp),
+                            shape = MaterialTheme.shapes.medium) { Text(if (saving) "저장 중…" else "저장") }
+                        Button(onClick = onConfirm, enabled = !saving,
+                            modifier = Modifier.weight(1f).heightIn(min = 56.dp),
+                            shape = MaterialTheme.shapes.medium) { Text("확인") }
+                    }
+                })
+            shown == "busy" -> Column(horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 CircularProgressIndicator(Modifier.size(40.dp))
                 Text("사진을 준비하고 있습니다.", style = MaterialTheme.typography.bodyLarge)
-            }
-            result != null -> Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-                val image = remember(result) { result.asImageBitmap() }
-                if (revealing) FittingWipe(person?.image, image, onRevealed,
-                    Modifier.fillMaxWidth().weight(1f).semantics { contentDescription = "생성된 피팅 이미지" })
-                else Image(image, "생성된 피팅 이미지", Modifier.fillMaxWidth().weight(1f), contentScale = ContentScale.Fit)
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OutlinedButton(onClick = onSaveResult, enabled = !saving && !saved,
-                        modifier = Modifier.weight(1f).heightIn(min = 56.dp),
-                        shape = MaterialTheme.shapes.medium) { Text(if (saving) "저장 중…" else "저장") }
-                    Button(onClick = onConfirm, enabled = !saving,
-                        modifier = Modifier.weight(1f).heightIn(min = 56.dp),
-                        shape = MaterialTheme.shapes.medium) { Text("확인") }
-                }
             }
             else -> Column(Modifier.verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(20.dp)) {
@@ -385,6 +392,7 @@ internal fun PhotoFittingContent(
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
+    }
     }
 }
 

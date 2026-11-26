@@ -3,7 +3,13 @@ package com.swpp.stylemate.ui.tryon
 
 import android.content.Context
 import android.graphics.BitmapFactory
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -45,6 +51,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -89,12 +96,19 @@ import kotlinx.coroutines.withContext
 /** The photo being dressed: the bundled virtual model, or the gallery photo while this screen keeps it. */
 internal data class FittingPerson(val image: ImageBitmap)
 
+/** easeInOutSine: the sweep slows gently at each end instead of snapping round. */
+private val SineInOut = CubicBezierEasing(.37f, 0f, .63f, 1f)
+
 /**
- * The fitting screen while a fitting is made. The AI returns the finished picture in one piece, so nothing
- * here pretends to be part of it: the photo to be dressed stays as it is while a scan band sweeps over it,
- * and the text says how far along it is. When the result arrives, [FittingWipe] reveals it from the top.
- * Without the photo (a gallery photo is removed after upload) the outfit is shown instead. Closing keeps
- * the fitting going under [FittingProgressCard].
+ * The fitting screen while a fitting is made, and the reveal once it is done. The AI returns the finished
+ * picture in one piece, so while it works the photo to be dressed stays as it is and a scan line sweeps over
+ * it. When [result] arrives, the same line glides back to the top from wherever it is and comes down again,
+ * the result above it and the photo before fitting below (without that photo, a soft grey copy of the
+ * result), then [onRevealed] is called. Without any photo the outfit is shown. Closing keeps the fitting
+ * going under [FittingProgressCard].
+ *
+ * The line's position is read only while drawing, so the animation redraws the line and the clip, never the
+ * whole screen.
  */
 @Composable
 internal fun FittingScanLoading(
@@ -104,72 +118,84 @@ internal fun FittingScanLoading(
     notificationsEnabled: Boolean,
     onConfirm: () -> Unit,
     modifier: Modifier = Modifier,
+    result: ImageBitmap? = null,
+    reveal: Boolean = true,
+    onRevealed: () -> Unit = {},
+    resultActions: @Composable () -> Unit = {},
 ) {
-    val fraction by animateFloatAsState(progress?.fraction ?: .05f, tween(900), label = "fitting")
-    val sweep by rememberInfiniteTransition(label = "scan").animateFloat(0f, 1f,
-        infiniteRepeatable(tween(2600, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "sweep")
+    val fraction by animateFloatAsState(if (result != null) 1f else progress?.fraction ?: .05f, tween(900), label = "fitting")
+    val sweep = rememberInfiniteTransition(label = "scan").animateFloat(0f, 1f,
+        infiniteRepeatable(tween(2800, easing = SineInOut), RepeatMode.Reverse), label = "sweep")
+    val line = remember { Animatable(0f) }
+    // 0: sweeping while it is made, 1: gliding back to the top, 2: revealing the result downwards,
+    // 3: the result itself (straight away when an earlier result is reopened).
+    var phase by remember { mutableIntStateOf(if (result != null && !reveal) 3 else 0) }
+    val done by rememberUpdatedState(onRevealed)
+    LaunchedEffect(result != null) {
+        if (result == null || phase == 3) return@LaunchedEffect
+        line.snapTo(sweep.value)
+        phase = 1
+        line.animateTo(0f, tween((line.value * 900).toInt().coerceAtLeast(120), easing = SineInOut))
+        phase = 2
+        line.animateTo(1f, tween(1800, easing = SineInOut))
+        delay(200)
+        phase = 3
+        done()
+    }
+    val at = { if (phase == 0) sweep.value else line.value }
     val panel = MaterialTheme.colorScheme.surfaceContainerLow
     val ink = MaterialTheme.colorScheme.primary
     val items = outfit?.items.orEmpty()
+    val grey = remember { ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(0f) }) }
     Column(modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
         Box(Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(24.dp)).background(panel)
-            .semantics { contentDescription = "가상 피팅 진행 ${(fraction * 100).toInt()}%, ${progress?.text ?: "준비 중"}" }) {
-            if (person != null) Image(person.image, null, Modifier.fillMaxSize().padding(18.dp), contentScale = ContentScale.Fit)
-            else if (items.isNotEmpty()) OutfitDressed(items, Modifier.fillMaxSize().padding(18.dp).alpha(.55f))
-            ScanLine(sweep, ink)
+            .then(if (phase == 3) Modifier else Modifier.semantics {
+                contentDescription = "가상 피팅 진행 ${(fraction * 100).toInt()}%, ${progress?.text ?: "준비 중"}"
+            })) {
+            val inner = Modifier.fillMaxSize().padding(18.dp)
+            when {
+                person != null -> Image(person.image, null, inner, contentScale = ContentScale.Fit)
+                result != null -> Image(result, null, inner.blur(12.dp), contentScale = ContentScale.Fit, colorFilter = grey, alpha = .55f)
+                items.isNotEmpty() -> OutfitDressed(items, inner.alpha(.55f))
+            }
+            if (result != null && phase == 2) Image(result, null, Modifier.fillMaxSize().drawWithContent {
+                clipRect(bottom = size.height * at()) { this@drawWithContent.drawContent() }
+            }.padding(18.dp), contentScale = ContentScale.Fit)
+            if (phase == 3 && result != null) Image(result, "생성된 피팅 이미지", Modifier.fillMaxSize().padding(18.dp),
+                contentScale = ContentScale.Fit)
+            else Canvas(Modifier.fillMaxSize()) {
+                val y = size.height * at().coerceIn(0f, 1f)
+                val glow = 64.dp.toPx()
+                drawRect(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0f), Color.White.copy(alpha = .45f)),
+                    startY = y - glow, endY = y), Offset(0f, y - glow), Size(size.width, glow))
+                drawLine(ink, Offset(0f, y), Offset(size.width, y), 1.5.dp.toPx())
+            }
         }
-        Spacer(Modifier.height(20.dp))
-        Text("가상 피팅을 만드는 중입니다.", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-        Spacer(Modifier.height(12.dp))
-        LinearProgressIndicator(progress = { fraction }, Modifier.fillMaxWidth().height(3.dp), color = ink,
-            trackColor = MaterialTheme.colorScheme.outlineVariant, drawStopIndicator = {})
-        Spacer(Modifier.height(8.dp))
-        Text(progress?.text ?: "준비하고 있어요", style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text("창을 닫아도 계속 만들어요.", style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(if (notificationsEnabled) "완료되면 알림을 보내드립니다." else "완료 후 코디에서 결과를 확인해 주세요.",
-            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center)
-        Spacer(Modifier.height(16.dp))
-        Button(onClick = onConfirm, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
-            shape = MaterialTheme.shapes.medium) { Text("확인") }
-    }
-}
-
-/** A thin line at [at] (0 top … 1 bottom of the box) with a soft light trailing above it. */
-@Composable
-private fun ScanLine(at: Float, color: Color) {
-    Canvas(Modifier.fillMaxSize()) {
-        val y = size.height * at.coerceIn(0f, 1f)
-        val glow = 64.dp.toPx()
-        drawRect(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0f), Color.White.copy(alpha = .5f)),
-            startY = y - glow, endY = y), Offset(0f, y - glow), Size(size.width, glow))
-        drawLine(color, Offset(0f, y), Offset(size.width, y), 1.5.dp.toPx())
-    }
-}
-
-/**
- * The finished fitting revealed from the top: above the scan line is the real result, below it the photo
- * before fitting ([before]; without it, a soft grey copy of the result). Calls [onDone] once fully shown.
- */
-@Composable
-internal fun FittingWipe(before: ImageBitmap?, after: ImageBitmap, onDone: () -> Unit, modifier: Modifier = Modifier) {
-    val line = remember { Animatable(0f) }
-    val done by rememberUpdatedState(onDone)
-    LaunchedEffect(after) {
-        delay(150)
-        line.animateTo(1f, tween(1700, easing = FastOutSlowInEasing))
-        done()
-    }
-    val grey = remember { ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(0f) }) }
-    Box(modifier) {
-        if (before != null) Image(before, null, Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
-        else Image(after, null, Modifier.fillMaxSize().blur(12.dp), contentScale = ContentScale.Fit, colorFilter = grey, alpha = .55f)
-        Image(after, null, Modifier.fillMaxSize().drawWithContent {
-            clipRect(bottom = size.height * line.value) { this@drawWithContent.drawContent() }
-        }, contentScale = ContentScale.Fit)
-        if (line.value < 1f) ScanLine(line.value, MaterialTheme.colorScheme.primary)
+        // Below the panel: the progress while it is made, then the result's buttons; the panel grows smoothly.
+        AnimatedContent(phase == 3, Modifier.fillMaxWidth(), label = "fitting actions", transitionSpec = {
+            fadeIn(tween(350, delayMillis = 150)) togetherWith fadeOut(tween(200)) using SizeTransform(clip = false) { _, _ -> tween(450, easing = SineInOut) }
+        }) { finished ->
+            if (finished) Box(Modifier.fillMaxWidth().padding(top = 20.dp)) { resultActions() }
+            else Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+            Spacer(Modifier.height(20.dp))
+            Text(if (result != null) "가상 피팅이 완성됐어요." else "가상 피팅을 만드는 중입니다.",
+                style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(12.dp))
+            LinearProgressIndicator(progress = { fraction }, Modifier.fillMaxWidth().height(3.dp), color = ink,
+                trackColor = MaterialTheme.colorScheme.outlineVariant, drawStopIndicator = {})
+            Spacer(Modifier.height(8.dp))
+            Text(if (result != null) "결과를 보여드릴게요" else progress?.text ?: "준비하고 있어요",
+                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("창을 닫아도 계속 만들어요.", style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(if (notificationsEnabled) "완료되면 알림을 보내드립니다." else "완료 후 코디에서 결과를 확인해 주세요.",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center)
+            Spacer(Modifier.height(16.dp))
+            Button(onClick = onConfirm, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
+                shape = MaterialTheme.shapes.medium) { Text("확인") }
+            }
+        }
     }
 }
 
