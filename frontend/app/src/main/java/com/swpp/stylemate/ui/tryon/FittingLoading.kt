@@ -24,6 +24,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
@@ -162,16 +163,21 @@ internal fun FittingScanLoading(
             .then(if (phase == 3) Modifier else Modifier.semantics {
                 contentDescription = "가상 피팅 진행 ${(fraction * 100).toInt()}%, ${progress?.text ?: "준비 중"}"
             })) {
-            val inner = Modifier.fillMaxSize().padding(18.dp)
-            when {
+            // One frame in the result's shape (the AI always returns 2:3) holds the photo before, the result and
+            // the line, so a gallery photo of another shape never shows around the result.
+            val frame = result?.let { it.width.toFloat() / it.height } ?: (2f / 3f)
+            Box(Modifier.fillMaxSize().padding(18.dp), contentAlignment = Alignment.Center) {
+            Box(Modifier.aspectRatio(frame)) {
+            val inner = Modifier.fillMaxSize()
+            if (phase < 3) when {
                 person != null -> Image(person.image, null, inner, contentScale = ContentScale.Fit)
                 result != null -> Image(result, null, inner.blur(12.dp), contentScale = ContentScale.Fit, colorFilter = grey, alpha = .55f)
                 items.isNotEmpty() -> OutfitDressed(items, inner.alpha(.55f))
             }
             if (result != null && phase == 2) Image(result, null, Modifier.fillMaxSize().drawWithContent {
                 clipRect(bottom = size.height * at()) { this@drawWithContent.drawContent() }
-            }.padding(18.dp), contentScale = ContentScale.Fit)
-            if (phase == 3 && result != null) Image(result, "생성된 피팅 이미지", Modifier.fillMaxSize().padding(18.dp),
+            }, contentScale = ContentScale.Fit)
+            if (phase == 3 && result != null) Image(result, "생성된 피팅 이미지", Modifier.fillMaxSize(),
                 contentScale = ContentScale.Fit)
             else Canvas(Modifier.fillMaxSize()) {
                 val y = size.height * at().coerceIn(0f, 1f)
@@ -179,6 +185,8 @@ internal fun FittingScanLoading(
                 drawRect(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0f), Color.White.copy(alpha = .45f)),
                     startY = y - glow, endY = y), Offset(0f, y - glow), Size(size.width, glow))
                 drawLine(ink, Offset(0f, y), Offset(size.width, y), 1.5.dp.toPx())
+            }
+            }
             }
         }
         // Below the panel: the progress while it is made, then the result's buttons; the panel grows smoothly.

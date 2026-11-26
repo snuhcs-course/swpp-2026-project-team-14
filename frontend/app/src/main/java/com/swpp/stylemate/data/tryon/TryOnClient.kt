@@ -49,6 +49,9 @@ data class FittingProgress(val stage: String, val fraction: Float, val text: Str
     }
 }
 
+/** Shown when the fitting photo has no person in it (the server answers 422 PERSON_REQUIRED). */
+const val PERSON_REQUIRED_MESSAGE = "사람이 보이는 사진을 골라 주세요. 옷만 있거나 사람이 없는 사진으로는 가상 피팅을 할 수 없어요."
+
 data class TryOnJob(val id: String, val token: String) {
     init { require(id.matches(Regex("[0-9a-f-]{36}")) && token.isNotBlank()) }
 }
@@ -172,6 +175,8 @@ class TryOnClient(private val account: AccountAccess, private val baseUrl: Strin
                     429 -> "피팅 대기열이 가득 찼어요. 잠시 후 다시 시도해 주세요."
                     404 -> "피팅 작업이 만료됐어요. 다시 생성해 주세요."
                     400, 413 -> "사진 형식과 크기를 확인해 주세요."
+                    // The server found no person in the photo (a garment, a screenshot…).
+                    422 -> PERSON_REQUIRED_MESSAGE
                     else -> "피팅 요청을 처리하지 못했어요. 다시 시도해 주세요."
                 }
             }

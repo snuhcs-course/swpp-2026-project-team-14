@@ -7,6 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from django.test import SimpleTestCase, TestCase, override_settings
 from PIL import Image
+import numpy as np
 from apps.users.auth import issue_token
 from apps.users.models import User
 from .generation import GeneratedImage, MODEL
@@ -32,6 +33,18 @@ class FittingAccountTests(TestCase):
         mocked.start()
         self.addCleanup(mocked.stop)
         self.addCleanup(self.jobs.close)
+        # The test photos are plain colour; the person check has its own tests below.
+        person = patch("apps.fittings.person.has_person", return_value=True)
+        self.has_person = person.start()
+        self.addCleanup(person.stop)
+
+    def test_a_photo_without_a_person_is_refused_before_any_generation(self):
+        self.has_person.return_value = False
+        refused = self.upload()
+        self.assertEqual((refused.status_code, refused.json()["error"]), (422, "PERSON_REQUIRED"))
+        self.assertEqual(self.jobs.jobs, {})
+        self.has_person.return_value = None  # the check could not run here: fitting is not blocked
+        self.assertEqual(self.upload().status_code, 202)
 
     def upload(self, payload=None, **headers):
         return self.client.post("/api/fittings/jobs/", json.dumps(self.payload if payload is None else payload),
@@ -206,3 +219,32 @@ class FittingQueueInitializationTests(SimpleTestCase):
                 self.assertEqual(queues[0].concurrency, 2)
             finally:
                 queues[0].close()
+
+
+class PersonCheckTests(SimpleTestCase):
+    """Label maps as SegFormer gives them (2 hair, 11 face, 12-15 legs and arms, 4 upper clothes)."""
+
+    def labels(self, **share):
+        found = np.zeros(10_000, dtype=np.int64)
+        start = 0
+        for label, fraction in share.items():
+            count = int(fraction * found.size)
+            found[start:start + count] = int(label.lstrip("l"))
+            start += count
+        return found.reshape(100, 100)
+
+    def test_a_person_needs_a_head_and_some_body(self):
+        from .person import shows_person
+        self.assertTrue(shows_person(self.labels(l2=.01, l11=.008, l14=.02, l4=.2)), "front photo")
+        self.assertTrue(shows_person(self.labels(l2=.007, l12=.01)), "side or back view: hair, no face")
+        self.assertFalse(shows_person(self.labels(l4=.35)), "a flat-lay garment")
+        self.assertFalse(shows_person(self.labels(l11=.002, l4=.3)), "a face-like print on a T-shirt")
+        self.assertFalse(shows_person(self.labels()), "a screenshot")
+
+    def test_the_check_never_blocks_when_it_cannot_run(self):
+        from apps.wardrobe.analysis import AnalysisError
+        from . import person
+        with patch.object(person, "labels", side_effect=AnalysisError("SEGMENTATION_NOT_CONFIGURED", 503)):
+            self.assertIsNone(person.has_person(b"photo"))
+        with patch.object(person, "labels", side_effect=RuntimeError("model crashed")):
+            self.assertIsNone(person.has_person(b"photo"))
