@@ -79,9 +79,11 @@ def submit(request):
                 raise ValueError("Invalid garment metadata")
             clothes.append((garment["category"], decode_image(garment["image"]), kind, open_front))
         photo = decode_image(data["person"])
-        # A photo without a person would come back with a stranger the model made up.
-        if person.has_person(photo) is False:
-            return response({"error": "PERSON_REQUIRED"}, 422)
+        # A photo without a person would come back with a stranger the model made up, and bottoms on a photo
+        # cut above the legs with legs it made up.
+        refused = person.check(photo, needs_lower_body="bottoms" in categories)
+        if refused:
+            return response({"error": refused}, 422)
         job = get_jobs().submit(photo, clothes, owner=str(request.user.pk))
     except QueueFull:
         result = response({"error": "FITTING_BUSY"}, 429)

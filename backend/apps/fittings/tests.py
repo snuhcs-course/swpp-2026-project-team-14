@@ -34,17 +34,25 @@ class FittingAccountTests(TestCase):
         self.addCleanup(mocked.stop)
         self.addCleanup(self.jobs.close)
         # The test photos are plain colour; the person check has its own tests below.
-        person = patch("apps.fittings.person.has_person", return_value=True)
-        self.has_person = person.start()
+        person = patch("apps.fittings.person.check", return_value=None)
+        self.person_check = person.start()
         self.addCleanup(person.stop)
 
     def test_a_photo_without_a_person_is_refused_before_any_generation(self):
-        self.has_person.return_value = False
-        refused = self.upload()
-        self.assertEqual((refused.status_code, refused.json()["error"]), (422, "PERSON_REQUIRED"))
+        for reason in ("PERSON_REQUIRED", "FULL_BODY_REQUIRED"):
+            self.person_check.return_value = reason
+            refused = self.upload()
+            self.assertEqual((refused.status_code, refused.json()["error"]), (422, reason))
         self.assertEqual(self.jobs.jobs, {})
-        self.has_person.return_value = None  # the check could not run here: fitting is not blocked
+        self.person_check.return_value = None
         self.assertEqual(self.upload().status_code, 202)
+
+    def test_the_lower_body_is_needed_only_when_bottoms_are_fitted(self):
+        self.upload()
+        self.assertFalse(self.person_check.call_args.kwargs["needs_lower_body"])  # a top alone
+        encoded = self.payload["person"]
+        self.upload({**self.payload, "garments": [{"category": "tops", "image": encoded}, {"category": "bottoms", "image": encoded}]})
+        self.assertTrue(self.person_check.call_args.kwargs["needs_lower_body"])
 
     def upload(self, payload=None, **headers):
         return self.client.post("/api/fittings/jobs/", json.dumps(self.payload if payload is None else payload),
@@ -241,10 +249,21 @@ class PersonCheckTests(SimpleTestCase):
         self.assertFalse(shows_person(self.labels(l11=.002, l4=.3)), "a face-like print on a T-shirt")
         self.assertFalse(shows_person(self.labels()), "a screenshot")
 
+    def test_bottoms_need_the_legs_in_view(self):
+        from .person import shows_lower_body
+        self.assertTrue(shows_lower_body(self.labels(l12=.004, l6=.1, l4=.15)), "full body: legs and shoes")
+        self.assertFalse(shows_lower_body(self.labels(l4=.3, l11=.05)), "cut at the chest")
+        found = np.zeros((100, 100), dtype=np.int64)
+        found[20:45, 30:70] = 4   # top, 25 rows
+        found[45:70, 35:65] = 6   # trousers cut at the knees, 25 rows
+        self.assertFalse(shows_lower_body(found), "cut at the knees: bottoms no longer than the top")
+        found[70:98, 35:65] = 6   # trousers down to just above the feet
+        self.assertTrue(shows_lower_body(found), "cut just above the feet")
+
     def test_the_check_never_blocks_when_it_cannot_run(self):
         from apps.wardrobe.analysis import AnalysisError
         from . import person
         with patch.object(person, "labels", side_effect=AnalysisError("SEGMENTATION_NOT_CONFIGURED", 503)):
-            self.assertIsNone(person.has_person(b"photo"))
+            self.assertIsNone(person.check(b"photo", needs_lower_body=True))
         with patch.object(person, "labels", side_effect=RuntimeError("model crashed")):
-            self.assertIsNone(person.has_person(b"photo"))
+            self.assertIsNone(person.check(b"photo", needs_lower_body=True))

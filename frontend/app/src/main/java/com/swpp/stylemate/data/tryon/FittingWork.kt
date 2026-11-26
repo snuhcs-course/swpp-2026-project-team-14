@@ -108,6 +108,8 @@ class FittingWorker internal constructor(context: Context, parameters: WorkerPar
                 }
                 // The garment photos are independent downloads: fetch them together, keep the slot order.
                 val picked = slots.mapNotNull { slot -> outfit.items.firstOrNull { it.slot == slot }?.let { slot to it } }
+                // Shoes and accessories are not dressed; an outfit of only those has nothing to fit.
+                check(picked.isNotEmpty()) { "이 코디에는 입혀볼 상의나 하의가 없어요." }
                 val images = kotlinx.coroutines.coroutineScope {
                     picked.map { (_, item) -> async {
                         WardrobeRepository.fittingImage(records.getValue(item.garmentId).getString("image_url"), account, apiBaseUrl)
@@ -139,8 +141,12 @@ class FittingWorker internal constructor(context: Context, parameters: WorkerPar
             if (error is java.io.IOException && tasks.read(key)?.let(FittingTaskStore::job) != null) {
                 return@withContext Result.retry()
             }
-            val message = if (error is java.io.IOException) "피팅 작업을 완료하지 못했어요. 사진을 다시 선택해 주세요."
-                else error.message ?: "피팅 생성에 실패했어요. 다시 시도해 주세요."
+            val message = when {
+                error is java.io.IOException -> "피팅 작업을 완료하지 못했어요. 사진을 다시 선택해 주세요."
+                // A garment of the outfit was deleted from the wardrobe after the outfit was shown.
+                error is com.swpp.stylemate.data.AuthException && error.code in listOf("HTTP_404", "GARMENT_NOT_FOUND") -> GARMENT_GONE_MESSAGE
+                else -> error.message ?: "피팅 생성에 실패했어요. 다시 시도해 주세요."
+            }
             tasks.finish(key, message)
             if (currentAccount()?.userId == owner) FittingNotifications.finished(applicationContext, key, owner, failed = true)
             Result.failure()

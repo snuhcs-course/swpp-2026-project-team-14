@@ -40,12 +40,40 @@ def shows_person(found):
     return bool(head >= MIN_HEAD and head + np.isin(found, LIMBS).mean() >= MIN_PERSON)
 
 
-def has_person(raw):
-    """True or False; None when the check cannot run (no model here), so fitting is not blocked by it."""
+LEGS_AND_SHOES = (12, 13, 9, 10)
+UPPER_CLOTHES, LOWER_CLOTHES = (4, 7), (5, 6, 7)
+MIN_LEGS = .003
+
+
+def _height(found, values):
+    rows = np.where(np.isin(found, values).any(axis=1))[0]
+    return (rows.max() - rows.min() + 1) / found.shape[0] if len(rows) else 0.
+
+
+def shows_lower_body(found):
+    """Legs or shoes in view, or bottoms clearly longer than the top (a photo cut just above the ankles).
+
+    Full-body photos showed at least 0.5 % legs and shoes; the same photos cut at the chest, waist or knees
+    showed none, and their bottoms were no longer than the top."""
+    if np.isin(found, LEGS_AND_SHOES).mean() >= MIN_LEGS:
+        return True
+    upper = _height(found, UPPER_CLOTHES)
+    return bool(upper and _height(found, LOWER_CLOTHES) >= upper * 1.1)
+
+
+def check(raw, needs_lower_body):
+    """None when the photo will do, otherwise the reason to refuse it ('PERSON_REQUIRED' or
+    'FULL_BODY_REQUIRED' when bottoms are to be fitted on a photo cut above the legs). The photo is never
+    refused when the check cannot run here (no model), so fitting is not blocked by it."""
     try:
-        return shows_person(labels(raw))
+        found = labels(raw)
     except AnalysisError:
         return None
     except Exception:
         logger.exception('Person check failed')
         return None
+    if not shows_person(found):
+        return 'PERSON_REQUIRED'
+    if needs_lower_body and not shows_lower_body(found):
+        return 'FULL_BODY_REQUIRED'
+    return None
