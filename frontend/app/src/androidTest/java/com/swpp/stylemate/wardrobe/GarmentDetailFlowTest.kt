@@ -178,11 +178,11 @@ class GarmentDetailFlowTest {
         compose.onNode(hasText("신발") and isSelectable()).performScrollTo().performClick().assertIsSelected()
         compose.onNodeWithText("스니커즈").assertIsDisplayed()
         compose.runOnIdle { items.value = listOf(top) }
-        compose.onNode(hasScrollToIndexAction()).performScrollToIndex(0)
+        compose.onAllNodes(hasScrollToIndexAction()).onFirst().performScrollToIndex(0)
         compose.onNodeWithText("전체").assertIsSelected()
         compose.onNodeWithText("내 셔츠").assertIsDisplayed()
         compose.runOnIdle { items.value = listOf(top, shoe) }
-        compose.onNode(hasScrollToIndexAction()).performScrollToIndex(0)
+        compose.onAllNodes(hasScrollToIndexAction()).onFirst().performScrollToIndex(0)
         compose.onNodeWithText("전체").assertIsSelected()
     }
 }
