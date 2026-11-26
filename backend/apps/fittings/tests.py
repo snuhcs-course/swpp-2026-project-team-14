@@ -51,8 +51,13 @@ class FittingAccountTests(TestCase):
             self.assertEqual(self.client.get(path + "image/", **denied).status_code, 404)
             self.assertEqual(self.client.delete(path, **denied).status_code, 404)
         self.assertEqual(self.client.get(path + "image/", **headers).status_code, 409)
+        waiting = self.client.get(path, **headers).json()
+        self.assertEqual((waiting["stage"], waiting["progress"], waiting["expected_seconds"]), ("waiting", 0.05, 40.0))
         self.jobs.run_next()
         state = self.client.get(path, **headers)
+        self.assertEqual((state.json()["stage"], state.json()["progress"]), ("done", 1.0))
+        # the next estimate follows the generation that just finished
+        self.assertLess(state.json()["expected_seconds"], 40.0)
         self.assertTrue(state.json()["inputs_deleted"])
         self.assertEqual(state.json()["cost_usd"], "0.06")
         result = self.client.get(path + "image/", **headers)
@@ -175,6 +180,17 @@ class FittingAccountTests(TestCase):
                 self.assertEqual(operation(path + suffix, **headers).status_code, 404)
         self.assertFalse(self.jobs.run_next())
         runner.assert_not_called()
+
+
+class FittingProgressTests(SimpleTestCase):
+    def test_progress_is_a_bounded_estimate_of_the_usual_generation_time(self):
+        from apps.fittings.jobs import progress_of
+        self.assertEqual(progress_of("queued", 0, 40), 0.05)
+        self.assertEqual(progress_of("running", 0, 40), 0.1)
+        self.assertEqual(progress_of("running", 20, 40), 0.525)
+        self.assertEqual(progress_of("running", 400, 40), 0.95)  # never "done" before the image exists
+        self.assertEqual(progress_of("completed", 5, 40), 1.0)
+        self.assertEqual(progress_of("failed", 5, 40), 0.0)
 
 
 @override_settings(OPENROUTER_API_KEY="synthetic-only", FITTING_CONCURRENCY=2)

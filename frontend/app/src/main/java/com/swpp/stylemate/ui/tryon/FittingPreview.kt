@@ -106,6 +106,7 @@ internal fun PhotoFitting(outfit: Outfit, repository: FittingRepository, account
     var saving by remember { mutableStateOf(false) }
     var saved by remember { mutableStateOf(false) }
     var pending by remember { mutableStateOf(false) }
+    var progress by remember { mutableStateOf<com.swpp.stylemate.data.tryon.FittingProgress?>(null) }
     var notificationSettings by remember { mutableStateOf(FittingNotificationSettings()) }
     var changingNotification by remember { mutableStateOf(false) }
     var requestingNotificationPermission by remember { mutableStateOf(false) }
@@ -228,6 +229,7 @@ internal fun PhotoFitting(outfit: Outfit, repository: FittingRepository, account
             do {
                 val task = work.state(repository.taskKey(outfit))
                 pending = task?.optString("state") in listOf("queued", "running")
+                progress = task?.let(com.swpp.stylemate.data.tryon.FittingTaskStore::progress)
                 if (task?.optString("state") == "failed") failure = task.optString("error")
                 if (!pending && task?.optString("state") != "failed") {
                     val source = initialSource ?: repository.latestSource(outfit)
@@ -264,7 +266,7 @@ internal fun PhotoFitting(outfit: Outfit, repository: FittingRepository, account
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) saveResult()
                 else saveDocument.launch("StyleMate-${UUID.randomUUID()}.png")
             }, onConfirm = onClose, modifier = Modifier.weight(1f), saving = saving, saved = saved,
-                virtualModelLabel = virtualModel?.label, pending = pending,
+                virtualModelLabel = virtualModel?.label, pending = pending, progress = progress,
                 notificationsEnabled = notificationSettings.enabled && FittingNotifications.allowed(context))
         }
     }
@@ -313,6 +315,7 @@ internal fun PhotoFittingContent(
     saved: Boolean = false,
     virtualModelLabel: String? = null,
     pending: Boolean = false,
+    progress: com.swpp.stylemate.data.tryon.FittingProgress? = null,
     notificationsEnabled: Boolean = true,
 ) {
     Box(modifier.fillMaxWidth().padding(20.dp), contentAlignment = Alignment.Center) {
@@ -320,6 +323,7 @@ internal fun PhotoFittingContent(
             pending -> Column(horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(20.dp)) {
                 Text("가상 피팅을 만드는 중입니다.", style = MaterialTheme.typography.titleMedium)
+                FittingProgressView(progress)
                 Text(if (notificationsEnabled) "완료되면 알림을 보내드립니다."
                     else "완료 후 코디에서 결과를 확인해 주세요.", textAlign = TextAlign.Center)
                 Button(onClick = onConfirm) { Text("확인") }
@@ -453,5 +457,28 @@ private suspend fun Bitmap.fittingJpeg(): ByteArray = withContext(Dispatchers.De
     ByteArrayOutputStream().use { output ->
         check(compress(Bitmap.CompressFormat.JPEG, 95, output)) { "사진을 준비하지 못했어요. 다시 선택해 주세요." }
         output.toByteArray()
+    }
+}
+
+
+/** Steps of a fitting with an estimated bar: the time left comes from recent generations on the server. */
+@Composable
+internal fun FittingProgressView(progress: com.swpp.stylemate.data.tryon.FittingProgress?) {
+    val steps = listOf("uploading" to "사진 전송", "waiting" to "대기", "generating" to "옷 입히는 중", "done" to "완료")
+    val current = steps.indexOfFirst { it.first == (progress?.stage ?: "waiting") }.coerceAtLeast(0)
+    val fraction by androidx.compose.animation.core.animateFloatAsState(progress?.fraction ?: 0.05f, label = "fitting")
+    Column(Modifier.fillMaxWidth().semantics(mergeDescendants = true) {
+        contentDescription = "가상 피팅 진행 ${(fraction * 100).toInt()}%, ${progress?.text ?: "준비 중"}"
+    }, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            steps.forEachIndexed { index, (_, label) ->
+                Text(label, style = MaterialTheme.typography.labelMedium,
+                    fontWeight = if (index == current) androidx.compose.ui.text.font.FontWeight.Bold else null,
+                    color = if (index <= current) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        androidx.compose.material3.LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth())
+        Text(progress?.text ?: "준비하고 있어요", style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

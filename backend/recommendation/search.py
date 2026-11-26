@@ -43,6 +43,10 @@ COLOR_RERANK = 150
 NOVELTY_PENALTY = 0.12
 SEEN_PENALTY = 0.15
 SEEN_OUTFIT_PENALTY = 0.5
+# Rank-only cost per garment from the set shown just before, so 새로 추천 does not lead with the same coat
+# every time. It changes the pick order only; the score people read stays the same.
+RECENT_GARMENT_RANK = 0.04
+RECENT_LEAD_RANK = 0.12  # garments of the previous first card: the one people notice repeating
 WEATHER_RELAX_PENALTY = 0.25
 MASKED_SHARE = 0.5
 MMR_LAMBDA = 0.5
@@ -72,6 +76,8 @@ class Request:
     preference: dict = field(default_factory=preference.empty)
     seen: list[str] = field(default_factory=list)  # garment ids already shown
     seen_outfits: list[str] = field(default_factory=list)  # outfit keys already shown ("id+id")
+    recent: list[str] = field(default_factory=list)  # garment ids of the set shown just before (rank only)
+    recent_lead: list[str] = field(default_factory=list)  # garment ids of that set's first card (rank only)
     count: int = 3
     seed: int = 0
     jitter: float = 0.0  # random spread on the pick order (app refreshes vary); 0 keeps results deterministic
@@ -115,6 +121,7 @@ def recommend(catalog: Catalog, req: Request) -> dict:
     context_style = style_order[0] if style_order else None
     excluded = set(req.preference.get("excluded", []))
     seen, seen_outfits = set(req.seen), set(req.seen_outfits)
+    recent, recent_lead = set(req.recent), set(req.recent_lead)
     filtered: Counter = Counter()
     notes = [explain.MALE_NOTE] if req.body.male and not wardrobe_only else []
 
@@ -217,8 +224,16 @@ def recommend(catalog: Catalog, req: Request) -> dict:
         o["seen"] = o["key"] in seen_outfits
         o["total"] = o["prelim"] + WEIGHTS["color"] * (col.score - 0.75) - SEEN_OUTFIT_PENALTY * o["seen"]
         o["rank"] = o["total"] + (rng.uniform(0, req.jitter) if req.jitter else 0.0)  # total itself stays unchanged
+        ids = {c.item.id for c in o["cands"]}
+        o["rank"] -= RECENT_GARMENT_RANK * len(recent & ids) + RECENT_LEAD_RANK * len(recent_lead & ids)
         finals.append(o)
     picked = _mmr(finals, req.count)
+    if recent_lead and picked:
+        # The first card is what people compare between refreshes: lead with the best outfit of this set that
+        # shares nothing with the previous first card (the set and every score stay as they are).
+        overlap = [len(recent_lead & {c.item.id for c in o["cands"]}) for o in picked]
+        best = min(range(len(picked)), key=lambda i: (overlap[i], i))
+        picked.insert(0, picked.pop(best))
     has_feedback = bool(req.preference.get("weights"))
     outfits = [_present(catalog, req, band, o, has_feedback) for o in picked]
     return {
