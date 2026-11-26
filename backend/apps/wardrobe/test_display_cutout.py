@@ -139,3 +139,32 @@ class DisplayCutoutPixelsTests(SimpleTestCase):
         self.assertIsNotNone(mask)
         self.assertEqual(mask.getpixel((45, 45)), 255)
         self.assertEqual(mask.getpixel((0, 0)), 0)
+
+    @patch('apps.wardrobe.cutouts.clothing_mask')
+    def test_only_ai_flatlays_use_the_colour_shortcut_real_photos_use_segformer(self, segment):
+        # A dark garment on a light background passes the colour check, but a phone photo's floor seams and
+        # shadows would stay in the cutout, so real photos always go through the model.
+        source = np.full((100, 100, 3), 245, dtype=np.uint8)
+        source[15:85, 20:80] = 20
+        mask = Image.new('L', (100, 100))
+        mask.paste(255, (20, 15, 80, 85))
+        segment.return_value = mask
+        for display_source in ('garment_photo', 'worn_crop'):
+            cutouts.render(png(Image.fromarray(source)), dict(attributes(), _display_source=display_source))
+        self.assertEqual(segment.call_count, 2)
+        cutouts.render(png(Image.fromarray(source)), dict(attributes(), _display_source='ai_flatlay'))
+        self.assertEqual(segment.call_count, 2)
+
+    def test_gaps_enclosed_by_a_flat_garment_are_filled_but_not_in_worn_crops(self):
+        mask = Image.new('L', (20, 20))
+        mask.paste(255, (3, 3, 17, 17))
+        mask.paste(0, (8, 8, 12, 12))  # a light print read as background
+        filled = np.asarray(cutouts.fill_enclosed_holes(mask))
+        self.assertEqual(filled[10, 10], 255)
+        self.assertEqual(filled[0, 0], 0)
+        with patch('apps.wardrobe.cutouts.clothing_mask', return_value=mask):
+            source = png(Image.new('RGB', (20, 20), (90, 90, 90)))
+            flat = Image.open(BytesIO(cutouts.render(source, dict(attributes(), _display_source='garment_photo'))))
+            worn = Image.open(BytesIO(cutouts.render(source, dict(attributes(), _display_source='worn_crop'))))
+        self.assertEqual(flat.getpixel((7, 7))[3], 255)
+        self.assertEqual(worn.getpixel((7, 7))[3], 0)

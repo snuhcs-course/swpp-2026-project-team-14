@@ -27,7 +27,7 @@ from .models import Garment
 
 logger = logging.getLogger(__name__)
 HANGABLE = ('top', 'bottom', 'outerwear')
-DISPLAY_VERSION = 'flatlay-union-v2-448'
+DISPLAY_VERSION = 'flatlay-union-v4-448'  # v3: real photos always use SegFormer; v4: enclosed holes filled
 _inference = Semaphore(1)  # one CPU inference at a time, shared by background work and requests
 _jobs = [Lock() for _ in range(16)]  # one cutout job per garment at a time
 _pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix='garment-cutout')
@@ -85,13 +85,28 @@ def contrast_mask(image):
     return Image.fromarray(mask)
 
 
+def fill_enclosed_holes(mask):
+    """A flat garment has no see-through gaps: light prints or logos that the model reads as background
+    would otherwise become holes. Only gaps fully enclosed by the garment are filled; worn crops keep
+    theirs, since a gap between an arm and the body there is real background."""
+    solid = np.asarray(mask) > 0
+    count, labels = cv2.connectedComponents((~solid).astype(np.uint8), connectivity=4)
+    border = np.unique(np.concatenate((labels[0], labels[-1], labels[:, 0], labels[:, -1])))
+    holes = ~solid & ~np.isin(labels, border)
+    return Image.fromarray(((solid | holes) * 255).astype(np.uint8))
+
+
 def render(raw, attributes):
     with Image.open(BytesIO(raw)) as original:
         image = ImageOps.exif_transpose(original).convert('RGBA')
         image.thumbnail((600, 600))
-    mask = contrast_mask(image)
+    # The colour shortcut only for AI flat-lays, which are always on clean white. Real photos (직접 촬영하기,
+    # worn crops) have floors, seams and shadows that it would keep as part of the garment.
+    mask = contrast_mask(image) if attributes.get('_display_source') == 'ai_flatlay' else None
     if mask is None:
         mask = clothing_mask(image, attributes)
+    if attributes.get('_display_source') != 'worn_crop':
+        mask = fill_enclosed_holes(mask)
     if mask.size != image.size or mask.getbbox() is None:
         raise AnalysisError('IMAGE_TARGET_UNCLEAR', 422)
     bounds = mask.getbbox()
