@@ -1,0 +1,255 @@
+# AI-generated with Claude Code (Claude Opus 5.5), 2026-11-26, review pending (Kihwan Kim)
+# 장애 판단 전용 Prometheus. rule 구간이 최대 15분이므로 1시간만 보관하고 emptyDir에 저장한다.
+# ConfigMap은 자동 reload되지 않는다. 설정이나 rule을 바꾸면 rollout restart가 필요하다.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: prometheus
+  namespace: monitoring
+---
+# Traefik Pod를 찾기 위해 kube-system의 Pod 조회 권한만 준다.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: prometheus-pod-discovery
+  namespace: kube-system
+rules:
+  - apiGroups: [""]
+    resources: [pods]
+    verbs: [get, list, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: prometheus-pod-discovery
+  namespace: kube-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: prometheus-pod-discovery
+subjects:
+  - kind: ServiceAccount
+    name: prometheus
+    namespace: monitoring
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: monitoring
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 30s
+      evaluation_interval: 30s
+
+    rule_files:
+      - /etc/prometheus/rules.yml
+
+    alerting:
+      alertmanagers:
+        - static_configs:
+            - targets: [alertmanager.monitoring.svc:9093]
+
+    scrape_configs:
+      - job_name: prometheus
+        static_configs:
+          - targets: [localhost:9090]
+
+      - job_name: alertmanager
+        static_configs:
+          - targets: [alertmanager.monitoring.svc:9093]
+
+      - job_name: kube-state-metrics
+        static_configs:
+          - targets: [kube-state-metrics.monitoring.svc:8080]
+
+      - job_name: node-exporter
+        static_configs:
+          - targets: [node-exporter.monitoring.svc:9100]
+
+      - job_name: mysqld-exporter
+        static_configs:
+          - targets: [mysqld-exporter.team14.svc:9104]
+
+      # K3s 내장 Traefik. 이름이 metrics인 컨테이너 포트(기본 9100)를 scrape한다.
+      - job_name: traefik
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names: [kube-system]
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
+            regex: traefik
+            action: keep
+          - source_labels: [__meta_kubernetes_pod_container_port_name]
+            regex: metrics
+            action: keep
+
+  rules.yml: |
+    groups:
+      # 각 인프라가 살아 있는지
+      - name: liveness
+        rules:
+          - alert: NodeNotReady
+            expr: kube_node_status_condition{condition="Ready",status="true"} == 0
+            for: 1m
+            labels: {severity: critical}
+            annotations:
+              summary: "노드 {{ $labels.node }}가 Ready 상태가 아닙니다."
+
+          - alert: BackendDown
+            expr: kube_deployment_status_replicas_available{namespace="team14",deployment="backend"} < 1
+            for: 1m
+            labels: {severity: critical}
+            annotations:
+              summary: "backend Pod 중 /healthz/를 통과한 것이 없습니다."
+
+          - alert: MySQLDown
+            expr: mysql_up == 0
+            for: 1m
+            labels: {severity: critical}
+            annotations:
+              summary: "MySQL에 접속할 수 없습니다."
+
+          - alert: TraefikDown
+            expr: kube_deployment_status_replicas_available{namespace="kube-system",deployment="traefik"} < 1
+            for: 1m
+            labels: {severity: critical}
+            annotations:
+              summary: "Traefik(Ingress)이 내려가 외부 요청을 받을 수 없습니다."
+
+          # 수집이 끊기면 다른 rule이 판단할 데이터가 없어 조용해지므로 따로 감시한다.
+          - alert: TargetDown
+            expr: up == 0
+            for: 2m
+            labels: {severity: warning}
+            annotations:
+              summary: "{{ $labels.job }} 메트릭 수집에 실패했습니다 ({{ $labels.instance }})."
+
+      # 살아 있지만 정상이 아닌 상태
+      - name: essential
+        rules:
+          # 요청이 적을 때 한두 건 실패로 울리지 않도록 5분간 20건 이상일 때만 판단한다.
+          - alert: Backend5xxHigh
+            expr: |
+              (
+                sum(rate(traefik_service_requests_total{service=~"team14-backend-.*",code=~"5.."}[5m]))
+                /
+                sum(rate(traefik_service_requests_total{service=~"team14-backend-.*"}[5m]))
+              ) > 0.05
+              and
+              sum(increase(traefik_service_requests_total{service=~"team14-backend-.*"}[5m])) >= 20
+            for: 5m
+            labels: {severity: critical}
+            annotations:
+              summary: "backend 응답 중 5xx 비율이 {{ $value | humanizePercentage }}입니다."
+
+          # 재시작 사이에 잠깐 Ready가 되어 BackendDown을 피해 가는 경우를 잡는다.
+          - alert: BackendRestarting
+            expr: increase(kube_pod_container_status_restarts_total{namespace="team14",container="backend"}[15m]) > 2
+            labels: {severity: warning}
+            annotations:
+              summary: "backend가 15분 동안 {{ $value | humanize }}회 재시작했습니다."
+
+          - alert: NodeDiskLow
+            expr: |
+              node_filesystem_avail_bytes{mountpoint="/",fstype!~"tmpfs|ramfs"}
+              / node_filesystem_size_bytes{mountpoint="/",fstype!~"tmpfs|ramfs"} < 0.15
+            for: 10m
+            labels: {severity: critical}
+            annotations:
+              summary: "노드 디스크 여유 공간이 {{ $value | humanizePercentage }} 남았습니다."
+
+      - name: backup
+        rules:
+          # 하루 1회 백업이므로 마지막 성공 후 2일이 지나면 실패로 본다.
+          - alert: BackupFailed
+            expr: time() - kube_cronjob_status_last_successful_time{namespace="team14",cronjob=~"mysql-backup|media-backup"} > 2 * 86400
+            for: 10m
+            labels: {severity: warning}
+            annotations:
+              summary: "{{ $labels.cronjob }}가 2일 넘게 성공하지 못했습니다."
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus
+  namespace: monitoring
+spec:
+  replicas: 1
+  revisionHistoryLimit: 2
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: prometheus
+  template:
+    metadata:
+      labels:
+        app: prometheus
+    spec:
+      serviceAccountName: prometheus
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        fsGroup: 65534
+      containers:
+        - name: prometheus
+          image: prom/prometheus:v2.55.1
+          args:
+            - --config.file=/etc/prometheus/prometheus.yml
+            - --storage.tsdb.path=/prometheus
+            - --storage.tsdb.retention.time=1h
+            - --storage.tsdb.retention.size=512MB
+          ports:
+            - name: http
+              containerPort: 9090
+          readinessProbe:
+            httpGet: {path: /-/ready, port: http}
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: {path: /-/healthy, port: http}
+            periodSeconds: 30
+            failureThreshold: 4
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - name: config
+              mountPath: /etc/prometheus
+              readOnly: true
+            - name: data
+              mountPath: /prometheus
+      volumes:
+        - name: config
+          configMap:
+            name: prometheus-config
+        # Pod가 재시작되면 데이터가 사라지지만, rule 구간(최대 15분)만큼 알림이 늦어지는 정도다.
+        - name: data
+          emptyDir:
+            sizeLimit: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus
+  namespace: monitoring
+spec:
+  type: ClusterIP
+  selector:
+    app: prometheus
+  ports:
+    - name: http
+      port: 9090
+      targetPort: http

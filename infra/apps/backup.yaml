@@ -1,0 +1,173 @@
+# AI-generated with Claude Code (Claude Opus 5.5), 2026-11-26, review pending (Kihwan Kim)
+# DB와 옷 사진을 하루 1회 같은 노드의 backup-data PVC에 백업한다.
+# 같은 디스크라 서버 유실은 막지 못한다. DB 손상·실수 삭제·잘못된 마이그레이션 복구용이다.
+# 복구 절차: docs/deployment/monitoring.md
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: backup-data
+  namespace: team14
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 4Gi
+---
+# stylemate DB 전체 덤프. 앱 계정(stylemate)을 재사용하므로 root 비밀번호가 필요 없다.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: mysql-backup
+  namespace: team14
+spec:
+  # 매일 04:00 KST (= 19:00 UTC). timeZone 필드는 클러스터 버전에 따라 없을 수 있어 UTC로 적는다.
+  schedule: "0 19 * * *"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 3600
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 1800
+      template:
+        metadata:
+          labels:
+            app: mysql-backup
+        spec:
+          restartPolicy: Never
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+          containers:
+            - name: dump
+              image: mysql:8.4
+              env:
+                - name: MYSQL_USER
+                  valueFrom:
+                    secretKeyRef: {name: mysql-secret, key: MYSQL_USER}
+                - name: MYSQL_PWD
+                  valueFrom:
+                    secretKeyRef: {name: mysql-secret, key: MYSQL_PASSWORD}
+                - name: MYSQL_DATABASE
+                  valueFrom:
+                    secretKeyRef: {name: mysql-secret, key: MYSQL_DATABASE}
+                - name: KEEP
+                  value: "7"
+              command: ["/bin/bash", "-c"]
+              args:
+                - |
+                  set -euo pipefail
+                  dir=/backup/mysql
+                  mkdir -p "$dir"
+                  out="$dir/stylemate-$(date -u +%Y%m%d-%H%M%S).sql"
+                  tmp="$out.tmp"
+                  trap 'rm -f "$tmp"' EXIT
+                  # --single-transaction: InnoDB 스냅샷으로 덤프해 서비스 중에도 테이블 락을 잡지 않는다.
+                  # --no-tablespaces: PROCESS 권한이 없는 앱 계정으로도 덤프할 수 있게 한다.
+                  mysqldump -h mysql -u "$MYSQL_USER" \
+                    --single-transaction --no-tablespaces "$MYSQL_DATABASE" > "$tmp"
+                  # 정상 종료한 mysqldump만 마지막 줄에 완료 표시를 남긴다. 잘린 파일은 버린다.
+                  last="$(tail -n 1 "$tmp")"
+                  [[ "$last" == "-- Dump completed"* ]] || { echo "incomplete dump" >&2; exit 1; }
+                  mv "$tmp" "$out"
+                  # 파일 이름이 시각 순이므로 오래된 것부터 KEEP개를 넘는 만큼 지운다.
+                  files=("$dir"/stylemate-*.sql)
+                  extra=$(( ${#files[@]} - KEEP ))
+                  for (( i = 0; i < extra; i++ )); do rm -f "${files[$i]}"; done
+                  echo "saved $out ($(stat -c %s "$out") bytes), kept $(( ${#files[@]} - (extra > 0 ? extra : 0) ))"
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 64Mi
+                limits:
+                  cpu: 500m
+                  memory: 256Mi
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop: [ALL]
+              volumeMounts:
+                - name: backup
+                  mountPath: /backup
+          volumes:
+            - name: backup
+              persistentVolumeClaim:
+                claimName: backup-data
+---
+# 옷 사진(wardrobe-media) 전체를 tar.gz 하나로 유지한다. 보관은 항상 1개.
+# 임시 파일에 쓰고 검증한 뒤 교체하므로, 실패해도 이전 백업은 남는다.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: media-backup
+  namespace: team14
+spec:
+  # 매일 04:30 KST (= 19:30 UTC). DB 백업과 겹치지 않게 30분 늦춘다.
+  schedule: "30 19 * * *"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 3600
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 3600
+      template:
+        metadata:
+          labels:
+            app: media-backup
+        spec:
+          restartPolicy: Never
+          automountServiceAccountToken: false
+          # backend와 같은 uid/gid로 읽어야 사진 파일 권한이 맞는다.
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+          containers:
+            - name: archive
+              image: busybox:1.37
+              command: ["/bin/sh", "-c"]
+              args:
+                - |
+                  set -eu
+                  dir=/backup/media
+                  mkdir -p "$dir"
+                  out="$dir/wardrobe-media.tar.gz"
+                  tmp="$out.tmp"
+                  trap 'rm -f "$tmp"' EXIT
+                  tar -czf "$tmp" -C /media .
+                  # 압축 파일이 끝까지 읽히는지 확인한 뒤에만 기존 백업을 교체한다.
+                  tar -tzf "$tmp" > /dev/null
+                  mv "$tmp" "$out"
+                  echo "saved $out ($(stat -c %s "$out") bytes)"
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 32Mi
+                limits:
+                  cpu: 500m
+                  memory: 128Mi
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop: [ALL]
+              volumeMounts:
+                - name: media
+                  mountPath: /media
+                  readOnly: true
+                - name: backup
+                  mountPath: /backup
+          volumes:
+            # RWO지만 단일 노드라 backend와 동시에 마운트할 수 있다.
+            - name: media
+              persistentVolumeClaim:
+                claimName: wardrobe-media
+                readOnly: true
+            - name: backup
+              persistentVolumeClaim:
+                claimName: backup-data

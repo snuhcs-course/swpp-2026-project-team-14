@@ -1,0 +1,226 @@
+# AI-generated with Claude Code (Claude Opus 5.5), 2026-11-26, review pending (Kihwan Kim)
+# Alertmanager webhook을 받아 카카오톡 "나에게 보내기"로 전송한다.
+# 이미지 빌드 없이 python:3.12-slim에 스크립트를 ConfigMap으로 마운트한다. 표준 라이브러리만 쓴다.
+# kakao-secret은 Git에 올리지 않고 서버에서 직접 만든다 (docs/deployment/monitoring.md).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kakao-notifier
+  namespace: monitoring
+data:
+  notifier.py: |
+    import json
+    import logging
+    import os
+    import threading
+    import urllib.error
+    import urllib.parse
+    import urllib.request
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+    TOKEN_URL = "https://kauth.kakao.com/oauth/token"
+    SEND_URL = "https://kapi.kakao.com/v2/api/talk/memo/default/send"
+    # 카카오 텍스트 템플릿의 text는 최대 200자다.
+    MAX_TEXT = 200
+
+    REST_API_KEY = os.environ["KAKAO_REST_API_KEY"]
+    CLIENT_SECRET = os.environ.get("KAKAO_CLIENT_SECRET", "")
+    # 메시지 템플릿에 link가 필수라서 넣는다. 카카오 앱 플랫폼에 등록된 도메인이어야 열린다.
+    LINK_URL = os.environ.get("KAKAO_LINK_URL", "https://github.com/snuhcs-course/swpp-2026-project-team-14")
+
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    log = logging.getLogger("kakao-notifier")
+
+
+    class Token:
+        """access token은 메모리에만 두고, 없거나 만료(401)되면 refresh token으로 다시 받는다."""
+
+        def __init__(self, refresh_token):
+            self.refresh_token = refresh_token
+            self.access_token = None
+            self.lock = threading.Lock()
+
+        def get(self):
+            with self.lock:
+                if self.access_token is None:
+                    self._refresh()
+                return self.access_token
+
+        def invalidate(self, used):
+            with self.lock:
+                if self.access_token == used:
+                    self.access_token = None
+
+        def _refresh(self):
+            form = {"grant_type": "refresh_token", "client_id": REST_API_KEY,
+                    "refresh_token": self.refresh_token}
+            if CLIENT_SECRET:
+                form["client_secret"] = CLIENT_SECRET
+            body = post(TOKEN_URL, form)
+            self.access_token = body["access_token"]
+            # refresh token 만료가 가까우면 새 값이 같이 온다. Secret에는 다시 쓰지 않으므로
+            # Pod가 재시작되면 Secret의 기존 값으로 돌아간다 (만료 전 수동 교체 필요).
+            if body.get("refresh_token"):
+                self.refresh_token = body["refresh_token"]
+                log.warning("카카오가 새 refresh token을 발급했습니다. 만료 전에 kakao-secret을 갱신하세요.")
+            log.info("access token 갱신 완료")
+
+
+    def post(url, form, headers=None):
+        data = urllib.parse.urlencode(form).encode()
+        request = urllib.request.Request(url, data=data, headers=headers or {}, method="POST")
+        with urllib.request.urlopen(request, timeout=10) as response:
+            return json.loads(response.read() or b"{}")
+
+
+    token = Token(os.environ["KAKAO_REFRESH_TOKEN"])
+
+
+    def send(text):
+        template = {"object_type": "text", "text": text[:MAX_TEXT],
+                    "link": {"web_url": LINK_URL, "mobile_web_url": LINK_URL}}
+        form = {"template_object": json.dumps(template, ensure_ascii=False)}
+        for attempt in range(2):
+            access = token.get()
+            try:
+                post(SEND_URL, form, {"Authorization": f"Bearer {access}"})
+                return
+            except urllib.error.HTTPError as error:
+                # 401이면 access token 만료로 보고 한 번만 갱신 후 재시도한다.
+                if error.code == 401 and attempt == 0:
+                    token.invalidate(access)
+                    continue
+                raise
+
+
+    def format_message(payload):
+        """group_by가 alertname이라 한 번의 webhook에는 같은 alert만 들어 있다."""
+        status = payload.get("status", "unknown")
+        alerts = payload.get("alerts", [])
+        name = payload.get("groupLabels", {}).get("alertname") or "알 수 없는 alert"
+        head = "🚨 [장애]" if status == "firing" else "✅ [복구]"
+        lines = [f"{head} {name}"]
+        for alert in alerts:
+            summary = alert.get("annotations", {}).get("summary")
+            if summary and summary not in lines:
+                lines.append(f"- {summary}")
+        if alerts:
+            severity = alerts[0].get("labels", {}).get("severity")
+            if severity:
+                lines.append(f"severity: {severity}")
+        return "\n".join(lines)
+
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            self._reply(200 if self.path == "/healthz" else 404)
+
+        def do_POST(self):
+            if self.path != "/alert":
+                self._reply(404)
+                return
+            try:
+                length = int(self.headers.get("Content-Length", "0"))
+                payload = json.loads(self.rfile.read(length))
+                send(format_message(payload))
+                log.info("전송 완료: %s %s", payload.get("status"),
+                         payload.get("groupLabels", {}).get("alertname"))
+                self._reply(200)
+            except Exception as error:  # noqa: BLE001
+                # 실패를 5xx로 돌려주면 Alertmanager가 재시도한다. 토큰 값은 로그에 남기지 않는다.
+                log.error("전송 실패: %s", type(error).__name__ + ": " + str(error)[:200])
+                self._reply(502)
+
+        def _reply(self, code):
+            self.send_response(code)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+
+        def log_message(self, *args):
+            pass  # 접근 로그는 남기지 않는다 (probe 소음 방지)
+
+
+    if __name__ == "__main__":
+        log.info("listening on :8080")
+        ThreadingHTTPServer(("0.0.0.0", 8080), Handler).serve_forever()
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kakao-notifier
+  namespace: monitoring
+spec:
+  replicas: 1
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      app: kakao-notifier
+  template:
+    metadata:
+      labels:
+        app: kakao-notifier
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+      containers:
+        - name: notifier
+          image: python:3.12-slim
+          command: ["python", "/app/notifier.py"]
+          env:
+            - name: PYTHONDONTWRITEBYTECODE
+              value: "1"
+            - name: PYTHONUNBUFFERED
+              value: "1"
+            - name: KAKAO_REST_API_KEY
+              valueFrom:
+                secretKeyRef: {name: kakao-secret, key: KAKAO_REST_API_KEY}
+            - name: KAKAO_REFRESH_TOKEN
+              valueFrom:
+                secretKeyRef: {name: kakao-secret, key: KAKAO_REFRESH_TOKEN}
+            # 카카오 앱에서 Client Secret을 켠 경우에만 Secret에 넣는다.
+            - name: KAKAO_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef: {name: kakao-secret, key: KAKAO_CLIENT_SECRET, optional: true}
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - name: script
+              mountPath: /app
+              readOnly: true
+      volumes:
+        - name: script
+          configMap:
+            name: kakao-notifier
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kakao-notifier
+  namespace: monitoring
+spec:
+  type: ClusterIP
+  selector:
+    app: kakao-notifier
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
