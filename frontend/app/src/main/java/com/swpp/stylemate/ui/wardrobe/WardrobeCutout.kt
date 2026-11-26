@@ -1,4 +1,4 @@
-// AI-generated with Codex and Claude Code (Dongkun Moon), 2026-11-25, reviewed by Dongkun Moon
+// AI-generated with Codex and Claude Code (Dongkun Moon), 2026-11-25; stored cutouts with Claude Code (Claude Opus 5.5), 2026-11-26, reviewed by Dongkun Moon
 package com.swpp.stylemate.ui.wardrobe
 
 import android.graphics.Bitmap
@@ -57,6 +57,10 @@ private suspend fun hangingAsset(bitmap: ImageBitmap, category: String): Garment
     }
 
 /** One display-size asset request per saved garment; direct previews keep the studio fallback. */
+/** The server's stored background-free PNG: `cutout_url`, or the same route for servers that do not send it. */
+internal fun storedCutoutPath(item: WardrobeItem): String? = item.cutoutUrl
+    ?: item.imageUrl?.takeIf { it.endsWith("/image/") }?.let { it.removeSuffix("image/") + "display-cutout/" }
+
 @Composable
 internal fun HangingGarmentImage(
     item: WardrobeItem,
@@ -79,10 +83,11 @@ internal fun HangingGarmentImage(
             // Let the center start first; quick swipes discard peripheral work before it starts.
             delay(loadDelayMillis)
             // No tokens are retained in cache keys; account ownership isolates otherwise equal paths.
-            val key = "v4:${account?.userId}:${item.id}:${item.category}:${item.imageUrl}:${item.thumbnail?.let(System::identityHashCode)}"
+            val key = "v5:${account?.userId}:${item.id}:${item.category}:${item.imageUrl}:${item.cutoutUrl}:${item.thumbnail?.let(System::identityHashCode)}"
             value = GarmentCutoutCache.load(key) {
-                if (account != null && item.imageUrl?.endsWith("/image/") == true) {
-                    val path = item.imageUrl.removeSuffix("image/") + "display-cutout/"
+                val path = storedCutoutPath(item)
+                if (account != null && path != null) {
+                    // The server stores the cutout when the garment is saved; hanger fitting stays here.
                     val derived = sourceRequests.withPermit { WardrobeRepository.thumbnail(context, path, account) }
                     return@load derived?.let { hangingAsset(it, item.category) } ?: GarmentAsset.Uncertain
                 }

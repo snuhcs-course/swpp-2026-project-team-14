@@ -205,6 +205,24 @@ class WornBatchFlowTests(TestCase):
         self.assertEqual(Garment.objects.filter(saved=True).count(), 3)
         self.assertEqual(WornGeneration.objects.values('candidate_id').distinct().count(), 3)
 
+    def test_saved_batch_garments_get_a_stored_cutout_of_the_chosen_image(self):
+        from . import cutouts
+        output = BytesIO()
+        Image.new('RGBA', (6, 8), (10, 10, 10, 255)).save(output, 'PNG')
+        photo, path, selected, records = self.drafts()
+        self.generate(records)
+        self.assertFalse(Garment.objects.exclude(cutout='').exists())  # drafts get none
+        with patch('apps.wardrobe.cutouts.render', return_value=output.getvalue()) as render, \
+                patch.object(cutouts._pool, 'submit', side_effect=lambda job, *args: job(*args)), \
+                patch('apps.wardrobe.cutouts.close_old_connections'), \
+                self.captureOnCommitCallbacks(execute=True):
+            saved = self.post(path + 'save/', {'items': [self.payload(records[0]), self.payload(records[1], 'crop')]})
+        self.assertEqual(saved.status_code, 200)
+        self.assertEqual(render.call_count, 2)
+        self.assertEqual([call.args[1]['_display_source'] for call in render.call_args_list], ['ai_flatlay', 'worn_crop'])
+        for garment in Garment.objects.filter(saved=True):
+            self.assertTrue(garment.cutout.name.startswith('cutouts/'))
+
     def test_batch_save_requires_each_image_approval_and_is_atomic(self):
         photo, path, selected, records = self.drafts()
         self.generate(records[:1])

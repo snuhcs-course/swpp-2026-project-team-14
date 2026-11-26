@@ -86,4 +86,21 @@ class WardrobeCutoutTest {
     @Test fun missingDimensions_rejectedExplicitly() {
         assertThrows(IllegalArgumentException::class.java) { studioCutout(IntArray(0), 0, 0) }
     }
+
+    // Stored cutouts (#108): the rail loads the server's stored PNG, never the original photo.
+    @Test fun storedCutout_preferredOverTheOriginalPhoto() {
+        val item = WardrobeItem("g1", "셔츠", "top", imageUrl = "/api/wardrobe/items/g1/image/",
+            cutoutUrl = "/api/wardrobe/items/g1/display-cutout/")
+        assertEquals("/api/wardrobe/items/g1/display-cutout/", storedCutoutPath(item))
+    }
+
+    @Test fun olderServerWithoutCutoutUrl_usesTheSameRouteFromTheImageUrl() {
+        val item = WardrobeItem("g2", "바지", "bottom", imageUrl = "/api/wardrobe/items/g2/image/")
+        assertEquals("/api/wardrobe/items/g2/display-cutout/", storedCutoutPath(item))
+    }
+
+    @Test fun localPhotoWithoutAServerRecord_hasNoStoredCutout() {
+        assertNull(storedCutoutPath(WardrobeItem("draft", "코트", "outerwear")))
+        assertNull(storedCutoutPath(WardrobeItem("x", "코트", "outerwear", imageUrl = "/somewhere/else.png")))
+    }
 }

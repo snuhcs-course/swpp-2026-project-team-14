@@ -1,4 +1,4 @@
-# AI-generated with Codex, 2026-11-05
+# AI-generated with Codex, 2026-11-05; stored cutouts added with Claude Code (Claude Opus 5.5), 2026-11-26, reviewed by Dongkun Moon
 """Delete garment media after commit, preserving references across all accounts."""
 import logging
 
@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 def delete_garment_with_media(garment):
     """Run inside the caller's transaction and owner lock; defer storage changes."""
-    names = {garment.image.name}
+    names = {garment.image.name, garment.cutout.name}
     generation = WornGeneration.objects.filter(garment=garment).first()
     if generation:
         names.update((generation.original.name, generation.segmented.name, generation.candidate.name))
@@ -32,11 +32,16 @@ def delete_garment_with_media(garment):
     transaction.on_commit(lambda: _delete_unreferenced(names), robust=True)
 
 
+def delete_unreferenced(names):
+    """Delete files that no garment, worn photo or generation refers to any more (outside a transaction)."""
+    _delete_unreferenced(names)
+
+
 def _delete_unreferenced(names):
     for name in sorted(names):
         try:
             # Include unsaved drafts and other accounts, including legacy shared demo photos.
-            if (Garment.objects.filter(image=name).exists()
+            if (Garment.objects.filter(Q(image=name) | Q(cutout=name)).exists()
                     or WornPhoto.objects.filter(image=name).exists()
                     or WornGeneration.objects.filter(
                         Q(original=name) | Q(segmented=name) | Q(candidate=name)).exists()):
