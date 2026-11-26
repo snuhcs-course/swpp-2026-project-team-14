@@ -29,6 +29,11 @@ class FittingWork(private val context: Context) {
             val key = repository.taskKey(outfit)
             val manager = WorkManager.getInstance(context)
             if (manager.getWorkInfosForUniqueWork("fitting:$key").get().any { !it.state.isFinished }) return@withLock false
+            // Several outfits may be fitted at once, up to a small limit (the server makes two at a time and queues the rest).
+            val active = FittingTaskStore.running(tasks.all(owner)).count { (other, _) ->
+                manager.getWorkInfosForUniqueWork("fitting:$other").get().any { !it.state.isFinished }
+            }
+            if (active >= FittingTaskStore.MAX_ACTIVE) throw TooManyFittings()
             tasks.create(key, owner, source, outfit, person())
             val work = OneTimeWorkRequestBuilder<FittingWorker>().setInputData(workDataOf("key" to key))
                 .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())

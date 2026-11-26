@@ -8,6 +8,12 @@ import java.io.File
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 
+/** The fitting the floating card shows, with how many are in progress and finished but not yet opened. */
+data class CardSummary(val shown: Pair<String, JSONObject>, val running: Int, val finished: Int)
+
+/** More fittings are already in progress than [FittingTaskStore.MAX_ACTIVE]. */
+class TooManyFittings : IllegalStateException("가상 피팅은 한 번에 ${FittingTaskStore.MAX_ACTIVE}개까지 만들 수 있어요. 진행 중인 피팅이 끝나면 다시 시도해 주세요.")
+
 /** Private job metadata survives process recreation; source photos are removed after upload. */
 class FittingTaskStore(private val directory: File) {
     private fun file(key: String, suffix: String): File {
@@ -86,11 +92,29 @@ class FittingTaskStore(private val directory: File) {
          * card existed carry no finish time and never show.
          */
         fun cardTask(tasks: List<Pair<String, JSONObject>>, now: Long, recentMs: Long = CARD_RECENT_MS): Pair<String, JSONObject>? =
-            tasks.filter { it.second.optString("state") in listOf("queued", "running") }.maxByOrNull { it.second.optLong("created_at") }
-                ?: tasks.filter { (_, data) ->
-                    data.optString("state") in listOf("completed", "failed") && !data.optBoolean("card_dismissed") &&
-                        data.has("finished_at") && now - data.getLong("finished_at") in 0..recentMs
-                }.maxByOrNull { it.second.optLong("finished_at") }
+            cardSummary(tasks, now, recentMs)?.shown
+
+        /** How many fittings may be in progress at once for one account (each is a paid generation). */
+        const val MAX_ACTIVE = 3
+
+        fun running(tasks: List<Pair<String, JSONObject>>) =
+            tasks.filter { it.second.optString("state") in listOf("queued", "running") }
+
+        /**
+         * What the floating card shows when several fittings are going: a finished one not yet opened comes
+         * first (the newest), so a result is never hidden behind work still in progress; otherwise the
+         * running one started first, which is closest to done. [running] and [finished] count the rest.
+         */
+        fun cardSummary(tasks: List<Pair<String, JSONObject>>, now: Long, recentMs: Long = CARD_RECENT_MS): CardSummary? {
+            val active = running(tasks)
+            val finished = tasks.filter { (_, data) ->
+                data.optString("state") in listOf("completed", "failed") && !data.optBoolean("card_dismissed") &&
+                    data.has("finished_at") && now - data.getLong("finished_at") in 0..recentMs
+            }
+            val shown = finished.maxByOrNull { it.second.optLong("finished_at") }
+                ?: active.minByOrNull { it.second.optLong("created_at") } ?: return null
+            return CardSummary(shown, active.size, finished.size)
+        }
         fun job(data: JSONObject): TryOnJob? = if (data.has("job_id")) TryOnJob(data.getString("job_id"), data.getString("job_token")) else null
     }
 }

@@ -216,42 +216,56 @@ internal suspend fun virtualModelPreview(context: Context, source: String?): Fit
 internal fun FittingProgressCard(owner: String, onOpen: (String) -> Unit, modifier: Modifier = Modifier) {
     val context = LocalContext.current.applicationContext
     val work = remember(context) { FittingWork(context) }
-    var card by remember(owner) { mutableStateOf<Pair<String, org.json.JSONObject>?>(null) }
+    var summary by remember(owner) { mutableStateOf<com.swpp.stylemate.data.tryon.CardSummary?>(null) }
     var avatar by remember(owner) { mutableStateOf<Pair<String, FittingPerson?>?>(null) }
     var resumed by remember { mutableStateOf(false) }
     LifecycleResumeEffect(Unit) { resumed = true; onPauseOrDispose { resumed = false } }
     LaunchedEffect(owner, resumed) {
         while (resumed) {
             try {
-                val chosen = withContext(Dispatchers.IO) {
-                    FittingTaskStore.cardTask(work.tasks.all(owner), System.currentTimeMillis())
+                // state() also closes a task whose background work died, so every running one is checked first.
+                val tasks = withContext(Dispatchers.IO) { work.tasks.all(owner) }
+                FittingTaskStore.running(tasks).forEach { (key, _) -> work.state(key) }
+                summary = withContext(Dispatchers.IO) {
+                    FittingTaskStore.cardSummary(work.tasks.all(owner), System.currentTimeMillis())
                 }
-                // state() also closes a task whose background work died.
-                card = chosen?.let { (key, _) -> work.state(key)?.let { key to it } }
-                val source = card?.second?.optString("source")
+                val source = summary?.shown?.second?.optString("source")
                 if (source != null && avatar?.first != source) avatar = source to virtualModelPreview(context, source)
             } catch (error: CancellationException) { throw error }
-            catch (_: Exception) { card = null }
+            catch (_: Exception) { summary = null }
             delay(1_000)
         }
     }
-    val (key, data) = card ?: return
+    val current = summary ?: return
+    val (key, data) = current.shown
     val state = data.optString("state")
     val progress = FittingTaskStore.progress(data)
     val name = runCatching { FittingTaskStore.outfit(data).name }.getOrNull().orEmpty()
-    fun dismiss() { card = null; runCatching { work.tasks.dismissCard(key) } }
+    fun dismiss() { summary = null; runCatching { work.tasks.dismissCard(key) } }
     val title: String
     val detail: String
+    // With several fittings the card names how many more are under way, so none goes unnoticed.
+    val alsoRunning = if (state == "queued" || state == "running") current.running - 1 else current.running
+    val more = if (alsoRunning > 0) " · ${alsoRunning}개 더 만드는 중" else ""
     when (state) {
-        "completed" -> { title = "가상 피팅이 완성됐어요"; detail = "눌러서 결과를 확인하세요" }
-        "failed" -> { title = "가상 피팅을 만들지 못했어요"; detail = data.optString("error").ifBlank { "눌러서 다시 시도해 주세요" } }
-        else -> { title = if (name.isBlank()) "가상 피팅 만드는 중" else "$name 입혀보는 중"
-            detail = progress?.text ?: "준비하고 있어요" }
+        "completed" -> {
+            title = if (current.finished > 1) "가상 피팅 ${current.finished}개가 완성됐어요" else "가상 피팅이 완성됐어요"
+            detail = "눌러서 결과를 확인하세요$more"
+        }
+        "failed" -> { title = "가상 피팅을 만들지 못했어요"; detail = data.optString("error").ifBlank { "눌러서 다시 시도해 주세요" } + more }
+        else -> {
+            title = when {
+                current.running > 1 -> "가상 피팅 ${current.running}개 만드는 중"
+                name.isBlank() -> "가상 피팅 만드는 중"
+                else -> "$name 입혀보는 중"
+            }
+            detail = progress?.text ?: "준비하고 있어요"
+        }
     }
     val shape = RoundedCornerShape(20.dp)
     Row(modifier.fillMaxWidth().clip(shape).background(MaterialTheme.colorScheme.surface)
         .border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape)
-        .clickable { card = null; onOpen(key) }  // the fitting screen marks it seen once it shows it
+        .clickable { summary = null; onOpen(key) }  // the fitting screen marks it seen once it shows it
         .padding(start = 12.dp, top = 10.dp, bottom = 10.dp, end = 4.dp)
         .semantics(mergeDescendants = true) { contentDescription = "$title, $detail" },
         verticalAlignment = Alignment.CenterVertically) {

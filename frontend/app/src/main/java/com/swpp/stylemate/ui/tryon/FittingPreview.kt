@@ -241,7 +241,10 @@ internal fun PhotoFitting(outfit: Outfit, repository: FittingRepository, account
                 if (running) { pending = true; waited = true }
                 progress = task?.let(com.swpp.stylemate.data.tryon.FittingTaskStore::progress)
                 if (running && personPreview == null) personPreview = virtualModelPreview(context, task?.optString("source"))
-                if (task?.optString("state") == "failed") failure = task.optString("error")
+                if (task?.optString("state") == "failed") {
+                    failure = task.optString("error")
+                    runCatching { work.tasks.dismissCard(key) }  // seen here, as for a result
+                }
                 // The loading screen stays up until the result is in hand, so it hands over without a blank frame.
                 if (!running && task?.optString("state") != "failed") {
                     val source = initialSource ?: repository.latestSource(outfit)
