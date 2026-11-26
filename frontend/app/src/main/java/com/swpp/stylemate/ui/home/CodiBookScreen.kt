@@ -32,8 +32,7 @@ import androidx.compose.ui.window.DialogProperties
 import com.swpp.stylemate.data.recommendation.Outfit
 import com.swpp.stylemate.data.recommendation.OutfitGarment
 import com.swpp.stylemate.ui.components.PageHeader
-import com.swpp.stylemate.ui.wardrobe.OutfitHanger
-import com.swpp.stylemate.ui.wardrobe.OutfitRail
+import com.swpp.stylemate.ui.wardrobe.OutfitDressed
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -151,7 +150,7 @@ fun CodiBookScreen(
                             }, shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceContainer,
                                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
                                 Box(Modifier.fillMaxSize()) {
-                                    OutfitRail(state.outfits[page].items, Modifier.padding(12.dp), photo = photo)
+                                    OutfitDressed(state.outfits[page].items, Modifier.padding(16.dp), photo = photo)
                                     if (page == index) IconButton(onClick = { onClearRemoveError(); removingId = ids[page] },
                                         enabled = enabled && !pager.isScrollInProgress,
                                         colors = IconButtonDefaults.iconButtonColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = .94f)),
@@ -181,14 +180,14 @@ fun CodiBookScreen(
                     contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 20.dp),
                     horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     items(state.outfits, key = { it.id }) { outfit ->
-                        // Design C: each saved outfit hangs on one hanger, like the 옷장 rail.
+                        // Design B, as on 홈: each saved outfit laid out as one styled look.
                         Surface(onClick = {
                             selectedId = outfit.id; lastIndex = ids.indexOf(outfit.id); view = CodiBookView.SLIDES
                         }, enabled = state.removingId == null, shape = MaterialTheme.shapes.large,
                             color = MaterialTheme.colorScheme.surfaceContainerLow,
                             modifier = Modifier.fillMaxWidth().semantics { contentDescription = "${outfit.displayName()} 크게 보기" }) {
                             Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                OutfitHanger(outfit.items, Modifier.fillMaxWidth().height(250.dp).padding(top = 4.dp), photo = photo)
+                                OutfitDressed(outfit.items, Modifier.fillMaxWidth().height(220.dp).padding(top = 4.dp), photo = photo)
                                 Text(outfit.displayName(), style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
                                 fittingStatuses[outfit.id]?.label?.let {
@@ -210,7 +209,7 @@ fun CodiBookScreen(
             title = { Text("코디북에서 뺄까요?") },
             text = {
                 Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OutfitHanger(outfit.items, Modifier.fillMaxWidth().height(180.dp), photo = photo)
+                    OutfitDressed(outfit.items, Modifier.fillMaxWidth().height(180.dp), photo = photo)
                     Text(outfit.displayName(), fontWeight = FontWeight.SemiBold)
                     Text("옷장에 등록된 옷은 그대로 유지돼요.")
                     if (state.removeErrorId == outfit.id) state.removeError?.let {
