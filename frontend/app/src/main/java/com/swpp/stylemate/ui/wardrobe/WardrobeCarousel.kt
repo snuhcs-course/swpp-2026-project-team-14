@@ -319,7 +319,7 @@ internal fun HangerRenderer(
 
 /** Clips sit in front of the waistband; the wooden bar stays behind the garment. */
 @Composable
-private fun HangerClips(shape: GarmentHangingShape, garmentWidth: Dp, modifier: Modifier = Modifier) {
+internal fun HangerClips(shape: GarmentHangingShape, garmentWidth: Dp, modifier: Modifier = Modifier) {
     Canvas(modifier) {
         val width = garmentWidth.toPx()
         val left = size.width / 2 - width * shape.neckX + width * shape.left

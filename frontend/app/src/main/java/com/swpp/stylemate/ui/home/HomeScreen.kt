@@ -41,7 +41,7 @@ import com.swpp.stylemate.data.recommendation.OutfitGarment
 import com.swpp.stylemate.data.wardrobe.WardrobeRepository
 import com.swpp.stylemate.ui.components.OutfitFeedbackButtons
 import com.swpp.stylemate.ui.components.PageHeader
-import com.swpp.stylemate.ui.components.OutfitBoard
+import com.swpp.stylemate.ui.wardrobe.OutfitRail
 import com.swpp.stylemate.ui.components.OutfitSaveButton
 import com.swpp.stylemate.ui.components.StarRating
 import com.swpp.stylemate.ui.components.starsOf
@@ -66,7 +66,8 @@ fun HomeScreen(
     todayPlan: (@Composable () -> Unit)? = null,
     hint: (@Composable () -> Unit)? = null,
     onRegion: ((String) -> Unit)? = null,
-    photo: @Composable (OutfitGarment, Modifier) -> Unit = { item, m -> GarmentThumbnail(item.imageUrl, item.name, m) },
+    // null: hang the stored background-free photos; screen tests pass their own renderer.
+    photo: (@Composable (OutfitGarment, Modifier) -> Unit)? = null,
 ) {
     val snackbar = remember { SnackbarHostState() }
     LaunchedEffect(state.message) {
@@ -143,7 +144,7 @@ fun HomeScreen(
 /** Selecting a cached outfit does not request new recommendations. */
 @Composable
 private fun OutfitCarousel(state: HomeState, pager: PagerState, height: Dp, onSelect: (Int) -> Unit,
-    photo: @Composable (OutfitGarment, Modifier) -> Unit) {
+    photo: (@Composable (OutfitGarment, Modifier) -> Unit)?) {
     val selectedIndex by rememberUpdatedState(state.index)
     val select by rememberUpdatedState(onSelect)
     LaunchedEffect(pager) {
@@ -161,7 +162,7 @@ private fun OutfitCarousel(state: HomeState, pager: PagerState, height: Dp, onSe
         Box(Modifier.fillMaxWidth().height(height).semantics {
             contentDescription = "코디 ${page + 1} / ${state.outfits.size}"
         }) {
-            OutfitBoard(state.outfits[page].items, photo)
+            OutfitRail(state.outfits[page].items, photo = photo)
             if (state.loading) CircularProgressIndicator(Modifier.align(Alignment.Center))
         }
     }
