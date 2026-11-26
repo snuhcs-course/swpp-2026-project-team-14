@@ -72,6 +72,17 @@ class OutfitHangersTest {
         assertTrue(layout.getValue("outerwear").width >= layout.getValue("top").width * OUTER_OVER_TOP - .5f)
     }
 
+    @Test fun piecesLeanGentlyAndAlwaysTheSameWay() {
+        val ids = (1..40).map { "g$it" }
+        for (id in ids) {
+            assertTrue(dressedTilt("outerwear", true, id) in -7f..-5f)
+            assertTrue(dressedTilt("top", true, id) in 2f..4f)
+            assertTrue(dressedTilt("bottom", true, id) in -2.5f..-.5f)
+            assertEquals(dressedTilt("top", false, id), dressedTilt("top", false, id))
+        }
+        assertTrue("garments differ a little", ids.map { dressedTilt("top", true, it) }.toSet().size > 1)
+    }
+
     @Test fun aCoatIsDrawnLongerThanATee() {
         val layout = dressedLayout(400f, 2000f, jacket, tee, jeans, outerCm = 100f, topCm = 68f, bottomCm = 100f)
         assertTrue(layout.getValue("outerwear").height > layout.getValue("top").height * 1.4f)

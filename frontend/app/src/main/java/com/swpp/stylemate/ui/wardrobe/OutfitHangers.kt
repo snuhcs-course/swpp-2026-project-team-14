@@ -127,7 +127,23 @@ internal const val TOP_OVER_BOTTOM_MAX = 1.6f
 internal const val OUTER_OVER_TOP = 1.05f
 
 /** The outerwear lies back at a slight angle when a top is laid over it. */
-internal const val OUTER_TILT = -5f
+internal const val OUTER_TILT = -6f
+
+/**
+ * A styled look is laid out by hand, so no piece sits perfectly straight: the outerwear leans back to the
+ * left, the top a little the other way and the bottom slightly back, each with a small fixed variation per
+ * garment (the same every time it is drawn) so looks do not all lean alike.
+ */
+internal fun dressedTilt(slot: String, layered: Boolean, garmentId: String): Float {
+    val base = when (slot) {
+        "outerwear" -> OUTER_TILT
+        "top" -> if (layered) 3f else -2.5f
+        "bottom" -> if (layered) -1.5f else 2f
+        else -> 0f
+    }
+    val jitter = (Math.floorMod(garmentId.hashCode(), 9) - 4) * .25f  // -1° … +1°
+    return base + jitter
+}
 
 /**
  * One garment on its hanger inside a [width] × [height] box whose hook sits near the top. Sizes, the
@@ -224,7 +240,7 @@ internal fun OutfitDressed(
             listOfNotNull(bottom, outer, top).forEachIndexed { depth, garment ->
                 val rect = layout[garment.slot] ?: return@forEachIndexed
                 key(garment.garmentId) {
-                    val tilt = if (garment.slot == "outerwear" && top != null) OUTER_TILT else 0f
+                    val tilt = dressedTilt(garment.slot, layered = outer != null && top != null, garment.garmentId)
                     val placed = with(density) {
                         Modifier.offset(x = rect.left.toDp(), y = rect.top.toDp()).size(rect.width.toDp(), rect.height.toDp())
                             .rotate(tilt).zIndex(depth.toFloat()).semantics { contentDescription = garment.name }
