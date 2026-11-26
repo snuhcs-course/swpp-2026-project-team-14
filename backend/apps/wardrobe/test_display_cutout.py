@@ -122,9 +122,9 @@ class DisplayCutoutPixelsTests(SimpleTestCase):
         self.assertEqual(mask[0, 0], 0)
 
     def test_worn_crop_does_not_merge_other_worn_garments(self):
-        labels = np.array([[4, 4], [6, 7]], dtype=np.uint8)
+        labels = np.array([[11, 11], [4, 4], [6, 7]], dtype=np.uint8)  # a face: the crop shows a person
         mask = np.asarray(cutouts.apparel_mask(labels, dict(attributes(), _display_source='worn_crop')))
-        self.assertEqual(mask.tolist(), [[255, 255], [0, 0]])
+        self.assertEqual(mask.tolist(), [[0, 0], [255, 255], [0, 0]])
 
     def test_white_on_white_avoids_colour_cutout_even_if_some_edges_remain(self):
         source = np.full((100, 100, 3), 245, dtype=np.uint8)

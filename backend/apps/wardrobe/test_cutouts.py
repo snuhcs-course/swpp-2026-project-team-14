@@ -157,3 +157,28 @@ class StoredCutoutTests(TestCase):
             call_command('make_cutouts', stdout=StringIO())  # second run finds them current
         self.assertEqual(render.call_count, 2)
         self.assertEqual(Garment.objects.exclude(cutout='').count(), 2)
+
+
+class GarmentOnlyCropTests(TestCase):
+    """SegFormer names a lone garment wrongly (trousers as upper clothes); on a person it must not merge clothes."""
+
+    def test_a_crop_without_a_person_keeps_any_clothing_label(self):
+        import numpy as np
+        from . import worn
+        labels = np.zeros((40, 20), dtype=np.uint8)
+        labels[2:38, 3:17] = 4  # lone ivory slacks read as upper clothes
+        keep = worn.garment_mask(labels, {'category': 'bottom', 'subcategory': 'slacks'})
+        self.assertTrue(keep[2:38, 3:17].all())
+        self.assertFalse(keep[0, 0])
+
+    def test_on_a_person_only_the_chosen_garment_is_kept(self):
+        import numpy as np
+        from . import worn
+        labels = np.zeros((40, 20), dtype=np.uint8)
+        labels[0:5, 5:15] = 11   # face
+        labels[5:20, 2:18] = 4   # T-shirt
+        labels[20:40, 4:16] = 6  # jeans
+        keep = worn.garment_mask(labels, {'category': 'bottom', 'subcategory': 'jeans'})
+        self.assertTrue(keep[20:40, 4:16].all())
+        self.assertFalse(keep[5:20, 2:18].any())
+

@@ -27,7 +27,7 @@ from .models import Garment
 
 logger = logging.getLogger(__name__)
 HANGABLE = ('top', 'bottom', 'outerwear')
-DISPLAY_VERSION = 'flatlay-union-v4-448'  # v3: real photos always use SegFormer; v4: enclosed holes filled
+DISPLAY_VERSION = 'flatlay-union-v5-448'  # v3: real photos use SegFormer; v4: enclosed holes filled; v5: lone worn crops
 _inference = Semaphore(1)  # one CPU inference at a time, shared by background work and requests
 _jobs = [Lock() for _ in range(16)]  # one cutout job per garment at a time
 _pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix='garment-cutout')
@@ -47,10 +47,9 @@ def clothing_mask(image, attributes):
 
 def apparel_mask(labels, attributes):
     if attributes.get('_display_source') == 'worn_crop':
-        target = (5 if attributes.get('subcategory') == 'skirt' else 6) if attributes['category'] == 'bottom' else 4
-        keep = labels == target
+        keep = worn.garment_mask(labels, attributes)  # one garment on a person; all clothing if no person
     else:
-        keep = np.isin(labels, (4, 5, 6, 7, 8, 17))
+        keep = np.isin(labels, worn.APPAREL_LABELS)
     return Image.fromarray(keep.astype(np.uint8) * 255)
 
 
