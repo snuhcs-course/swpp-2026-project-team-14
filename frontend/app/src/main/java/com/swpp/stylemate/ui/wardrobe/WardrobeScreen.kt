@@ -1,6 +1,8 @@
 // AI-generated with Codex, 2026-09-29, reviewed by Hyeon U Jeong; recommendation labels added with Claude Code (Claude Opus 5.5), 2026-10-12, reviewed by Dongkun Moon
 package com.swpp.stylemate.ui.wardrobe
 
+import com.swpp.stylemate.data.usage.RatingPrompts
+import com.swpp.stylemate.data.usage.RatingTask
 import com.swpp.stylemate.data.wardrobe.*
 import com.swpp.stylemate.BuildConfig
 import com.swpp.stylemate.data.BodyProfileJson
@@ -98,8 +100,18 @@ fun WardrobeRoute(
     val analysisPhoto = if (needsFront) frontPhoto else selected
     val analysisModel: GarmentAnalysisViewModel = viewModel(factory = viewModelFactory { initializer { GarmentAnalysisViewModel(account) } })
     val analysis by analysisModel.state.collectAsStateWithLifecycle()
+    // 온보딩 중 옷 등록에는 별점을 묻지 않는다. ViewModel은 온보딩과 옷장 탭이 함께 쓸 수 있어
+    // 콜백에 온보딩 여부를 가두지 않고, 온보딩 화면이 떠 있는 동안 요청을 멈춘다.
+    if (onboardingTopBar != null) DisposableEffect(Unit) {
+        RatingPrompts.setPaused(true)
+        onDispose { RatingPrompts.setPaused(false) }
+    }
+    val requestRating = remember(account.userId) {
+        { RatingPrompts.request(RatingTask.GARMENT_REGISTRATION, account.userId) }
+    }
     val wardrobeModel: WardrobeViewModel = viewModel(factory = viewModelFactory {
-        initializer { WardrobeViewModel(store, account, com.swpp.stylemate.data.usage.UsageMetrics.forAccount(context, account.userId))
+        initializer { WardrobeViewModel(store, account, com.swpp.stylemate.data.usage.UsageMetrics.forAccount(context, account.userId),
+            onRatingPrompt = requestRating)
             .apply { restoreRegistration(registrationCheckpoint) } }
     })
     val wardrobe by wardrobeModel.state.collectAsStateWithLifecycle()
@@ -321,7 +333,8 @@ fun WardrobeRoute(
             wardrobePages.removeState("collection")
             wardrobeModel.refresh()
             onSaved?.invoke()
-        }, onAttempt = { wardrobeModel.beginRegistration("worn") }, onFailure = wardrobeModel::failRegistration)
+        }, onAttempt = { wardrobeModel.beginRegistration("worn") }, onFailure = wardrobeModel::failRegistration,
+            onRatingPrompt = requestRating)
         return
     }
     val page = pages.lastOrNull()

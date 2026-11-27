@@ -202,6 +202,8 @@ class WornBatchFlowTests(TestCase):
         self.generate(records)  # mocked image generation, no external calls
         saved = self.post(path + 'save/', {'items': [self.payload(r) for r in records]})
         self.assertEqual(saved.status_code, 200)
+        # 배치 전체에 별점 팝업 여부가 한 번 붙는다 (아직 평가한 적 없으므로 True).
+        self.assertIs(saved.json()['rating_prompt'], True)
         self.assertEqual(Garment.objects.filter(saved=True).count(), 3)
         self.assertEqual(WornGeneration.objects.values('candidate_id').distinct().count(), 3)
 

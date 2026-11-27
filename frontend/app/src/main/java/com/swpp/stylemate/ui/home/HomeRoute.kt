@@ -61,6 +61,9 @@ import kotlinx.coroutines.isActive
 import com.swpp.stylemate.ui.tryon.FittingDialog
 import com.swpp.stylemate.ui.tryon.FittingPreview
 import com.swpp.stylemate.ui.tryon.LocalFittingNotificationKey
+import androidx.compose.runtime.DisposableEffect
+import com.swpp.stylemate.data.usage.RatingPrompts
+import com.swpp.stylemate.data.usage.RatingTask
 import org.json.JSONObject
 
 @Composable
@@ -75,7 +78,10 @@ fun HomeRoute(profile: BodyProfile?, onSetupProfile: () -> Unit, onOpenWardrobe:
     LaunchedEffect(notification) { if (notification != null) selected = null }
     val model: HomeViewModel = viewModel(factory = viewModelFactory {
         initializer {
-            HomeViewModel(OutfitRepository(account), LocalTasteStore(context, account.userId)).apply {
+            HomeViewModel(OutfitRepository(account), LocalTasteStore(context, account.userId), onRatingPrompt = {
+                // 추천 결과를 볼 시간을 둔 뒤 묻는다.
+                RatingPrompts.request(RatingTask.RECOMMENDATION, account.userId, showAfterMs = 5_000)
+            }).apply {
                 // Restore the region before the first weather/recommendation request.
                 setRegion(HomeRegion.load(store), reload = false)
             }
@@ -93,9 +99,11 @@ fun HomeRoute(profile: BodyProfile?, onSetupProfile: () -> Unit, onOpenWardrobe:
     LaunchedEffect(body?.toString(), wardrobeRevision) { model.ensureLoaded(body, wardrobeRevision) }
     // Each return to 홈 (from 코디북, chat or another tab) re-checks which cards are saved.
     LaunchedEffect(Unit) { model.syncSaved() }
+    // 지연 중에 홈을 떠나면 그 별점 요청은 띄우지 않는다.
+    DisposableEffect(Unit) { onDispose { RatingPrompts.cancel(RatingTask.RECOMMENDATION) } }
     HomeScreen(
         state = state,
-        onRefresh = { model.load(body) },
+        onRefresh = { model.load(body, fromRefresh = true) },
         onSelect = model::select,
         onLike = { model.feedback("liked") },
         onDislike = { model.feedback("disliked") },

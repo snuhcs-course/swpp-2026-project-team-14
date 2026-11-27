@@ -8,6 +8,8 @@ import com.swpp.stylemate.data.AuthSessionStore
 import com.swpp.stylemate.data.AccountAccess
 import com.swpp.stylemate.data.KeystoreSessionStore
 import com.swpp.stylemate.data.LocalUserStore
+import com.swpp.stylemate.data.usage.RatingPrompts
+import com.swpp.stylemate.data.usage.RatingTask
 import com.swpp.stylemate.data.usage.UsageMetrics
 import com.swpp.stylemate.data.usage.usageErrorCode
 import com.swpp.stylemate.data.recommendation.Outfit
@@ -64,6 +66,11 @@ class FittingWork(private val context: Context) {
         val data = tasks.read(key) ?: return@withContext
         if (data.optString("owner") != owner || data.optString("source") != source || data.optString("state") != "completed") return@withContext
         data.optJSONObject("usage")?.let { UsageMetrics.forAccount(context, owner).resume(it).success() }
+        // 같은 결과를 다시 열 때는 묻지 않도록 쓰고 바로 지운다. 결과를 볼 시간을 두고 띄운다.
+        if (data.optBoolean("rating_prompt")) {
+            tasks.ratingPrompt(key, false)
+            RatingPrompts.request(RatingTask.VIRTUAL_FITTING, owner, showAfterMs = 2_000)
+        }
     }
     companion object { private val enqueueLock = Mutex() }
 }
@@ -118,7 +125,7 @@ class FittingWorker internal constructor(context: Context, parameters: WorkerPar
             }
             TryOnClient(account, apiBaseUrl).fit(person, clothes, true, resumeJob = resumed,
                 onSubmitted = { tasks.submitted(key, it) }, keepForResume = true,
-                onProgress = { tasks.progress(key, it) },
+                onProgress = { tasks.progress(key, it) }, onRatingPrompt = { tasks.ratingPrompt(key, it) },
                 onResult = { image ->
                     val bitmap = BitmapFactory.decodeByteArray(image, 0, image.size) ?: error("피팅 결과를 읽지 못했어요.")
                     bitmap.recycle()

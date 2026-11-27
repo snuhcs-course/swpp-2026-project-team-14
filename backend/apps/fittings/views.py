@@ -10,6 +10,8 @@ from django.http import HttpResponse, JsonResponse
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 from PIL import Image, UnidentifiedImageError
 from apps.users.auth import require_auth
+from apps.usage.models import RatingTask
+from apps.usage.ratings import should_prompt
 
 from .generation import MODEL, RESOLUTION, NanoBanana
 from .jobs import Jobs, QueueFull
@@ -103,7 +105,11 @@ def job(request, job_id):
         result = HttpResponse(status=204)
         result["Cache-Control"] = "no-store"
         return result
-    return response(get_jobs().status(entry))
+    status = get_jobs().status(entry)
+    # 완료된 job에만 별점 팝업 여부를 붙인다. 앱은 결과 이미지를 처음 보여 줄 때 이 값을 쓴다.
+    if status["status"] == "completed":
+        status["rating_prompt"] = should_prompt(request.user, RatingTask.VIRTUAL_FITTING)
+    return response(status)
 
 
 @require_GET

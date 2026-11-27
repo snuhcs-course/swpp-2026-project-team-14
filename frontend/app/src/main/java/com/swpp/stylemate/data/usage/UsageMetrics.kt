@@ -35,6 +35,13 @@ object UsageMetrics {
         }
     }
 
+    /** 측정 이벤트가 아닌 이벤트(별점 등)를 같은 큐로 보낸다. 오프라인이면 연결 후 재전송된다. */
+    fun enqueue(context: Context, owner: String, event: JSONObject) {
+        require(UUID.fromString(owner).toString() == owner)
+        val application = context.applicationContext
+        scope.launch { runCatching { queue(application, owner).add(event); schedule(application, owner) } }
+    }
+
     internal fun queue(context: Context, owner: String): UsageQueue {
         require(UUID.fromString(owner).toString() == owner)
         return UsageQueue(File(context.noBackupFilesDir, "usage/$owner.json"))

@@ -41,7 +41,8 @@ data class WardrobeAnalysisState(val open: Boolean = false, val loading: Boolean
                                  val result: WardrobeAnalysis? = null, val error: String? = null)
 
 class WardrobeViewModel(private val store: LocalUserStore, private val account: AccountAccess,
-                        private val usage: UsageTracker = UsageTracker.NONE) : ViewModel() {
+                        private val usage: UsageTracker = UsageTracker.NONE,
+                        private val onRatingPrompt: () -> Unit = {}) : ViewModel() {
     private var registration: UsageTracker.Attempt? = null
     private var registrationSource = "wardrobe"
 
@@ -109,7 +110,10 @@ class WardrobeViewModel(private val store: LocalUserStore, private val account: 
         viewModelScope.launch {
             try {
                 val record = WardrobeRepository.json("/api/wardrobe/items/$id/", payload, store, account)
+                // 별점 여부는 옷 레코드가 아니므로 목록에 넣기 전에 떼어 낸다. 새 옷 등록일 때만 쓴다.
+                val ratingPrompt = record.remove("rating_prompt") == true
                 attempt?.success()
+                if (attempt != null && ratingPrompt) onRatingPrompt()
                 if (registration === attempt) clearRegistration()
                 val records = mutableState.value.records
                 mutableState.value = mutableState.value.copy(saving = false, savedId = id,

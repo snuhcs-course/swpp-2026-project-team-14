@@ -16,6 +16,8 @@ from apps.body_profiles.profile import body_from_request
 from apps.users.auth import require_auth
 from apps.users.models import User
 from apps.users.pagination import account_page
+from apps.usage.models import RatingTask
+from apps.usage.ratings import should_prompt
 from recommendation.labeling import label
 
 from .analysis import AnalysisError, MAX_IMAGE_BYTES, model_name, analyze_image, prepare_image
@@ -232,6 +234,11 @@ def item(request, item_id):
             garment.saved = True
             garment.save(update_fields=[*values, 'estimated_dimensions', 'saved', 'updated_at'])
             schedule_cutout(garment)  # after commit, in the background; a later edit keeps a valid cutout
+        # 별점 팝업 여부. 앱은 새 옷 등록으로 저장한 경우에만 이 값을 쓴다 (기존 옷 수정은 제외).
+        response = JsonResponse({**serialize(garment),
+                                 'rating_prompt': should_prompt(request.user, RatingTask.GARMENT_REGISTRATION)})
+        response['Cache-Control'] = 'no-store'
+        return response
     response = JsonResponse(serialize(garment))
     response['Cache-Control'] = 'no-store'
     return response

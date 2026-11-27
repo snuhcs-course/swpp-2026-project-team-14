@@ -62,6 +62,7 @@ class TryOnClient(private val account: AccountAccess, private val baseUrl: Strin
                     onSubmitted: suspend (TryOnJob) -> Unit = {},
                     onResult: suspend (ByteArray) -> Unit = {},
                     keepForResume: Boolean = false, onProgress: (FittingProgress) -> Unit = {},
+                    onRatingPrompt: (Boolean) -> Unit = {},
                     onStatus: (String) -> Unit): ByteArray {
         require(consent) { "사진 처리에 동의해 주세요." }
         require(resumeJob != null || (person.size in 1..MAX_IMAGE && garments.size in 1..3))
@@ -96,6 +97,7 @@ class TryOnClient(private val account: AccountAccess, private val baseUrl: Strin
                 when (state.getString("status")) {
                     "completed" -> {
                         check(state.optBoolean("inputs_deleted")) { "서버의 입력 사진 삭제 상태를 확인하지 못했어요." }
+                        onRatingPrompt(state.optBoolean("rating_prompt"))
                         val image = retrieve("jobs/$id/image/", token)
                         onResult(image)
                         return image

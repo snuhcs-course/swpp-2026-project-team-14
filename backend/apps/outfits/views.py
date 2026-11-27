@@ -34,6 +34,8 @@ from apps.wardrobe import sizes
 from apps.wardrobe.models import Garment
 from apps.users.auth import require_auth
 from apps.users.models import User
+from apps.usage.models import RatingTask
+from apps.usage.ratings import should_prompt
 from apps.usage.recording import record_outfit_event, record_recommendations
 from apps.users.pagination import account_page
 from recommendation import preference, season, weather
@@ -259,8 +261,9 @@ def recommend_view(request):
             outfits.append(_create(Outfit.Source.RECOMMENDED, members, user=request.user, score=o["total"], components=o["components"],
                                    reasons=o["reasons"], context=context))
     record_recommendations(request.user, [outfit.key for outfit in outfits], data.get('seen_keys'), 'home')
+    # 별점 팝업 여부. 앱은 홈의 새로고침 버튼으로 받은 응답일 때만 이 값을 쓴다.
     return _json({"outfits": [serialize(o) for o in outfits], "notes": result["notes"], "band": result["band"],
-                  "context": context})
+                  "context": context, "rating_prompt": should_prompt(request.user, RatingTask.RECOMMENDATION)})
 
 
 @require_POST
