@@ -37,7 +37,8 @@ data class HomeState(
 }
 
 /** 오늘의 코디: outfits from the user's own wardrobe for today's weather, liked/disliked/saved. */
-class HomeViewModel(private val repository: OutfitRepository, private val taste: TasteStore) : ViewModel() {
+class HomeViewModel(private val repository: OutfitRepository, private val taste: TasteStore,
+                    private val onRatingPrompt: () -> Unit = {}) : ViewModel() {
     companion object {
         const val CAROUSEL_SIZE = 3
     }
@@ -63,8 +64,8 @@ class HomeViewModel(private val repository: OutfitRepository, private val taste:
     /** The occasion of today's calendar events (from the device), sent with the next recommendation. */
     fun setOccasion(value: String?) { occasion = value }
 
-    /** First load, or the refresh button: new weather and new outfits. */
-    fun load(body: JSONObject?, refreshWeather: Boolean = true) {
+    /** First load, or the refresh button: new weather and new outfits. [fromRefresh]: 사용자가 새로고침을 눌러 받은 추천 */
+    fun load(body: JSONObject?, refreshWeather: Boolean = true, fromRefresh: Boolean = false) {
         this.body = body
         if (body == null) {
             mutableState.value = HomeState(errorCode = HomeState.NO_PROFILE)
@@ -83,6 +84,8 @@ class HomeViewModel(private val repository: OutfitRepository, private val taste:
                 seen += outfits.map { it.key }
                 mutableState.value = mutableState.value.copy(loading = false, weather = weather, outfits = outfits,
                     index = 0, notes = result.notes)
+                // 별점은 직접 새로고침해서 받은 추천일 때만 묻는다 (홈 진입 시 자동 추천은 제외).
+                if (fromRefresh && result.ratingPrompt && outfits.isNotEmpty()) onRatingPrompt()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: OutfitApiException) {
@@ -172,6 +175,29 @@ class HomeViewModel(private val repository: OutfitRepository, private val taste:
             } catch (e: OutfitApiException) {
                 mutableState.value = mutableState.value.copy(acting = false, message = e.message)
             }
+        }
+    }
+
+    /**
+     * Brings each card's saved state in line with the 코디북 when 홈 is shown again: an outfit removed there (or saved
+     * from chat) would otherwise keep its old 저장 button, and a tap would repeat the change instead of reversing it.
+     * Matched by garment combination, since the 코디북 keeps one entry per combination. A failed check changes nothing.
+     */
+    fun syncSaved() {
+        if (mutableState.value.outfits.isEmpty() || mutableState.value.acting) return
+        viewModelScope.launch {
+            val keys = try { repository.saved().map { it.key }.toSet() }
+                catch (e: CancellationException) { throw e }
+                catch (e: OutfitApiException) { return@launch }
+            val state = mutableState.value
+            if (state.acting) return@launch  // a tap on 저장 meanwhile has the newer answer
+            val outfits = state.outfits.map { outfit ->
+                val saved = outfit.key in keys
+                if (outfit.saved == saved) outfit else outfit.copy(saved = saved)
+            }
+            if (outfits == state.outfits) return@launch
+            // A "저장했어요" not yet shown before leaving 홈 would now contradict the button, so it is dropped.
+            mutableState.value = state.copy(outfits = outfits, message = null)
         }
     }
 

@@ -71,11 +71,16 @@ class WornBatchViewModel internal constructor(
     private val uploadPhoto: suspend (ByteArray, String) -> JSONObject,
     private val requestPhoto: suspend (String, String, JSONObject?) -> JSONObject,
     private val requestGeneration: suspend (String, String, JSONObject?) -> JSONObject,
+    private val onAttempt: () -> Unit = {},
+    private val onFailure: (String) -> Unit = {},
+    private val onRatingPrompt: () -> Unit = {},
 ) : ViewModel() {
-    constructor(account: AccountAccess) : this(
+    constructor(account: AccountAccess, onAttempt: () -> Unit = {}, onFailure: (String) -> Unit = {},
+                onRatingPrompt: () -> Unit = {}) : this(
         { bytes, id -> WornPhotoRepository.upload(account, bytes, id) },
         { id, action, body -> WornPhotoRepository.request(account, id, action, body) },
         { id, action, body -> WornGenerationRepository.request(account, id, action, body) },
+        onAttempt, onFailure, onRatingPrompt,
     )
     private val mutable = MutableStateFlow(WornBatchState())
     val state = mutable.asStateFlow()
@@ -85,12 +90,14 @@ class WornBatchViewModel internal constructor(
 
     private fun run(action: suspend () -> Unit) {
         if (mutable.value.busy) return
+        onAttempt()
         mutable.value = mutable.value.copy(busy = true, error = null)
         job = viewModelScope.launch {
             try { action() }
             catch (cancelled: CancellationException) { throw cancelled }
             catch (error: Exception) {
                 currentCoroutineContext().ensureActive()
+                onFailure(com.swpp.stylemate.data.usage.usageErrorCode(error))
                 mutable.value = mutable.value.copy(error = error.message ?: "요청을 처리하지 못했어요.")
             }
             finally {
@@ -140,6 +147,7 @@ class WornBatchViewModel internal constructor(
     }
 
     private fun acceptPhoto(result: JSONObject) {
+        if (result.optString("status") == "failed") onFailure(result.optString("error").ifBlank { "WORN_REGISTRATION_FAILED" })
         val candidates = result.optJSONArray("candidates") ?: JSONArray()
         mutable.value = mutable.value.copy(photo = result,
             selected = (0 until candidates.length()).map { candidates.getJSONObject(it).getString("id") }.toSet(),
@@ -174,6 +182,7 @@ class WornBatchViewModel internal constructor(
                 try { generateOne(item.id, item.requestId) }
                 catch (cancelled: CancellationException) { throw cancelled }
                 catch (error: Exception) {
+                    onFailure(com.swpp.stylemate.data.usage.usageErrorCode(error))
                     update(item.id) { it.copy(error = error.message) }
                     break // An ambiguous network failure must be checked, not automatically retried.
                 }
@@ -234,6 +243,8 @@ class WornBatchViewModel internal constructor(
         val result = requestPhoto(state.photo!!.getString("id"), "save",
             JSONObject().put("items", JSONArray(rows)))
         mutable.value = mutable.value.copy(savedCount = result.getJSONArray("items").length())
+        // 배치 전체에 한 번만 묻는다.
+        if (result.optBoolean("rating_prompt")) onRatingPrompt()
     }
 
     fun reset() {

@@ -200,6 +200,7 @@ fun ChatScreen(
                                         "undo" -> "수정 취소"
                                         else -> null
                                     })
+                                    if (result.changes.isNotEmpty()) ChangeReasons(result.changes)
                                     if (result.status == "unlock" && state.turns.lastOrNull()?.id == turn.id) {
                                         OutlinedButton(onClick = { onUnlock(turn.id) },
                                             enabled = !state.busy && outfit.key == turn.request.current.key,
@@ -232,6 +233,24 @@ fun ChatScreen(
         title = { Text("작성 중인 요청을 바꿀까요?") }, text = { Text("실패한 요청의 메시지와 조건을 불러옵니다.") },
         confirmButton = { TextButton(onClick = { replacingDraft = null; edit(turn) }) { Text("불러오기") } },
         dismissButton = { TextButton(onClick = { replacingDraft = null }) { Text("계속 작성") } }) }
+}
+
+@Composable
+private fun ChangeReasons(changes: List<com.swpp.stylemate.data.chat.ChatChange>) {
+    val slots = mapOf("top" to "상의", "bottom" to "하의", "outerwear" to "아우터")
+    Column(Modifier.fillMaxWidth().padding(start = 4.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text("바뀐 이유", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
+        // The bubble above already names the garments (before → after); this says why, one line per slot.
+        changes.forEach { change ->
+            Row(Modifier.semantics(mergeDescendants = true) {}, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(slots[change.slot] ?: change.slot, style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.SemiBold)
+                Text(change.reason, style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
 }
 
 @Composable

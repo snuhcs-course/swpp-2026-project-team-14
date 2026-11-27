@@ -185,7 +185,6 @@ fun MyProfileScreen(
     onLogout: () -> Unit = {},
     authBusy: Boolean = false,
     onDeleteRemote: (suspend () -> String?)? = null,
-    onImport: (() -> Unit)? = null,
     connections: (@Composable () -> Unit)? = null,
     connectionSummary: String = "연결 상태 확인",
 ) {
@@ -240,8 +239,6 @@ fun MyProfileScreen(
                 if (connections != null) { ProfileHeading("캘린더 연동"); connections() }
                 ProfileHeading("계정")
                 ProfileSummaryRow("계정 설정", "로그인 정보 · 로그아웃", enabled = !authBusy) { page = ProfilePage.ACCOUNT }
-                if (username != null && onImport != null) TextButton(onClick = onImport, enabled = !authBusy,
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("이 기기의 기존 데이터 가져오기") }
             }
         }
     }

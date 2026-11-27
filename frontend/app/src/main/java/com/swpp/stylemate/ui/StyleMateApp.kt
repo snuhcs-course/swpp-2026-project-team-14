@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -49,13 +50,10 @@ import com.swpp.stylemate.data.LocalBodyProfileStore
 import com.swpp.stylemate.data.AccountAccess
 import com.swpp.stylemate.data.AuthRepository
 import com.swpp.stylemate.data.KeystoreSessionStore
-import com.swpp.stylemate.data.GuestImportRepository
 import com.swpp.stylemate.data.chat.ChatRepository
 import com.swpp.stylemate.data.recommendation.LocalTasteStore
 import com.swpp.stylemate.ui.chat.ChatRoute
 import com.swpp.stylemate.ui.chat.ChatViewModel
-import com.swpp.stylemate.ui.profile.GuestImportViewModel
-import com.swpp.stylemate.ui.profile.GuestImportDialog
 import com.swpp.stylemate.data.LocalUserStore
 import com.swpp.stylemate.BuildConfig
 import com.swpp.stylemate.ui.profile.AuthViewModel
@@ -133,6 +131,10 @@ fun StyleMateApp(viewModel: BodyProfileViewModel? = null, authModel: AuthViewMod
         }
     } else {
         val scope = account.userId
+        androidx.lifecycle.compose.LifecycleResumeEffect(scope) {
+            com.swpp.stylemate.data.usage.UsageMetrics.schedule(context, scope)
+            onPauseOrDispose { }
+        }
         val owner = remember(scope) { object : ViewModelStoreOwner { override val viewModelStore = ViewModelStore() } }
         DisposableEffect(owner) { onDispose { owner.viewModelStore.clear() } }
         CompositionLocalProvider(LocalViewModelStoreOwner provides owner, LocalAccountAccess provides account,
@@ -140,12 +142,7 @@ fun StyleMateApp(viewModel: BodyProfileViewModel? = null, authModel: AuthViewMod
             key(scope) {
                 val profileModel = viewModel ?: defaultBodyProfileViewModel(account)
                 LaunchedEffect(auth.session?.user?.json()?.toString()) { profileModel.refreshAccountProfile() }
-                val importModel: GuestImportViewModel = viewModel(factory = viewModelFactory {
-                    initializer { GuestImportViewModel(GuestImportRepository(LocalUserStore.legacyGuestForContext(context), account)) }
-                })
-                AppContent(profileModel, authModel, importModel)
-                val importing by importModel.state.collectAsStateWithLifecycle()
-                GuestImportDialog(importing, importModel::confirm, importModel::decide, importModel::retry, importModel::close)
+                AppContent(profileModel, authModel)
                 com.swpp.stylemate.ui.tryon.FittingNotificationResult(fittingTask, account, onFittingHandled)
             }
         }
@@ -157,7 +154,7 @@ fun StyleMateApp(viewModel: BodyProfileViewModel? = null, authModel: AuthViewMod
 }
 
 @Composable
-private fun AppContent(viewModel: BodyProfileViewModel, authModel: AuthViewModel, importModel: GuestImportViewModel) {
+private fun AppContent(viewModel: BodyProfileViewModel, authModel: AuthViewModel) {
     val app by viewModel.app.collectAsStateWithLifecycle()
     val onboarding by viewModel.onboarding.collectAsStateWithLifecycle()
     if (app.storageError != null) {
@@ -174,7 +171,7 @@ private fun AppContent(viewModel: BodyProfileViewModel, authModel: AuthViewModel
     } else if (app.setupVisible) {
         ProfileSetupFlow(viewModel, canCancel = true)
     } else {
-        MainTabs(viewModel, authModel, importModel)
+        MainTabs(viewModel, authModel)
     }
 }
 
@@ -218,12 +215,13 @@ private fun ProfileSetupFlow(viewModel: BodyProfileViewModel, canCancel: Boolean
 }
 
 @Composable
-private fun MainTabs(viewModel: BodyProfileViewModel, authModel: AuthViewModel, importModel: GuestImportViewModel) {
+private fun MainTabs(viewModel: BodyProfileViewModel, authModel: AuthViewModel) {
     var wardrobeRevision by rememberSaveable { mutableStateOf(0) }
     val app by viewModel.app.collectAsStateWithLifecycle()
     val auth by authModel.state.collectAsStateWithLifecycle()
     val account = checkNotNull(LocalAccountAccess.current)
     var tab by rememberSaveable { mutableStateOf(Tab.HOME) }
+    var openedFitting by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current.applicationContext
     val profileStore = remember(account.userId) { LocalUserStore.forContext(context, account.userId) }
     var calendarConnected by remember(account.userId) {
@@ -235,13 +233,9 @@ private fun MainTabs(viewModel: BodyProfileViewModel, authModel: AuthViewModel, 
     }
     val chat: ChatViewModel = viewModel(factory = viewModelFactory {
         initializer { ChatViewModel(ChatRepository(BuildConfig.API_BASE_URL, account = account),
-            LocalTasteStore(context, account.userId)) }
+            LocalTasteStore(context, account.userId), com.swpp.stylemate.data.usage.UsageMetrics.forAccount(context, account.userId)) }
     })
     val chatting by chat.visible.collectAsStateWithLifecycle()
-    val importing by importModel.state.collectAsStateWithLifecycle()
-    LaunchedEffect(tab, importing.stage) {
-        if (tab == Tab.PROFILE && importing.stage == com.swpp.stylemate.ui.profile.GuestImportStage.HIDDEN) importModel.checkAvailable()
-    }
 
     Box(Modifier.fillMaxSize()) {
     Scaffold(
@@ -254,7 +248,7 @@ private fun MainTabs(viewModel: BodyProfileViewModel, authModel: AuthViewModel, 
                     NavigationBarItem(
                         selected = tab == item,
                         onClick = { tab = item },
-                        icon = { Icon(item.icon, contentDescription = null) },
+                        icon = { if (item == Tab.WARDROBE) com.swpp.stylemate.ui.wardrobe.WardrobeHangerIcon(Modifier.size(24.dp), if (tab == item) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant) else Icon(item.icon, contentDescription = null) },
                         label = { Text(item.label) },
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = MaterialTheme.colorScheme.onPrimary,
@@ -268,7 +262,7 @@ private fun MainTabs(viewModel: BodyProfileViewModel, authModel: AuthViewModel, 
             }
             }
         },
-    ) { padding ->
+    ) { padding -> Box(Modifier.fillMaxSize()) {
         AccountTabContent(account.userId, tab.name) { when (tab) {
             Tab.HOME -> HomeRoute(app.profile, onSetupProfile = viewModel::startReanalysis,
                 onOpenWardrobe = { tab = Tab.WARDROBE }, modifier = Modifier.padding(padding).consumeWindowInsets(padding),
@@ -297,7 +291,6 @@ private fun MainTabs(viewModel: BodyProfileViewModel, authModel: AuthViewModel, 
                 modifier = Modifier.padding(padding),
                 username = auth.session?.user?.username,
                 onLogout = authModel::logout,
-                onImport = if (importing.available) importModel::open else null,
                 authBusy = auth.busy,
                 onDeleteRemote = viewModel::deleteAccountProfile,
                 connections = {
@@ -306,8 +299,13 @@ private fun MainTabs(viewModel: BodyProfileViewModel, authModel: AuthViewModel, 
                 connectionSummary = if (calendarConnected) "연결됨" else "연결 안 됨",
             )
         } }
-    }
+        // A fitting keeps going in the background; this card follows it over every tab.
+        if (!chatting) com.swpp.stylemate.ui.tryon.FittingProgressCard(account.userId, onOpen = { openedFitting = it },
+            Modifier.align(Alignment.BottomCenter).padding(padding).padding(horizontal = 16.dp, vertical = 12.dp))
+    } }
+    com.swpp.stylemate.ui.tryon.FittingNotificationResult(openedFitting, account) { openedFitting = null }
     if (chatting) ChatRoute(chat)
+    com.swpp.stylemate.ui.components.RatingPromptHost(account.userId)
     }
 }
 

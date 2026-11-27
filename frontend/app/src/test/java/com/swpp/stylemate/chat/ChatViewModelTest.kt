@@ -98,6 +98,19 @@ class ChatViewModelTest {
         assertEquals("", viewModel.state.value.draft)
     }
 
+    @Test fun anEditCarriesWhyEachGarmentChanged() {
+        val reply = JSONObject().put("status", "updated").put("message", "상의를 바꿨어요.").put("outfit", edited)
+            .put("changed_ids", JSONArray(listOf("c"))).put("locked_ids", JSONArray()).put("unlock_ids", JSONArray())
+            .put("notes", JSONArray()).put("changes", JSONArray().put(JSONObject().put("slot", "top")
+                .put("from", "검정 니트").put("to", "흰 셔츠").put("reason", "요청하신 더 밝은 색으로 바꿨어요 (블랙 → 화이트).")))
+        server.on("POST /api/outfits/chat/", json(reply.toString()))
+        send("밝게")
+        settled()
+        val changes = viewModel.state.value.turns.last().result!!.changes
+        assertEquals(listOf(com.swpp.stylemate.data.chat.ChatChange("top", "검정 니트", "흰 셔츠",
+            "요청하신 더 밝은 색으로 바꿨어요 (블랙 → 화이트).")), changes)
+    }
+
     @Test fun draftIsLimitedTo400Characters() {
         viewModel.setDraft("가".repeat(500))
         assertEquals(400, viewModel.state.value.draft.length)

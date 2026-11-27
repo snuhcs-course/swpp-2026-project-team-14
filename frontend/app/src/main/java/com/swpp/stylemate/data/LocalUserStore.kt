@@ -243,10 +243,6 @@ class LocalUserStore(private val directory: File) {
 
     companion object {
         private val lock = Any()
-        // Only the authenticated import flow reads the old guest snapshot; service screens never use it.
-        internal fun legacyGuestForContext(context: Context): LocalUserStore =
-            legacyGuestInDirectory(File(context.applicationContext.filesDir, "local-users"))
-        internal fun legacyGuestInDirectory(root: File) = LocalUserStore(File(root, "guest"))
         fun forContext(context: Context, accountId: String): LocalUserStore =
             inDirectory(File(context.applicationContext.filesDir, "local-users"), accountId)
         fun inDirectory(root: File, accountId: String): LocalUserStore {

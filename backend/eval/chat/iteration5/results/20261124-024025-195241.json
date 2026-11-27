@@ -1,0 +1,719 @@
+{
+  "run_at": "2026-11-23T17:40:25+00:00",
+  "model": "google/gemini-3.1-flash-lite",
+  "provider": "openrouter",
+  "temperature": 0,
+  "cases_version": "iteration5",
+  "summary": {
+    "cases": 24,
+    "scored": 24,
+    "passed": 23,
+    "pass_rate": 0.9583,
+    "critical_errors": 0,
+    "format_errors": 0,
+    "infra_errors": [],
+    "criteria": {
+      "pass_rate": 0.8,
+      "critical_errors": 0,
+      "format_errors": 0
+    },
+    "verdict": "PASS"
+  },
+  "results": [
+    {
+      "id": "trip-01",
+      "category": "trip",
+      "request": "내일 부산 여행 가는데 뭐 입지?",
+      "passed": true,
+      "failed": [],
+      "critical": [],
+      "error": null,
+      "output": {
+        "action": "edit",
+        "change_slots": [
+          "top",
+          "bottom"
+        ],
+        "keep_slots": [],
+        "wants": [],
+        "avoid_colors": [],
+        "target_colors": [],
+        "target_garment_ids": [],
+        "remove_outerwear": false,
+        "question": ""
+      }
+    },
+    {
+      "id": "trip-02",
+      "category": "trip",
+      "request": "다음 주 토요일 결혼식 하객룩으로 바꿔줘",
+      "passed": true,
+      "failed": [],
+      "critical": [],
+      "error": null,
+      "output": {
+        "action": "edit",
+        "change_slots": [
+          "top",
+          "bottom",
+          "outerwear"
+        ],
+        "keep_slots": [],
+        "wants": [
+          {
+            "slot": "top",
+            "want": "formal"
+          },
+          {
+            "slot": "bottom",
+            "want": "formal"
+          },
+          {
+            "slot": "outerwear",
+            "want": "formal"
+          }
+        ],
+        "avoid_colors": [],
+        "target_colors": [],
+        "target_garment_ids": [
+          "g-blue-shirt",
+          "g-black-slacks",
+          "g-navy-jacket"
+        ],
+        "remove_outerwear": false,
+        "question": ""
+      }
+    },
+    {
+      "id": "trip-03",
+      "category": "trip",
+      "request": "주말에 제주도 바닷가 가는데 시원하게 입고 싶어",
+      "passed": true,
+      "failed": [],
+      "critical": [],
+      "error": null,
+      "output": {
+        "action": "edit",
+        "change_slots": [
+          "top",
+          "bottom",
+          "outerwear"
+        ],
+        "keep_slots": [],
+        "wants": [
+          {
+            "slot": "top",
+            "want": "cooler"
+          },
+          {
+            "slot": "bottom",
+            "want": "cooler"
+          },
+          {
+            "slot": "outerwear",
+            "want": "cooler"
+          }
+        ],
+        "avoid_colors": [],
+        "target_colors": [],
+        "target_garment_ids": [],
+        "remove_outerwear": true,
+        "question": ""
+      }
+    },
+    {
+      "id": "trip-04",
+      "category": "trip",
+      "request": "모레 면접 보러 가는데 단정하게 해줘",
+      "passed": true,
+      "failed": [],
+      "critical": [],
+      "error": null,
+      "output": {
+        "action": "edit",
+        "change_slots": [
+          "top",
+          "bottom",
+          "outerwear"
+        ],
+        "keep_slots": [],
+        "wants": [
+          {
+            "slot": "top",
+            "want": "formal"
+          },
+          {
+            "slot": "bottom",
+            "want": "formal"
+          },
+          {
+            "slot": "outerwear",
+            "want": "formal"
+          }
+        ],
+        "avoid_colors": [],
+        "target_colors": [],
+        "target_garment_ids": [
+          "g-blue-shirt",
+          "g-black-slacks",
+          "g-navy-jacket"
+        ],
+        "remove_outerwear": false,
+        "question": ""
+      }
+    },
+    {
+      "id": "trip-05",
+      "category": "trip",
+      "request": "11월 30일에 등산 가요",
+      "passed": true,
+      "failed": [],
+      "critical": [],
+      "error": null,
+      "output": {
+        "action": "edit",
+        "change_slots": [
+          "top",
+          "bottom",
+          "outerwear"
+        ],
+        "keep_slots": [],
+        "wants": [
+          {
+            "slot": "top",
+            "want": "warmer"
+          },
+          {
+            "slot": "bottom",
+            "want": "casual"
+          }
+        ],
+        "avoid_colors": [],
+        "target_colors": [],
+        "target_garment_ids": [],
+        "remove_outerwear": false,
+        "question": ""
+      }
+    },
+    {
+      "id": "trip-06",
+      "category": "trip",
+      "request": "내일 춥다는데 따뜻하게",
+      "passed": true,
+      "failed": [],
+      "critical": [],
+      "error": null,
+      "output": {
+        "action": "edit",
+        "change_slots": [
+          "top",
+          "outerwear"
+        ],
+        "keep_slots": [
+          "bottom"
+        ],
+        "wants": [
+          {
+            "slot": "top",
+            "want": "warmer"
+          },
+          {
+            "slot": "outerwear",
+            "want": "warmer"
+          }
+        ],
+        "avoid_colors": [],
+        "target_colors": [],
+        "target_garment_ids": [],
+        "remove_outerwear": false,
+        "question": ""
+      }
+    },
+    {
+      "id": "outer-01",
+      "category": "add_outer",
+      "request": "아우터 하나 추가해줘",
+      "passed": true,
+      "failed": [],
+      "critical": [],
+      "error": null,
+      "output": {
+        "action": "edit",
+        "change_slots": [
+          "outerwear"
+        ],
+        "keep_slots": [
+          "top",
+          "bottom"
+        ],
+        "wants": [],
+        "avoid_colors": [],
+        "target_colors": [],
+        "target_garment_ids": [],
+        "remove_outerwear": false,
+        "question": ""
+      }
+    },
+    {
+      "id": "outer-02",
+      "category": "add_outer",
+      "request": "추우니까 코트 걸칠래",
+      "passed": true,
+      "failed": [],
+      "critical": [],
+      "error": null,
+      "output": {
+        "action": "edit",
+        "change_slots": [
+          "outerwear"
+        ],
+        "keep_slots": [
+          "top",
+          "bottom"
+        ],
+        "wants": [
+          {
+            "slot": "outerwear",
+            "want": "warmer"
+          }
+        ],
+        "avoid_colors": [],
+        "target_colors": [],
+        "target_garment_ids": [
+          "g-brown-coat"
+        ],
+        "remove_outerwear": false,
+        "question": ""
+      }
+    },
+    {
+      "id": "outer-03",
+      "category": "add_outer",
+      "request": "패딩 입혀줘",
+      "passed": true,
+      "failed": [],
+      "critical": [],
+      "error": null,
+      "output": {
+        "action": "edit",
+        "change_slots": [
+          "outerwear"
+        ],
+        "keep_slots": [
+          "top",
+          "bottom"
+        ],
+        "wants": [],
+        "avoid_colors": [],
+        "target_colors": [],
+        "target_garment_ids": [
+          "g-black-puffer"
+        ],
+        "remove_outerwear": false,
+        "question": ""
+      }
+    },
+    {
+      "id": "follow-01",
+      "category": "follow_up",
+      "request": "상의만",
+      "passed": true,
+      "failed": [],
+      "critical": [],
+      "error": null,
+      "output": {
+        "action": "edit",
+        "change_slots": [
+          "top"
+        ],
+        "keep_slots": [
+          "bottom"
+        ],
+        "wants": [],
+        "avoid_colors": [],
+        "target_colors": [],
+        "target_garment_ids": [],
+        "remove_outerwear": false,
+        "question": "어떤 스타일의 상의로 바꿔드릴까요?"
+      }
+    },
+    {
+      "id": "follow-02",
+      "category": "follow_up",
+      "request": "하의를 어두운 색으로",
+      "passed": true,
+      "failed": [],
+      "critical": [],
+      "error": null,
+      "output": {
+        "action": "edit",
+        "change_slots": [
+          "bottom"
+        ],
+        "keep_slots": [
+          "top"
+        ],
+        "wants": [
+          {
+            "slot": "bottom",
+            "want": "darker"
+          }
+        ],
+        "avoid_colors": [],
+        "target_colors": [],
+        "target_garment_ids": [
+          "g-black-slacks"
+        ],
+        "remove_outerwear": false,
+        "question": ""
+      }
+    },
+    {
+      "id": "follow-03",
+      "category": "follow_up",
+      "request": "응 그 코트로",
+      "passed": true,
+      "failed": [],
+      "critical": [],
+      "error": null,
+      "output": {
+        "action": "edit",
+        "change_slots": [
+          "outerwear"
+        ],
+        "keep_slots": [
+          "top",
+          "bottom"
+        ],
+        "wants": [],
+        "avoid_colors": [],
+        "target_colors": [],
+        "target_garment_ids": [
+          "g-brown-coat"
+        ],
+        "remove_outerwear": false,
+        "question": ""
+      }
+    },
+    {
+      "id": "casual-01",
+      "category": "informal",
+      "request": "좀 밝게 ㄱㄱ",
+      "passed": true,
+      "failed": [],
+      "critical": [],
+      "error": null,
+      "output": {
+        "action": "edit",
+        "change_slots": [
+          "top",
+          "bottom"
+        ],
+        "keep_slots": [],
+        "wants": [
+          {
+            "slot": "top",
+            "want": "brighter"
+          },
+          {
+            "slot": "bottom",
+            "want": "brighter"
+          }
+        ],
+        "avoid_colors": [],
+        "target_colors": [],
+        "target_garment_ids": [],
+        "remove_outerwear": false,
+        "question": ""
+      }
+    },
+    {
+      "id": "casual-02",
+      "category": "informal",
+      "request": "넘 칙칙해",
+      "passed": true,
+      "failed": [],
+      "critical": [],
+      "error": null,
+      "output": {
+        "action": "edit",
+        "change_slots": [
+          "top",
+          "bottom"
+        ],
+        "keep_slots": [],
+        "wants": [
+          {
+            "slot": "top",
+            "want": "brighter"
+          },
+          {
+            "slot": "bottom",
+            "want": "brighter"
+          }
+        ],
+        "avoid_colors": [],
+        "target_colors": [],
+        "target_garment_ids": [],
+        "remove_outerwear": false,
+        "question": ""
+      }
+    },
+    {
+      "id": "casual-03",
+      "category": "informal",
+      "request": "바지 넘 꽉끼는듯",
+      "passed": true,
+      "failed": [],
+      "critical": [],
+      "error": null,
+      "output": {
+        "action": "edit",
+        "change_slots": [
+          "bottom"
+        ],
+        "keep_slots": [
+          "top"
+        ],
+        "wants": [
+          {
+            "slot": "bottom",
+            "want": "looser"
+          }
+        ],
+        "avoid_colors": [],
+        "target_colors": [],
+        "target_garment_ids": [
+          "g-blue-jeans"
+        ],
+        "remove_outerwear": false,
+        "question": ""
+      }
+    },
+    {
+      "id": "casual-04",
+      "category": "informal",
+      "request": "윗옷 색 좀 바꿔봐",
+      "passed": false,
+      "failed": [
+        "action: action=clarify"
+      ],
+      "critical": [],
+      "error": null,
+      "output": {
+        "action": "clarify",
+        "change_slots": [
+          "top"
+        ],
+        "keep_slots": [
+          "bottom"
+        ],
+        "wants": [],
+        "avoid_colors": [],
+        "target_colors": [],
+        "target_garment_ids": [],
+        "remove_outerwear": false,
+        "question": "어떤 색상의 상의로 바꿔드릴까요?"
+      }
+    },
+    {
+      "id": "multi-01",
+      "category": "multi",
+      "request": "상의는 밝게, 하의는 어둡게",
+      "passed": true,
+      "failed": [],
+      "critical": [],
+      "error": null,
+      "output": {
+        "action": "edit",
+        "change_slots": [
+          "top",
+          "bottom"
+        ],
+        "keep_slots": [],
+        "wants": [
+          {
+            "slot": "top",
+            "want": "brighter"
+          },
+          {
+            "slot": "bottom",
+            "want": "darker"
+          }
+        ],
+        "avoid_colors": [],
+        "target_colors": [],
+        "target_garment_ids": [],
+        "remove_outerwear": false,
+        "question": ""
+      }
+    },
+    {
+      "id": "multi-02",
+      "category": "multi",
+      "request": "블랙은 빼고 편한 옷으로",
+      "passed": true,
+      "failed": [],
+      "critical": [],
+      "error": null,
+      "output": {
+        "action": "edit",
+        "change_slots": [
+          "top",
+          "bottom"
+        ],
+        "keep_slots": [],
+        "wants": [
+          {
+            "slot": "top",
+            "want": "casual"
+          },
+          {
+            "slot": "bottom",
+            "want": "casual"
+          }
+        ],
+        "avoid_colors": [
+          "블랙"
+        ],
+        "target_colors": [],
+        "target_garment_ids": [],
+        "remove_outerwear": false,
+        "question": ""
+      }
+    },
+    {
+      "id": "multi-03",
+      "category": "multi",
+      "request": "코트 벗고 반팔로",
+      "passed": true,
+      "failed": [],
+      "critical": [],
+      "error": null,
+      "output": {
+        "action": "edit",
+        "change_slots": [
+          "top",
+          "outerwear"
+        ],
+        "keep_slots": [
+          "bottom"
+        ],
+        "wants": [],
+        "avoid_colors": [],
+        "target_colors": [],
+        "target_garment_ids": [
+          "g-white-tee"
+        ],
+        "remove_outerwear": true,
+        "question": ""
+      }
+    },
+    {
+      "id": "multi-04",
+      "category": "multi",
+      "request": "니트는 그대로 두고 하의만 청바지로",
+      "passed": true,
+      "failed": [],
+      "critical": [],
+      "error": null,
+      "output": {
+        "action": "edit",
+        "change_slots": [
+          "bottom"
+        ],
+        "keep_slots": [
+          "top"
+        ],
+        "wants": [],
+        "avoid_colors": [],
+        "target_colors": [],
+        "target_garment_ids": [
+          "g-blue-jeans"
+        ],
+        "remove_outerwear": false,
+        "question": ""
+      }
+    },
+    {
+      "id": "fail-01",
+      "category": "unsupported",
+      "request": "가방도 추천해줘",
+      "passed": true,
+      "failed": [],
+      "critical": [],
+      "error": null,
+      "output": {
+        "action": "clarify",
+        "change_slots": [],
+        "keep_slots": [],
+        "wants": [],
+        "avoid_colors": [],
+        "target_colors": [],
+        "target_garment_ids": [],
+        "remove_outerwear": false,
+        "question": "죄송합니다. 현재 가방은 추천해 드릴 수 없습니다. 의류만 변경 가능합니다."
+      }
+    },
+    {
+      "id": "fail-02",
+      "category": "unsupported",
+      "request": "빨간 원피스로 바꿔줘",
+      "passed": true,
+      "failed": [],
+      "critical": [],
+      "error": null,
+      "output": {
+        "action": "clarify",
+        "change_slots": [],
+        "keep_slots": [],
+        "wants": [],
+        "avoid_colors": [],
+        "target_colors": [],
+        "target_garment_ids": [],
+        "remove_outerwear": false,
+        "question": "죄송하지만 현재 원피스는 보유하고 있지 않습니다. 다른 옷으로 추천해 드릴까요?"
+      }
+    },
+    {
+      "id": "fail-03",
+      "category": "undo",
+      "request": "아까 걸로 다시 돌려줘",
+      "passed": true,
+      "failed": [],
+      "critical": [],
+      "error": null,
+      "output": {
+        "action": "undo",
+        "change_slots": [],
+        "keep_slots": [],
+        "wants": [],
+        "avoid_colors": [],
+        "target_colors": [],
+        "target_garment_ids": [],
+        "remove_outerwear": false,
+        "question": ""
+      }
+    },
+    {
+      "id": "fail-04",
+      "category": "unsupported",
+      "request": "오늘 날씨 어때?",
+      "passed": true,
+      "failed": [],
+      "critical": [],
+      "error": null,
+      "output": {
+        "action": "clarify",
+        "change_slots": [],
+        "keep_slots": [],
+        "wants": [],
+        "avoid_colors": [],
+        "target_colors": [],
+        "target_garment_ids": [],
+        "remove_outerwear": false,
+        "question": "오늘 날씨를 확인해 드릴까요? 특정 장소나 계획이 있으신가요?"
+      }
+    }
+  ]
+}

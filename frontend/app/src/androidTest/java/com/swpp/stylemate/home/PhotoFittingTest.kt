@@ -313,6 +313,15 @@ class PhotoFittingTest {
         compose.onNodeWithText("완료되면 알림을 보내드립니다.").assertDoesNotExist()
     }
 
+    @Test fun fittingNotificationsPlayTheAppsSoftChime() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        FittingNotifications.notification(context, "synthetic-chime", true)
+        val manager = context.getSystemService(android.app.NotificationManager::class.java)
+        val channel = checkNotNull(manager.getNotificationChannel("fitting-results-v2"))
+        assertEquals("android.resource://${context.packageName}/${com.swpp.stylemate.R.raw.fitting_chime}", channel.sound.toString())
+        assertEquals(null, manager.getNotificationChannel("fitting-results"))
+    }
+
     @Test fun failureNotificationHasAnActionableMessageWithoutAnOngoingFlag() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val notification = FittingNotifications.notification(context, "synthetic-failure", false, failed = true)
