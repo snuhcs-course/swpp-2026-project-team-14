@@ -10,6 +10,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
@@ -19,6 +20,7 @@ import com.swpp.stylemate.ui.theme.StyleMateTheme
 import com.swpp.stylemate.ui.wardrobe.WardrobeCarousel
 import com.swpp.stylemate.ui.wardrobe.WardrobeCollection
 import com.swpp.stylemate.ui.wardrobe.WardrobeItem
+import com.swpp.stylemate.ui.wardrobe.HangingGarmentImage
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
@@ -39,6 +41,26 @@ class WardrobeRailTest {
             WardrobeItem("rail-$index", "테스트 의류 $index", if (index % 3 == 1) "bottom" else "top",
                 thumbnail = thumbnail)
         }
+    }
+
+    @Test fun shoePhotoWithAnOrdinaryBackgroundRemainsVisible() {
+        // An opaque brown photo fails the studio matte. Unsupported categories must show it intact.
+        val bitmap = Bitmap.createBitmap(48, 64, Bitmap.Config.ARGB_8888).apply { eraseColor(0xFFAA7733.toInt()) }
+        val item = WardrobeItem("saved-shoe", "원본 신발 사진", "shoes",
+            imageUrl = "/api/wardrobe/items/saved-shoe/image/", thumbnail = bitmap.asImageBitmap())
+        try {
+            compose.setContent { StyleMateTheme {
+                HangingGarmentImage(item, Modifier.fillMaxWidth().height(300.dp))
+            } }
+            compose.waitUntil(5_000) {
+                compose.onAllNodesWithContentDescription(item.name).fetchSemanticsNodes().isNotEmpty()
+            }
+            val pixels = compose.onNodeWithContentDescription(item.name).captureToImage().toPixelMap()
+            val center = pixels[pixels.width / 2, pixels.height / 2]
+            assertEquals(0xAA / 255f, center.red, .02f)
+            assertEquals(0x77 / 255f, center.green, .02f)
+            assertEquals(0x33 / 255f, center.blue, .02f)
+        } finally { bitmap.recycle() }
     }
 
     @Composable

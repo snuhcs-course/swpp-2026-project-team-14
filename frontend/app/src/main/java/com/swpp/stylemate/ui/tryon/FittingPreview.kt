@@ -253,7 +253,9 @@ internal fun PhotoFitting(outfit: Outfit, repository: FittingRepository, account
                 }
                 // The loading screen stays up until the result is in hand, so it hands over without a blank frame.
                 if (!running && task?.optString("state") != "failed") {
-                    val source = initialSource ?: repository.latestSource(outfit)
+                    // The card/notification source is only a fallback. A retry replaces this task.
+                    val source = task?.optString("source")?.takeIf { it.isNotBlank() }
+                        ?: initialSource ?: repository.latestSource(outfit)
                     // Opened from the card or the notification: the fitting has just been made, so it is revealed too.
                     val fresh = waited || (initialSource != null && task?.optString("state") == "completed" &&
                         !task.optBoolean("card_dismissed"))

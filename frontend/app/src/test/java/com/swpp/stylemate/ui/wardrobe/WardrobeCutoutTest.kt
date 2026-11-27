@@ -103,4 +103,12 @@ class WardrobeCutoutTest {
         assertNull(storedCutoutPath(WardrobeItem("draft", "코트", "outerwear")))
         assertNull(storedCutoutPath(WardrobeItem("x", "코트", "outerwear", imageUrl = "/somewhere/else.png")))
     }
+
+    @Test fun shoesAndAccessoriesNeverUseTheUnsupportedCutoutRoute() {
+        for (category in listOf("shoes", "accessory")) {
+            val item = WardrobeItem("g3", "기타", category, imageUrl = "/api/wardrobe/items/g3/image/")
+            assertNull(storedCutoutPath(item))
+            assertNull(storedCutoutPath(item.copy(cutoutUrl = "/api/wardrobe/items/g3/display-cutout/")))
+        }
+    }
 }

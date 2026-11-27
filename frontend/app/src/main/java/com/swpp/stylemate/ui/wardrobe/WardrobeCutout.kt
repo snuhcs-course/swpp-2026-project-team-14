@@ -58,8 +58,11 @@ private suspend fun hangingAsset(bitmap: ImageBitmap, category: String): Garment
 
 /** One display-size asset request per saved garment; direct previews keep the studio fallback. */
 /** The server's stored background-free PNG: `cutout_url`, or the same route for servers that do not send it. */
-internal fun storedCutoutPath(item: WardrobeItem): String? = item.cutoutUrl
-    ?: item.imageUrl?.takeIf { it.endsWith("/image/") }?.let { it.removeSuffix("image/") + "display-cutout/" }
+internal fun storedCutoutPath(item: WardrobeItem): String? {
+    if (item.category !in listOf("top", "bottom", "outerwear")) return null
+    return item.cutoutUrl
+        ?: item.imageUrl?.takeIf { it.endsWith("/image/") }?.let { it.removeSuffix("image/") + "display-cutout/" }
+}
 
 @Composable
 internal fun HangingGarmentImage(
@@ -95,6 +98,11 @@ internal fun HangingGarmentImage(
                     sourceRequests.withPermit {
                         WardrobeRepository.thumbnail(context, checkNotNull(item.imageUrl), owner)
                     }
+                }
+                // Shoes and accessories have no server cutout. Keep their original photo,
+                // including ordinary backgrounds that the studio matte would reject.
+                if (item.category !in listOf("top", "bottom", "outerwear")) {
+                    return@load source?.let { hangingAsset(it, item.category) } ?: GarmentAsset.Failed
                 }
                 val local = if (source == null) GarmentAsset.Failed else matteWork.withPermit { withContext(Dispatchers.Default) {
                     val original = source.asAndroidBitmap()

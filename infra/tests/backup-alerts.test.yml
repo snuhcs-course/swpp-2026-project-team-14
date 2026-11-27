@@ -1,0 +1,182 @@
+rule_files:
+- rules.yml
+evaluation_interval: 1m
+tests:
+- name: first failures alert without any earlier success
+  interval: 1m
+  input_series:
+  - series: kube_job_status_failed{namespace="team14",job_name="mysql-backup-100",reason="BackoffLimitExceeded"}
+    values: 1+0x5
+  - series: kube_job_status_start_time{namespace="team14",job_name="mysql-backup-100"}
+    values: 100+0x5
+  - series: kube_job_status_failed{namespace="team14",job_name="media-backup-100",reason="BackoffLimitExceeded"}
+    values: 1+0x5
+  - series: kube_job_status_start_time{namespace="team14",job_name="media-backup-100"}
+    values: 100+0x5
+  alert_rule_test:
+  - eval_time: 1m
+    alertname: BackupJobFailed
+    exp_alerts:
+    - exp_labels:
+        namespace: team14
+        job_name: mysql-backup-100
+        reason: BackoffLimitExceeded
+        severity: warning
+      exp_annotations:
+        summary: 백업 Job mysql-backup-100이 실패했습니다.
+    - exp_labels:
+        namespace: team14
+        job_name: media-backup-100
+        reason: BackoffLimitExceeded
+        severity: warning
+      exp_annotations:
+        summary: 백업 Job media-backup-100이 실패했습니다.
+- name: retained failed Job clears after newer scheduled success
+  interval: 1m
+  input_series:
+  - series: kube_job_status_failed{namespace="team14",job_name="mysql-backup-100",reason="BackoffLimitExceeded"}
+    values: 1+0x5
+  - series: kube_job_status_start_time{namespace="team14",job_name="mysql-backup-100"}
+    values: 100+0x5
+  - series: kube_job_status_start_time{namespace="team14",job_name="mysql-backup-200"}
+    values: 200+0x5
+  - series: kube_job_status_succeeded{namespace="team14",job_name="mysql-backup-200"}
+    values: 0 0 1+0x3
+  alert_rule_test:
+  - eval_time: 1m
+    alertname: BackupJobFailed
+    exp_alerts:
+    - exp_labels:
+        namespace: team14
+        job_name: mysql-backup-100
+        reason: BackoffLimitExceeded
+        severity: warning
+      exp_annotations:
+        summary: 백업 Job mysql-backup-100이 실패했습니다.
+  - eval_time: 2m
+    alertname: BackupJobFailed
+    exp_alerts: []
+  - eval_time: 5m
+    alertname: BackupJobFailed
+    exp_alerts: []
+- name: manual retry clears only its own backup type
+  interval: 1m
+  input_series:
+  - series: kube_job_status_failed{namespace="team14",job_name="mysql-backup-100",reason="BackoffLimitExceeded"}
+    values: 1+0x5
+  - series: kube_job_status_start_time{namespace="team14",job_name="mysql-backup-100"}
+    values: 100+0x5
+  - series: kube_job_status_failed{namespace="team14",job_name="media-backup-100",reason="BackoffLimitExceeded"}
+    values: 1+0x5
+  - series: kube_job_status_start_time{namespace="team14",job_name="media-backup-100"}
+    values: 100+0x5
+  - series: kube_job_status_start_time{namespace="team14",job_name="mysql-backup-manual"}
+    values: 200+0x5
+  - series: kube_job_status_succeeded{namespace="team14",job_name="mysql-backup-manual"}
+    values: 1+0x5
+  alert_rule_test:
+  - eval_time: 1m
+    alertname: BackupJobFailed
+    exp_alerts:
+    - exp_labels:
+        namespace: team14
+        job_name: media-backup-100
+        reason: BackoffLimitExceeded
+        severity: warning
+      exp_annotations:
+        summary: 백업 Job media-backup-100이 실패했습니다.
+- name: older success does not hide a newer failure
+  interval: 1m
+  input_series:
+  - series: kube_job_status_failed{namespace="team14",job_name="mysql-backup-200",reason="BackoffLimitExceeded"}
+    values: 1+0x5
+  - series: kube_job_status_start_time{namespace="team14",job_name="mysql-backup-200"}
+    values: 200+0x5
+  - series: kube_job_status_start_time{namespace="team14",job_name="mysql-backup-100"}
+    values: 100+0x5
+  - series: kube_job_status_succeeded{namespace="team14",job_name="mysql-backup-100"}
+    values: 1+0x5
+  alert_rule_test:
+  - eval_time: 1m
+    alertname: BackupJobFailed
+    exp_alerts:
+    - exp_labels:
+        namespace: team14
+        job_name: mysql-backup-200
+        reason: BackoffLimitExceeded
+        severity: warning
+      exp_annotations:
+        summary: 백업 Job mysql-backup-200이 실패했습니다.
+  - eval_time: 5m
+    alertname: BackupJobFailed
+    exp_alerts:
+    - exp_labels:
+        namespace: team14
+        job_name: mysql-backup-200
+        reason: BackoffLimitExceeded
+        severity: warning
+      exp_annotations:
+        summary: 백업 Job mysql-backup-200이 실패했습니다.
+- name: unrelated successes and other namespaces cannot clear a failure
+  interval: 1m
+  input_series:
+  - series: kube_job_status_failed{namespace="team14",job_name="mysql-backup-100",reason="BackoffLimitExceeded"}
+    values: 1+0x5
+  - series: kube_job_status_start_time{namespace="team14",job_name="mysql-backup-100"}
+    values: 100+0x5
+  - series: kube_job_status_start_time{namespace="team14",job_name="unrelated-200"}
+    values: 200+0x5
+  - series: kube_job_status_succeeded{namespace="team14",job_name="unrelated-200"}
+    values: 1+0x5
+  - series: kube_job_status_start_time{namespace="other",job_name="mysql-backup-300"}
+    values: 300+0x5
+  - series: kube_job_status_succeeded{namespace="other",job_name="mysql-backup-300"}
+    values: 1+0x5
+  alert_rule_test:
+  - eval_time: 1m
+    alertname: BackupJobFailed
+    exp_alerts:
+    - exp_labels:
+        namespace: team14
+        job_name: mysql-backup-100
+        reason: BackoffLimitExceeded
+        severity: warning
+      exp_annotations:
+        summary: 백업 Job mysql-backup-100이 실패했습니다.
+- name: unrelated failed Jobs and successful backups never alert
+  interval: 1m
+  input_series:
+  - series: kube_job_status_failed{namespace="team14",job_name="unrelated-100",reason="BackoffLimitExceeded"}
+    values: 1+0x5
+  - series: kube_job_status_start_time{namespace="team14",job_name="unrelated-100"}
+    values: 100+0x5
+  - series: kube_job_status_start_time{namespace="team14",job_name="media-backup-200"}
+    values: 200+0x5
+  - series: kube_job_status_succeeded{namespace="team14",job_name="media-backup-200"}
+    values: 1+0x5
+  - series: kube_job_status_failed{namespace="other",job_name="mysql-backup-100",reason="BackoffLimitExceeded"}
+    values: 1+0x5
+  alert_rule_test:
+  - eval_time: 1m
+    alertname: BackupJobFailed
+    exp_alerts: []
+- name: a missing start metric does not hide the failure
+  interval: 1m
+  input_series:
+  - series: kube_job_status_failed{namespace="team14",job_name="mysql-backup-100",reason="BackoffLimitExceeded"}
+    values: 1+0x5
+  - series: kube_job_status_start_time{namespace="team14",job_name="mysql-backup-200"}
+    values: 200+0x5
+  - series: kube_job_status_succeeded{namespace="team14",job_name="mysql-backup-200"}
+    values: 1+0x5
+  alert_rule_test:
+  - eval_time: 1m
+    alertname: BackupJobFailed
+    exp_alerts:
+    - exp_labels:
+        namespace: team14
+        job_name: mysql-backup-100
+        reason: BackoffLimitExceeded
+        severity: warning
+      exp_annotations:
+        summary: 백업 Job mysql-backup-100이 실패했습니다.

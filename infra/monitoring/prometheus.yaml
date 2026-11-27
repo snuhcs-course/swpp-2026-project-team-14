@@ -163,6 +163,17 @@ data:
 
       - name: backup
         rules:
+          # Group scheduled and manually retried backup Jobs by their backup type.
+          - record: backup_job:start_time
+            expr: label_replace(kube_job_status_start_time{namespace="team14",job_name=~"(mysql|media)-backup-.*"}, "cronjob", "$1", "job_name", "((mysql|media)-backup)-.*")
+          - record: backup:last_successful_start_time
+            expr: |
+              max by (namespace, cronjob) (
+                backup_job:start_time
+                and on (namespace, job_name)
+                (kube_job_status_succeeded{namespace="team14"} > 0)
+              )
+
           # 하루 1회 백업이므로 마지막 성공 후 2일이 지나면 실패로 본다.
           - alert: BackupFailed
             expr: time() - kube_cronjob_status_last_successful_time{namespace="team14",cronjob=~"mysql-backup|media-backup"} > 2 * 86400
@@ -171,10 +182,18 @@ data:
             annotations:
               summary: "{{ $labels.cronjob }}가 2일 넘게 성공하지 못했습니다."
 
-          # 첫 성공 전에는 last_successful_time 메트릭이 없어 위 rule이 평가되지 않으므로,
-          # 실패한 Job을 직접 본다. 실패 Job은 다음 실행 전까지 남아 있다 (failedJobsHistoryLimit: 1).
+          # Failed Jobs are retained independently of successful Jobs. Keep them for diagnosis,
+          # but clear their alerts once a newer Job of the same backup type succeeds.
+          # With no successful Job yet, the unless clause removes nothing: the first failure alerts.
           - alert: BackupJobFailed
-            expr: kube_job_status_failed{namespace="team14",job_name=~"(mysql|media)-backup-.*"} > 0
+            expr: |
+              (kube_job_status_failed{namespace="team14",job_name=~"(mysql|media)-backup-.*"} > 0)
+              unless on (namespace, job_name)
+              (
+                backup_job:start_time
+                < on (namespace, cronjob) group_left()
+                backup:last_successful_start_time
+              )
             labels: {severity: warning}
             annotations:
               summary: "백업 Job {{ $labels.job_name }}이 실패했습니다."
