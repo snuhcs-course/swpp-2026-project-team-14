@@ -95,6 +95,7 @@ fun HomeRoute(profile: BodyProfile?, onSetupProfile: () -> Unit, onOpenWardrobe:
     val account = checkNotNull(LocalAccountAccess.current)
     val store = remember(account) { LocalUserStore.forContext(context, account.userId) }
     val fitting = remember(account) { FittingRepository(store, account) }
+    var selectedRegion by remember(store) { mutableStateOf(HomeRegion.load(store)) }
     var selected by remember { mutableStateOf<Outfit?>(null) }
     val notification = LocalFittingNotificationKey.current
     LaunchedEffect(notification) { if (notification != null) selected = null }
@@ -135,8 +136,8 @@ fun HomeRoute(profile: BodyProfile?, onSetupProfile: () -> Unit, onOpenWardrobe:
         },
         todayPlan = if (events.isEmpty()) null else {{ TodayPlan(events) }},
         hint = if (profile == null) {{ BodyHint(onSetupProfile) }} else null,
-        onRegion = { place -> HomeRegion.save(store, place); model.setRegion(place) },
-        region = remember(state.region) { HomeRegion.load(store) },
+        onRegion = { place -> HomeRegion.save(store, place); selectedRegion = place; model.setRegion(place) },
+        region = selectedRegion,
         placeSearch = { query -> runCatching { OutfitRepository(account).places(query) }.getOrNull() },
         regionWeather = { region -> runCatching { OutfitRepository(account).weather(region) }.getOrNull() },
     )
