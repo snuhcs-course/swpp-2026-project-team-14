@@ -1,0 +1,21 @@
+# AI-generated with Claude Code (Claude Opus 5.5), 2026-11-26, review pending (Kihwan Kim)
+# infra/monitoring을 동기화한다. team14와 같은 정책(prune=false, selfHeal=true)을 따른다.
+# kakao-secret을 만든 뒤 서버에서 한 번 apply한다.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: monitoring
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/snuhcs-course/swpp-2026-project-team-14.git
+    targetRevision: main
+    path: infra/monitoring
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: false
+      selfHeal: true

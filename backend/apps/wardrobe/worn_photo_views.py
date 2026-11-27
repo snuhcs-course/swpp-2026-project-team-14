@@ -21,6 +21,7 @@ from .editor import validate_record
 from .models import Garment, WornGeneration, WornPhoto
 from . import worn_detection
 from .views import ANALYSIS_SLOTS, serialize
+from .cutouts import schedule_cutout
 from .worn_views import state as generation_state
 from .worn_estimates import suggestions, estimate_matches
 
@@ -237,6 +238,7 @@ def save(request, photo_id):
                     garment.estimated_dimensions = None
                 garment.saved = True
                 garment.save(update_fields=[*record, 'image', 'image_source', 'estimated_dimensions', 'saved', 'updated_at'])
+                schedule_cutout(garment)  # made from the chosen image after commit, in the background
             items.append(serialize(garment))
     # 착용 사진 배치 등록이 끝났을 때 별점 팝업 여부 (배치 전체에 한 번)
     return private_json({'items': items, 'rating_prompt': should_prompt(request.user, RatingTask.GARMENT_REGISTRATION)})

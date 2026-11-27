@@ -10,7 +10,9 @@ import java.net.URI
 data class Weather(val temp: Double, val apparent: Double, val label: String, val band: String,
                    val rain: Boolean, val snow: Boolean, val json: JSONObject)
 
-data class OutfitGarment(val garmentId: String, val slot: String, val name: String, val imageUrl: String, val note: String)
+/** [lengthCm]: the garment's real length from the server, used to draw outfits to scale (null on older servers). */
+data class OutfitGarment(val garmentId: String, val slot: String, val name: String, val imageUrl: String, val note: String,
+                         val lengthCm: Float? = null)
 
 data class Reason(val kind: String, val text: String, val sub: String)
 
@@ -251,7 +253,8 @@ class OutfitRepository(private val account: AccountAccess) {
                 items = (0 until items.length()).map { i ->
                     val item = items.getJSONObject(i)
                     OutfitGarment(item.getString("garment_id"), item.getString("slot"), item.optString("name"),
-                        item.getString("image_url"), item.optString("note"))
+                        item.getString("image_url"), item.optString("note"),
+                        item.optDouble("length_cm").takeIf { !it.isNaN() && it > 0 }?.toFloat())
                 },
                 reasons = (0 until reasons.length()).map { i ->
                     val r = reasons.getJSONObject(i)

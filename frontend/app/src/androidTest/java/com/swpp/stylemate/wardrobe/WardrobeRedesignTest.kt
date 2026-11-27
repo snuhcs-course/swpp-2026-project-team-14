@@ -31,6 +31,12 @@ import java.io.File
 class WardrobeRedesignTest {
     @get:Rule val compose = createComposeRule()
 
+    /** Card delete icons and the two-column layout live in 전체 보기; the tab opens on the rail. */
+    private fun openFullGrid() {
+        compose.onAllNodes(hasScrollToIndexAction()).onFirst().performScrollToNode(hasText("전체 보기"))
+        compose.onNodeWithText("전체 보기").performClick()
+    }
+
     private fun garment(width: Int, height: Int, color: Int, trousers: Boolean = false) =
         Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).apply {
             val canvas = Canvas(this)
@@ -113,8 +119,8 @@ class WardrobeRedesignTest {
 
     @Test fun filtersExposeSelectionAndMinimumTouchTarget() {
         compose.setContent { StyleMateTheme { WardrobeScreen(fixtures(), null, false, {}) } }
-        compose.onNodeWithText("상의").assertHeightIsAtLeast(48.dp).performClick().assertIsSelected()
-        compose.onNodeWithText("전체").assertIsNotSelected()
+        compose.onNode(hasText("상의") and isSelectable()).assertHeightIsAtLeast(48.dp).performClick().assertIsSelected()
+        compose.onNode(hasText("전체") and isSelectable()).assertIsNotSelected()
         compose.onNodeWithText("코튼 오버핏 셔츠").assertIsDisplayed()
         compose.onNodeWithText("인디고 스트레이트 데님 팬츠").assertDoesNotExist()
         compose.onNodeWithText("총 6벌").assertIsDisplayed()
@@ -123,7 +129,7 @@ class WardrobeRedesignTest {
 
     @Test fun emptyWardrobeKeepsRegistrationAvailable() {
         compose.setContent { StyleMateTheme { WardrobeScreen(emptyList(), null, false, {}) } }
-        compose.onNodeWithText("아직 등록된 옷이 없습니다").assertIsDisplayed()
+        compose.onNodeWithText("첫 번째 옷을 걸어보세요").assertIsDisplayed()
         compose.onNodeWithText("등록하기").assertIsDisplayed().assertIsEnabled()
         capture("06-empty")
     }
@@ -133,6 +139,8 @@ class WardrobeRedesignTest {
         compose.setContent { StyleMateTheme {
             Box(Modifier.size(width = 320.dp, height = 568.dp)) { WardrobeScreen(items, null, false, {}, onDelete = {}) }
         } }
+        compose.onNodeWithText("등록하기").assertIsDisplayed()
+        openFullGrid()
         val shirt = compose.onNodeWithText(items[0].name).fetchSemanticsNode().boundsInRoot
         val denim = compose.onNodeWithText(items[1].name).fetchSemanticsNode().boundsInRoot
         assertEquals(shirt.top, denim.top, 1f)
@@ -156,6 +164,7 @@ class WardrobeRedesignTest {
         compose.onNodeWithText("등록하기").assertIsDisplayed().assertIsEnabled()
         compose.onNodeWithText("옷장").assertIsDisplayed()
         capture("07-small-large-font")
+        openFullGrid()
         compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasText(items[3].name))
         compose.onNodeWithText(items[3].name).assertIsDisplayed()
         compose.onNodeWithContentDescription("${items[3].name} 삭제").assertIsDisplayed()

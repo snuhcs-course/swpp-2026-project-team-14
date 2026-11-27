@@ -54,6 +54,22 @@ def segmenter(path):
     return ort.InferenceSession(path, options, providers=['CPUExecutionProvider'])
 
 
+# SegFormer B2 Clothes labels: garments, and body parts that show a person is in the crop.
+APPAREL_LABELS = (4, 5, 6, 7, 8, 17)  # upper clothes, skirt, pants, dress, belt, scarf
+BODY_LABELS = (2, 11, 12, 13, 14, 15)  # hair, face, legs, arms
+
+
+def garment_mask(labels, attributes):
+    """Pixels of the selected garment. On a person, only that garment's own label, so other worn clothes stay
+    out. A crop with no body in it holds just this one garment, and the model (trained on worn clothes) often
+    names it wrongly there, e.g. lone trousers as upper clothes, so any clothing label is kept."""
+    target = (5 if attributes.get('subcategory') == 'skirt' else 6) if attributes['category'] == 'bottom' else 4
+    keep = labels == target
+    if keep.sum() < max(256, labels.size * .01) and np.isin(labels, BODY_LABELS).mean() < .01:
+        keep = np.isin(labels, APPAREL_LABELS)
+    return keep
+
+
 def segment(raw, attributes):
     import cv2
     image = Image.open(BytesIO(prepare_image(raw))).convert('RGB')
@@ -67,14 +83,14 @@ def segment(raw, attributes):
         raise
     except Exception:
         raise AnalysisError('SEGMENTATION_FAILED', 503) from None
-    target = (5 if attributes.get('subcategory') == 'skirt' else 6) if attributes['category'] == 'bottom' else 4
-    mask = Image.fromarray((labels == target).astype(np.uint8) * 255)
+    keep = garment_mask(labels, attributes)
+    mask = Image.fromarray(keep.astype(np.uint8) * 255)
     bounds = mask.getbbox()
-    if bounds is None or int((labels == target).sum()) < max(256, image.width * image.height * .01):
+    if bounds is None or int(keep.sum()) < max(256, image.width * image.height * .01):
         raise AnalysisError('IMAGE_TARGET_UNCLEAR', 422)
     white = Image.new('RGB', image.size, 'white')
     white.paste(image, mask=mask)
-    occupancy = (labels == target).sum() / ((bounds[2] - bounds[0]) * (bounds[3] - bounds[1]))
+    occupancy = keep.sum() / ((bounds[2] - bounds[0]) * (bounds[3] - bounds[1]))
     # A conservative warning, not a calibrated occlusion/accuracy score.
     return png(white.crop(bounds)), png(mask), bool(occupancy < .65)
 
