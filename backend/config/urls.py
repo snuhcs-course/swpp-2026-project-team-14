@@ -3,7 +3,7 @@ from django.urls import include, path
 from apps.usage.views import collect as collect_usage
 from apps.usage.stability import collect as collect_stability
 
-from apps.outfits.views import weather_view
+from apps.outfits.views import places_view, weather_view
 
 from . import views
 
@@ -17,4 +17,5 @@ urlpatterns = [
     path("api/fittings/", include("apps.fittings.urls")),
     path("api/outfits/", include("apps.outfits.urls")),
     path("api/weather/", weather_view),
+    path("api/weather/places/", places_view),
 ]

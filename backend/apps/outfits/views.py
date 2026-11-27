@@ -38,7 +38,7 @@ from apps.usage.models import RatingTask
 from apps.usage.ratings import should_prompt
 from apps.usage.recording import record_outfit_event, record_recommendations
 from apps.users.pagination import account_page
-from recommendation import preference, season, weather
+from recommendation import places, preference, season, weather
 from recommendation.body import UnknownBody
 from recommendation.catalog import Catalog
 from recommendation.external import ExternalModelUnavailable, matching_search
@@ -524,6 +524,22 @@ def chat_feedback_state_view(request):
     except (ValueError, TypeError, UnicodeDecodeError, OverflowError) as error:
         return _error("INVALID_FEEDBACK", 400, str(error))
     return _json({"key": key, "feedback": record.feedback if record else None})
+
+
+@require_GET
+@require_auth
+def places_view(request):
+    """Places in Korea matching ?q= (a city, district or neighbourhood), for choosing the weather region."""
+    query = request.GET.get("q", "")
+    if len(query) > 30:
+        return _error("QUERY_TOO_LONG", 400)
+    try:
+        found = places.search(query)
+    except places.PlaceError:
+        return _error("PLACES_UNAVAILABLE", 502)
+    response = JsonResponse({"places": found}, json_dumps_params={"ensure_ascii": False})
+    response["Cache-Control"] = "max-age=3600"
+    return response
 
 
 @require_GET
