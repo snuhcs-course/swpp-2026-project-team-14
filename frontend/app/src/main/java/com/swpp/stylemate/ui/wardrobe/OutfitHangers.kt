@@ -274,8 +274,12 @@ internal fun OutfitDressed(
     val spread = remember { Animatable(0f) }
     val scope = rememberCoroutineScope()
     val haptics = LocalHapticFeedback.current
+    val context = androidx.compose.ui.platform.LocalContext.current.applicationContext
     fun spreadOut(open: Boolean) {
-        if (open) haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+        if (open) {
+            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+            SpreadTips.used(context)  // once found, the tip is no longer offered
+        }
         scope.launch { spread.animateTo(if (open) 1f else 0f, spring(dampingRatio = .82f, stiffness = 380f)) }
     }
     val outer = items.firstOrNull { it.slot == "outerwear" }
