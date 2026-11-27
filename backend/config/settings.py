@@ -23,7 +23,7 @@ ALLOWED_HOSTS = os.environ.get("DJANGO_ALLOWED_HOSTS", "*").split(",")
 
 INSTALLED_APPS = [
     "django.contrib.contenttypes", "django.contrib.auth",
-    "apps.users", "apps.body_profiles", "apps.wardrobe", "apps.outfits", "apps.fittings",
+    "apps.users", "apps.body_profiles", "apps.wardrobe", "apps.outfits", "apps.fittings", "apps.usage",
 ]
 AUTH_USER_MODEL = "users.User"
 AUTH_TOKEN_TTL_DAYS = 30

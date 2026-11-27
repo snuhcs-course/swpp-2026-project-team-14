@@ -7,6 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from django.test import SimpleTestCase, TestCase, override_settings
 from PIL import Image
+import numpy as np
 from apps.users.auth import issue_token
 from apps.users.models import User
 from .generation import GeneratedImage, MODEL
@@ -32,6 +33,26 @@ class FittingAccountTests(TestCase):
         mocked.start()
         self.addCleanup(mocked.stop)
         self.addCleanup(self.jobs.close)
+        # The test photos are plain colour; the person check has its own tests below.
+        person = patch("apps.fittings.person.check", return_value=None)
+        self.person_check = person.start()
+        self.addCleanup(person.stop)
+
+    def test_a_photo_without_a_person_is_refused_before_any_generation(self):
+        for reason in ("PERSON_REQUIRED", "FULL_BODY_REQUIRED"):
+            self.person_check.return_value = reason
+            refused = self.upload()
+            self.assertEqual((refused.status_code, refused.json()["error"]), (422, reason))
+        self.assertEqual(self.jobs.jobs, {})
+        self.person_check.return_value = None
+        self.assertEqual(self.upload().status_code, 202)
+
+    def test_the_lower_body_is_needed_only_when_bottoms_are_fitted(self):
+        self.upload()
+        self.assertFalse(self.person_check.call_args.kwargs["needs_lower_body"])  # a top alone
+        encoded = self.payload["person"]
+        self.upload({**self.payload, "garments": [{"category": "tops", "image": encoded}, {"category": "bottoms", "image": encoded}]})
+        self.assertTrue(self.person_check.call_args.kwargs["needs_lower_body"])
 
     def upload(self, payload=None, **headers):
         return self.client.post("/api/fittings/jobs/", json.dumps(self.payload if payload is None else payload),
@@ -51,8 +72,13 @@ class FittingAccountTests(TestCase):
             self.assertEqual(self.client.get(path + "image/", **denied).status_code, 404)
             self.assertEqual(self.client.delete(path, **denied).status_code, 404)
         self.assertEqual(self.client.get(path + "image/", **headers).status_code, 409)
+        waiting = self.client.get(path, **headers).json()
+        self.assertEqual((waiting["stage"], waiting["progress"], waiting["expected_seconds"]), ("waiting", 0.05, 40.0))
         self.jobs.run_next()
         state = self.client.get(path, **headers)
+        self.assertEqual((state.json()["stage"], state.json()["progress"]), ("done", 1.0))
+        # the next estimate follows the generation that just finished
+        self.assertLess(state.json()["expected_seconds"], 40.0)
         self.assertTrue(state.json()["inputs_deleted"])
         self.assertEqual(state.json()["cost_usd"], "0.06")
         result = self.client.get(path + "image/", **headers)
@@ -177,6 +203,17 @@ class FittingAccountTests(TestCase):
         runner.assert_not_called()
 
 
+class FittingProgressTests(SimpleTestCase):
+    def test_progress_is_a_bounded_estimate_of_the_usual_generation_time(self):
+        from apps.fittings.jobs import progress_of
+        self.assertEqual(progress_of("queued", 0, 40), 0.05)
+        self.assertEqual(progress_of("running", 0, 40), 0.1)
+        self.assertEqual(progress_of("running", 20, 40), 0.525)
+        self.assertEqual(progress_of("running", 400, 40), 0.95)  # never "done" before the image exists
+        self.assertEqual(progress_of("completed", 5, 40), 1.0)
+        self.assertEqual(progress_of("failed", 5, 40), 0.0)
+
+
 @override_settings(OPENROUTER_API_KEY="synthetic-only", FITTING_CONCURRENCY=2)
 class FittingQueueInitializationTests(SimpleTestCase):
     def test_concurrent_requests_share_the_same_bounded_queue(self):
@@ -190,3 +227,43 @@ class FittingQueueInitializationTests(SimpleTestCase):
                 self.assertEqual(queues[0].concurrency, 2)
             finally:
                 queues[0].close()
+
+
+class PersonCheckTests(SimpleTestCase):
+    """Label maps as SegFormer gives them (2 hair, 11 face, 12-15 legs and arms, 4 upper clothes)."""
+
+    def labels(self, **share):
+        found = np.zeros(10_000, dtype=np.int64)
+        start = 0
+        for label, fraction in share.items():
+            count = int(fraction * found.size)
+            found[start:start + count] = int(label.lstrip("l"))
+            start += count
+        return found.reshape(100, 100)
+
+    def test_a_person_needs_a_head_and_some_body(self):
+        from .person import shows_person
+        self.assertTrue(shows_person(self.labels(l2=.01, l11=.008, l14=.02, l4=.2)), "front photo")
+        self.assertTrue(shows_person(self.labels(l2=.007, l12=.01)), "side or back view: hair, no face")
+        self.assertFalse(shows_person(self.labels(l4=.35)), "a flat-lay garment")
+        self.assertFalse(shows_person(self.labels(l11=.002, l4=.3)), "a face-like print on a T-shirt")
+        self.assertFalse(shows_person(self.labels()), "a screenshot")
+
+    def test_bottoms_need_the_legs_in_view(self):
+        from .person import shows_lower_body
+        self.assertTrue(shows_lower_body(self.labels(l12=.004, l6=.1, l4=.15)), "full body: legs and shoes")
+        self.assertFalse(shows_lower_body(self.labels(l4=.3, l11=.05)), "cut at the chest")
+        found = np.zeros((100, 100), dtype=np.int64)
+        found[20:45, 30:70] = 4   # top, 25 rows
+        found[45:70, 35:65] = 6   # trousers cut at the knees, 25 rows
+        self.assertFalse(shows_lower_body(found), "cut at the knees: bottoms no longer than the top")
+        found[70:98, 35:65] = 6   # trousers down to just above the feet
+        self.assertTrue(shows_lower_body(found), "cut just above the feet")
+
+    def test_the_check_never_blocks_when_it_cannot_run(self):
+        from apps.wardrobe.analysis import AnalysisError
+        from . import person
+        with patch.object(person, "labels", side_effect=AnalysisError("SEGMENTATION_NOT_CONFIGURED", 503)):
+            self.assertIsNone(person.check(b"photo", needs_lower_body=True))
+        with patch.object(person, "labels", side_effect=RuntimeError("model crashed")):
+            self.assertIsNone(person.check(b"photo", needs_lower_body=True))

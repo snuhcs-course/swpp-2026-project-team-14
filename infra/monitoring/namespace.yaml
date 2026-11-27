@@ -1,0 +1,5 @@
+# AI-generated with Claude Code (Claude Opus 5.5), 2026-11-26, review pending (Kihwan Kim)
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring

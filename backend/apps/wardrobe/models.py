@@ -1,4 +1,4 @@
-# AI-generated with Codex, 2026-09-29, reviewed by Hyeon U Jeong; recommendation labels added with Claude Code (Claude Opus 5.5), 2026-10-12, reviewed by Dongkun Moon; user ownership added with Codex, 2026-10-16
+# AI-generated with Codex, 2026-09-29, reviewed by Hyeon U Jeong; recommendation labels added with Claude Code (Claude Opus 5.5), 2026-10-12, reviewed by Dongkun Moon; user ownership added with Codex, 2026-10-16; stored cutouts added with Claude Code (Claude Opus 5.5), 2026-11-26, reviewed by Dongkun Moon
 import uuid
 
 from django.conf import settings
@@ -17,6 +17,10 @@ class Garment(models.Model):
     image_source = models.CharField(max_length=24, default='garment_photo',
                                     choices=[('garment_photo', '옷 사진'), ('worn_crop', '착용 사진 일부'),
                                              ('ai_flatlay', 'AI 재구성 이미지')])
+    # Transparent PNG of `image` for the wardrobe rail (cutouts.py), made in the background after saving.
+    # `cutout_key` records which source image and model made it, so a stale cutout is redone.
+    cutout = models.FileField(upload_to='cutouts/', blank=True, default='')
+    cutout_key = models.CharField(max_length=96, blank=True, default='')
     attributes = models.JSONField()
     dimensions = models.JSONField(null=True, default=None)
     # Server-derived rough estimates; never passed as measured dimensions to recommendation code.

@@ -22,6 +22,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.graphics.toPixelMap
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.work.*
 import androidx.work.testing.SynchronousExecutor
@@ -158,7 +159,7 @@ class FittingFlowTest {
         runBlocking {
             assertFalse(work.enqueue(outfit, repository, account.userId, "gallery") { error("Duplicate request read another photo") })
         }
-        compose.onNodeWithText("Open fitting").performClick()
+        // The fitting screen stays open on the loading screen after the request.
         compose.onNodeWithText("가상 피팅을 만드는 중입니다.").assertIsDisplayed()
         compose.onNodeWithText("확인").performClick()
         completed.set(true)
@@ -245,6 +246,43 @@ class FittingFlowTest {
         assertEquals(0, server.requestCount)
     }
 
+    @Test fun retryFromNotificationOrProgressCardDisplaysTheNewModelsResult() {
+        val oldBitmap = Bitmap.createBitmap(24, 36, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.RED) }
+        val oldImage = try {
+            ByteArrayOutputStream().use { oldBitmap.compress(Bitmap.CompressFormat.PNG, 100, it); it.toByteArray() }
+        } finally { oldBitmap.recycle() }
+        runBlocking {
+            work.tasks.create(key, account.userId, "gallery", outfit, oldImage)
+            repository.saveResult(outfit, oldImage, "gallery")
+            work.tasks.finish(key)
+        }
+        completed.set(true)
+        // Both the floating card and the notification use this entry point, with a fixed initial source.
+        compose.setContent { StyleMateTheme { FittingNotificationResult(key, account) {} } }
+        fun waitForImage() = compose.waitUntil(10_000) {
+            compose.onAllNodesWithContentDescription("생성된 피팅 이미지").fetchSemanticsNodes().isNotEmpty()
+        }
+        waitForImage()
+        val before = compose.onNodeWithContentDescription("생성된 피팅 이미지").captureToImage().toPixelMap()
+        assertTrue(before[before.width / 2, before.height / 2].red > .9f)
+        compose.onNodeWithText("다른 사진이나 모델로 입혀보기").performClick()
+        compose.onNodeWithText("다른 가상 모델\n고르기").performClick()
+        compose.onNodeWithText("남성").performClick()
+        compose.onNodeWithText("키 (cm)").performTextInput("170")
+        compose.onNodeWithText("몸무게 (kg)").performTextInput("66")
+        compose.onNodeWithText("이 모델에게 입히기").performScrollTo().performClick()
+        startConnectedWork()
+        compose.waitUntil(10_000) { work.tasks.read(key)?.optString("state") == "completed" }
+        val newSource = work.tasks.read(key)!!.getString("source")
+        assertNotEquals("gallery", newSource)
+        assertArrayEquals(image, runBlocking { repository.result(outfit, newSource) })
+        waitForImage()
+        val after = compose.onNodeWithContentDescription("생성된 피팅 이미지").captureToImage().toPixelMap()
+        assertTrue("The retry must display the new green result, not the previous red gallery result",
+            after[after.width / 2, after.height / 2].green > .9f && after[after.width / 2, after.height / 2].red < .1f)
+        assertEquals(1, submissions.get())
+    }
+
     private fun photoUri(bytes: ByteArray = image): Uri {
         val values = ContentValues().apply {
             put(MediaStore.Images.Media.DISPLAY_NAME, "fitting-test-${UUID.randomUUID()}.jpg")
@@ -299,7 +337,9 @@ class FittingFlowTest {
         compose.onNodeWithText("내 갤러리에서\n사진 고르기").performClick()
         startConnectedWork()
         compose.waitUntil(10_000) { work.tasks.read(key)?.optString("state") == "completed" }
-        assertTrue(closed.get())
+        // The fitting screen stays open through the loading screen and shows the result when it is done.
+        compose.waitUntil(5_000) { compose.onAllNodesWithContentDescription("생성된 피팅 이미지").fetchSemanticsNodes().isNotEmpty() }
+        assertFalse(closed.get())
         val payload = checkNotNull(uploaded)
         val person = java.util.Base64.getDecoder().decode(payload.getString("person"))
         val bitmap = checkNotNull(BitmapFactory.decodeByteArray(person, 0, person.size))

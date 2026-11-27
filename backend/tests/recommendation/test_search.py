@@ -132,6 +132,35 @@ def test_shown_outfits_are_not_repeated_first(catalog, female):
     assert second["key"] != first["key"] and not second["seen"]
 
 
+@pytest.mark.parametrize("anchor,temp", [("w:1", 17), ("w:4", 17), ("w:6", 0), ("w:6", 29)])
+def test_pinned_wardrobe_outfits_always_include_the_anchor_top_and_bottom(catalog, female, anchor, temp):
+    result = recommend(catalog, Request(body=female, pref_fit="loose", temp=temp, mode="wardrobe",
+                                        wardrobe=WARDROBE, anchor=anchor))
+    assert result["outfits"]
+    for outfit in result["outfits"]:
+        assert anchor in {item["id"] for item in outfit["items"]}
+        assert {"상의", "하의"} <= {item["slot"] for item in outfit["items"]}
+    keys = [outfit["key"] for outfit in result["outfits"]]
+    assert len(keys) == len(set(keys))
+
+
+def test_refresh_rotates_the_lead_garment_without_changing_scores(catalog, female):
+    req = dict(body=female, pref_fit="loose", temp=17, mode="wardrobe", wardrobe=WARDROBE, count=3)
+    first = recommend(catalog, Request(**req))["outfits"]
+    lead = {i["id"] for i in first[0]["items"]}
+    keys = [o["key"] for o in first]
+    again = recommend(catalog, Request(**req, seen_outfits=keys,
+                                       recent=[g for k in keys for g in k.split("+")], recent_lead=sorted(lead)))
+    # the garments that led the last set do not lead again when others can
+    new_lead = {i["id"] for i in again["outfits"][0]["items"]}
+    assert new_lead != lead and not lead <= new_lead
+    # rank only: an outfit's shown score does not depend on what was shown before
+    plain = {o["key"]: o["total"] for o in recommend(catalog, Request(**req, seen_outfits=keys))["outfits"]}
+    for o in again["outfits"]:
+        if o["key"] in plain:
+            assert o["total"] == plain[o["key"]]
+
+
 def test_jitter_varies_the_pick_but_never_repeats_shown_outfits(catalog, female):
     req = dict(body=female, pref_fit="loose", temp=17, mode="wardrobe", wardrobe=WARDROBE, count=1)
     plain = {recommend(catalog, Request(**req, seed=s))["outfits"][0]["key"] for s in range(10)}

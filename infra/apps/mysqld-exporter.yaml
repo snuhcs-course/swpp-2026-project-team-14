@@ -1,0 +1,65 @@
+# AI-generated with Claude Code (Claude Opus 5.5), 2026-11-26, review pending (Kihwan Kim)
+# MySQL 생존(mysql_up)만 보기 위한 exporter. mysql-secret을 쓰려고 team14 namespace에 둔다.
+# 앱 계정(stylemate)을 재사용한다. PROCESS 권한이 없어 일부 collector는 오류를 남기지만 mysql_up에는 영향이 없다.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysqld-exporter
+  namespace: team14
+spec:
+  replicas: 1
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      app: mysqld-exporter
+  template:
+    metadata:
+      labels:
+        app: mysqld-exporter
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+      containers:
+        - name: exporter
+          image: prom/mysqld-exporter:v0.16.0
+          env:
+            - name: MYSQL_USER
+              valueFrom:
+                secretKeyRef: {name: mysql-secret, key: MYSQL_USER}
+            - name: MYSQLD_EXPORTER_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: mysql-secret, key: MYSQL_PASSWORD}
+          args:
+            - --mysqld.address=mysql:3306
+            - --mysqld.username=$(MYSQL_USER)
+          ports:
+            - name: metrics
+              containerPort: 9104
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysqld-exporter
+  namespace: team14
+spec:
+  type: ClusterIP
+  selector:
+    app: mysqld-exporter
+  ports:
+    - name: metrics
+      port: 9104
+      targetPort: metrics

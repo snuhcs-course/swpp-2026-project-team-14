@@ -103,6 +103,8 @@ def summarize(rows, *, partial=False):
 
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--cases", type=Path, default=EVAL_DIR / "cases.json",
+                        help="케이스 파일 (기본: eval/chat/cases.json). 결과는 그 파일 옆 results/에 저장")
     parser.add_argument("--case", action="append", help="특정 케이스 id만 실행 (여러 번 지정 가능, 집계는 참고용)")
     parser.add_argument("--delay", type=float, default=1.0, help="호출 간격(초), 요청 한도 대비")
     parser.add_argument("--retries", type=int, default=2, help="인프라 오류 재시도 횟수")
@@ -131,7 +133,8 @@ def main(argv=None) -> int:
         print(f"{config['provider']} API 키가 없습니다. 서버와 같은 환경 변수나 backend/.env를 설정해 주세요.")
         return 2
 
-    data = json.loads((EVAL_DIR / "cases.json").read_text(encoding="utf-8"))
+    args.cases = args.cases.resolve()
+    data = json.loads(args.cases.read_text(encoding="utf-8"))
     wardrobe = data["wardrobe"]
     wardrobe_ids = {g["id"] for g in wardrobe}
     cases = [c for c in data["cases"] if not args.case or c["id"] in args.case]
@@ -162,14 +165,14 @@ def main(argv=None) -> int:
     complete = summary["verdict"] != "INCOMPLETE"
     result = {"run_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
               "model": config["model"], "provider": config["provider"], "temperature": 0,
-              "cases_version": data["version"], "summary": summary, "results": rows}
+              "cases_version": data.get("version", args.cases.parent.name), "summary": summary, "results": rows}
 
     print(f"\n통과 {summary['passed']}/{summary['scored']} ({summary['pass_rate']:.1%}, 기준 {PASS_RATE:.0%} 이상) · "
           f"치명적 오류 {summary['critical_errors']}건 · 형식 오류 {summary['format_errors']}건 → {summary['verdict']}")
     if infra:
         print(f"인프라 오류로 채점하지 못한 케이스: {infra} (다시 실행 필요, 이 결과는 쓰지 않음)")
     if complete:
-        out_dir = EVAL_DIR / "results"
+        out_dir = args.cases.parent / "results"
         out_dir.mkdir(exist_ok=True)
         path = out_dir / f"{datetime.now().strftime('%Y%m%d-%H%M%S-%f')}.json"
         path.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

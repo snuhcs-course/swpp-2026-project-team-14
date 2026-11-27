@@ -39,6 +39,8 @@ class WardrobeViewModelTest {
     private lateinit var model: WardrobeViewModel
     private val lifecycle = ViewModelStore()
     private val gates = mutableListOf<RequestGate>()
+    private val usageEvents = java.util.concurrent.CopyOnWriteArrayList<JSONObject>()
+    private var usageElapsed = 0L
 
     @Before fun setUp() {
         Dispatchers.setMain(UnconfinedTestDispatcher())
@@ -71,7 +73,8 @@ class WardrobeViewModelTest {
         .put("dimensions", JSONObject.NULL).put("notes", "Keep this note")
 
     private fun start() {
-        model = WardrobeViewModel(store, testAccount(server.baseUrl))
+        model = WardrobeViewModel(store, testAccount(server.baseUrl), com.swpp.stylemate.data.usage.UsageTracker(
+            emit = { usageEvents.add(it) }, elapsed = { usageElapsed }))
         lifecycle.put("wardrobe", model)
     }
 
@@ -87,6 +90,50 @@ class WardrobeViewModelTest {
     }
 
     private fun ids(state: WardrobeState = model.state.value) = state.records.map { it.getString("id") }
+
+    @Test fun registrationTimerSurvivesDraftRestorationAndEndsOnConfirmedSave() {
+        val checkpoint = com.swpp.stylemate.data.usage.UsageTracker(elapsed = { usageElapsed })
+            .start("garment_registration", "wardrobe").checkpoint.toString()
+        loaded()
+        model.restoreRegistration(checkpoint)
+        assertEquals(checkpoint, model.state.value.registrationCheckpoint)
+        usageElapsed = 7500
+        server.on("PUT /api/wardrobe/items/new-item/", json(garment("new-item").toString()))
+        model.save("new-item", payload(), registering = true)
+        settled()
+        assertEquals("success", usageEvents.last().getString("outcome"))
+        assertEquals(7500, usageEvents.last().getInt("duration_ms"))
+        assertEquals(1, usageEvents.size)
+        assertNull(model.state.value.registrationCheckpoint)
+    }
+
+    @Test fun registrationFailureAndRetryHaveSeparateAttemptsAndEditingIsExcluded() {
+        loaded(garment("existing"))
+        model.beginRegistration("onboarding")
+        server.on("PUT /api/wardrobe/items/new-item/", failure(503, "AI_BUSY"))
+        model.save("new-item", payload(), registering = true)
+        settled()
+        assertEquals("failure", usageEvents.last().getString("outcome"))
+        server.on("PUT /api/wardrobe/items/new-item/", json(garment("new-item").toString()))
+        model.save("new-item", payload(), registering = true)
+        settled()
+        assertEquals(2, usageEvents.map { it.getString("attempt_id") }.distinct().size)
+        val count = usageEvents.size
+        server.on("PUT /api/wardrobe/items/existing/", json(garment("existing").toString()))
+        model.save("existing", payload())
+        settled()
+        assertEquals(count, usageEvents.size)
+    }
+
+    @Test fun leavingRegistrationRecordsOneCancellation() {
+        loaded()
+        model.beginRegistration()
+        model.beginRegistration()
+        model.cancelRegistration()
+        model.cancelRegistration()
+        assertEquals(2, usageEvents.size)
+        assertEquals("cancelled", usageEvents.last().getString("outcome"))
+    }
 
     private class RequestGate {
         val arrived = CountDownLatch(1)

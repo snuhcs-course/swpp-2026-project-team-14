@@ -100,11 +100,16 @@ class SchemaTests(SimpleTestCase):
         self.assertEqual(validate_attributes(dict(attributes(), colors=[]))['colors'], [])
         self.assertEqual(len(validate_attributes(dict(attributes(), colors=list(COLOR_PALETTE)[:5]))['colors']), 5)
 
-    def test_ai_requires_one_or_two_palette_colors(self):
+    def test_ai_keeps_one_or_two_palette_colors(self):
+        # A third colour, a lowercase code or one colour outside the palette used to reject the answer, which
+        # dropped every garment of a worn photo (a striped jacket, 2026-11-26). Usable colours are kept now.
         data = {key: attributes()[key] for key in AI_FIELDS}
-        for colors in (['#FFFFFF'], ['#FFFFFF', '#C83C3C']):
-            self.assertEqual(validate_ai_attributes(dict(data, colors=colors))['colors'], colors)
-        for colors in ([], ['#123456'], ['#ffffff'], ['#FFFFFF'] * 2, list(COLOR_PALETTE)[:3]):
+        for colors, kept in ((['#FFFFFF'], ['#FFFFFF']), (['#FFFFFF', '#C83C3C'], ['#FFFFFF', '#C83C3C']),
+                             (['#ffffff'], ['#FFFFFF']), (['#FFFFFF'] * 2, ['#FFFFFF']),
+                             (list(COLOR_PALETTE)[:3], list(COLOR_PALETTE)[:2]), (['#123456', '#202020'], ['#202020'])):
+            with self.subTest(colors=colors):
+                self.assertEqual(validate_ai_attributes(dict(data, colors=colors))['colors'], kept)
+        for colors in ([], ['#123456'], 'black'):
             with self.subTest(colors=colors), self.assertRaises(ValueError):
                 validate_ai_attributes(dict(data, colors=colors))
 
@@ -431,6 +436,8 @@ class WardrobePersistenceTests(AnalysisEndpointTests):
         response = self.client.put(url, json.dumps(payload), content_type='application/json')
         self.assertEqual(response.status_code, 200)
         record = response.json()
+        # 저장 응답에만 붙는 별점 팝업 여부를 떼면 나머지는 조회 결과와 같은 옷 레코드다.
+        self.assertIsInstance(record.pop('rating_prompt'), bool)
         self.assertTrue(record['saved'])
         self.assertEqual(record['attributes']['colors'], ['#FFFFFF', '#A12B3C'])
         self.assertEqual(Garment.objects.get(pk=item_id).attributes['colors'], ['#FFFFFF', '#A12B3C'])

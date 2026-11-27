@@ -1,6 +1,8 @@
 // AI-generated with Codex, 2026-09-29, reviewed by Hyeon U Jeong; recommendation labels added with Claude Code (Claude Opus 5.5), 2026-10-12, reviewed by Dongkun Moon
 package com.swpp.stylemate.ui.wardrobe
 
+import com.swpp.stylemate.data.usage.RatingPrompts
+import com.swpp.stylemate.data.usage.RatingTask
 import com.swpp.stylemate.data.wardrobe.*
 import com.swpp.stylemate.BuildConfig
 import com.swpp.stylemate.data.BodyProfileJson
@@ -53,8 +55,10 @@ import org.json.JSONObject
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 
+/** [imageUrl] is the original photo; [cutoutUrl] is the stored background-free PNG the rail shows. */
 data class WardrobeItem(val id: String, val name: String, val category: String, val style: String? = null,
-                        val thumbnail: ImageBitmap? = null, val imageUrl: String? = null)
+                        val thumbnail: ImageBitmap? = null, val imageUrl: String? = null,
+                        val cutoutUrl: String? = null)
 
 @Composable
 fun WardrobeRoute(
@@ -65,6 +69,7 @@ fun WardrobeRoute(
     onboardingTopBar: (@Composable (onBack: () -> Unit, enabled: Boolean) -> Unit)? = null,
     localStore: LocalUserStore? = null,
     onDeleted: () -> Unit = {},
+    onRecommendOutfits: ((String, String) -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val account = checkNotNull(LocalAccountAccess.current)
@@ -73,6 +78,7 @@ fun WardrobeRoute(
     val files = remember { CaptureFiles(context.applicationContext) }
     val preferences = remember { context.getSharedPreferences("camera-permission", 0) }
     val initialDraft = remember { onboardingDraft }
+    var registrationCheckpoint by rememberSaveable { mutableStateOf(initialDraft?.optString("usage_registration")?.takeIf { it.isNotBlank() }) }
     val initialCategory = initialDraft?.optString("category")
     var selected by rememberSaveable { mutableStateOf(initialDraft?.optString("capture")?.takeIf { it.isNotBlank() }) }
     var message by rememberSaveable { mutableStateOf<String?>(null) }
@@ -95,10 +101,23 @@ fun WardrobeRoute(
     val analysisPhoto = if (needsFront) frontPhoto else selected
     val analysisModel: GarmentAnalysisViewModel = viewModel(factory = viewModelFactory { initializer { GarmentAnalysisViewModel(account) } })
     val analysis by analysisModel.state.collectAsStateWithLifecycle()
+    // 온보딩 중 옷 등록에는 별점을 묻지 않는다. ViewModel은 온보딩과 옷장 탭이 함께 쓸 수 있어
+    // 콜백에 온보딩 여부를 가두지 않고, 온보딩 화면이 떠 있는 동안 요청을 멈춘다.
+    if (onboardingTopBar != null) DisposableEffect(Unit) {
+        RatingPrompts.setPaused(true)
+        onDispose { RatingPrompts.setPaused(false) }
+    }
+    val requestRating = remember(account.userId) {
+        { RatingPrompts.request(RatingTask.GARMENT_REGISTRATION, account.userId) }
+    }
     val wardrobeModel: WardrobeViewModel = viewModel(factory = viewModelFactory {
-        initializer { WardrobeViewModel(store, account) }
+        initializer { WardrobeViewModel(store, account, com.swpp.stylemate.data.usage.UsageMetrics.forAccount(context, account.userId),
+            onRatingPrompt = requestRating)
+            .apply { restoreRegistration(registrationCheckpoint) } }
     })
     val wardrobe by wardrobeModel.state.collectAsStateWithLifecycle()
+    LaunchedEffect(wardrobe.registrationCheckpoint) { registrationCheckpoint = wardrobe.registrationCheckpoint }
+    LaunchedEffect(analysis.error) { if (analysis.error != null) wardrobeModel.failRegistration("ANALYSIS_FAILED") }
     val wardrobePages = rememberSaveableStateHolder()
     var pages by rememberSaveable(account.userId) { mutableStateOf(arrayListOf<String>()) }
     var deletingDetailId by rememberSaveable(account.userId) { mutableStateOf<String?>(null) }
@@ -143,13 +162,14 @@ fun WardrobeRoute(
     var savedPhoto by remember(editingId) { mutableStateOf<ImageBitmap?>(null) }
     LaunchedEffect(analysisPhoto) { analysisModel.select(analysisPhoto,
         initialDraft?.optJSONObject("result")?.takeIf { initialDraft.optString("analysis_photo") == analysisPhoto }) }
-    LaunchedEffect(selected, frontPhoto, selectedMeasurements, editingId, analysis.result?.toString(), editorDraftText) {
+    LaunchedEffect(selected, frontPhoto, selectedMeasurements, editingId, analysis.result?.toString(), editorDraftText, registrationCheckpoint) {
         onDraftChange?.invoke(JSONObject().put("category", initialCategory ?: "top").apply {
             selected?.let { put("capture", it) }; frontPhoto?.let { put("front", it) }
             selectedMeasurements?.let { put("measurements", JSONObject(it)) }
             editingId?.let { put("editing_id", it) }
             if (analysis.photo == analysisPhoto) analysis.result?.let { put("result", it); put("analysis_photo", analysisPhoto) }
             editorDraftText?.let { put("editor", JSONObject(it)) }
+            registrationCheckpoint?.let { put("usage_registration", it) }
         })
     }
     LaunchedEffect(wardrobe.savedId) {
@@ -198,7 +218,7 @@ fun WardrobeRoute(
             selected = name
             selectedMeasurements = result.data?.getStringExtra("measurements")
             message = null
-        } else message = null
+        } else { if (selected == null) wardrobeModel.cancelRegistration(); message = null }
     }
     fun launchCamera() {
         if (measurementBusy) return
@@ -206,12 +226,13 @@ fun WardrobeRoute(
         try { measurementCamera.launch(Intent(context, MeasurementActivity::class.java).apply {
             initialCategory?.let { putExtra("initial_category", it) }
         }) }
-        catch (_: Exception) { measurementBusy = false; message = "카메라를 열지 못했습니다." }
+        catch (_: Exception) { wardrobeModel.failRegistration("CAMERA_UNAVAILABLE"); measurementBusy = false; message = "카메라를 열지 못했습니다." }
     }
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         val blocked = !granted && !ActivityCompat.shouldShowRequestPermissionRationale(activity, Manifest.permission.CAMERA)
         preferences.edit().putBoolean("blocked", blocked).apply()
         if (granted) launchCamera() else {
+            wardrobeModel.failRegistration("PERMISSION_DENIED")
             message = "카메라 권한을 허용해야 촬영할 수 있습니다. 옷장 조회는 계속 사용할 수 있습니다."
             if (blocked) {
                 permissionDialog = "settings"
@@ -222,6 +243,7 @@ fun WardrobeRoute(
         permission.launch(Manifest.permission.CAMERA)
     }
     fun takePhoto() {
+        wardrobeModel.beginRegistration(if (onboardingTopBar == null) "wardrobe" else "onboarding")
         message = null
         when {
             ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED -> {
@@ -241,18 +263,22 @@ fun WardrobeRoute(
             else { files.delete(frontPhoto); frontPhoto = name }
             message = null
         }
-        else files.delete(name)
+        else { files.delete(name); if (initialCategory == "shoes" && selected == null) wardrobeModel.cancelRegistration() }
     }
     fun captureFront() {
         val name = files.create()
         pendingFront = name
         try { frontCamera.launch(files.uri(name)) }
-        catch (_: Exception) { files.delete(name); pendingFront = null; message = "카메라를 열지 못했습니다." }
+        catch (_: Exception) { wardrobeModel.failRegistration("CAMERA_UNAVAILABLE"); files.delete(name); pendingFront = null; message = "카메라를 열지 못했습니다." }
     }
     val frontPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) captureFront() else message = "카메라 권한을 허용하거나 갤러리에서 앞면 사진을 골라 주세요."
+        if (granted) captureFront() else {
+            wardrobeModel.failRegistration("PERMISSION_DENIED")
+            message = "카메라 권한을 허용하거나 갤러리에서 앞면 사진을 골라 주세요."
+        }
     }
     fun takeFront() {
+        if (initialCategory == "shoes") wardrobeModel.beginRegistration("onboarding")
         message = null
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) captureFront()
         else frontPermission.launch(Manifest.permission.CAMERA)
@@ -261,15 +287,17 @@ fun WardrobeRoute(
         if (uri != null) scope.launch {
             val bitmap = decodeDownscaled(context, uri, maxSide = 1536)
             val name = bitmap?.let { withContext(Dispatchers.IO) { runCatching { files.create().also { n -> files.write(n, it) } }.getOrNull() } }
-            if (name == null) message = "사진을 읽을 수 없습니다. 다른 사진을 골라 주세요."
+            if (name == null) { wardrobeModel.failRegistration("INVALID_IMAGE"); message = "사진을 읽을 수 없습니다. 다른 사진을 골라 주세요." }
             else {
                 if (initialCategory == "shoes") { files.delete(selected); selected = name }
                 else { files.delete(frontPhoto); frontPhoto = name }
                 message = null
             }
         }
+        else if (initialCategory == "shoes" && selected == null) wardrobeModel.cancelRegistration()
     }
     fun discard() {
+        wardrobeModel.cancelRegistration()
         files.delete(selected); files.delete(frontPhoto)
         selected = null; frontPhoto = null; selectedMeasurements = null; editorDraftText = null; message = null
         labelsModel.reset()
@@ -283,7 +311,7 @@ fun WardrobeRoute(
     if (permissionDialog != null) {
         val settings = permissionDialog == "settings"
         AlertDialog(
-            onDismissRequest = { permissionDialog = null },
+            onDismissRequest = { permissionDialog = null; wardrobeModel.cancelRegistration() },
             title = { Text("카메라 권한") },
             text = { Text(if (settings) "기기 설정에서 카메라 권한을 허용한 후 촬영 버튼을 다시 눌러 주세요."
                          else "옷 사진을 촬영하려면 카메라 권한이 필요합니다. 촬영한 사진은 확인 전 서버로 전송되지 않습니다.") },
@@ -294,18 +322,20 @@ fun WardrobeRoute(
                     catch (_: ActivityNotFoundException) { message = "기기의 앱 설정에서 카메라 권한을 변경해 주세요." }
                 } else requestPermission()
             }) { Text(if (settings) "설정 열기" else "권한 요청") } },
-            dismissButton = { TextButton(onClick = { permissionDialog = null }) { Text("나중에") } },
+            dismissButton = { TextButton(onClick = { permissionDialog = null; wardrobeModel.cancelRegistration() }) { Text("나중에") } },
         )
     }
 
     val editing = wardrobe.records.find { it.getString("id") == editingId }
     if (wornRegistration) {
-        WornRegistration(account, onBack = { wornRegistration = false }, onBatchSaved = {
+        WornRegistration(account, onBack = { wardrobeModel.cancelRegistration(); wornRegistration = false }, onBatchSaved = {
+            wardrobeModel.completeRegistration()
             wornRegistration = false
             wardrobePages.removeState("collection")
             wardrobeModel.refresh()
             onSaved?.invoke()
-        })
+        }, onAttempt = { wardrobeModel.beginRegistration("worn") }, onFailure = wardrobeModel::failRegistration,
+            onRatingPrompt = requestRating)
         return
     }
     val page = pages.lastOrNull()
@@ -363,6 +393,7 @@ fun WardrobeRoute(
                 Text(if (initialCategory == "shoes") "사진을 확인한 뒤 이름과 종류를 저장해요." else "옷을 촬영하고 치수를 확인한 뒤 옷장에 추가해요.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 message?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                 if (initialCategory == "shoes") OutlinedButton(onClick = {
+                    wardrobeModel.beginRegistration("onboarding")
                     frontGallery.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                 }) { Text("앨범에서 선택") }
             }
@@ -375,7 +406,8 @@ fun WardrobeRoute(
                 wardrobe.catalog?.getJSONObject("enums")?.getJSONObject("styles")?.optString(styles.getString(index))
             }.joinToString(", ").ifBlank { null }
             WardrobeItem(record.getString("id"), attrs.getString("name"), attrs.getString("category"),
-                style = style, imageUrl = record.getString("image_url"))
+                style = style, imageUrl = record.getString("image_url"),
+                cutoutUrl = record.optString("cutout_url").takeIf { !record.isNull("cutout_url") && it.isNotBlank() })
         }
         wardrobePages.SaveableStateProvider("collection") {
         WardrobeScreen(items = items, message = message ?: wardrobe.error, cameraBusy = measurementBusy,
@@ -383,6 +415,8 @@ fun WardrobeRoute(
             onInteraction = { message = null },
             onCapture = { wardrobeModel.clearSaveState(); takePhoto() },
             onItemClick = { message = null; pages = arrayListOf("detail:${it.id}") },
+            onRecommendOutfits = onRecommendOutfits?.let { recommend -> { garment -> recommend(garment.id, garment.name) } },
+            onFindMatchingClothes = { message = null; pages = arrayListOf("match:${it.id}") },
             onAnalyze = wardrobeModel::analyzeWardrobe,
             deletingId = wardrobe.deletingId, deleteError = wardrobe.deleteError,
             onDeleteDismiss = wardrobeModel::clearDeleteError,
@@ -435,7 +469,7 @@ fun WardrobeRoute(
                             // the fit is kept only in the labels, so the old attribute fields do not disagree with it
                             payload.getJSONObject("attributes").put("fit_type", JSONObject.NULL).put("leg_shape", JSONObject.NULL)
                         }
-                    wardrobeModel.save(record.getString("id"), payload)
+                    wardrobeModel.save(record.getString("id"), payload, registering = editing == null)
                 }, onBack = back,
                 image = if (generated) originalForColor else if (editing != null) savedPhoto else (if (needsFront) frontPreview else preview) ?: savedPhoto,
                 photoSource = if (editing != null) record.optString("image_source") else null,
@@ -483,7 +517,7 @@ fun WardrobeRoute(
                 title = if (editingId != null) "옷 정보" else "촬영한 옷",
                 primaryLabel = if (editingId != null || result != null) null else if (analysis.busy) "분석 중" else "분석하기",
                 primaryEnabled = !analysis.busy && !measurementBusy && preview != null && (!needsFront || frontPreview != null),
-                onPrimary = { analysisPhoto?.let { analysisModel.analyze(context, it, garmentType) } },
+                onPrimary = { analysisPhoto?.let { wardrobeModel.beginRegistration(); analysisModel.analyze(context, it, garmentType) } },
                 onBack = back,
                 actionLabel = if (editingId == null && result == null) "다시 촬영" else null,
                 onAction = { takePhoto() },
@@ -532,7 +566,17 @@ fun WardrobeScreen(items: List<WardrobeItem>, message: String?, cameraBusy: Bool
                    onWornPhoto: (() -> Unit)? = null,
                    onDelete: ((WardrobeItem) -> Unit)? = null, deletingId: String? = null,
                    deleteError: String? = null, onDeleteDismiss: () -> Unit = {}, onInteraction: () -> Unit = {},
-                   onAnalyze: (() -> Unit)? = null) {
+                   onAnalyze: (() -> Unit)? = null,
+                   onRecommendOutfits: ((WardrobeItem) -> Unit)? = null,
+                   onFindMatchingClothes: ((WardrobeItem) -> Unit)? = null) {
+    var actionGarmentId by rememberSaveable { mutableStateOf<String?>(null) }
+    val actionGarment = items.firstOrNull { it.id == actionGarmentId }
+    if (actionGarment != null && onRecommendOutfits != null) {
+        GarmentActionSheet(actionGarment, onDismiss = { actionGarmentId = null },
+            onRecommendOutfits = { actionGarmentId = null; onRecommendOutfits(actionGarment) },
+            onFindMatchingClothes = onFindMatchingClothes?.let { find -> { actionGarmentId = null; find(actionGarment) } },
+            onDetail = { actionGarmentId = null; onItemClick(actionGarment) })
+    }
     var pendingDeleteId by rememberSaveable { mutableStateOf<String?>(null) }
     val pendingDelete = items.firstOrNull { it.id == pendingDeleteId }
     LaunchedEffect(items) {
@@ -569,15 +613,40 @@ fun WardrobeScreen(items: List<WardrobeItem>, message: String?, cameraBusy: Bool
     LaunchedEffect(activeCategory, loading) { if (!loading && category != activeCategory) category = activeCategory }
     val visible = items.filter { activeCategory == "all" || it.category == activeCategory }
     WardrobeCollection(
-        total = items.size, items = visible, categories = categories, category = activeCategory,
+        total = items.size, items = visible, allItems = items, categories = categories, category = activeCategory,
         onCategory = { onInteraction(); category = it },
         message = message, loading = loading, cameraBusy = cameraBusy,
         onRegister = { onInteraction(); choosingMethod = true }, onRetry = onRetry,
-        onItemClick = onItemClick, deletingId = deletingId,
+        onItemClick = { garment ->
+            if (onRecommendOutfits != null && garment.category in setOf("top", "bottom", "outerwear")) actionGarmentId = garment.id
+            else onItemClick(garment)
+        }, deletingId = deletingId,
         onDelete = onDelete?.let { { garment -> onDeleteDismiss(); pendingDeleteId = garment.id } },
         onAnalyze = onAnalyze,
         photo = { garment -> GarmentPhoto(checkNotNull(garment.imageUrl), garment.name, framed = false) },
     )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun GarmentActionSheet(garment: WardrobeItem, onDismiss: () -> Unit, onRecommendOutfits: () -> Unit,
+                               onFindMatchingClothes: (() -> Unit)?, onDetail: () -> Unit) {
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = MaterialTheme.colorScheme.background) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(garment.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text("내 옷장에서 이 옷을 포함한 코디를 최대 3개 추천해요.",
+                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Button(onClick = onRecommendOutfits, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
+                shape = MaterialTheme.shapes.medium) { Text("이 옷을 포함한 코디 추천받기") }
+            onFindMatchingClothes?.let { find ->
+                OutlinedButton(onClick = find, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+                    shape = MaterialTheme.shapes.medium) { Text("함께 입을 옷 찾기") }
+            }
+            TextButton(onClick = onDetail, modifier = Modifier.fillMaxWidth()) { Text("상세 정보 보기") }
+        }
+    }
 }
 
 

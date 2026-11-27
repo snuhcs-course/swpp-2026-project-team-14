@@ -4,6 +4,7 @@ from django.urls import path
 from . import views
 from . import worn_views
 from . import worn_photo_views
+from . import display_cutout
 
 urlpatterns = [
     path('analyze/', views.analyze),
@@ -20,6 +21,7 @@ urlpatterns = [
     path('items/', views.items),
     path('items/<uuid:item_id>/', views.item),
     path('items/<uuid:item_id>/image/', views.item_image),
+    path('items/<uuid:item_id>/display-cutout/', display_cutout.image),
     path('items/<uuid:item_id>/generation/', worn_views.generation),
     path('items/<uuid:item_id>/review/', worn_views.review),
     path('items/<uuid:item_id>/worn-image/<str:kind>/', worn_views.image),

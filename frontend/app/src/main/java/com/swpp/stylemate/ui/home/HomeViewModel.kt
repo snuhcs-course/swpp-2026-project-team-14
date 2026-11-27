@@ -17,6 +17,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 
+data class PinnedGarment(val id: String, val name: String)
+
 data class HomeState(
     val loading: Boolean = false,
     val weather: Weather? = null,
@@ -28,6 +30,7 @@ data class HomeState(
     val acting: Boolean = false,
     val message: String? = null,
     val region: String = HomeRegion.SEOUL.name,
+    val pinnedGarment: PinnedGarment? = null,
 ) {
     val current: Outfit? get() = outfits.getOrNull(index)
 
@@ -37,7 +40,8 @@ data class HomeState(
 }
 
 /** 오늘의 코디: outfits from the user's own wardrobe for today's weather, liked/disliked/saved. */
-class HomeViewModel(private val repository: OutfitRepository, private val taste: TasteStore) : ViewModel() {
+class HomeViewModel(private val repository: OutfitRepository, private val taste: TasteStore,
+                    private val onRatingPrompt: () -> Unit = {}) : ViewModel() {
     companion object {
         const val CAROUSEL_SIZE = 3
     }
@@ -47,6 +51,7 @@ class HomeViewModel(private val repository: OutfitRepository, private val taste:
     private val seen = mutableListOf<String>()
     private var body: JSONObject? = null
     private var job: Job? = null
+    private var actionJob: Job? = null
     private var wardrobeRevision = 0
     private var occasion: String? = null
     private var region = HomeRegion.SEOUL
@@ -63,26 +68,49 @@ class HomeViewModel(private val repository: OutfitRepository, private val taste:
     /** The occasion of today's calendar events (from the device), sent with the next recommendation. */
     fun setOccasion(value: String?) { occasion = value }
 
-    /** First load, or the refresh button: new weather and new outfits. */
-    fun load(body: JSONObject?, refreshWeather: Boolean = true) {
+    /** Start a fresh recommendation context; the home route loads it after switching tabs. */
+    fun pinGarment(garment: PinnedGarment) { resetRecommendations(garment) }
+
+    fun clearPinnedGarment() {
+        resetRecommendations(null)
+        load(body, refreshWeather = false)
+    }
+
+    private fun resetRecommendations(garment: PinnedGarment?) {
+        job?.cancel()
+        actionJob?.cancel()
+        seen.clear()
+        mutableState.value = HomeState(weather = mutableState.value.weather, region = region.name, pinnedGarment = garment)
+    }
+
+    /** First load, or the refresh button: new weather and new outfits. [fromRefresh]: 사용자가 새로고침을 눌러 받은 추천 */
+    fun load(body: JSONObject?, refreshWeather: Boolean = true, fromRefresh: Boolean = false) {
         this.body = body
+        job?.cancel()
         if (body == null) {
-            mutableState.value = HomeState(errorCode = HomeState.NO_PROFILE)
+            mutableState.value = mutableState.value.copy(loading = false, outfits = emptyList(), index = 0,
+                errorCode = HomeState.NO_PROFILE)
             return
         }
-        job?.cancel()
         mutableState.value = mutableState.value.copy(loading = true, error = null, errorCode = null)
+        val pinned = mutableState.value.pinnedGarment
         job = viewModelScope.launch {
             try {
                 val weather = if (refreshWeather || mutableState.value.weather == null) {
                     try { repository.weather(region) } catch (e: OutfitApiException) { mutableState.value.weather }
                 } else mutableState.value.weather
-                val result = repository.recommend(body, weather, taste.load(), seen, count = CAROUSEL_SIZE, occasion = occasion)
-                // A small wardrobe cannot fill the carousel with distinct outfits: show the best one alone.
-                val outfits = if (result.outfits.size < CAROUSEL_SIZE) result.outfits.take(1) else result.outfits
+                val result = repository.recommend(body, weather, taste.load(), seen, count = CAROUSEL_SIZE,
+                    anchorId = pinned?.id, occasion = occasion)
+                // Default recommendations keep the single best fallback; pinned recommendations show every available match.
+                val outfits = if (pinned == null && result.outfits.size < CAROUSEL_SIZE) result.outfits.take(1) else result.outfits
                 seen += outfits.map { it.key }
+                val notes = result.notes + if (pinned != null && outfits.size in 1 until CAROUSEL_SIZE)
+                    listOf("이 옷으로 만들 수 있는 코디 ${outfits.size}개를 찾았어요. 옷을 더 등록하면 더 다양하게 추천받을 수 있어요.")
+                    else emptyList()
                 mutableState.value = mutableState.value.copy(loading = false, weather = weather, outfits = outfits,
-                    index = 0, notes = result.notes)
+                    index = 0, notes = notes)
+                // 별점은 직접 새로고침해서 받은 추천일 때만 묻는다 (홈 진입 시 자동 추천은 제외).
+                if (fromRefresh && result.ratingPrompt && outfits.isNotEmpty()) onRatingPrompt()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: OutfitApiException) {
@@ -100,9 +128,7 @@ class HomeViewModel(private val repository: OutfitRepository, private val taste:
     fun ensureLoaded(body: JSONObject?, wardrobeRevision: Int = 0) {
         if (this.wardrobeRevision != wardrobeRevision) {
             this.wardrobeRevision = wardrobeRevision
-            seen.clear()
-            job?.cancel()
-            mutableState.value = HomeState()
+            resetRecommendations(mutableState.value.pinnedGarment)
             load(body)
             return
         }
@@ -133,7 +159,7 @@ class HomeViewModel(private val repository: OutfitRepository, private val taste:
         if (mutableState.value.acting) return
         val newValue = if (outfit.feedback == value) null else value
         mutableState.value = mutableState.value.copy(acting = true)
-        viewModelScope.launch {
+        actionJob = viewModelScope.launch {
             try {
                 val (updated, preference) = repository.feedback(outfit.id, newValue, taste.load())
                 taste.save(preference)
@@ -161,7 +187,7 @@ class HomeViewModel(private val repository: OutfitRepository, private val taste:
         val outfit = mutableState.value.current ?: return
         if (mutableState.value.acting) return
         mutableState.value = mutableState.value.copy(acting = true)
-        viewModelScope.launch {
+        actionJob = viewModelScope.launch {
             try {
                 val updated = repository.setSaved(outfit.id, !outfit.saved)
                 replace(updated)
@@ -172,6 +198,29 @@ class HomeViewModel(private val repository: OutfitRepository, private val taste:
             } catch (e: OutfitApiException) {
                 mutableState.value = mutableState.value.copy(acting = false, message = e.message)
             }
+        }
+    }
+
+    /**
+     * Brings each card's saved state in line with the 코디북 when 홈 is shown again: an outfit removed there (or saved
+     * from chat) would otherwise keep its old 저장 button, and a tap would repeat the change instead of reversing it.
+     * Matched by garment combination, since the 코디북 keeps one entry per combination. A failed check changes nothing.
+     */
+    fun syncSaved() {
+        if (mutableState.value.outfits.isEmpty() || mutableState.value.acting) return
+        viewModelScope.launch {
+            val keys = try { repository.saved().map { it.key }.toSet() }
+                catch (e: CancellationException) { throw e }
+                catch (e: OutfitApiException) { return@launch }
+            val state = mutableState.value
+            if (state.acting) return@launch  // a tap on 저장 meanwhile has the newer answer
+            val outfits = state.outfits.map { outfit ->
+                val saved = outfit.key in keys
+                if (outfit.saved == saved) outfit else outfit.copy(saved = saved)
+            }
+            if (outfits == state.outfits) return@launch
+            // A "저장했어요" not yet shown before leaving 홈 would now contradict the button, so it is dropped.
+            mutableState.value = state.copy(outfits = outfits, message = null)
         }
     }
 

@@ -16,6 +16,8 @@ from apps.body_profiles.profile import body_from_request
 from apps.users.auth import require_auth
 from apps.users.models import User
 from apps.users.pagination import account_page
+from apps.usage.models import RatingTask
+from apps.usage.ratings import should_prompt
 from recommendation.labeling import label
 
 from .analysis import AnalysisError, MAX_IMAGE_BYTES, model_name, analyze_image, prepare_image
@@ -23,6 +25,7 @@ from .editor import catalog, validate_record
 from .schema import validate_ai_details, validate_attributes
 from .models import Garment, CategoryInUse, WornGeneration
 from .media import delete_garment_with_media
+from .cutouts import HANGABLE, schedule_cutout
 from .worn_estimates import suggestions, estimate_matches
 from .landmarks import GARMENTS, MAX_FRAME_BYTES, detect
 
@@ -126,7 +129,11 @@ def serialize(garment):
             'estimated_dimensions': garment.estimated_dimensions,
             'image_source': garment.image_source,
             'notes': garment.notes, 'labels': garment.labels,
-            'image_url': f'/api/wardrobe/items/{garment.id}/image/', 'saved': garment.saved}
+            'image_url': f'/api/wardrobe/items/{garment.id}/image/', 'saved': garment.saved,
+            # The background-free PNG for the wardrobe rail; image_url stays the original photo.
+            'cutout_url': (f'/api/wardrobe/items/{garment.id}/display-cutout/'
+                           if garment.saved and garment.attributes.get('category') in HANGABLE else None),
+            'cutout_ready': bool(garment.cutout and garment.cutout_key)}
 
 
 @require_GET
@@ -226,6 +233,12 @@ def item(request, item_id):
             # The analysis ID is reused on retry: saving never creates a second garment.
             garment.saved = True
             garment.save(update_fields=[*values, 'estimated_dimensions', 'saved', 'updated_at'])
+            schedule_cutout(garment)  # after commit, in the background; a later edit keeps a valid cutout
+        # 별점 팝업 여부. 앱은 새 옷 등록으로 저장한 경우에만 이 값을 쓴다 (기존 옷 수정은 제외).
+        response = JsonResponse({**serialize(garment),
+                                 'rating_prompt': should_prompt(request.user, RatingTask.GARMENT_REGISTRATION)})
+        response['Cache-Control'] = 'no-store'
+        return response
     response = JsonResponse(serialize(garment))
     response['Cache-Control'] = 'no-store'
     return response

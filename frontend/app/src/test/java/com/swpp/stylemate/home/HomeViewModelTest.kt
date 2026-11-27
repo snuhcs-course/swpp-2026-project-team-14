@@ -12,6 +12,7 @@ import com.swpp.stylemate.data.testAccount
 import com.swpp.stylemate.ui.home.CodiBookViewModel
 import com.swpp.stylemate.ui.home.HomeState
 import com.swpp.stylemate.ui.home.HomeViewModel
+import com.swpp.stylemate.ui.home.PinnedGarment
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -67,6 +68,107 @@ class HomeViewModelTest {
     }
 
     private fun idle(): HomeState = viewModel.state.await { !it.acting }
+
+    private fun loadPinnedGarment(id: String = "a") {
+        server.on("GET /api/weather/", json(weather))
+        server.on("POST /api/outfits/recommend/", recommendation(
+            outfitJson("p1", id, "b"), outfitJson("p2", id, "d"), outfitJson("p3", id, "f")))
+        viewModel.pinGarment(PinnedGarment(id, "내 셔츠"))
+        assertTrue(viewModel.state.value.outfits.isEmpty())
+        viewModel.ensureLoaded(body)
+        loaded()
+    }
+
+    @Test fun wardrobeSelectionRequestsThreeOutfitsWithThePinnedGarmentAndFreshHistory() {
+        loadThreeOutfits()
+        loadPinnedGarment()
+        val state = loaded()
+        assertEquals(PinnedGarment("a", "내 셔츠"), state.pinnedGarment)
+        assertEquals(3, state.outfits.size)
+        assertTrue(state.outfits.all { outfit -> outfit.items.any { it.garmentId == "a" } })
+        val sent = server.requests("POST /api/outfits/recommend/").last()
+        assertEquals("a", sent.getString("anchor_id"))
+        assertEquals(3, sent.getInt("count"))
+        assertEquals(0, sent.getJSONArray("seen_keys").length())
+        viewModel.ensureLoaded(body)
+        assertEquals(2, server.requests("POST /api/outfits/recommend/").size)
+    }
+
+    @Test fun refreshingAndMovingPastTheLastOutfitRetainThePin() {
+        loadPinnedGarment()
+        repeat(2) {
+            server.on("POST /api/outfits/recommend/", recommendation(
+                outfitJson("r1", "a", "g"), outfitJson("r2", "a", "h"), outfitJson("r3", "a", "i")))
+            if (it == 0) viewModel.load(body, refreshWeather = false)
+            else { viewModel.select(2); viewModel.next() }
+            loaded()
+            assertEquals("a", server.requests("POST /api/outfits/recommend/").last().getString("anchor_id"))
+            assertEquals("a", viewModel.state.value.pinnedGarment?.id)
+        }
+    }
+
+    @Test fun unpinningClearsOldCardsAndRequestsDefaultRecommendationsWithoutPinnedHistory() {
+        loadPinnedGarment()
+        server.on("POST /api/outfits/recommend/", recommendation(second, third, first))
+        viewModel.clearPinnedGarment()
+        val state = loaded()
+        assertNull(state.pinnedGarment)
+        assertEquals("o2", state.current?.id)
+        val sent = server.requests("POST /api/outfits/recommend/").last()
+        assertFalse(sent.has("anchor_id"))
+        assertEquals(0, sent.getJSONArray("seen_keys").length())
+    }
+
+    @Test fun changingThePinWhileLoadingDiscardsThePreviousResponse() {
+        server.on("GET /api/weather/", json(weather), json(weather))
+        server.on("POST /api/outfits/recommend/", json(JSONObject().put("outfits", JSONArray(listOf(first)))
+            .put("notes", JSONArray()).toString(), delayMs = 200), recommendation(
+                outfitJson("p4", "c", "b"), outfitJson("p5", "c", "d"), outfitJson("p6", "c", "f")))
+        viewModel.pinGarment(PinnedGarment("a", "첫 번째 옷"))
+        viewModel.ensureLoaded(body)
+        repeat(2) { assertTrue(server.server.takeRequest(2, java.util.concurrent.TimeUnit.SECONDS) != null) }
+        viewModel.pinGarment(PinnedGarment("c", "다른 옷"))
+        viewModel.ensureLoaded(body)
+        val state = loaded()
+        assertEquals("c", state.pinnedGarment?.id)
+        assertEquals(listOf("p4", "p5", "p6"), state.outfits.map { it.id })
+        assertEquals(listOf("a", "c"), server.requests("POST /api/outfits/recommend/").map { it.getString("anchor_id") })
+    }
+
+    @Test fun unavailablePinnedGarmentShowsAnErrorAndCanBeUnpinned() {
+        loadThreeOutfits()
+        server.on("GET /api/weather/", json(weather))
+        server.on("POST /api/outfits/recommend/", failure(422, "ANCHOR_NOT_FOUND", "기준이 될 내 옷을 골라 주세요."))
+        viewModel.pinGarment(PinnedGarment("missing", "삭제된 옷"))
+        viewModel.ensureLoaded(body)
+        val failed = loaded()
+        assertEquals("ANCHOR_NOT_FOUND", failed.errorCode)
+        assertEquals("missing", failed.pinnedGarment?.id)
+        assertTrue(failed.outfits.isEmpty())
+        server.on("POST /api/outfits/recommend/", recommendation(second))
+        viewModel.clearPinnedGarment()
+        assertEquals("o2", loaded().current?.id)
+        assertNull(viewModel.state.value.pinnedGarment)
+    }
+
+    @Test fun aSmallPinnedWardrobeShowsEveryAvailableOutfitAndExplainsTheShortfall() {
+        server.on("GET /api/weather/", json(weather))
+        server.on("POST /api/outfits/recommend/", recommendation(first, outfitJson("p2", "a", "d")))
+        viewModel.pinGarment(PinnedGarment("a", "내 셔츠"))
+        viewModel.ensureLoaded(body)
+        val state = loaded()
+        assertEquals(2, state.outfits.size)
+        assertTrue(state.notes.any { it.contains("코디 2개") })
+    }
+
+    @Test fun wardrobeChangesReloadWithTheSamePin() {
+        loadPinnedGarment()
+        server.on("GET /api/weather/", json(weather))
+        server.on("POST /api/outfits/recommend/", recommendation(first))
+        viewModel.ensureLoaded(body, wardrobeRevision = 1)
+        assertEquals("a", loaded().pinnedGarment?.id)
+        assertEquals("a", server.requests("POST /api/outfits/recommend/").last().getString("anchor_id"))
+    }
 
     @Test fun garmentDeletionInvalidatesOldRecommendationsOnlyOncePerRevision() {
         loadThreeOutfits()
@@ -316,6 +418,40 @@ class HomeViewModelTest {
         val state = idle()
         assertFalse(state.current!!.saved)
         assertEquals(OutfitRepository.SERVER_ERROR, state.message)
+    }
+
+    @Test fun returningToHomeMatchesTheSaveButtonsToTheCodiBook() {
+        loadThreeOutfits()
+        server.on("PUT /api/outfits/o1/", json(outfitJson("o1", "a", "b", saved = true).toString()))
+        viewModel.toggleSaved()
+        assertTrue(idle().current!!.saved)
+        // o1 was removed in 코디북; o2's combination was saved from chat under another id.
+        server.on("GET /api/outfits/", json(JSONObject().put("outfits", JSONArray().put(outfitJson("chat1", "c", "d", saved = true)))
+            .put("next", JSONObject.NULL).toString()))
+        viewModel.syncSaved()
+        val synced = viewModel.state.await { state -> state.outfits.none { it.id == "o1" && it.saved } }
+        assertEquals(listOf(false, true, false), synced.outfits.map { it.saved })
+        assertNull("the old 저장했어요 would contradict the button", synced.message)
+        assertEquals(1, server.requests("GET /api/outfits/").size)
+    }
+
+    @Test fun aFailedCodiBookCheckKeepsTheSaveButtons() {
+        loadThreeOutfits()
+        server.on("PUT /api/outfits/o1/", json(outfitJson("o1", "a", "b", saved = true).toString()))
+        viewModel.toggleSaved()
+        idle()
+        server.on("GET /api/outfits/", failure(500, "SERVER_ERROR"))
+        viewModel.syncSaved()
+        val deadline = System.currentTimeMillis() + 5_000
+        while (server.requests("GET /api/outfits/").isEmpty() && System.currentTimeMillis() < deadline) Thread.sleep(20)
+        Thread.sleep(200)  // let the failed check finish
+        assertEquals(listOf(true, false, false), viewModel.state.value.outfits.map { it.saved })
+        assertEquals("코디북에 저장했어요.", viewModel.state.value.message)  // no error is shown for the check
+    }
+
+    @Test fun nothingIsCheckedBeforeOutfitsLoad() {
+        viewModel.syncSaved()
+        assertTrue(server.requests("GET /api/outfits/").isEmpty())
     }
 
     @Test fun shownMessageIsCleared() {

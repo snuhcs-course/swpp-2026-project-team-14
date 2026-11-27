@@ -158,11 +158,19 @@ class ServiceAuthenticationTests(TestCase):
         ('post', '/api/wardrobe/labels/'), ('get', '/api/wardrobe/items/'),
         ('post', '/api/outfits/recommend/'), ('get', '/api/outfits/'),
         ('get', '/api/weather/'),
-        ('post', '/api/users/me/import/preview/'),
-        ('put', '/api/users/me/import/profile/style/'),
-        ('post', '/api/users/me/import/garments/00000000-0000-0000-0000-000000000001/'),
-        ('put', '/api/users/me/import/outfits/00000000-0000-0000-0000-000000000001/'),
     ]
+
+    def test_the_guest_data_import_is_gone(self):
+        # Login-only app (issue #95): there is no guest snapshot to bring into an account any more.
+        from apps.users.auth import issue_token
+        from apps.users.models import User
+        _, token = issue_token(User.objects.create(username='import_gone'))
+        for method, url in (('post', '/api/users/me/import/preview/'), ('put', '/api/users/me/import/profile/style/'),
+                            ('post', '/api/users/me/import/garments/00000000-0000-0000-0000-000000000001/'),
+                            ('put', '/api/users/me/import/outfits/00000000-0000-0000-0000-000000000001/')):
+            with self.subTest(url=url):
+                response = getattr(self.client, method)(url, HTTP_AUTHORIZATION=f'Bearer {token}')
+                self.assertEqual(response.status_code, 404)
 
     def test_missing_and_invalid_tokens_reject_before_body_parsing_or_inference(self):
         from unittest.mock import patch

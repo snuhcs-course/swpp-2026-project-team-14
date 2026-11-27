@@ -2,6 +2,18 @@
 
 옷장 기능은 팀의 `frontend/`·`backend/`에서 실행한다. Android는 공통 앱, Django는 `manage.py`와 `config.wsgi`를 사용한다.
 
+## 옷장봉 보기 (2026-11-25, #105)
+
+`WardrobeCollection`은 기존 계정 목록과 콜백을 유지하면서 검색, 카테고리 요약, 전체 Grid와 옷장봉 보기를 연결한다. `WardrobeCarousel`은 고정된 봉과 개별 옷걸이를 Canvas로 그리고, 선택 위치 주변 최대 9개 의류에 비균등 간격·연속 회전·깊이·스프링 스냅을 적용한다. `GarmentHangingGeometry`는 투명 이미지의 윗부분 윤곽에서 어깨·목선·허리의 상대 위치를 한 번 추정하고 이미지와 함께 캐시한다. 긴 소매와 치마 밑단이 옷걸이 폭에 영향을 주지 않도록 상의 위쪽 10–18%, 하의 위쪽 2.5–8%를 사용한다. 비대칭 사진은 옷의 위치를 보정해 고리가 목선 중심에 온다. 상의는 목선 안의 우드 옷걸이, 아우터는 굵은 어깨 옷걸이, 하의는 허리 양끝의 앞쪽 집게와 뒤쪽 바를 사용한다. 이는 실루엣 기반 추정으로 기울어진 사진이나 잘못 분할된 윤곽은 오차가 남을 수 있다.
+
+의류와 옷걸이는 고리를 기준으로 같은 변환을 받는다. 흰 배경의 전체 폭 옷장봉은 중앙이 양끝보다 화면 폭의 3%(8–14dp) 낮은 고정된 U자 포물선이다. 고리의 세로 위치는 봉과 같은 곡선에서 계산한다. 중앙은 정면, 첫 번째 측면은 약 37도, 가장자리는 최대 52도로 회전한다. 중앙에서 멀어질수록 간격을 좁히며 크기는 중심의 100%에서 가장자리의 90%까지 연속적으로 변한다. 회전과 이동은 연속적으로 계산해 중간에 꺾이는 구간을 만들지 않는다. 스와이프 중 고리가 곡선을 따라 움직여 봉과 분리되지 않는다. 비착용 소품은 선반 아래쪽에 정렬한다. 연속 위치는 구성 단계에서 읽지 않고 그래픽 레이어에서 읽으며, 겹침 순서는 중앙 항목 변경 시 갱신한다. 투명도는 ModulateAlpha로 처리해 의류마다 별도 합성 버퍼를 만들지 않는다. 중심 이동은 손가락 거리와 맞추며 거의 임계 감쇠인 스프링과 고리 기준 ±1도 이내의 작은 흔들림을 사용한다. 배경 제거와 이미지 캐시, 실루엣에 맞춘 옷걸이 배치는 유지한다.
+
+`WardrobeCutout`은 인증된 `GET /api/wardrobe/items/<id>/display-cutout/`에서 최대 448px PNG를 한 번 요청한다. 서버는 흰 배경이 보장되는 AI 플랫레이에만 빠른 색 대비 배경 제거를 적용하고, 실제 사진(직접 촬영·착용 사진 크롭)과 흰 옷에는 기존 CPU SegFormer를 사용한다. 평평한 옷 사진은 옷 안쪽에 갇힌 빈 곳(밝은 프린트 등)을 채운다. 단일 의류 사진은 의류 라벨을 합쳐 상의 일부가 원피스로 오분류되어도 몸통이 지워지지 않게 한다. 착용 사진 크롭은 선택 카테고리를 유지한다. 생성형 AI, 외부 전송, DB 쓰기, 원본 덮어쓰기는 없다. 서버 모델은 기존 `WORN_SEGMENTATION_MODEL` 설정을 사용한다. Android는 32MB, 서버는 24MB 메모리 캐시로 파생 이미지를 제한한다. 진행 중인 요청은 공유하여 화면 밖으로 나간 뒤 돌아와도 중복 다운로드하지 않는다. 서버는 소유권을 캐시 조회보다 먼저 검사하고 원본 내용 해시와 처리 버전으로 변경을 구분한다. 캐시 조회는 다른 이미지의 추론 잠금에 막히지 않는다.
+
+**저장된 배경 제거 이미지 (#108).** 옷을 저장하면(직접 촬영·사진으로 등록·착용 사진 단건, 모두 `PUT /items/<id>/` 또는 `worn-photos/<id>/save/`) 커밋 직후 백그라운드에서 같은 SegFormer 경로로 투명 PNG를 만들어 `Garment.cutout`(`cutouts/`)에 저장한다. `cutout_key`는 원본 사진·분류·모델 버전의 해시라서 바뀌면 다음 요청에서 다시 만든다. `display-cutout/`은 저장된 PNG를 그대로 돌려주고, 없거나 오래된 경우에만 만들어 저장한다. 목록 응답의 `cutout_url`을 옷장봉이 사용하며 `image_url`은 상세·코디·피팅·색상 선택용 원본으로 남는다. 기존 옷은 `python manage.py make_cutouts`로 한 번에 채운다. 옷걸이 위치 계산(`GarmentHangingGeometry`)은 앱이 옷장봉에서 이미지를 불러올 때만 한다. 옷을 삭제하면 PNG도 함께 지운다.
+
+분할이 불확실하거나 모델이 없는 환경에서는 안내와 재시도를 제공하고 원본은 기존 상세 화면에서 볼 수 있다. 겹침·누락된 부분을 새로 생성하지 않는다. 캐러셀의 60FPS는 실기기 성능 측정이 남아 있다.
+
 ```text
 swpp-2026-project-team-14/
 |-- frontend/app/src/
@@ -27,7 +39,7 @@ swpp-2026-project-team-14/
 |   |   |       |-- CaptureFiles.kt               # 옷 사진 임시 캐시·재개 중인 촬영 파일 보존
 |   |   |       `-- CaptureType.kt                # 측정 종류 → 하의 세부 종류 기본값
 |   |   `-- ui/
-|   |       |-- StyleMateApp.kt                   # 로그인 필수 진입·계정별 탭/편집 상태 보존·수동 가져오기·만료 시 상태 폐기
+|   |       |-- StyleMateApp.kt                   # 로그인 필수 진입·계정별 탭 상태·옷장 선택 의상을 홈 추천에 전달·만료 시 폐기
 |   |       |-- components/ScreenComponents.kt   # 탭/하위 제목 위계·뒤로가기 정렬·상단바 교체 슬롯·하단 버튼·섹션 제목
 |   |       |-- components/StarRating.kt         # 서버 보정 점수를 0.5–5개·반별 단위로 표시하는 읽기 전용 추천 별점
 |   |       |-- components/OutfitFeedbackButtons.kt # 홈·대화 공용 저장·엄지 평가 보조 버튼·선택/해제 표시
@@ -35,9 +47,9 @@ swpp-2026-project-team-14/
 |   |       |-- theme/Theme.kt                    # 앱 전체 흑백 팔레트·글자 위계·모서리·시스템 바 스타일
 |   |       |-- home/
 |   |       |   |-- HomeScreen.kt                # 압축 코디판·좌우 비교·행동/피드백 버튼·별점/추천 문장·재시도
-|   |       |   |-- HomeRoute.kt                 # 선택 코디의 채팅/피팅 연결·계정별 코디북 피팅 상태·의상 삭제 후 갱신
+|   |       |   |-- HomeRoute.kt                 # 계정별 홈 모델·의상 고정 해제·선택 코디의 채팅/피팅 연결·삭제 후 갱신
 |   |       |   |-- CodiBookScreen.kt            # 슬라이드/목록·코디별 복귀 위치·피팅 상태·저장 해제 확인/재시도
-|   |       |   `-- HomeViewModel.kt             # 홈 추천/저장/평가·코디북 조회/중복 해제 방지·오류 분리·삭제 시 무효화
+|   |       |   `-- HomeViewModel.kt             # 고정 의상을 포함한 홈 추천/해제·저장/평가·코디북 조회·삭제 시 무효화
 |   |       |-- chat/
 |   |       |   |-- ChatScreen.kt                # 단일 코디 미리보기·조건 요약/전송·대화·실패 요청 복구
 |   |       |   |-- ChatComponents.kt            # 조건·사진 기록 시트·작은 그대로 입기 칩·코디 하단 저장·분리된 평가
@@ -58,8 +70,11 @@ swpp-2026-project-team-14/
 |   |       |   |-- BodySummaryFigure.kt          # 온보딩 예시 모델에 실제 저장된 분석 치수 위치 표시
 |   |       |   `-- ConnectionsSection.kt        # MY 안의 캘린더 스위치·권한 거부 복구·연결 상태 갱신
 |   |       `-- wardrobe/
-|   |           |-- WardrobeScreen.kt            # 목록/상세/추천 페이지·복귀 상태·등록/편집·삭제 연결
-|   |           |-- WardrobeCollection.kt        # 옷장 헤더·반응형 사진 그리드·필터 아래 분석 진입·상태·등록 행동 표시
+|   |           |-- WardrobeScreen.kt            # 옷 선택 팝업·홈 코디/외부 추천/상세 분기·복귀 상태·등록/편집·삭제
+|   |           |-- WardrobeCollection.kt        # 옷장 헤더·검색·필터·카테고리 요약·전체 그리드·고정 행동
+|   |           |-- WardrobeCarousel.kt          # 고정 옷장봉·옷걸이·밀집 원근 배치·드래그·스프링 스냅
+|   |           |-- WardrobeCutout.kt            # 인증 사진의 보수적 배경 제거·계정별 메모리 캐시
+|   |           |-- GarmentHangingGeometry.kt    # 투명 의류 윤곽의 목선·어깨·허리 지지점 추정
 |   |           |-- WardrobeStyle.kt             # 공통 팔레트를 참조하는 옷장 배치·모서리 별칭
 |   |           |-- WardrobeViewModel.kt         # 계정 목록·저장·삭제/중복 방지·외부 추천·옷장 분석 상태
 |   |           |-- WardrobeAnalysisDialog.kt    # 부족한 옷 분석 결과·내 옷 근거·외부 검색·재시도
@@ -123,6 +138,7 @@ swpp-2026-project-team-14/
 |       |-- UxPhaseOneTest.kt                    # 탭/계정별 초안·저장/버리기·사진 취소/가이드·채팅 조건·가져오기 표시 회귀
 |       |-- GlobalThemeTest.kt                   # 실제 앱 탭·로그인/가입·편집/체형/채팅/피팅의 이전 테마 색상 검출·화면 촬영
 |       |-- home/HomeScreenTest.kt               # 작은 화면의 행동 노출·선택 상태·별점/추천 문장·실패 재시도 검사
+|       |-- home/PinnedOutfitLiveTest.kt          # 실제 Activity·Django HTTP·합성사진으로 로그인/의상 고정/추천/저장/해제 검사
 |       |-- chat/ChatScreenTest.kt               # 조건/단일 전송·중복 미리보기 제거·복구 확인·오류 범위·작은 화면 검사
 |       |-- chat/OutfitActionLayoutTest.kt       # 사진 아래 별 저장 전환·48dp 자물쇠·저장 중/실패·큰 글자 검사
 |       |-- wardrobe/GarmentDetailFlowTest.kt     # 관리 메뉴·상세/수정 배치·추정/출처 안내·내 옷/쇼핑 분리·신발 필터
@@ -133,7 +149,7 @@ swpp-2026-project-team-14/
 |   |-- config/
 |   |   |-- settings.py                          # 공통 API·사용자 모델·MySQL·사진·모델 설정
 |   |   |-- urls.py                              # 체형·옷장 API 연결
-|   |   `-- test_settings.py                     # 외부 서비스 없는 옷장 테스트 환경
+|   |   `-- test_settings.py                     # 격리 DB 회귀 검사·에뮬레이터용 Django testserver 호스트 허용
 |   |-- apps/
 |   |   |-- users/
 |   |   |   |-- models.py                        # 사용자·체형·취향·토큰 해시 저장
@@ -197,6 +213,7 @@ swpp-2026-project-team-14/
 |   |-- wardrobe/garment-landmarks/              # HRNet 가중치·메타데이터·라이선스
 |   |-- models/segformer_clothes.onnx            # 고정 SegFormer 의류 분할 가중치, Git 제외·이미지 빌드 시 포함
 |   |-- scripts/prepare_landmarks.py             # 빌드 시 HRNet 다운로드·검증·ONNX 변환
+|   |-- scripts/prepare_pinned_outfit_fixture.py  # 투명 의류 사진 7장 검증·DB 접근 없이 testserver 계정/의상 fixture 생성
 |   `-- tests/                                   # 체형 분석·추천 모델 입력 계약·공통 API 회귀 검사
 `-- docs/
     |-- login/viewmodel-testing.md              # 로그인·가져오기 ViewModel의 기대 동작·실행·커버리지

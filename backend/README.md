@@ -5,6 +5,7 @@ The team backend: a Django project (`config/` + `apps/`) deployed to the team14 
 
 | Endpoint | Purpose |
 |---|---|
+| `POST /api/usage/events/` | Authenticated alpha-test usage collection; [definitions, export, and rehearsal](../docs/testing/alpha-test.md) |
 | `GET /healthz/` | Kubernetes readiness/liveness probe |
 | `/api/auth/register/`, `/api/auth/login/`, `/api/auth/logout/`, `/api/users/me/` | ID/password authentication and account profile ([contract](../docs/login/README.md)) |
 | `POST /api/body-profile/analyze/` | body measurements from front + side photos (`apps/body_profiles/`) |

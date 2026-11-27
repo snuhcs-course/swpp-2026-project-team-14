@@ -29,12 +29,16 @@ class FittingRepository(private val store: LocalUserStore, private val account: 
         store.put(FittingNotificationSettings.storageKey(account.userId), settings.json())
     }
 
+    // A fitting depends only on the garments (and their photos) and the person, not on which outfit card asked
+    // for it: 홈 makes a new outfit id each time it recommends the same garments again, and the same garments
+    // can be saved to 코디북 twice. So results and tasks are kept per garment combination. Results saved before
+    // this, per outfit id, are still found under their old key.
     suspend fun result(outfit: Outfit, source: String = "gallery"): ByteArray? = withContext(Dispatchers.IO) {
-        store.fittingResult(resultKey(outfit, source))
+        store.fittingResult(resultKey(outfit, source)) ?: store.fittingResult(legacyKey(outfit, source))
     }
 
     suspend fun hasResult(outfit: Outfit, source: String): Boolean = withContext(Dispatchers.IO) {
-        store.hasFittingResult(resultKey(outfit, source))
+        store.hasFittingResult(resultKey(outfit, source)) || store.hasFittingResult(legacyKey(outfit, source))
     }
 
     suspend fun saveResult(outfit: Outfit, image: ByteArray, source: String = "gallery") = withContext(Dispatchers.IO) {
@@ -43,18 +47,25 @@ class FittingRepository(private val store: LocalUserStore, private val account: 
     }
 
     suspend fun latestSource(outfit: Outfit): String? = withContext(Dispatchers.IO) {
-        store.get("fitting-latest:${taskKey(outfit)}")?.getString("source")
+        (store.get("fitting-latest:${taskKey(outfit)}") ?: store.get("fitting-latest:${legacyKey(outfit, "background-job")}"))
+            ?.getString("source")
     }
 
     fun taskKey(outfit: Outfit): String = resultKey(outfit, "background-job")
 
-    private fun resultKey(outfit: Outfit, source: String): String {
+    private fun resultKey(outfit: Outfit, source: String): String =
+        digest(listOf("nano-banana-2.1-2k-v2", account.userId, garments(outfit), source))
+
+    /** The key used before results were shared by garment combination (it also held the outfit id). */
+    internal fun legacyKey(outfit: Outfit, source: String): String =
+        digest(listOf("nano-banana-2.1-2k-v1", account.userId, outfit.id, garments(outfit), source))
+
+    private fun garments(outfit: Outfit) = JSONArray(outfit.items.sortedWith(compareBy({ it.slot }, { it.garmentId }))
+        .map { JSONArray(listOf(it.slot, it.garmentId, it.imageUrl)) })
+
+    private fun digest(parts: List<Any>): String {
         account.authorization()
-        val items = outfit.items.sortedWith(compareBy({ it.slot }, { it.garmentId }))
-            .map { JSONArray(listOf(it.slot, it.garmentId, it.imageUrl)) }
-        val input = JSONArray(listOf("nano-banana-2.1-2k-v1", account.userId,
-            outfit.id, JSONArray(items), source))
-        return MessageDigest.getInstance("SHA-256").digest(input.toString().toByteArray(Charsets.UTF_8))
+        return MessageDigest.getInstance("SHA-256").digest(JSONArray(parts).toString().toByteArray(Charsets.UTF_8))
             .joinToString("") { "%02x".format(it) }
     }
 

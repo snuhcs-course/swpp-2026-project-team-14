@@ -1,4 +1,4 @@
-# AI-generated with Codex, 2026-09-29, reviewed by Hyeon U Jeong; recommendation labels added with Claude Code (Claude Opus 5.5), 2026-10-12, reviewed by Dongkun Moon
+# AI-generated with Codex, 2026-09-29, reviewed by Hyeon U Jeong; recommendation labels added with Claude Code (Claude Opus 5.5), 2026-10-12, reviewed by Dongkun Moon; tolerant AI colours with Claude Code (Claude Opus 5.5), 2026-11-26, reviewed by Dongkun Moon
 import re
 from typing import TypedDict, cast
 
@@ -261,10 +261,13 @@ def validate_ai_attributes(data: object) -> WardrobeAttributes:
     if not isinstance(data, dict) or not AI_REQUIRED_FIELDS <= set(data) or set(data) - set(AI_FIELDS):
         raise ValueError('Unexpected AI fields')
 
-    colors = data['colors']
-    if not isinstance(colors, list) or not AI_COLOR_MIN_COUNT <= len(colors) <= AI_COLOR_MAX_COUNT:
-        raise ValueError('Invalid AI colors')
-    if any(not isinstance(color, str) or color not in COLOR_PALETTE for color in colors):
+    # Keep the palette colours the model gave (case-insensitive, at most two). A striped or multi-colour
+    # garment often comes back with a third colour or one outside the palette; rejecting the whole answer
+    # for that dropped every garment in the photo. Only an answer with no usable colour is rejected.
+    raw_colors = data['colors'] if isinstance(data['colors'], list) else []
+    colors = list(dict.fromkeys(c.strip().upper() for c in raw_colors
+                                if isinstance(c, str) and c.strip().upper() in COLOR_PALETTE))[:AI_COLOR_MAX_COUNT]
+    if len(colors) < AI_COLOR_MIN_COUNT:
         raise ValueError('Invalid AI colors')
 
     category = data['category'] if isinstance(data['category'], str) else ''
@@ -272,6 +275,7 @@ def validate_ai_attributes(data: object) -> WardrobeAttributes:
     styles = data.get('styles') if isinstance(data.get('styles'), list) else []
     attributes = {
         **data,
+        'colors': colors,
         'subcategory': subcategory if isinstance(subcategory, str) and subcategory in SUBCATEGORIES.get(category, {}) else None,
         'styles': list(dict.fromkeys(s for s in styles if isinstance(s, str) and s in ENUMS['styles']))[:AI_STYLE_MAX_COUNT],
         'fit_type': None,

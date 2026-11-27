@@ -22,7 +22,7 @@ import uuid
 from functools import lru_cache
 
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Exists, OuterRef, Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
@@ -30,9 +30,13 @@ from django.utils import timezone
 from onnxruntime.capi.onnxruntime_pybind11_state import Fail, InvalidGraph, InvalidProtobuf, NoSuchFile
 
 from apps.body_profiles.profile import body_or_unknown
+from apps.wardrobe import sizes
 from apps.wardrobe.models import Garment
 from apps.users.auth import require_auth
 from apps.users.models import User
+from apps.usage.models import RatingTask
+from apps.usage.ratings import should_prompt
+from apps.usage.recording import record_outfit_event, record_recommendations
 from apps.users.pagination import account_page
 from recommendation import preference, season, weather
 from recommendation.body import UnknownBody
@@ -159,6 +163,8 @@ def serialize(outfit: Outfit) -> dict:
             "garment_id": str(i.garment_id), "slot": i.slot, "name": i.garment.attributes.get("name", ""),
             "colors": i.garment.attributes.get("colors", []), "image_url": f"/api/wardrobe/items/{i.garment_id}/image/",
             "note": i.note,
+            # Real length, so 홈/코디북 can draw the garments of an outfit to one scale.
+            "length_cm": sizes.length_cm(i.garment),
         } for i in items],
     }
 
@@ -174,12 +180,29 @@ def _members(user, ids: list[str]) -> list[tuple[str, Garment, str]]:
     return members
 
 
+def _only_saved_copy(outfit: Outfit) -> None:
+    """One 코디북 entry per garment combination: saving a combination again moves it to the top instead of
+    adding a copy. Older saved rows with the same garments leave the 코디북 (their history stays); a name
+    given to one of them carries over when this one has none. Call inside the owner's lock."""
+    older = Outfit.objects.filter(user=outfit.user, key=outfit.key, saved=True).exclude(pk=outfit.pk)
+    named = older.exclude(name="").order_by("-updated_at").values_list("name", flat=True).first()
+    if named and not outfit.name:
+        outfit.name = named
+        outfit.save(update_fields=["name", "updated_at"])
+    older.update(saved=False)
+
+
 def _create(source: str, garments: list[tuple[str, Garment, str]], **fields) -> Outfit:
     """garments: (slot code, garment, note)."""
     outfit = Outfit.objects.create(source=source, key="+".join(sorted(f"w:{g.id}" for _, g, _ in garments)), **fields)
     OutfitItem.objects.bulk_create([OutfitItem(outfit=outfit, garment=g, slot=slot, note=note[:200])
                                     for slot, g, note in garments])
     return outfit
+
+
+def _recent_garments(seen_keys: list[str], count: int) -> list[str]:
+    """Garment ids of the last set the app showed (its last `count` keys), oldest first in `seen_keys`."""
+    return [gid for key in seen_keys[-count:] for gid in key.split("+") if gid.startswith("w:")]
 
 
 def _calculate(data, garments):
@@ -202,7 +225,9 @@ def _calculate(data, garments):
     items = [i for i in (_garment_item(g, body) for g in garments.values()) if i]
     req = Request(body=body, pref_fit=pref_fit, styles=styles, temp=temp, wet=wet, mode="wardrobe",
                   anchor=f"w:{anchor}" if anchor else None, wardrobe=items, preference=taste,
-                  seen_outfits=seen_keys, count=count, seed=secrets.randbits(32), jitter=PICK_JITTER)
+                  seen_outfits=seen_keys, recent=_recent_garments(seen_keys, count),
+                  recent_lead=_recent_garments(seen_keys[-count:][:1], 1),
+                  count=count, seed=secrets.randbits(32), jitter=PICK_JITTER)
     result = recommend(models(), req)
     context = {**weather_context, "band": result["band"]["label"], "pref_fit": pref_fit, "styles": styles,
                **({"occasion": occasion} if occasion else {})}
@@ -235,8 +260,10 @@ def recommend_view(request):
             members = [(SLOT_CODE[i["slot"]], garments[i["id"][2:]], i.get("size", "")) for i in o["items"]]
             outfits.append(_create(Outfit.Source.RECOMMENDED, members, user=request.user, score=o["total"], components=o["components"],
                                    reasons=o["reasons"], context=context))
+    record_recommendations(request.user, [outfit.key for outfit in outfits], data.get('seen_keys'), 'home')
+    # 별점 팝업 여부. 앱은 홈의 새로고침 버튼으로 받은 응답일 때만 이 값을 쓴다.
     return _json({"outfits": [serialize(o) for o in outfits], "notes": result["notes"], "band": result["band"],
-                  "context": context})
+                  "context": context, "rating_prompt": should_prompt(request.user, RatingTask.RECOMMENDATION)})
 
 
 @require_POST
@@ -319,7 +346,10 @@ def wardrobe_gaps_view(request):
 @require_auth
 def outfits_view(request):
     if request.method == "GET":
-        saved = Outfit.objects.filter(user=request.user, saved=True).prefetch_related("items__garment")
+        newer = Outfit.objects.filter(user=OuterRef("user"), key=OuterRef("key"), saved=True,
+                                      updated_at__gt=OuterRef("updated_at"))
+        # Duplicates saved before one-entry-per-combination are hidden, not deleted.
+        saved = Outfit.objects.filter(user=request.user, saved=True).exclude(Exists(newer))             .prefetch_related("items__garment")
         return account_page(request, saved, serialize, 'outfits', 'updated_at')
     try:
         data = _read(request)
@@ -348,6 +378,7 @@ def outfits_view(request):
                     return _json(serialize(existing))
             members = _members(request.user, ids)
             key = '+'.join(sorted(f'w:{gid}' for gid in ids))
+            already_saved = Outfit.objects.filter(user=request.user, key=key, saved=True).exists()
             outfit = Outfit.objects.filter(user=request.user, source=source, key=key).order_by('-saved', 'created_at').first() \
                 if source == Outfit.Source.CHAT else None
             if outfit is not None:
@@ -363,12 +394,16 @@ def outfits_view(request):
                 outfit.save(update_fields=['saved', 'name', 'context', 'updated_at'])
             else:
                 outfit = _create(source, members, user=request.user, saved=True, name=name.strip(), context=context)
+            _only_saved_copy(outfit)
     except TooLarge:
         return _error("BODY_TOO_LARGE", 413)
     except NotJson:
         return _error("JSON_REQUIRED", 415)
     except (ValueError, TypeError, UnicodeDecodeError, OverflowError) as error:
         return _error("INVALID_OUTFIT", 400, str(error))
+    record_outfit_event(request.user, 'outfit_save', source=source,
+                       already_saved=already_saved, total_count=1,
+                       duplicate_count=max(0, Outfit.objects.filter(user=request.user, key=key, saved=True).count() - 1))
     return _json(serialize(outfit), 201)
 
 
@@ -390,9 +425,22 @@ def outfit_view(request, outfit_id):
             return _error("JSON_REQUIRED", 415)
         except (ValueError, TypeError, UnicodeDecodeError) as error:
             return _error("INVALID_OUTFIT", 400, str(error))
-        outfit.saved = data.get("saved", outfit.saved)
-        outfit.name = name.strip()
-        outfit.save(update_fields=["saved", "name", "updated_at"])
+        with transaction.atomic():
+            User.objects.select_for_update().get(pk=request.user.pk)
+            already_saved = Outfit.objects.filter(user=request.user, key=outfit.key, saved=True).exists()
+            outfit.saved = data.get("saved", outfit.saved)
+            outfit.name = name.strip()
+            outfit.save(update_fields=["saved", "name", "updated_at"])
+            if outfit.saved:
+                _only_saved_copy(outfit)
+            else:
+                # Copies saved before one-entry-per-combination would reappear in the 코디북 once the
+                # entry hiding them is unsaved, so unsaving takes the whole combination out (rows are kept).
+                Outfit.objects.filter(user=request.user, key=outfit.key, saved=True).update(saved=False)
+            if data.get('saved') is True:
+                record_outfit_event(request.user, 'outfit_save', source='home' if outfit.source == 'recommended' else outfit.source,
+                                   already_saved=already_saved, total_count=1,
+                                   duplicate_count=max(0, Outfit.objects.filter(user=request.user, key=outfit.key, saved=True).count() - 1))
     return _json(serialize(outfit))
 
 

@@ -37,6 +37,17 @@ class TryOnClientTest {
         assertEquals("DELETE", server.takeRequest().method)
     }
 
+    @Test fun aPhotoWithoutAPersonIsExplainedAndNotRetried() = runBlocking {
+        server.enqueue(MockResponse().setResponseCode(422).setBody("""{"error":"PERSON_REQUIRED"}"""))
+        try { client.fit(byteArrayOf(1), garment(), true) {}; fail() }
+        catch (error: IllegalStateException) { assertEquals(PERSON_REQUIRED_MESSAGE, error.message) }
+        assertEquals(1, server.requestCount)
+        // Bottoms on a photo cut above the legs: a different reason, its own message.
+        server.enqueue(MockResponse().setResponseCode(422).setBody("""{"error":"FULL_BODY_REQUIRED"}"""))
+        try { client.fit(byteArrayOf(1), garment(), true) {}; fail() }
+        catch (error: IllegalStateException) { assertEquals(FULL_BODY_REQUIRED_MESSAGE, error.message) }
+    }
+
     @Test fun expiredLoginDuringPollingStopsWithoutRetrying() = runBlocking {
         server.enqueue(accepted())
         server.enqueue(MockResponse().setResponseCode(401))

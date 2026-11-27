@@ -43,6 +43,10 @@ COLOR_RERANK = 150
 NOVELTY_PENALTY = 0.12
 SEEN_PENALTY = 0.15
 SEEN_OUTFIT_PENALTY = 0.5
+# Rank-only cost per garment from the set shown just before, so 새로 추천 does not lead with the same coat
+# every time. It changes the pick order only; the score people read stays the same.
+RECENT_GARMENT_RANK = 0.04
+RECENT_LEAD_RANK = 0.12  # garments of the previous first card: the one people notice repeating
 WEATHER_RELAX_PENALTY = 0.25
 MASKED_SHARE = 0.5
 MMR_LAMBDA = 0.5
@@ -72,6 +76,8 @@ class Request:
     preference: dict = field(default_factory=preference.empty)
     seen: list[str] = field(default_factory=list)  # garment ids already shown
     seen_outfits: list[str] = field(default_factory=list)  # outfit keys already shown ("id+id")
+    recent: list[str] = field(default_factory=list)  # garment ids of the set shown just before (rank only)
+    recent_lead: list[str] = field(default_factory=list)  # garment ids of that set's first card (rank only)
     count: int = 3
     seed: int = 0
     jitter: float = 0.0  # random spread on the pick order (app refreshes vary); 0 keeps results deterministic
@@ -115,6 +121,7 @@ def recommend(catalog: Catalog, req: Request) -> dict:
     context_style = style_order[0] if style_order else None
     excluded = set(req.preference.get("excluded", []))
     seen, seen_outfits = set(req.seen), set(req.seen_outfits)
+    recent, recent_lead = set(req.recent), set(req.recent_lead)
     filtered: Counter = Counter()
     notes = [explain.MALE_NOTE] if req.body.male and not wardrobe_only else []
 
@@ -187,13 +194,15 @@ def recommend(catalog: Catalog, req: Request) -> dict:
 
     templates = [(t, w) for t, w in band.templates if not (req.body.male and "원피스" in t)]
     required = set(req.fixed) | req.required_slots
+    if wardrobe_only and anchor is not None:
+        required.update((anchor.slot, "상의", "하의"))
     if required:
         if any(not pools.get(s) for s in required):
             raise RecommendError('요청한 옷을 포함한 코디를 만들 수 없어요. 옷장 정보나 조건을 확인해 주세요.')
         templates = [(t, w) for t, w in templates if required <= set(t)]
         if not templates:
             templates = [((('아우터',) if '아우터' in required else ()) + ('상의', '하의'), 1.0)]
-    if anchor is not None:
+    if anchor is not None and not wardrobe_only:
         templates = [(t, w) for t, w in templates if anchor.slot in t] or [((anchor.slot,), 1.0)]
     cache: dict = {}
     scored = []
@@ -217,8 +226,16 @@ def recommend(catalog: Catalog, req: Request) -> dict:
         o["seen"] = o["key"] in seen_outfits
         o["total"] = o["prelim"] + WEIGHTS["color"] * (col.score - 0.75) - SEEN_OUTFIT_PENALTY * o["seen"]
         o["rank"] = o["total"] + (rng.uniform(0, req.jitter) if req.jitter else 0.0)  # total itself stays unchanged
+        ids = {c.item.id for c in o["cands"]}
+        o["rank"] -= RECENT_GARMENT_RANK * len(recent & ids) + RECENT_LEAD_RANK * len(recent_lead & ids)
         finals.append(o)
     picked = _mmr(finals, req.count)
+    if recent_lead and picked:
+        # The first card is what people compare between refreshes: lead with the best outfit of this set that
+        # shares nothing with the previous first card (the set and every score stay as they are).
+        overlap = [len(recent_lead & {c.item.id for c in o["cands"]}) for o in picked]
+        best = min(range(len(picked)), key=lambda i: (overlap[i], i))
+        picked.insert(0, picked.pop(best))
     has_feedback = bool(req.preference.get("weights"))
     outfits = [_present(catalog, req, band, o, has_feedback) for o in picked]
     return {
