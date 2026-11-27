@@ -28,6 +28,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.key
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -125,6 +126,7 @@ fun StyleMateApp(viewModel: BodyProfileViewModel? = null, authModel: AuthViewMod
         return
     }
     val account = remember(auth.session) { authModel.repository.account() }
+    SideEffect { com.swpp.stylemate.data.usage.AppStability.setUploader(account?.userId) }
     if (account == null) {
         if (auth.page == AuthPage.REGISTER) {
             RegistrationScreen(auth, { authModel.open(AuthPage.LOGIN) }, { id, password, confirmation -> authModel.submit(id, password, confirmation) })
