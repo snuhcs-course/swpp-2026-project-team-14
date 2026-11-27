@@ -138,6 +138,7 @@ swpp-2026-project-team-14/
 |       |-- UxPhaseOneTest.kt                    # 탭/계정별 초안·저장/버리기·사진 취소/가이드·채팅 조건·가져오기 표시 회귀
 |       |-- GlobalThemeTest.kt                   # 실제 앱 탭·로그인/가입·편집/체형/채팅/피팅의 이전 테마 색상 검출·화면 촬영
 |       |-- home/HomeScreenTest.kt               # 작은 화면의 행동 노출·선택 상태·별점/추천 문장·실패 재시도 검사
+|       |-- home/PinnedOutfitLiveTest.kt          # 실제 Activity·Django HTTP·합성사진으로 로그인/의상 고정/추천/저장/해제 검사
 |       |-- chat/ChatScreenTest.kt               # 조건/단일 전송·중복 미리보기 제거·복구 확인·오류 범위·작은 화면 검사
 |       |-- chat/OutfitActionLayoutTest.kt       # 사진 아래 별 저장 전환·48dp 자물쇠·저장 중/실패·큰 글자 검사
 |       |-- wardrobe/GarmentDetailFlowTest.kt     # 관리 메뉴·상세/수정 배치·추정/출처 안내·내 옷/쇼핑 분리·신발 필터
@@ -148,7 +149,7 @@ swpp-2026-project-team-14/
 |   |-- config/
 |   |   |-- settings.py                          # 공통 API·사용자 모델·MySQL·사진·모델 설정
 |   |   |-- urls.py                              # 체형·옷장 API 연결
-|   |   `-- test_settings.py                     # 외부 서비스 없는 옷장 테스트 환경
+|   |   `-- test_settings.py                     # 격리 DB 회귀 검사·에뮬레이터용 Django testserver 호스트 허용
 |   |-- apps/
 |   |   |-- users/
 |   |   |   |-- models.py                        # 사용자·체형·취향·토큰 해시 저장
@@ -212,6 +213,7 @@ swpp-2026-project-team-14/
 |   |-- wardrobe/garment-landmarks/              # HRNet 가중치·메타데이터·라이선스
 |   |-- models/segformer_clothes.onnx            # 고정 SegFormer 의류 분할 가중치, Git 제외·이미지 빌드 시 포함
 |   |-- scripts/prepare_landmarks.py             # 빌드 시 HRNet 다운로드·검증·ONNX 변환
+|   |-- scripts/prepare_pinned_outfit_fixture.py  # 투명 의류 사진 7장 검증·DB 접근 없이 testserver 계정/의상 fixture 생성
 |   `-- tests/                                   # 체형 분석·추천 모델 입력 계약·공통 API 회귀 검사
 `-- docs/
     |-- login/viewmodel-testing.md              # 로그인·가져오기 ViewModel의 기대 동작·실행·커버리지
