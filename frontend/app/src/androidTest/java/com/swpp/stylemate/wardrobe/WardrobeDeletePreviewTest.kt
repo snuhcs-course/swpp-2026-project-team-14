@@ -46,6 +46,8 @@ class WardrobeDeletePreviewTest {
         } }
         compose.onNodeWithText("총 2벌").assertIsDisplayed()
         capture("01-wardrobe")
+        compose.onAllNodes(hasScrollToIndexAction()).onFirst().performScrollToNode(hasText("전체 보기"))
+        compose.onNodeWithText("전체 보기").performClick()  // card delete icons live in the full grid
         compose.onNodeWithContentDescription("화이트 티셔츠 삭제").performClick()
         compose.onNodeWithText("'화이트 티셔츠'을(를) 옷장에서 삭제할까요?").assertIsDisplayed()
         capture("02-confirmation")

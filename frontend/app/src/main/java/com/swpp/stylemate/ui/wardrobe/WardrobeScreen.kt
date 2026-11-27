@@ -584,7 +584,7 @@ fun WardrobeScreen(items: List<WardrobeItem>, message: String?, cameraBusy: Bool
     LaunchedEffect(activeCategory, loading) { if (!loading && category != activeCategory) category = activeCategory }
     val visible = items.filter { activeCategory == "all" || it.category == activeCategory }
     WardrobeCollection(
-        total = items.size, items = visible, categories = categories, category = activeCategory,
+        total = items.size, items = visible, allItems = items, categories = categories, category = activeCategory,
         onCategory = { onInteraction(); category = it },
         message = message, loading = loading, cameraBusy = cameraBusy,
         onRegister = { onInteraction(); choosingMethod = true }, onRetry = onRetry,

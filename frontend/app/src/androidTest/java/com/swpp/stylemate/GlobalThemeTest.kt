@@ -84,7 +84,7 @@ class GlobalThemeTest {
         compose.waitUntil(5_000) { compose.onAllNodesWithText("MY").fetchSemanticsNodes().isNotEmpty() }
         capture("01-home-with-navigation")
         compose.onNode(hasText("옷장") and isSelectable()).performClick().assertIsSelected()
-        compose.waitUntil(5_000) { compose.onAllNodesWithText("아직 등록된 옷이 없습니다").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(5_000) { compose.onAllNodesWithText("첫 번째 옷을 걸어보세요").fetchSemanticsNodes().isNotEmpty() }
         capture("02-wardrobe-with-navigation")
         compose.onNodeWithText("등록하기").performClick()
         compose.onNodeWithText("사진으로 등록").assertIsDisplayed()
