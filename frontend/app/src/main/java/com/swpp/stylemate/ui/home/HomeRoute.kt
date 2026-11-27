@@ -70,16 +70,11 @@ import com.swpp.stylemate.data.usage.RatingTask
 import org.json.JSONObject
 
 @Composable
-fun HomeRoute(profile: BodyProfile?, onSetupProfile: () -> Unit, onOpenWardrobe: () -> Unit, modifier: Modifier = Modifier,
-              onChat: (Outfit, Weather?) -> Unit, wardrobeRevision: Int = 0, style: StyleProfile = StyleProfile()) {
+internal fun homeViewModel(): HomeViewModel {
     val context = LocalContext.current.applicationContext
     val account = checkNotNull(LocalAccountAccess.current)
     val store = remember(account) { LocalUserStore.forContext(context, account.userId) }
-    val fitting = remember(account) { FittingRepository(LocalUserStore.forContext(context, account.userId), account) }
-    var selected by remember { mutableStateOf<Outfit?>(null) }
-    val notification = LocalFittingNotificationKey.current
-    LaunchedEffect(notification) { if (notification != null) selected = null }
-    val model: HomeViewModel = viewModel(factory = viewModelFactory {
+    return viewModel(factory = viewModelFactory {
         initializer {
             HomeViewModel(OutfitRepository(account), LocalTasteStore(context, account.userId), onRatingPrompt = {
                 // 추천 결과를 볼 시간을 둔 뒤 묻는다.
@@ -90,6 +85,19 @@ fun HomeRoute(profile: BodyProfile?, onSetupProfile: () -> Unit, onOpenWardrobe:
             }
         }
     })
+}
+
+@Composable
+fun HomeRoute(profile: BodyProfile?, onSetupProfile: () -> Unit, onOpenWardrobe: () -> Unit, modifier: Modifier = Modifier,
+              onChat: (Outfit, Weather?) -> Unit, wardrobeRevision: Int = 0, style: StyleProfile = StyleProfile(),
+              model: HomeViewModel = homeViewModel()) {
+    val context = LocalContext.current.applicationContext
+    val account = checkNotNull(LocalAccountAccess.current)
+    val store = remember(account) { LocalUserStore.forContext(context, account.userId) }
+    val fitting = remember(account) { FittingRepository(store, account) }
+    var selected by remember { mutableStateOf<Outfit?>(null) }
+    val notification = LocalFittingNotificationKey.current
+    LaunchedEffect(notification) { if (notification != null) selected = null }
     val state by model.state.collectAsStateWithLifecycle()
     // Without a body profile (analysis skipped in onboarding) outfits still come, from the preferred fit and styles.
     val body = remember(profile, style) { BodyProfileJson.request(profile, style) }
@@ -116,6 +124,7 @@ fun HomeRoute(profile: BodyProfile?, onSetupProfile: () -> Unit, onOpenWardrobe:
         onSetupProfile = onSetupProfile,
         onOpenWardrobe = onOpenWardrobe,
         onMessageShown = model::messageShown,
+        onUnpin = model::clearPinnedGarment,
         onChat = { state.current?.let { onChat(it, state.weather) } },
         modifier = modifier,
         fitting = { outfit, previewModifier, enabled ->

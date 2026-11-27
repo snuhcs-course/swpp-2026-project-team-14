@@ -30,10 +30,10 @@ class WardrobeScreenTest {
         } }
         openFullGrid()
         compose.onNodeWithContentDescription("내 셔츠 삭제").performClick()
-        compose.onNodeWithText("'내 셔츠'을(를) 옷장에서 삭제할까요?").assertIsDisplayed()
-        compose.onNodeWithText("이 옷이 들어간 코디북 코디도 함께 삭제돼요.").assertIsDisplayed()
-        compose.onNodeWithText("취소").performClick()
-        compose.onNodeWithText("'내 셔츠'을(를) 옷장에서 삭제할까요?").assertDoesNotExist()
+        compose.onNodeWithText("해당 의상을 삭제하시겠습니까?").assertIsDisplayed()
+        compose.onNodeWithText("이 의상이 포함된 코디도 함께 삭제됩니다.").assertIsDisplayed()
+        compose.onNodeWithText("아니요").performClick()
+        compose.onNodeWithText("해당 의상을 삭제하시겠습니까?").assertDoesNotExist()
         compose.onNodeWithText("내 셔츠").assertIsDisplayed()
         compose.runOnIdle { assertEquals(0, opened); assertEquals(0, deleted) }
     }
@@ -47,8 +47,8 @@ class WardrobeScreenTest {
         } }
         openFullGrid()
         compose.onNodeWithContentDescription("내 셔츠 삭제").performClick()
-        compose.onNodeWithText("삭제").performClick()
-        compose.onNodeWithText("'내 셔츠'을(를) 옷장에서 삭제할까요?").assertDoesNotExist()
+        compose.onNodeWithText("예").performClick()
+        compose.onNodeWithText("해당 의상을 삭제하시겠습니까?").assertDoesNotExist()
         compose.onNodeWithText("총 0벌").assertIsDisplayed()
         compose.onNodeWithText("아직 등록된 옷이 없습니다").assertIsDisplayed()
     }
@@ -72,12 +72,12 @@ class WardrobeScreenTest {
         } }
         openFullGrid()
         compose.onNodeWithContentDescription("내 셔츠 삭제").performClick()
-        compose.onNodeWithText("삭제").performClick()
-        compose.onNodeWithText("삭제 중…").assertIsNotEnabled()
-        compose.onNodeWithText("취소").assertIsNotEnabled()
+        compose.onNodeWithText("예").performClick()
+        compose.onNodeWithText("예").assertIsNotEnabled()
+        compose.onNodeWithText("아니요").assertIsNotEnabled()
         compose.runOnIdle { busy.value = null; error.value = "서버에 연결하지 못했어요." }
         compose.onNodeWithText("서버에 연결하지 못했어요.").assertIsDisplayed()
-        compose.onNodeWithText("삭제").assertIsEnabled().performClick()
+        compose.onNodeWithText("예").assertIsEnabled().performClick()
         compose.runOnIdle { assertEquals(2, requests) }
     }
 
@@ -121,5 +121,54 @@ class WardrobeScreenTest {
         // On the rail the centred garment opens its detail; the caption below is not a button.
         compose.onNodeWithContentDescription("내 셔츠").performClick()
         compose.runOnIdle { assertEquals("saved-id", opened) }
+    }
+
+    @Test fun choosingAGarmentOffersOutfitRecommendationsWithoutStartingUntilTapped() {
+        var recommended: String? = null
+        compose.setContent { StyleMateTheme {
+            WardrobeScreen(listOf(WardrobeItem("shirt-id", "내 셔츠", "top")), null, false, {},
+                onRecommendOutfits = { recommended = it.id }, onFindMatchingClothes = {})
+        } }
+        compose.onNodeWithContentDescription("내 셔츠").performClick()
+        compose.onNodeWithText("이 옷을 포함한 코디 추천받기").assertIsDisplayed()
+        compose.onNodeWithText("함께 입을 옷 찾기").assertIsDisplayed()
+        compose.onNodeWithText("상세 정보 보기").assertIsDisplayed()
+        compose.runOnIdle { assertEquals(null, recommended) }
+        compose.onNodeWithText("이 옷을 포함한 코디 추천받기").performClick()
+        compose.runOnIdle { assertEquals("shirt-id", recommended) }
+        compose.onNodeWithText("이 옷을 포함한 코디 추천받기").assertDoesNotExist()
+    }
+
+    @Test fun theGarmentSheetKeepsTheMatchingClothesAction() {
+        var matched: String? = null
+        compose.setContent { StyleMateTheme {
+            WardrobeScreen(listOf(WardrobeItem("coat-id", "내 코트", "outerwear")), null, false, {},
+                onRecommendOutfits = {}, onFindMatchingClothes = { matched = it.id })
+        } }
+        compose.onNodeWithContentDescription("내 코트").performClick()
+        compose.onNodeWithText("함께 입을 옷 찾기").performClick()
+        compose.runOnIdle { assertEquals("coat-id", matched) }
+    }
+
+    @Test fun theGarmentSheetCanStillOpenTheSelectedGarmentsDetails() {
+        var opened: String? = null
+        compose.setContent { StyleMateTheme {
+            WardrobeScreen(listOf(WardrobeItem("jeans-id", "내 청바지", "bottom")), null, false, {},
+                onItemClick = { opened = it.id }, onRecommendOutfits = {})
+        } }
+        compose.onNodeWithContentDescription("내 청바지").performClick()
+        compose.onNodeWithText("상세 정보 보기").performClick()
+        compose.runOnIdle { assertEquals("jeans-id", opened) }
+    }
+
+    @Test fun unsupportedShoesOpenDetailsWithoutOfferingOutfitRecommendations() {
+        var opened: String? = null
+        compose.setContent { StyleMateTheme {
+            WardrobeScreen(listOf(WardrobeItem("shoes-id", "내 운동화", "shoes")), null, false, {},
+                onItemClick = { opened = it.id }, onRecommendOutfits = {})
+        } }
+        compose.onNodeWithContentDescription("내 운동화").performClick()
+        compose.onNodeWithText("이 옷을 포함한 코디 추천받기").assertDoesNotExist()
+        compose.runOnIdle { assertEquals("shoes-id", opened) }
     }
 }

@@ -139,6 +139,32 @@ adb shell am start -n com.swpp.stylemate/.ui.wardrobe.WornPreviewActivity
 
 연결 기기의 UI 검사는 `connectedDebugAndroidTest`로 실행한다. 기존 팀 CI는 체형 pytest와 옷장 Django 테스트를 모두 실행한다.
 
+### 실사진·실서버 고정 코디 통합 검사
+
+`PinnedOutfitLiveTest`는 실제 `MainActivity`에서 로그인하고 의상 선택 팝업·홈 이동·각 분류의 3개 코디·새로 추천·코디북 저장·좋아요·탭 복귀·고정 해제·외부 검색 링크 표시를 검사한다. API나 ViewModel을 대체하지 않으며 원본/누끼 사진도 인증된 Django HTTP로 읽는다. 일반 UI 검사에서는 건너뛰고, 명시한 에뮬레이터용 API 주소가 APK 설정과 일치할 때 실행한다.
+
+검증용 투명 PNG 7장(`white-shirt`, `beige-knit`, `black-slacks`, `blue-jeans`, `khaki-chinos`, `brown-coat`, `navy-blazer`)을 한 폴더에 준비한다. 아래 fixture 준비 명령은 파일과 해시만 만들며 DB에 접속하지 않는다. 저장 속성과 라벨은 실제 저장 검증을 거친다. 준비한 누끼를 사용하므로 사진 분석·체형 분석·유료 펼침 생성·피팅 생성 자체는 이 검사의 범위가 아니다. 사진·fixture·촬영 결과는 APK와 Git에 넣지 않는다.
+
+저장소 루트에서 다음 명령을 실행한다. `--images`는 준비한 사진 폴더로 바꾼다.
+
+```powershell
+python backend/scripts/prepare_pinned_outfit_fixture.py --images <photo-directory> --output frontend/app/build/live-e2e
+$env:WARDROBE_MEDIA_ROOT = (Resolve-Path frontend/app/build/live-e2e/assets).Path
+python backend/manage.py testserver --settings=config.test_settings --noinput --addrport 127.0.0.1:8765 frontend/app/build/live-e2e/fixture.json
+```
+
+Django 공식 `testserver`가 새 메모리 테스트 DB를 만들고 fixture를 읽는다. 검사를 다시 시작할 때도 새 testserver 프로세스를 사용한다. 일반 서비스는 기존 MySQL 설정을 유지한다. 별도 터미널에서 에뮬레이터용 앱과 테스트 APK를 빌드·설치한다.
+
+```powershell
+.\frontend\gradlew.bat -p frontend assembleDebug assembleDebugAndroidTest -Pstylemate.apiBaseUrl=http://10.0.2.2:8765
+adb install -r frontend/app/build/outputs/apk/debug/app-debug.apk
+adb install -r -t frontend/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+$live = Get-Content frontend/app/build/live-e2e/test-account.json -Raw | ConvertFrom-Json
+adb shell am instrument -w -e class com.swpp.stylemate.home.PinnedOutfitLiveTest -e livePinnedOutfits true -e liveApiBaseUrl http://10.0.2.2:8765 -e liveUsername $live.username -e livePassword $live.password com.swpp.stylemate.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+검사는 화면을 앱 외부 파일 영역의 `pinned-live/`에 저장한다. 시험용 계정과 사진은 해당 testserver에만 존재하며 실제 사용자 데이터와 분리된다.
+
 ## 8. 배포
 
 기존 GHCR·ArgoCD·k3s 흐름을 사용한다.

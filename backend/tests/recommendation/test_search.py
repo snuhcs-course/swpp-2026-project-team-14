@@ -132,6 +132,18 @@ def test_shown_outfits_are_not_repeated_first(catalog, female):
     assert second["key"] != first["key"] and not second["seen"]
 
 
+@pytest.mark.parametrize("anchor,temp", [("w:1", 17), ("w:4", 17), ("w:6", 0), ("w:6", 29)])
+def test_pinned_wardrobe_outfits_always_include_the_anchor_top_and_bottom(catalog, female, anchor, temp):
+    result = recommend(catalog, Request(body=female, pref_fit="loose", temp=temp, mode="wardrobe",
+                                        wardrobe=WARDROBE, anchor=anchor))
+    assert result["outfits"]
+    for outfit in result["outfits"]:
+        assert anchor in {item["id"] for item in outfit["items"]}
+        assert {"상의", "하의"} <= {item["slot"] for item in outfit["items"]}
+    keys = [outfit["key"] for outfit in result["outfits"]]
+    assert len(keys) == len(set(keys))
+
+
 def test_refresh_rotates_the_lead_garment_without_changing_scores(catalog, female):
     req = dict(body=female, pref_fit="loose", temp=17, mode="wardrobe", wardrobe=WARDROBE, count=3)
     first = recommend(catalog, Request(**req))["outfits"]

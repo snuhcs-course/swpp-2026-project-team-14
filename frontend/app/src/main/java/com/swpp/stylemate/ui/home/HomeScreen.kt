@@ -2,6 +2,8 @@
 package com.swpp.stylemate.ui.home
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -26,6 +28,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -68,6 +72,7 @@ fun HomeScreen(
     onRegion: ((String) -> Unit)? = null,
     // null: hang the stored background-free photos; screen tests pass their own renderer.
     photo: (@Composable (OutfitGarment, Modifier) -> Unit)? = null,
+    onUnpin: () -> Unit = {},
 ) {
     val snackbar = remember { SnackbarHostState() }
     LaunchedEffect(state.message) {
@@ -82,6 +87,9 @@ fun HomeScreen(
             val boardHeight = (maxHeight * 0.38f).coerceIn(170.dp, 280.dp)
             Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
                 PageHeader("오늘의 코디", subtitleContent = { WeatherLine(state, onRegion, Modifier) })
+                state.pinnedGarment?.let { garment ->
+                    PinnedGarmentCard(garment, onUnpin, enabled = !state.acting)
+                }
                 todayPlan?.let { content -> Box(Modifier.padding(horizontal = 20.dp).padding(bottom = 12.dp)) { content() } }
                 hint?.let { content -> Box(Modifier.padding(horizontal = 20.dp).padding(bottom = 12.dp)) { content() } }
                 when {
@@ -137,6 +145,40 @@ fun HomeScreen(
                 }
                 Spacer(Modifier.height(20.dp))
             }
+        }
+    }
+}
+
+@Composable
+private fun PinnedGarmentCard(garment: PinnedGarment, onUnpin: () -> Unit, enabled: Boolean) {
+    val ink = MaterialTheme.colorScheme.primary
+    Surface(Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 12.dp),
+        shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.secondaryContainer,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
+        Row(Modifier.padding(start = 14.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Canvas(Modifier.size(20.dp)) {
+                drawPath(Path().apply {
+                    moveTo(size.width * .28f, size.height * .08f)
+                    lineTo(size.width * .72f, size.height * .08f)
+                    lineTo(size.width * .72f, size.height * .22f)
+                    lineTo(size.width * .63f, size.height * .22f)
+                    lineTo(size.width * .63f, size.height * .48f)
+                    lineTo(size.width * .80f, size.height * .68f)
+                    lineTo(size.width * .20f, size.height * .68f)
+                    lineTo(size.width * .37f, size.height * .48f)
+                    lineTo(size.width * .37f, size.height * .22f)
+                    lineTo(size.width * .28f, size.height * .22f)
+                    close()
+                }, ink)
+                drawLine(ink, Offset(size.width * .5f, size.height * .65f),
+                    Offset(size.width * .5f, size.height * .95f), strokeWidth = 1.5.dp.toPx())
+            }
+            Column(Modifier.weight(1f)) {
+                Text("고정한 옷", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(garment.name, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            }
+            TextButton(onClick = onUnpin, enabled = enabled) { Text("고정 해제") }
         }
     }
 }

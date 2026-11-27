@@ -194,13 +194,15 @@ def recommend(catalog: Catalog, req: Request) -> dict:
 
     templates = [(t, w) for t, w in band.templates if not (req.body.male and "원피스" in t)]
     required = set(req.fixed) | req.required_slots
+    if wardrobe_only and anchor is not None:
+        required.update((anchor.slot, "상의", "하의"))
     if required:
         if any(not pools.get(s) for s in required):
             raise RecommendError('요청한 옷을 포함한 코디를 만들 수 없어요. 옷장 정보나 조건을 확인해 주세요.')
         templates = [(t, w) for t, w in templates if required <= set(t)]
         if not templates:
             templates = [((('아우터',) if '아우터' in required else ()) + ('상의', '하의'), 1.0)]
-    if anchor is not None:
+    if anchor is not None and not wardrobe_only:
         templates = [(t, w) for t, w in templates if anchor.slot in t] or [((anchor.slot,), 1.0)]
     cache: dict = {}
     scored = []

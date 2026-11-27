@@ -230,6 +230,15 @@ class OutfitApiTests(TestCase):
         self.assertEqual(data["context"]["pref_fit"], "loose")
         self.assertEqual(data["context"]["styles"], ["미니멀"])
 
+    def test_pinned_outerwear_in_hot_weather_still_has_a_top_and_bottom(self):
+        response = self.recommend(anchor_id=str(self.coat.id), temp=29)
+        self.assertEqual(response.status_code, 200, response.content)
+        outfits = response.json()["outfits"]
+        self.assertTrue(outfits)
+        for outfit in outfits:
+            self.assertIn(str(self.coat.id), {item["garment_id"] for item in outfit["items"]})
+            self.assertEqual({"outerwear", "top", "bottom"}, {item["slot"] for item in outfit["items"]})
+
     def test_errors(self):
         self.assertEqual(self.recommend(body={"height_cm": 500}).status_code, 400)
         self.assertEqual(self.recommend(body="tall").status_code, 400)

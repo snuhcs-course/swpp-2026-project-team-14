@@ -39,7 +39,7 @@ swpp-2026-project-team-14/
 |   |   |       |-- CaptureFiles.kt               # 옷 사진 임시 캐시·재개 중인 촬영 파일 보존
 |   |   |       `-- CaptureType.kt                # 측정 종류 → 하의 세부 종류 기본값
 |   |   `-- ui/
-|   |       |-- StyleMateApp.kt                   # 로그인 필수 진입·계정별 탭/편집 상태 보존·수동 가져오기·만료 시 상태 폐기
+|   |       |-- StyleMateApp.kt                   # 로그인 필수 진입·계정별 탭 상태·옷장 선택 의상을 홈 추천에 전달·만료 시 폐기
 |   |       |-- components/ScreenComponents.kt   # 탭/하위 제목 위계·뒤로가기 정렬·상단바 교체 슬롯·하단 버튼·섹션 제목
 |   |       |-- components/StarRating.kt         # 서버 보정 점수를 0.5–5개·반별 단위로 표시하는 읽기 전용 추천 별점
 |   |       |-- components/OutfitFeedbackButtons.kt # 홈·대화 공용 저장·엄지 평가 보조 버튼·선택/해제 표시
@@ -47,9 +47,9 @@ swpp-2026-project-team-14/
 |   |       |-- theme/Theme.kt                    # 앱 전체 흑백 팔레트·글자 위계·모서리·시스템 바 스타일
 |   |       |-- home/
 |   |       |   |-- HomeScreen.kt                # 압축 코디판·좌우 비교·행동/피드백 버튼·별점/추천 문장·재시도
-|   |       |   |-- HomeRoute.kt                 # 선택 코디의 채팅/피팅 연결·계정별 코디북 피팅 상태·의상 삭제 후 갱신
+|   |       |   |-- HomeRoute.kt                 # 계정별 홈 모델·의상 고정 해제·선택 코디의 채팅/피팅 연결·삭제 후 갱신
 |   |       |   |-- CodiBookScreen.kt            # 슬라이드/목록·코디별 복귀 위치·피팅 상태·저장 해제 확인/재시도
-|   |       |   `-- HomeViewModel.kt             # 홈 추천/저장/평가·코디북 조회/중복 해제 방지·오류 분리·삭제 시 무효화
+|   |       |   `-- HomeViewModel.kt             # 고정 의상을 포함한 홈 추천/해제·저장/평가·코디북 조회·삭제 시 무효화
 |   |       |-- chat/
 |   |       |   |-- ChatScreen.kt                # 단일 코디 미리보기·조건 요약/전송·대화·실패 요청 복구
 |   |       |   |-- ChatComponents.kt            # 조건·사진 기록 시트·작은 그대로 입기 칩·코디 하단 저장·분리된 평가
@@ -70,7 +70,7 @@ swpp-2026-project-team-14/
 |   |       |   |-- BodySummaryFigure.kt          # 온보딩 예시 모델에 실제 저장된 분석 치수 위치 표시
 |   |       |   `-- ConnectionsSection.kt        # MY 안의 캘린더 스위치·권한 거부 복구·연결 상태 갱신
 |   |       `-- wardrobe/
-|   |           |-- WardrobeScreen.kt            # 목록/상세/추천 페이지·복귀 상태·등록/편집·삭제 연결
+|   |           |-- WardrobeScreen.kt            # 옷 선택 팝업·홈 코디/외부 추천/상세 분기·복귀 상태·등록/편집·삭제
 |   |           |-- WardrobeCollection.kt        # 옷장 헤더·검색·필터·카테고리 요약·전체 그리드·고정 행동
 |   |           |-- WardrobeCarousel.kt          # 고정 옷장봉·옷걸이·밀집 원근 배치·드래그·스프링 스냅
 |   |           |-- WardrobeCutout.kt            # 인증 사진의 보수적 배경 제거·계정별 메모리 캐시
@@ -138,6 +138,7 @@ swpp-2026-project-team-14/
 |       |-- UxPhaseOneTest.kt                    # 탭/계정별 초안·저장/버리기·사진 취소/가이드·채팅 조건·가져오기 표시 회귀
 |       |-- GlobalThemeTest.kt                   # 실제 앱 탭·로그인/가입·편집/체형/채팅/피팅의 이전 테마 색상 검출·화면 촬영
 |       |-- home/HomeScreenTest.kt               # 작은 화면의 행동 노출·선택 상태·별점/추천 문장·실패 재시도 검사
+|       |-- home/PinnedOutfitLiveTest.kt          # 실제 Activity·Django HTTP·합성사진으로 로그인/의상 고정/추천/저장/해제 검사
 |       |-- chat/ChatScreenTest.kt               # 조건/단일 전송·중복 미리보기 제거·복구 확인·오류 범위·작은 화면 검사
 |       |-- chat/OutfitActionLayoutTest.kt       # 사진 아래 별 저장 전환·48dp 자물쇠·저장 중/실패·큰 글자 검사
 |       |-- wardrobe/GarmentDetailFlowTest.kt     # 관리 메뉴·상세/수정 배치·추정/출처 안내·내 옷/쇼핑 분리·신발 필터
@@ -148,7 +149,7 @@ swpp-2026-project-team-14/
 |   |-- config/
 |   |   |-- settings.py                          # 공통 API·사용자 모델·MySQL·사진·모델 설정
 |   |   |-- urls.py                              # 체형·옷장 API 연결
-|   |   `-- test_settings.py                     # 외부 서비스 없는 옷장 테스트 환경
+|   |   `-- test_settings.py                     # 격리 DB 회귀 검사·에뮬레이터용 Django testserver 호스트 허용
 |   |-- apps/
 |   |   |-- users/
 |   |   |   |-- models.py                        # 사용자·체형·취향·토큰 해시 저장
@@ -212,6 +213,7 @@ swpp-2026-project-team-14/
 |   |-- wardrobe/garment-landmarks/              # HRNet 가중치·메타데이터·라이선스
 |   |-- models/segformer_clothes.onnx            # 고정 SegFormer 의류 분할 가중치, Git 제외·이미지 빌드 시 포함
 |   |-- scripts/prepare_landmarks.py             # 빌드 시 HRNet 다운로드·검증·ONNX 변환
+|   |-- scripts/prepare_pinned_outfit_fixture.py  # 투명 의류 사진 7장 검증·DB 접근 없이 testserver 계정/의상 fixture 생성
 |   `-- tests/                                   # 체형 분석·추천 모델 입력 계약·공통 API 회귀 검사
 `-- docs/
     |-- login/viewmodel-testing.md              # 로그인·가져오기 ViewModel의 기대 동작·실행·커버리지
