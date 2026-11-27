@@ -3,8 +3,8 @@ package com.swpp.stylemate.data.recommendation
 import com.swpp.stylemate.data.LocalUserStore
 import org.json.JSONObject
 
-/** A place whose weather home uses; the coordinates are its city hall. */
-data class Region(val name: String, val lat: Double, val lon: Double)
+/** A place whose weather home uses: a listed city (its city hall) or a place found by search, with [area]. */
+data class Region(val name: String, val lat: Double, val lon: Double, val area: String = "")
 
 /**
  * The region whose weather home recommends for (HE: it was always Seoul). Kept per account on the device,
@@ -22,6 +22,18 @@ object HomeRegion {
     private const val KEY = "home_region"
 
     fun of(name: String?): Region? = OPTIONS.firstOrNull { it.name == name }
-    fun load(store: LocalUserStore): Region = of(store.get(KEY)?.optString("name")) ?: SEOUL
-    fun save(store: LocalUserStore, region: Region) = store.put(KEY, JSONObject().put("name", region.name))
+
+    /** A listed city by name, or a searched place kept with its coordinates (older saves hold only a name). */
+    fun load(store: LocalUserStore): Region {
+        val saved = store.get(KEY) ?: return SEOUL
+        val name = saved.optString("name")
+        if (saved.has("lat") && saved.has("lon") && name.isNotBlank()) {
+            val lat = saved.optDouble("lat"); val lon = saved.optDouble("lon")
+            if (lat in 33.0..38.9 && lon in 124.5..131.0) return Region(name, lat, lon, saved.optString("area"))
+        }
+        return of(name) ?: SEOUL
+    }
+
+    fun save(store: LocalUserStore, region: Region) = store.put(KEY, JSONObject().put("name", region.name)
+        .put("lat", region.lat).put("lon", region.lon).put("area", region.area))
 }
