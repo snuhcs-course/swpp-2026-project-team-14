@@ -14,6 +14,7 @@ from apps.usage.models import RatingTask
 from apps.usage.ratings import should_prompt
 
 from .generation import MODEL, RESOLUTION, NanoBanana
+from . import person
 from .jobs import Jobs, QueueFull
 
 MAX_IMAGE_BYTES = 4 * 1024 * 1024
@@ -79,7 +80,13 @@ def submit(request):
             if kind not in ("flat-lay", "model") or not isinstance(open_front, bool):
                 raise ValueError("Invalid garment metadata")
             clothes.append((garment["category"], decode_image(garment["image"]), kind, open_front))
-        job = get_jobs().submit(decode_image(data["person"]), clothes, owner=str(request.user.pk))
+        photo = decode_image(data["person"])
+        # A photo without a person would come back with a stranger the model made up, and bottoms on a photo
+        # cut above the legs with legs it made up.
+        refused = person.check(photo, needs_lower_body="bottoms" in categories)
+        if refused:
+            return response({"error": refused}, 422)
+        job = get_jobs().submit(photo, clothes, owner=str(request.user.pk))
     except QueueFull:
         result = response({"error": "FITTING_BUSY"}, 429)
         result["Retry-After"] = "5"

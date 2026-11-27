@@ -221,6 +221,7 @@ private fun MainTabs(viewModel: BodyProfileViewModel, authModel: AuthViewModel) 
     val auth by authModel.state.collectAsStateWithLifecycle()
     val account = checkNotNull(LocalAccountAccess.current)
     var tab by rememberSaveable { mutableStateOf(Tab.HOME) }
+    var openedFitting by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current.applicationContext
     val profileStore = remember(account.userId) { LocalUserStore.forContext(context, account.userId) }
     var calendarConnected by remember(account.userId) {
@@ -261,7 +262,7 @@ private fun MainTabs(viewModel: BodyProfileViewModel, authModel: AuthViewModel) 
             }
             }
         },
-    ) { padding ->
+    ) { padding -> Box(Modifier.fillMaxSize()) {
         AccountTabContent(account.userId, tab.name) { when (tab) {
             Tab.HOME -> HomeRoute(app.profile, onSetupProfile = viewModel::startReanalysis,
                 onOpenWardrobe = { tab = Tab.WARDROBE }, modifier = Modifier.padding(padding).consumeWindowInsets(padding),
@@ -298,7 +299,11 @@ private fun MainTabs(viewModel: BodyProfileViewModel, authModel: AuthViewModel) 
                 connectionSummary = if (calendarConnected) "연결됨" else "연결 안 됨",
             )
         } }
-    }
+        // A fitting keeps going in the background; this card follows it over every tab.
+        if (!chatting) com.swpp.stylemate.ui.tryon.FittingProgressCard(account.userId, onOpen = { openedFitting = it },
+            Modifier.align(Alignment.BottomCenter).padding(padding).padding(horizontal = 16.dp, vertical = 12.dp))
+    } }
+    com.swpp.stylemate.ui.tryon.FittingNotificationResult(openedFitting, account) { openedFitting = null }
     if (chatting) ChatRoute(chat)
     com.swpp.stylemate.ui.components.RatingPromptHost(account.userId)
     }

@@ -33,12 +33,19 @@ class FittingWork(private val context: Context) {
             val key = repository.taskKey(outfit)
             val manager = WorkManager.getInstance(context)
             if (manager.getWorkInfosForUniqueWork("fitting:$key").get().any { !it.state.isFinished }) return@withLock false
+            // Several outfits may be fitted at once, up to a small limit (the server makes two at a time and queues the rest).
+            val active = FittingTaskStore.running(tasks.all(owner)).count { (other, _) ->
+                manager.getWorkInfosForUniqueWork("fitting:$other").get().any { !it.state.isFinished }
+            }
+            if (active >= FittingTaskStore.MAX_ACTIVE) throw TooManyFittings()
             val attempt = UsageMetrics.forAccount(context, owner).start("virtual_fitting", if (source == "gallery") "gallery" else "virtual")
             val work = OneTimeWorkRequestBuilder<FittingWorker>().setInputData(workDataOf("key" to key))
                 .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
                 .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST).build()
             try {
-                tasks.create(key, owner, source, outfit, person(), attempt.checkpoint)
+                val photo = person()
+                tasks.create(key, owner, source, outfit, photo, attempt.checkpoint)
+                if (VirtualFittingModels.all.none { it.sourceKey == source }) runCatching { smallJpeg(photo)?.let { tasks.savePreview(key, it) } }
                 manager.enqueueUniqueWork("fitting:$key", ExistingWorkPolicy.KEEP, work).result.get()
             } catch (error: CancellationException) { attempt.cancel(); throw error }
             catch (error: Exception) {
@@ -71,6 +78,20 @@ class FittingWork(private val context: Context) {
             tasks.ratingPrompt(key, false)
             RatingPrompts.request(RatingTask.VIRTUAL_FITTING, owner, showAfterMs = 2_000)
         }
+    }
+    /** The photo downscaled to about 720 px for the on-device preview. */
+    private fun smallJpeg(photo: ByteArray): ByteArray? {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(photo, 0, photo.size, bounds)
+        var sample = 1
+        while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= 720) sample *= 2
+        val bitmap = BitmapFactory.decodeByteArray(photo, 0, photo.size, BitmapFactory.Options().apply { inSampleSize = sample })
+            ?: return null
+        return try {
+            java.io.ByteArrayOutputStream().use { out ->
+                bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 85, out); out.toByteArray()
+            }
+        } finally { bitmap.recycle() }
     }
     companion object { private val enqueueLock = Mutex() }
 }
@@ -110,6 +131,8 @@ class FittingWorker internal constructor(context: Context, parameters: WorkerPar
                 }
                 // The garment photos are independent downloads: fetch them together, keep the slot order.
                 val picked = slots.mapNotNull { slot -> outfit.items.firstOrNull { it.slot == slot }?.let { slot to it } }
+                // Shoes and accessories are not dressed; an outfit of only those has nothing to fit.
+                check(picked.isNotEmpty()) { "이 코디에는 입혀볼 상의나 하의가 없어요." }
                 val images = kotlinx.coroutines.coroutineScope {
                     picked.map { (_, item) -> async {
                         WardrobeRepository.fittingImage(records.getValue(item.garmentId).getString("image_url"), account, apiBaseUrl)
@@ -142,8 +165,12 @@ class FittingWorker internal constructor(context: Context, parameters: WorkerPar
             if (error is java.io.IOException && tasks.read(key)?.let(FittingTaskStore::job) != null) {
                 return@withContext Result.retry()
             }
-            val message = if (error is java.io.IOException) "피팅 작업을 완료하지 못했어요. 사진을 다시 선택해 주세요."
-                else error.message ?: "피팅 생성에 실패했어요. 다시 시도해 주세요."
+            val message = when {
+                error is java.io.IOException -> "피팅 작업을 완료하지 못했어요. 사진을 다시 선택해 주세요."
+                // A garment of the outfit was deleted from the wardrobe after the outfit was shown.
+                error is com.swpp.stylemate.data.AuthException && error.code in listOf("HTTP_404", "GARMENT_NOT_FOUND") -> GARMENT_GONE_MESSAGE
+                else -> error.message ?: "피팅 생성에 실패했어요. 다시 시도해 주세요."
+            }
             if (error is FittingApiException && error.code == "FITTING_CANCELLED") usage?.cancel()
             else usage?.failure(usageErrorCode(error))
             tasks.finish(key, message)

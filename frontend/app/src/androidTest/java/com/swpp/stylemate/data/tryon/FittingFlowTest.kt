@@ -158,7 +158,7 @@ class FittingFlowTest {
         runBlocking {
             assertFalse(work.enqueue(outfit, repository, account.userId, "gallery") { error("Duplicate request read another photo") })
         }
-        compose.onNodeWithText("Open fitting").performClick()
+        // The fitting screen stays open on the loading screen after the request.
         compose.onNodeWithText("가상 피팅을 만드는 중입니다.").assertIsDisplayed()
         compose.onNodeWithText("확인").performClick()
         completed.set(true)
@@ -299,7 +299,9 @@ class FittingFlowTest {
         compose.onNodeWithText("내 갤러리에서\n사진 고르기").performClick()
         startConnectedWork()
         compose.waitUntil(10_000) { work.tasks.read(key)?.optString("state") == "completed" }
-        assertTrue(closed.get())
+        // The fitting screen stays open through the loading screen and shows the result when it is done.
+        compose.waitUntil(5_000) { compose.onAllNodesWithContentDescription("생성된 피팅 이미지").fetchSemanticsNodes().isNotEmpty() }
+        assertFalse(closed.get())
         val payload = checkNotNull(uploaded)
         val person = java.util.Base64.getDecoder().decode(payload.getString("person"))
         val bitmap = checkNotNull(BitmapFactory.decodeByteArray(person, 0, person.size))

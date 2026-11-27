@@ -49,6 +49,15 @@ data class FittingProgress(val stage: String, val fraction: Float, val text: Str
     }
 }
 
+/** Shown when the fitting photo has no person in it (the server answers 422 PERSON_REQUIRED). */
+const val PERSON_REQUIRED_MESSAGE = "사람이 보이는 사진을 골라 주세요. 옷만 있거나 사람이 없는 사진으로는 가상 피팅을 할 수 없어요."
+
+/** Shown when bottoms are to be fitted on a photo cut above the legs (422 FULL_BODY_REQUIRED). */
+const val FULL_BODY_REQUIRED_MESSAGE = "하의까지 입혀 보려면 다리와 발이 보이는 전신 사진을 골라 주세요."
+
+/** Shown when a garment of the outfit was deleted from the wardrobe before the fitting started. */
+const val GARMENT_GONE_MESSAGE = "이 코디의 옷이 옷장에서 삭제됐어요. 코디를 새로 받아 주세요."
+
 data class TryOnJob(val id: String, val token: String) {
     init { require(id.matches(Regex("[0-9a-f-]{36}")) && token.isNotBlank()) }
 }
@@ -173,11 +182,16 @@ class TryOnClient(private val account: AccountAccess, private val baseUrl: Strin
             SchoolGateway.onResponse(url, status)
             account.checkResponse(status)
             if (status in listOf(500, 502, 503, 504)) throw FittingUnavailable()
+            // 422: the photo will not do (no person, or bottoms on a photo cut above the legs); the body says which.
+            val refused = if (status == 422) runCatching {
+                connection.errorStream?.use { JSONObject(it.readBytes().toString(Charsets.UTF_8)).optString("error") }
+            }.getOrNull() else null
             check(status in 200..299) {
                 when (status) {
                     429 -> "피팅 대기열이 가득 찼어요. 잠시 후 다시 시도해 주세요."
                     404 -> "피팅 작업이 만료됐어요. 다시 생성해 주세요."
                     400, 413 -> "사진 형식과 크기를 확인해 주세요."
+                    422 -> if (refused == "FULL_BODY_REQUIRED") FULL_BODY_REQUIRED_MESSAGE else PERSON_REQUIRED_MESSAGE
                     else -> "피팅 요청을 처리하지 못했어요. 다시 시도해 주세요."
                 }
             }
