@@ -71,6 +71,8 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import com.swpp.stylemate.ui.home.CodiBookRoute
 import com.swpp.stylemate.ui.home.HomeRoute
+import com.swpp.stylemate.ui.home.homeViewModel
+import com.swpp.stylemate.ui.home.PinnedGarment
 import com.swpp.stylemate.ui.profile.AnalyzingScreen
 import com.swpp.stylemate.ui.profile.BodyProfileViewModel
 import com.swpp.stylemate.ui.profile.CaptureGuideScreen
@@ -220,6 +222,7 @@ private fun MainTabs(viewModel: BodyProfileViewModel, authModel: AuthViewModel) 
     val app by viewModel.app.collectAsStateWithLifecycle()
     val auth by authModel.state.collectAsStateWithLifecycle()
     val account = checkNotNull(LocalAccountAccess.current)
+    val homeModel = homeViewModel()
     var tab by rememberSaveable { mutableStateOf(Tab.HOME) }
     var openedFitting by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current.applicationContext
@@ -267,8 +270,13 @@ private fun MainTabs(viewModel: BodyProfileViewModel, authModel: AuthViewModel) 
             Tab.HOME -> HomeRoute(app.profile, onSetupProfile = viewModel::startReanalysis,
                 onOpenWardrobe = { tab = Tab.WARDROBE }, modifier = Modifier.padding(padding).consumeWindowInsets(padding),
                 onChat = { outfit, weather -> chat.open(outfit, app.profile, weather, app.style) }, wardrobeRevision = wardrobeRevision,
-                style = app.style)
-            Tab.WARDROBE -> Box(Modifier.padding(padding).consumeWindowInsets(padding)) { WardrobeRoute(onDeleted = { wardrobeRevision++ }) }
+                style = app.style, model = homeModel)
+            Tab.WARDROBE -> Box(Modifier.padding(padding).consumeWindowInsets(padding)) {
+                WardrobeRoute(onDeleted = { wardrobeRevision++ }, onRecommendOutfits = { id, name ->
+                    homeModel.pinGarment(PinnedGarment(id, name))
+                    tab = Tab.HOME
+                })
+            }
             Tab.CODIBOOK -> CodiBookRoute(Modifier.padding(padding).consumeWindowInsets(padding),
                 wardrobeRevision = wardrobeRevision, profile = app.profile)
             Tab.PROFILE -> MyProfileScreen(

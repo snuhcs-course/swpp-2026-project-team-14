@@ -6,6 +6,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.test.platform.app.InstrumentationRegistry
@@ -97,6 +98,78 @@ class GlobalThemeTest {
         compose.onNode(hasText("MY") and isSelectable()).performClick().assertIsSelected()
         compose.onNodeWithText("내 체형 정보").assertIsDisplayed()
         capture("05-profile-with-navigation")
+    }
+
+    @Test fun wardrobeSelectionPinsThreeHomeOutfitsUntilExplicitlyUnpinned() {
+        val id = UUID.randomUUID().toString()
+        ownDirectory = File(context.filesDir, "local-users/$id")
+        val user = AccountUser(id, "pinned_preview", null, StyleProfile())
+        val session = AuthSession("z".repeat(43), Instant.parse("2099-01-01T00:00:00Z"), user)
+        val data = fixture()
+        val garmentId = UUID.randomUUID().toString()
+        val garment = JSONObject().put("id", garmentId).put("saved", true).put("notes", "")
+            .put("image_url", "/fixture.png").put("cutout_url", "/fixture.png")
+            .put("dimensions", JSONObject.NULL).put("labels", JSONObject.NULL)
+            .put("attributes", data.getJSONObject("attributes").put("name", "선택할 셔츠").put("category", "top"))
+        val requests = java.util.concurrent.ConcurrentLinkedQueue<JSONObject>()
+        val client = OkHttpClient.Builder().addInterceptor { chain ->
+            val request = chain.request()
+            val json = when (request.url.encodedPath) {
+                "/api/users/me/" -> JSONObject().put("user", user.json())
+                "/api/wardrobe/items/" -> JSONObject().put("items", JSONArray().put(garment)).put("next", JSONObject.NULL)
+                "/api/wardrobe/options/" -> data.getJSONObject("catalog")
+                "/api/outfits/" -> JSONObject().put("outfits", JSONArray()).put("next", JSONObject.NULL)
+                "/api/weather/" -> JSONObject().put("temp", 18).put("apparent", 18).put("label", "맑음")
+                "/api/outfits/recommend/" -> {
+                    val body = JSONObject(okio.Buffer().also { request.body!!.writeTo(it) }.readUtf8())
+                    requests.add(body)
+                    val pinned = body.has("anchor_id")
+                    val top = if (pinned) body.getString("anchor_id") else "default-top"
+                    val outfits = (1..3).map { index ->
+                        fun item(gid: String, slot: String, name: String) = JSONObject().put("garment_id", gid)
+                            .put("slot", slot).put("name", name).put("image_url", "/fixture.png").put("note", "")
+                        JSONObject().put("id", "preview-$pinned-$index").put("key", "w:$top+w:bottom-$index")
+                            .put("saved", false).put("feedback", JSONObject.NULL).put("score", 75)
+                            .put("items", JSONArray().put(item(top, "top", if (pinned) "선택할 셔츠" else "기본 상의"))
+                                .put(item("bottom-$index", "bottom", "하의 $index")))
+                            .put("reasons", JSONArray())
+                    }
+                    JSONObject().put("outfits", JSONArray(outfits)).put("notes", JSONArray())
+                }
+                else -> JSONObject()
+            }
+            Response.Builder().request(request).protocol(Protocol.HTTP_1_1).code(200).message("fixture")
+                .body(json.toString().toResponseBody("application/json".toMediaType())).build()
+        }.build()
+        val auth = AuthViewModel(AuthRepository("http://localhost", object : AuthSessionStore {
+            override fun read() = session.json().toString()
+            override fun write(value: String) = Unit
+            override fun clear() = Unit
+        }, client))
+        val profile = BodyProfileViewModel(FakeBodyAnalyzer(0)).apply { skipSetup() }
+        compose.setContent { StyleMateTheme { StyleMateApp(profile, auth) } }
+        compose.waitUntil(5_000) { compose.onAllNodesWithContentDescription("코디 3 선택").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNode(hasText("옷장") and isSelectable()).performClick()
+        compose.waitUntil(5_000) { compose.onAllNodesWithContentDescription("선택할 셔츠").fetchSemanticsNodes().isNotEmpty() }
+        // Open the garment itself, even when its offline-photo retry button occupies the centre.
+        compose.onNodeWithContentDescription("선택할 셔츠").performSemanticsAction(SemanticsActions.OnClick) { it() }
+        capture("12-wardrobe-recommendation-sheet")
+        compose.onNodeWithText("이 옷을 포함한 코디 추천받기").assertIsDisplayed()
+        compose.onNodeWithText("이 옷을 포함한 코디 추천받기").performClick()
+        compose.waitUntil(5_000) { requests.lastOrNull()?.optString("anchor_id") == garmentId &&
+            compose.onAllNodesWithContentDescription("코디 3 선택").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNode(hasText("홈") and isSelectable()).assertIsSelected()
+        compose.onNodeWithText("고정한 옷").assertIsDisplayed()
+        compose.onNodeWithText("선택할 셔츠").assertIsDisplayed()
+        assertEquals(3, requests.last().getInt("count"))
+        capture("13-home-pinned-garment")
+        compose.onNode(hasText("옷장") and isSelectable()).performClick()
+        compose.onNode(hasText("홈") and isSelectable()).performClick()
+        compose.onNodeWithText("고정한 옷").assertIsDisplayed()
+        compose.onNodeWithText("고정 해제").performClick()
+        compose.waitUntil(5_000) { requests.lastOrNull()?.has("anchor_id") == false }
+        compose.onNodeWithText("고정한 옷").assertDoesNotExist()
+        capture("14-home-default-after-unpin")
     }
 
     @Test fun authEditorBodyChatAndFittingShareTheAppTheme() {

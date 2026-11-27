@@ -60,7 +60,7 @@
 | `styles` | | 미니멀·캐주얼·스트릿·러블리·클래식·스포티 중 최대 6개 |
 | `preference` | | 기기에 둔 취향 (feedback 응답의 `preference`) |
 | `seen_keys` | | 이미 보여 준 코디의 `key` 목록 (다른 코디 보기) |
-| `anchor_id` | | 이 옷을 꼭 넣은 코디 (garment id) |
+| `anchor_id` | | 이 옷을 꼭 넣은 코디 (garment id). 아우터를 고정해도 상의·하의를 함께 구성한다 |
 | `count` | | 1–5, 기본 3 |
 | `occasion` | | 상황 메모 (지금은 기록만) |
 

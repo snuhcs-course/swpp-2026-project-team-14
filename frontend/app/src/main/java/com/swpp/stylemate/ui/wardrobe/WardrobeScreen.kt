@@ -69,6 +69,7 @@ fun WardrobeRoute(
     onboardingTopBar: (@Composable (onBack: () -> Unit, enabled: Boolean) -> Unit)? = null,
     localStore: LocalUserStore? = null,
     onDeleted: () -> Unit = {},
+    onRecommendOutfits: ((String, String) -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val account = checkNotNull(LocalAccountAccess.current)
@@ -414,6 +415,8 @@ fun WardrobeRoute(
             onInteraction = { message = null },
             onCapture = { wardrobeModel.clearSaveState(); takePhoto() },
             onItemClick = { message = null; pages = arrayListOf("detail:${it.id}") },
+            onRecommendOutfits = onRecommendOutfits?.let { recommend -> { garment -> recommend(garment.id, garment.name) } },
+            onFindMatchingClothes = { message = null; pages = arrayListOf("match:${it.id}") },
             onAnalyze = wardrobeModel::analyzeWardrobe,
             deletingId = wardrobe.deletingId, deleteError = wardrobe.deleteError,
             onDeleteDismiss = wardrobeModel::clearDeleteError,
@@ -563,7 +566,17 @@ fun WardrobeScreen(items: List<WardrobeItem>, message: String?, cameraBusy: Bool
                    onWornPhoto: (() -> Unit)? = null,
                    onDelete: ((WardrobeItem) -> Unit)? = null, deletingId: String? = null,
                    deleteError: String? = null, onDeleteDismiss: () -> Unit = {}, onInteraction: () -> Unit = {},
-                   onAnalyze: (() -> Unit)? = null) {
+                   onAnalyze: (() -> Unit)? = null,
+                   onRecommendOutfits: ((WardrobeItem) -> Unit)? = null,
+                   onFindMatchingClothes: ((WardrobeItem) -> Unit)? = null) {
+    var actionGarmentId by rememberSaveable { mutableStateOf<String?>(null) }
+    val actionGarment = items.firstOrNull { it.id == actionGarmentId }
+    if (actionGarment != null && onRecommendOutfits != null) {
+        GarmentActionSheet(actionGarment, onDismiss = { actionGarmentId = null },
+            onRecommendOutfits = { actionGarmentId = null; onRecommendOutfits(actionGarment) },
+            onFindMatchingClothes = onFindMatchingClothes?.let { find -> { actionGarmentId = null; find(actionGarment) } },
+            onDetail = { actionGarmentId = null; onItemClick(actionGarment) })
+    }
     var pendingDeleteId by rememberSaveable { mutableStateOf<String?>(null) }
     val pendingDelete = items.firstOrNull { it.id == pendingDeleteId }
     LaunchedEffect(items) {
@@ -604,11 +617,36 @@ fun WardrobeScreen(items: List<WardrobeItem>, message: String?, cameraBusy: Bool
         onCategory = { onInteraction(); category = it },
         message = message, loading = loading, cameraBusy = cameraBusy,
         onRegister = { onInteraction(); choosingMethod = true }, onRetry = onRetry,
-        onItemClick = onItemClick, deletingId = deletingId,
+        onItemClick = { garment ->
+            if (onRecommendOutfits != null && garment.category in setOf("top", "bottom", "outerwear")) actionGarmentId = garment.id
+            else onItemClick(garment)
+        }, deletingId = deletingId,
         onDelete = onDelete?.let { { garment -> onDeleteDismiss(); pendingDeleteId = garment.id } },
         onAnalyze = onAnalyze,
         photo = { garment -> GarmentPhoto(checkNotNull(garment.imageUrl), garment.name, framed = false) },
     )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun GarmentActionSheet(garment: WardrobeItem, onDismiss: () -> Unit, onRecommendOutfits: () -> Unit,
+                               onFindMatchingClothes: (() -> Unit)?, onDetail: () -> Unit) {
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = MaterialTheme.colorScheme.background) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(garment.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text("내 옷장에서 이 옷을 포함한 코디를 최대 3개 추천해요.",
+                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Button(onClick = onRecommendOutfits, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
+                shape = MaterialTheme.shapes.medium) { Text("이 옷을 포함한 코디 추천받기") }
+            onFindMatchingClothes?.let { find ->
+                OutlinedButton(onClick = find, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+                    shape = MaterialTheme.shapes.medium) { Text("함께 입을 옷 찾기") }
+            }
+            TextButton(onClick = onDetail, modifier = Modifier.fillMaxWidth()) { Text("상세 정보 보기") }
+        }
+    }
 }
 
 

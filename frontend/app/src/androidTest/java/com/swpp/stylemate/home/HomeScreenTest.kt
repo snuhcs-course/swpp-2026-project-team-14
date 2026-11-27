@@ -19,6 +19,7 @@ import com.swpp.stylemate.data.recommendation.Weather
 import com.swpp.stylemate.ui.home.BodyHint
 import com.swpp.stylemate.ui.home.HomeScreen
 import com.swpp.stylemate.ui.home.HomeState
+import com.swpp.stylemate.ui.home.PinnedGarment
 import com.swpp.stylemate.ui.theme.StyleMateTheme
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -62,10 +63,29 @@ class HomeScreenTest {
                         fitting = { selected, fittingModifier, enabled ->
                             Button(onClick = { events += "fitting:${selected.id}" }, enabled = enabled,
                                 modifier = fittingModifier.heightIn(min = 52.dp)) { Text("가상 피팅") }
-                        }, photo = { item, photoModifier -> Box(photoModifier) { Text("사진:${item.name}") } })
+                        }, photo = { item, photoModifier -> Box(photoModifier) { Text("사진:${item.name}") } },
+                        onUnpin = { events += "unpin"; state = state.copy(pinnedGarment = null) })
                 }
             }
         }
+    }
+
+    @Test fun pinnedGarmentIsShownAboveOutfitsAndRefreshKeepsItUntilUnpinned() {
+        val events = mutableListOf<String>()
+        show(HomeState(weather = weather, outfits = listOf(outfit), pinnedGarment = PinnedGarment("a", "베이지 니트")), events)
+        compose.onNodeWithText("고정한 옷").assertIsDisplayed()
+        compose.onNodeWithText("베이지 니트").assertIsDisplayed()
+        compose.onNodeWithText("새로 추천").performScrollTo().performClick()
+        compose.onNodeWithText("고정 해제").performScrollTo().assertIsDisplayed().performClick()
+        compose.onNodeWithText("고정한 옷").assertDoesNotExist()
+        compose.runOnIdle { assertEquals(listOf("refresh", "unpin"), events) }
+    }
+
+    @Test fun aPinCanBeClearedWhileItsRecommendationIsLoading() {
+        val events = mutableListOf<String>()
+        show(HomeState(loading = true, pinnedGarment = PinnedGarment("a", "베이지 니트")), events)
+        compose.onNodeWithText("고정 해제").assertIsEnabled().performClick()
+        compose.runOnIdle { assertEquals(listOf("unpin"), events) }
     }
 
     @Test fun smallScreenShowsTheWholeOutfitAndPrimaryActionsBeforeScrolling() {
