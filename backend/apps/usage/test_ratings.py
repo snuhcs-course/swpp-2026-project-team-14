@@ -254,6 +254,11 @@ class FittingRatingFlagTests(RatingFixture):
         mocked.start()
         self.addCleanup(mocked.stop)
         self.addCleanup(self.jobs.close)
+        # The test photo is a plain colour: where the segmentation model is installed, the person check
+        # (apps.fittings.person, tested in apps.fittings) would rightly refuse it.
+        person = patch('apps.fittings.person.check', return_value=None)
+        person.start()
+        self.addCleanup(person.stop)
 
     def test_flag_only_on_completed_job(self):
         uploaded = self.client.post('/api/fittings/jobs/', json.dumps(self.payload), content_type='application/json').json()

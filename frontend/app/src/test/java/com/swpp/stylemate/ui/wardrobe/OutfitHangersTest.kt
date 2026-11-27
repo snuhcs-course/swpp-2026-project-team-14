@@ -87,4 +87,23 @@ class OutfitHangersTest {
         val layout = dressedLayout(400f, 2000f, jacket, tee, jeans, outerCm = 100f, topCm = 68f, bottomCm = 100f)
         assertTrue(layout.getValue("outerwear").height > layout.getValue("top").height * 1.4f)
     }
+
+    // Held down: the look spreads out like the earlier outfit board.
+    @Test fun spreadOutNothingOverlapsAndEachKeepsItsShape() {
+        val layout = spreadLayout(400f, 300f, jacket, tee, jeans)
+        val outer = layout.getValue("outerwear"); val top = layout.getValue("top"); val bottom = layout.getValue("bottom")
+        assertTrue("outerwear on the left", outer.right <= top.left && outer.right <= bottom.left)
+        assertTrue("top above the bottom on the right", top.bottom <= bottom.top)
+        for ((rect, shape) in listOf(outer to jacket, top to tee, bottom to jeans)) {
+            assertEquals(shape.aspectRatio, rect.width / rect.height, .01f)
+            assertTrue("inside the box", rect.left >= 0f && rect.top >= 0f && rect.right <= 400.5f && rect.bottom <= 300.5f)
+        }
+    }
+
+    @Test fun withoutOuterwearTheTopAndBottomStandSideBySide() {
+        val layout = spreadLayout(400f, 300f, null, tee, jeans)
+        assertEquals(setOf("top", "bottom"), layout.keys)
+        assertTrue(layout.getValue("top").right <= layout.getValue("bottom").left)
+        assertEquals("a lone garment is centred", 200f, spreadLayout(400f, 300f, null, tee, null).getValue("top").center.x, .5f)
+    }
 }

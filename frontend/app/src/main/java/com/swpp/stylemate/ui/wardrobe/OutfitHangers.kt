@@ -2,6 +2,20 @@
 package com.swpp.stylemate.ui.wardrobe
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.onLongClick
+import androidx.compose.ui.unit.Constraints
+import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -205,6 +219,47 @@ internal fun OutfitRail(
 }
 
 /**
+ * Where each garment goes when a styled look is spread out (held down on 홈 or 코디북), as on the earlier
+ * outfit board: nothing overlaps or leans, so every detail shows. Outerwear takes the left half and the top
+ * and bottom are stacked on the right; without outerwear the pieces stand side by side. Each garment keeps
+ * its own proportions and is centred in its cell.
+ */
+internal fun spreadLayout(
+    width: Float,
+    height: Float,
+    outer: GarmentHangingShape?,
+    top: GarmentHangingShape?,
+    bottom: GarmentHangingShape?,
+): Map<String, Rect> {
+    val gap = width * .04f
+    val half = (width - gap) / 2
+    val rest = listOfNotNull(top?.let { "top" }, bottom?.let { "bottom" })
+    val cells = buildMap {
+        if (outer != null) {
+            put("outerwear", Rect(0f, 0f, if (rest.isEmpty()) width else half, height))
+            val column = (height - gap * (rest.size - 1).coerceAtLeast(0)) / rest.size.coerceAtLeast(1)
+            rest.forEachIndexed { index, slot ->
+                put(slot, Rect(width - half, index * (column + gap), width, index * (column + gap) + column))
+            }
+        } else {
+            val cell = (width - gap * (rest.size - 1).coerceAtLeast(0)) / rest.size.coerceAtLeast(1)
+            rest.forEachIndexed { index, slot -> put(slot, Rect(index * (cell + gap), 0f, index * (cell + gap) + cell, height)) }
+        }
+    }
+    val shapes = mapOf("outerwear" to outer, "top" to top, "bottom" to bottom)
+    return cells.mapValues { (slot, cell) ->
+        val aspect = shapes[slot]?.aspectRatio ?: 1f
+        val inset = cell.width * .05f
+        val w = minOf(cell.width - inset * 2, (cell.height - inset * 2) * aspect)
+        val h = w / aspect
+        Rect(Offset(cell.center.x - w / 2, cell.center.y - h / 2), Size(w, h))
+    }
+}
+
+private fun lerp(a: Rect, b: Rect, t: Float) = Rect(a.left + (b.left - a.left) * t, a.top + (b.top - a.top) * t,
+    a.right + (b.right - a.right) * t, a.bottom + (b.bottom - a.bottom) * t)
+
+/**
  * 홈 (design B): the outfit laid out as one styled look, without a body. The outerwear lies behind, the
  * top overlaps it in front, the bottom's waist tucks under the top's hem, and a soft shadow grounds it. Each garment's
  * proportions come from its own cutout, so the figure settles as photos load.
@@ -215,6 +270,18 @@ internal fun OutfitDressed(
     modifier: Modifier = Modifier,
     photo: (@Composable (OutfitGarment, Modifier) -> Unit)? = null,
 ) {
+    // Held down, the look spreads out so details the layering hides can be seen; let go and it comes back.
+    val spread = remember { Animatable(0f) }
+    val scope = rememberCoroutineScope()
+    val haptics = LocalHapticFeedback.current
+    val context = androidx.compose.ui.platform.LocalContext.current.applicationContext
+    fun spreadOut(open: Boolean) {
+        if (open) {
+            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+            SpreadTips.used(context)  // once found, the tip is no longer offered
+        }
+        scope.launch { spread.animateTo(if (open) 1f else 0f, spring(dampingRatio = .82f, stiffness = 380f)) }
+    }
     val outer = items.firstOrNull { it.slot == "outerwear" }
     val top = items.firstOrNull { it.slot == "top" }
     val bottom = items.firstOrNull { it.slot == "bottom" }
@@ -222,29 +289,52 @@ internal fun OutfitDressed(
     fun shapeOf(garment: OutfitGarment?) = garment?.let { shapes[it.garmentId] ?: defaultShape(it.slot) }
     // Garment names stay off 홈 (PR #82); each garment carries its name for screen readers instead.
     Column(modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
-        BoxWithConstraints(Modifier.fillMaxWidth().weight(1f)) {
+        BoxWithConstraints(Modifier.fillMaxWidth().weight(1f)
+            .pointerInput(Unit) {
+                awaitEachGesture {
+                    awaitFirstDown(requireUnconsumed = false)
+                    // A tap or a swipe (the pager or the list takes it) ends before the long-press time.
+                    var ended = false
+                    withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) { waitForUpOrCancellation(); ended = true }
+                    if (ended) return@awaitEachGesture
+                    spreadOut(true)
+                    // Held: keep the gesture (no swipe, no tap on the card) until the finger lifts.
+                    do {
+                        val event = awaitPointerEvent()
+                        event.changes.forEach { it.consume() }
+                    } while (event.changes.any { it.pressed })
+                    spreadOut(false)
+                }
+            }
+            .semantics { onLongClick("옷 펼쳐 보기") { spreadOut(spread.targetValue < .5f); true } }) {
             val density = LocalDensity.current
             val widthPx = with(density) { maxWidth.toPx() }
             val heightPx = with(density) { (maxHeight - 14.dp).toPx() }
             fun cm(garment: OutfitGarment?, slot: String) = garment?.lengthCm ?: fallbackLengthCm(slot)
             val layout = dressedLayout(widthPx, heightPx, shapeOf(outer), shapeOf(top), shapeOf(bottom),
                 cm(outer, "outerwear"), cm(top, "top"), cm(bottom, "bottom"))
+            val spreadOutLayout = spreadLayout(widthPx, heightPx, shapeOf(outer), shapeOf(top), shapeOf(bottom))
             val shadowBrush = remember { Brush.radialGradient(listOf(Color.Black.copy(alpha = .08f), Color.Transparent)) }
             val lowest = layout.values.maxOfOrNull { it.bottom } ?: heightPx
-            Canvas(Modifier.fillMaxSize()) {
+            Canvas(Modifier.fillMaxSize().graphicsLayer { alpha = 1f - spread.value }) {
                 val shadowWidth = size.width * .5f
                 drawOval(shadowBrush, Offset((size.width - shadowWidth) / 2, lowest - 4.dp.toPx()),
                     Size(shadowWidth, 16.dp.toPx()))
             }
             // Back to front: trousers, then the jacket, then the top laid over it.
             listOfNotNull(bottom, outer, top).forEachIndexed { depth, garment ->
-                val rect = layout[garment.slot] ?: return@forEachIndexed
+                val dressed = layout[garment.slot] ?: return@forEachIndexed
+                val open = spreadOutLayout[garment.slot] ?: dressed
                 key(garment.garmentId) {
                     val tilt = dressedTilt(garment.slot, layered = outer != null && top != null, garment.garmentId)
-                    val placed = with(density) {
-                        Modifier.offset(x = rect.left.toDp(), y = rect.top.toDp()).size(rect.width.toDp(), rect.height.toDp())
-                            .rotate(tilt).zIndex(depth.toFloat()).semantics { contentDescription = garment.name }
-                    }
+                    val placed = Modifier.layout { measurable, _ ->
+                        // Read while laying out, so holding animates the pieces without recomposing the look.
+                        val rect = lerp(dressed, open, spread.value)
+                        val placeable = measurable.measure(Constraints.fixed(rect.width.roundToInt().coerceAtLeast(1),
+                            rect.height.roundToInt().coerceAtLeast(1)))
+                        layout(placeable.width, placeable.height) { placeable.place(rect.left.roundToInt(), rect.top.roundToInt()) }
+                    }.graphicsLayer { rotationZ = tilt * (1f - spread.value) }
+                        .zIndex(depth.toFloat()).semantics { contentDescription = garment.name }
                     if (photo != null) photo(garment, placed)
                     else HangingGarmentImage(garment.asWardrobeItem(), placed,
                         onHangingShape = { shapes[garment.garmentId] = it }, alignment = Alignment.TopCenter)
