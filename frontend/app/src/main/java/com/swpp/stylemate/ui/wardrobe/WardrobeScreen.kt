@@ -53,8 +53,10 @@ import org.json.JSONObject
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 
+/** [imageUrl] is the original photo; [cutoutUrl] is the stored background-free PNG the rail shows. */
 data class WardrobeItem(val id: String, val name: String, val category: String, val style: String? = null,
-                        val thumbnail: ImageBitmap? = null, val imageUrl: String? = null)
+                        val thumbnail: ImageBitmap? = null, val imageUrl: String? = null,
+                        val cutoutUrl: String? = null)
 
 @Composable
 fun WardrobeRoute(
@@ -390,7 +392,8 @@ fun WardrobeRoute(
                 wardrobe.catalog?.getJSONObject("enums")?.getJSONObject("styles")?.optString(styles.getString(index))
             }.joinToString(", ").ifBlank { null }
             WardrobeItem(record.getString("id"), attrs.getString("name"), attrs.getString("category"),
-                style = style, imageUrl = record.getString("image_url"))
+                style = style, imageUrl = record.getString("image_url"),
+                cutoutUrl = record.optString("cutout_url").takeIf { !record.isNull("cutout_url") && it.isNotBlank() })
         }
         wardrobePages.SaveableStateProvider("collection") {
         WardrobeScreen(items = items, message = message ?: wardrobe.error, cameraBusy = measurementBusy,
