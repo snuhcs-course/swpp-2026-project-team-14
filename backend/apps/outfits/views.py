@@ -30,6 +30,7 @@ from django.utils import timezone
 from onnxruntime.capi.onnxruntime_pybind11_state import Fail, InvalidGraph, InvalidProtobuf, NoSuchFile
 
 from apps.body_profiles.profile import body_or_unknown
+from apps.wardrobe import sizes
 from apps.wardrobe.models import Garment
 from apps.users.auth import require_auth
 from apps.users.models import User
@@ -160,6 +161,8 @@ def serialize(outfit: Outfit) -> dict:
             "garment_id": str(i.garment_id), "slot": i.slot, "name": i.garment.attributes.get("name", ""),
             "colors": i.garment.attributes.get("colors", []), "image_url": f"/api/wardrobe/items/{i.garment_id}/image/",
             "note": i.note,
+            # Real length, so 홈/코디북 can draw the garments of an outfit to one scale.
+            "length_cm": sizes.length_cm(i.garment),
         } for i in items],
     }
 

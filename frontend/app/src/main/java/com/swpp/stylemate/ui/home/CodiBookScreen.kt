@@ -3,9 +3,6 @@ package com.swpp.stylemate.ui.home
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
@@ -35,7 +32,11 @@ import androidx.compose.ui.window.DialogProperties
 import com.swpp.stylemate.data.recommendation.Outfit
 import com.swpp.stylemate.data.recommendation.OutfitGarment
 import com.swpp.stylemate.ui.components.PageHeader
-import com.swpp.stylemate.ui.components.OutfitBoard
+import com.swpp.stylemate.ui.wardrobe.OutfitDressed
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 
@@ -54,7 +55,8 @@ fun CodiBookScreen(
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
     onTryOn: (Outfit) -> Unit = {},
-    photo: @Composable (OutfitGarment, Modifier) -> Unit = { item, m -> GarmentThumbnail(item.imageUrl, item.name, m) },
+    // null: hang the stored background-free photos; screen tests pass their own renderer.
+    photo: (@Composable (OutfitGarment, Modifier) -> Unit)? = null,
     fittingStatuses: Map<String, CodiBookFittingStatus> = emptyMap(),
     onClearRemoveError: () -> Unit = {},
 ) {
@@ -66,7 +68,7 @@ fun CodiBookScreen(
     val index = ids.indexOf(selectedId).takeIf { it >= 0 } ?: lastIndex.coerceIn(0, ids.lastIndex.coerceAtLeast(0))
     val current = state.outfits.getOrNull(index)
     val pager = rememberPagerState(initialPage = index) { ids.size }
-    val list = rememberLazyListState()
+    val list = rememberLazyGridState()
     val scope = rememberCoroutineScope()
     val enabled = !state.loading && state.removingId == null
 
@@ -148,7 +150,7 @@ fun CodiBookScreen(
                             }, shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceContainer,
                                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
                                 Box(Modifier.fillMaxSize()) {
-                                    OutfitBoard(state.outfits[page].items, photo, Modifier.padding(12.dp))
+                                    OutfitDressed(state.outfits[page].items, Modifier.padding(16.dp), photo = photo)
                                     if (page == index) IconButton(onClick = { onClearRemoveError(); removingId = ids[page] },
                                         enabled = enabled && !pager.isScrollInProgress,
                                         colors = IconButtonDefaults.iconButtonColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = .94f)),
@@ -174,28 +176,23 @@ fun CodiBookScreen(
                         }
                     }
                 }
-                else -> LazyColumn(Modifier.fillMaxSize(), state = list,
+                else -> LazyVerticalGrid(GridCells.Fixed(2), Modifier.fillMaxSize(), state = list,
                     contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 20.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     items(state.outfits, key = { it.id }) { outfit ->
+                        // Design B, as on 홈: each saved outfit laid out as one styled look.
                         Surface(onClick = {
                             selectedId = outfit.id; lastIndex = ids.indexOf(outfit.id); view = CodiBookView.SLIDES
                         }, enabled = state.removingId == null, shape = MaterialTheme.shapes.large,
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                            color = MaterialTheme.colorScheme.surfaceContainer,
+                            color = MaterialTheme.colorScheme.surfaceContainerLow,
                             modifier = Modifier.fillMaxWidth().semantics { contentDescription = "${outfit.displayName()} 크게 보기" }) {
-                            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                                OutfitBoard(outfit.items, photo, Modifier.fillMaxWidth().height(190.dp))
-                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                        Text(outfit.displayName(), style = MaterialTheme.typography.bodyLarge,
-                                            fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                                        fittingStatuses[outfit.id]?.label?.let {
-                                            Text(it, style = MaterialTheme.typography.labelMedium,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                        }
-                                    }
-                                    Icon(Icons.AutoMirrored.Filled.ArrowForward, null, Modifier.size(20.dp))
+                            Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutfitDressed(outfit.items, Modifier.fillMaxWidth().height(220.dp).padding(top = 4.dp), photo = photo)
+                                Text(outfit.displayName(), style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                fittingStatuses[outfit.id]?.label?.let {
+                                    Text(it, style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
                         }
@@ -212,7 +209,7 @@ fun CodiBookScreen(
             title = { Text("코디북에서 뺄까요?") },
             text = {
                 Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OutfitBoard(outfit.items, photo, Modifier.fillMaxWidth().height(120.dp))
+                    OutfitDressed(outfit.items, Modifier.fillMaxWidth().height(180.dp), photo = photo)
                     Text(outfit.displayName(), fontWeight = FontWeight.SemiBold)
                     Text("옷장에 등록된 옷은 그대로 유지돼요.")
                     if (state.removeErrorId == outfit.id) state.removeError?.let {

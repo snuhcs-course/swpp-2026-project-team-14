@@ -283,6 +283,7 @@ internal fun HangerRenderer(
     garmentHeight: Dp,
     garmentTop: Dp,
     modifier: Modifier = Modifier,
+    rodFromY: Dp? = null,
 ) {
     Canvas(modifier) {
         val center = size.width / 2
@@ -293,7 +294,9 @@ internal fun HangerRenderer(
         val right = imageLeft + clothWidth * shape.right
         val neckY = if (category == "bottom") 49.dp.toPx()
             else garmentTop.toPx() + clothHeight * shape.neckY.coerceAtMost(.075f)
-        val hook = Path().apply {
+        // A combination hanger has one hook: the lower bar hangs from a straight rod instead.
+        val hook = if (rodFromY != null) Path().apply { moveTo(center, rodFromY.toPx()); lineTo(center, neckY) }
+        else Path().apply {
             moveTo(center - 4.dp.toPx(), 14.dp.toPx())
             cubicTo(center - 7.dp.toPx(), 2.dp.toPx(), center + 8.dp.toPx(), 2.dp.toPx(), center + 5.dp.toPx(), 14.dp.toPx())
             cubicTo(center + 4.dp.toPx(), 19.dp.toPx(), center, 19.dp.toPx(), center, 24.dp.toPx())
@@ -319,7 +322,7 @@ internal fun HangerRenderer(
 
 /** Clips sit in front of the waistband; the wooden bar stays behind the garment. */
 @Composable
-private fun HangerClips(shape: GarmentHangingShape, garmentWidth: Dp, modifier: Modifier = Modifier) {
+internal fun HangerClips(shape: GarmentHangingShape, garmentWidth: Dp, modifier: Modifier = Modifier) {
     Canvas(modifier) {
         val width = garmentWidth.toPx()
         val left = size.width / 2 - width * shape.neckX + width * shape.left

@@ -27,7 +27,7 @@ from .models import Garment
 
 logger = logging.getLogger(__name__)
 HANGABLE = ('top', 'bottom', 'outerwear')
-DISPLAY_VERSION = 'flatlay-union-v5-448'  # v3: real photos use SegFormer; v4: enclosed holes filled; v5: lone worn crops
+DISPLAY_VERSION = 'flatlay-union-v6-448'  # v3 SegFormer for real photos; v4 holes filled; v5 lone worn crops; v6 GrabCut on plain backdrops
 _inference = Semaphore(1)  # one CPU inference at a time, shared by background work and requests
 _jobs = [Lock() for _ in range(16)]  # one cutout job per garment at a time
 _pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix='garment-cutout')
@@ -84,6 +84,40 @@ def contrast_mask(image):
     return Image.fromarray(mask)
 
 
+def refine_on_plain_backdrop(image, mask):
+    """Light garments on a white studio backdrop (ivory padding, cream knit) are often read as background
+    by SegFormer, leaving holes and bitten edges. On a plain, even backdrop the garment is the only thing
+    that differs from it, so GrabCut seeded with SegFormer's pixels recovers the whole outline. Busy
+    backgrounds (floors, rooms) keep SegFormer's mask, since GrabCut would pull them in."""
+    rgb = np.asarray(image.convert('RGB'))
+    border = np.concatenate((rgb[0], rgb[-1], rgb[:, 0], rgb[:, -1])).astype(np.int16)
+    backdrop = np.median(border, axis=0)
+    if np.ptp(backdrop) > 25 or (np.abs(border - backdrop).max(axis=1) <= 12).mean() < .9:
+        return mask
+    seed = np.asarray(mask) > 0
+    if not seed.any():
+        return mask
+    difference = np.abs(rgb.astype(np.int16) - backdrop).max(axis=2)
+    labels = np.full(seed.shape, cv2.GC_PR_BGD, np.uint8)
+    labels[difference > 12] = cv2.GC_PR_FGD
+    labels[seed] = cv2.GC_FGD
+    edge = max(2, min(rgb.shape[:2]) // 200)
+    labels[:edge, :] = labels[-edge:, :] = cv2.GC_BGD
+    labels[:, :edge] = labels[:, -edge:] = cv2.GC_BGD
+    try:
+        cv2.grabCut(rgb[:, :, ::-1].copy(), labels, None, np.zeros((1, 65)), np.zeros((1, 65)), 5,
+                    cv2.GC_INIT_WITH_MASK)
+    except cv2.error:
+        return mask
+    refined = (labels == cv2.GC_FGD) | (labels == cv2.GC_PR_FGD)
+    # Keep the piece that holds the garment; stray specks of shadow or dust are dropped.
+    count, parts, stats, _ = cv2.connectedComponentsWithStats(refined.astype(np.uint8), connectivity=8)
+    if count < 2:
+        return mask
+    largest = 1 + stats[1:, cv2.CC_STAT_AREA].argmax()
+    return Image.fromarray(((parts == largest) * 255).astype(np.uint8))
+
+
 def fill_enclosed_holes(mask):
     """A flat garment has no see-through gaps: light prints or logos that the model reads as background
     would otherwise become holes. Only gaps fully enclosed by the garment are filled; worn crops keep
@@ -104,6 +138,8 @@ def render(raw, attributes):
     mask = contrast_mask(image) if attributes.get('_display_source') == 'ai_flatlay' else None
     if mask is None:
         mask = clothing_mask(image, attributes)
+        if attributes.get('_display_source') != 'worn_crop':
+            mask = refine_on_plain_backdrop(image, mask)
     if attributes.get('_display_source') != 'worn_crop':
         mask = fill_enclosed_holes(mask)
     if mask.size != image.size or mask.getbbox() is None:
