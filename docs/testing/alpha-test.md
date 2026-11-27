@@ -1,5 +1,7 @@
 # Alpha-test usage collection
 
+App-wide crash/ANR diagnostics and daily rates are documented in [App stability telemetry](app-stability.md).
+
 Issue: [#99](https://github.com/snuhcs-course/swpp-2026-project-team-14/issues/99). Branch: `feature/alpha-test`, based on `develop`.
 
 The alpha test is on November 30, 2026. Store registration is due November 29 at 23:59 KST.

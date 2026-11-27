@@ -71,17 +71,18 @@ class UsageUploadWorker(context: Context, parameters: WorkerParameters) : Corout
             val account = auth.account() ?: return Result.success()
             if (account.userId != owner) return Result.success()
             upload(UsageMetrics.queue(applicationContext, owner), account)
+            upload(AppStability.queue(applicationContext), account, "/api/usage/stability/")
             Result.success()
         } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
         catch (_: Exception) { Result.retry() }
     }
 
     companion object {
-        internal suspend fun upload(queue: UsageQueue, account: AccountAccess) {
+        internal suspend fun upload(queue: UsageQueue, account: AccountAccess, path: String = "/api/usage/events/") {
             while (true) {
                 val batch = queue.batch()
                 if (batch.isEmpty()) return
-                val response = account.json("POST", "/api/usage/events/", JSONObject().put("events", JSONArray(batch)))
+                val response = account.json("POST", path, JSONObject().put("events", JSONArray(batch)))
                 val accepted = response.getJSONArray("accepted")
                 val ids = (0 until accepted.length()).map { accepted.getString(it) }.toSet()
                 check(batch.all { it.getString("id") in ids })

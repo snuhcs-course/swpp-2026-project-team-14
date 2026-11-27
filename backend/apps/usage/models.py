@@ -23,6 +23,28 @@ class UsageEvent(models.Model):
         indexes = [models.Index(fields=['name', 'occurred_at'], name='usage_name_time')]
 
 
+class StabilityEvent(models.Model):
+    """Device diagnostics; the authenticated uploader is not the affected account."""
+    id = models.UUIDField(primary_key=True, editable=False)
+    installation_id = models.UUIDField()
+    session_id = models.UUIDField()
+    kind = models.CharField(max_length=12)
+    source = models.CharField(max_length=12)
+    occurred_at = models.DateTimeField()
+    received_at = models.DateTimeField(auto_now_add=True)
+    app_version = models.CharField(max_length=40)
+    sdk_int = models.PositiveSmallIntegerField()
+    foreground = models.BooleanField()
+    exception_type = models.CharField(max_length=160, blank=True)
+    frames = models.JSONField(default=list)
+    duration_ms = models.PositiveBigIntegerField(null=True)
+    exit_reason = models.PositiveSmallIntegerField(null=True)
+    exit_status = models.IntegerField(null=True)
+
+    class Meta:
+        indexes = [models.Index(fields=['kind', 'occurred_at'], name='stability_kind_time')]
+
+
 # AI-generated with Claude Code (Claude Opus 5.5), 2026-11-26, review pending (Kihwan Kim)
 class RatingTask(models.TextChoices):
     """별점 팝업을 띄우는 세 작업. DB에는 영문 코드로 저장하고 화면에서만 한글로 보여 준다."""

@@ -7,7 +7,7 @@ import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 
 /** Account-specific, atomically replaced queue. Only acknowledged event ids are removed. */
-class UsageQueue(private val file: File) {
+class UsageQueue(private val file: File, private val maxEvents: Int = MAX_EVENTS, private val batchSize: Int = BATCH_SIZE) {
     private fun read(): List<JSONObject> {
         if (!file.exists()) return emptyList()
         val rows = JSONArray(file.readText())
@@ -27,11 +27,11 @@ class UsageQueue(private val file: File) {
         val rows = read()
         if (rows.none { it.getString("id") == event.getString("id") }) {
             // Keep recent alpha-test events if a device stays offline for an extended period.
-            write((rows + event).takeLast(MAX_EVENTS))
+            write((rows + event).takeLast(maxEvents))
         }
     }
 
-    fun batch(): List<JSONObject> = synchronized(lock) { read().take(BATCH_SIZE) }
+    fun batch(): List<JSONObject> = synchronized(lock) { read().take(batchSize) }
     fun acknowledge(ids: Set<String>) = synchronized(lock) { write(read().filterNot { it.getString("id") in ids }) }
 
     companion object {
