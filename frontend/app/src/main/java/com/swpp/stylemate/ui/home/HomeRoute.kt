@@ -135,7 +135,9 @@ fun HomeRoute(profile: BodyProfile?, onSetupProfile: () -> Unit, onOpenWardrobe:
         },
         todayPlan = if (events.isEmpty()) null else {{ TodayPlan(events) }},
         hint = if (profile == null) {{ BodyHint(onSetupProfile) }} else null,
-        onRegion = { name -> HomeRegion.of(name)?.let { HomeRegion.save(store, it); model.setRegion(it) } },
+        onRegion = { place -> HomeRegion.save(store, place); model.setRegion(place) },
+        region = remember(state.region) { HomeRegion.load(store) },
+        placeSearch = { query -> runCatching { OutfitRepository(account).places(query) }.getOrNull() },
         regionWeather = { region -> runCatching { OutfitRepository(account).weather(region) }.getOrNull() },
     )
     selected?.let { FittingDialog(it, fitting, account, onClose = { selected = null }, profile = profile) }

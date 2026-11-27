@@ -49,4 +49,31 @@ class RegionPickerTest {
         assertFalse("once per outfit", SpreadTips.eligible(0, 0, alreadyShownForOutfit = true))
         assertFalse("never again once used", SpreadTips.eligible(SpreadTips.STOP_AFTER_USES, 0, false))
     }
+
+    private val outline = parseOutline(java.io.File("src/main/assets/map/korea_outline.json").readText())
+
+    private fun onLand(lat: Double, lon: Double) = outline.any { ring ->
+        // Ray casting on (lon, lat).
+        var inside = false
+        ring.indices.forEach { i ->
+            val (ay, ax) = ring[i]; val (by, bx) = ring[(i + 1) % ring.size]
+            if ((ay > lat) != (by > lat) && lon < (bx - ax) * (lat - ay) / (by - ay) + ax) inside = !inside
+        }
+        inside
+    }
+
+    @Test fun everyListedCityFallsOnTheRealCoastline() {
+        assertTrue("the mainland and the islands", outline.size >= 3 && outline[0].size > 50)
+        HomeRegion.OPTIONS.forEach { assertTrue("${it.name} is on land", onLand(it.lat, it.lon)) }
+        assertTrue("Ulleung is drawn too", onLand(37.50, 130.86))
+        assertFalse("the Yellow Sea is not land", onLand(36.5, 125.9))
+        assertFalse("nor the East Sea", onLand(37.0, 130.0))
+    }
+
+    @Test fun placesAreKeyedByWhereTheyAreNotTheirName() {
+        val a = com.swpp.stylemate.data.recommendation.Region("송도", 37.3826, 126.6566, "인천광역시 연수구")
+        val b = com.swpp.stylemate.data.recommendation.Region("송도", 36.0184, 129.3727, "경상북도 포항시 남구")
+        assertTrue(a.key != b.key)
+        assertEquals(a.key, a.copy(name = "송도국제도시").key)
+    }
 }

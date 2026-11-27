@@ -58,6 +58,17 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.style.TextOverflow
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
@@ -110,11 +121,12 @@ internal fun skyOf(weather: Weather): Sky = when {
 }
 
 /**
- * Where a place falls on the small map: an equirectangular view of South Korea, with longitude narrowed by
- * the cosine of the middle latitude so the peninsula keeps its shape, fitted and centred in [size].
+ * Where a place falls on the small map: an equirectangular view of South Korea (Ulleung included), with
+ * longitude narrowed by the cosine of the middle latitude so the peninsula keeps its shape, fitted and centred
+ * in [size]. Any place is drawn where it really is, not only the listed regions.
  */
 internal fun projectKorea(lat: Double, lon: Double, size: Size, inset: Float = 0f): Offset {
-    val west = 125.9; val east = 129.75; val south = 33.0; val north = 38.75
+    val west = 125.9; val east = 131.0; val south = 33.0; val north = 38.75
     val squeeze = cos(Math.toRadians(36.0))
     val spanX = (east - west) * squeeze; val spanY = north - south
     val scale = minOf((size.width - inset * 2) / spanX, (size.height - inset * 2) / spanY)
@@ -122,141 +134,206 @@ internal fun projectKorea(lat: Double, lon: Double, size: Size, inset: Float = 0
     return Offset((left + (lon - west) * squeeze * scale).toFloat(), (top + (north - lat) * scale).toFloat())
 }
 
-// A simplified outline of the mainland (latitude, longitude), clockwise from Ganghwa, and Jeju as an ellipse.
-private val MAINLAND = listOf(
-    37.75 to 126.45, 38.0 to 126.95, 38.15 to 127.45, 38.32 to 127.95, 38.62 to 128.35, 38.2 to 128.62,
-    37.75 to 128.92, 37.35 to 129.27, 36.95 to 129.42, 36.4 to 129.4, 36.05 to 129.57, 35.55 to 129.45,
-    35.1 to 129.1, 35.0 to 128.7, 34.85 to 128.4, 34.9 to 127.9, 34.7 to 127.7, 34.55 to 127.35,
-    34.45 to 126.9, 34.3 to 126.55, 34.7 to 126.3, 35.1 to 126.35, 35.6 to 126.45, 35.95 to 126.65,
-    36.3 to 126.5, 36.75 to 126.15, 37.0 to 126.75, 37.2 to 126.65, 37.45 to 126.55,
-)
+/** A place's key for its weather: two regions with the same name are still different places. */
+internal val Region.key get() = String.format(Locale.US, "%.3f,%.3f", lat, lon)
+
+/** South Korea's coastline (mainland and islands) from Natural Earth, public domain, as (lat, lon) rings. */
+internal fun parseOutline(json: String): List<List<Pair<Double, Double>>> {
+    val rings = org.json.JSONObject(json).getJSONArray("rings")
+    return (0 until rings.length()).map { i ->
+        val ring = rings.getJSONArray(i)
+        (0 until ring.length()).map { j -> ring.getJSONArray(j).let { it.getDouble(0) to it.getDouble(1) } }
+    }
+}
+
+@Composable
+private fun rememberKoreaOutline(): List<List<Pair<Double, Double>>> {
+    val context = LocalContext.current.applicationContext
+    var rings by remember { mutableStateOf<List<List<Pair<Double, Double>>>>(emptyList()) }
+    LaunchedEffect(Unit) {
+        rings = withContext(Dispatchers.IO) {
+            runCatching { context.assets.open("map/korea_outline.json").bufferedReader().use { parseOutline(it.readText()) } }
+                .getOrDefault(emptyList())
+        }
+    }
+    return rings
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun RegionSheet(
-    current: String,
+    current: Region,
     currentWeather: Weather?,
     load: suspend (Region) -> Weather?,
-    onPick: (String) -> Unit,
+    search: suspend (String) -> List<Region>?,
+    onPick: (Region) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val weathers = remember { mutableStateMapOf<String, Weather>().apply { currentWeather?.let { put(current, it) } } }
+    val weathers = remember { mutableStateMapOf<String, Weather>().apply { currentWeather?.let { put(current.key, it) } } }
     var chosen by remember { mutableStateOf(current) }
     var query by remember { mutableStateOf("") }
-    // Every region's weather at once (the server caches each for 10 minutes), a few requests at a time.
+    // Places found on the map service for the last submitted search; null: nothing searched yet.
+    var found by remember { mutableStateOf<List<Region>?>(null) }
+    var searching by remember { mutableStateOf(false) }
+    var searchFailed by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    val keyboard = LocalSoftwareKeyboardController.current
+    // Every listed region's weather at once (the server caches each for 10 minutes), a few requests at a time.
     LaunchedEffect(Unit) {
         val gate = Semaphore(4)
         coroutineScope {
-            HomeRegion.OPTIONS.filter { it.name !in weathers }.map { region ->
-                async { gate.withPermit { load(region)?.let { weathers[region.name] = it } } }
+            (HomeRegion.OPTIONS + current).distinctBy { it.key }.filter { it.key !in weathers }.map { region ->
+                async { gate.withPermit { load(region)?.let { weathers[region.key] = it } } }
             }.awaitAll()
+        }
+    }
+    // A place picked from the search has its own weather.
+    LaunchedEffect(chosen.key) { if (chosen.key !in weathers) load(chosen)?.let { weathers[chosen.key] = it } }
+    fun submit() {
+        val text = query.trim()
+        if (text.isEmpty() || searching) return
+        keyboard?.hide()
+        searching = true; searchFailed = false
+        scope.launch {
+            val result = search(text)
+            searchFailed = result == null
+            found = result.orEmpty()
+            searching = false
         }
     }
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = MaterialTheme.colorScheme.surface) {
         Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 20.dp)) {
             Text("날씨를 볼 지역", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            Text("오늘의 코디를 이 지역 날씨로 골라요. 여행지는 대화에서 \"내일 부산\"처럼 말해 주세요.",
+            Text("동네 이름으로도 찾을 수 있어요. 여행지는 대화에서 \"내일 부산\"처럼 말해 주세요.",
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(14.dp))
             Row(Modifier.fillMaxWidth().height(272.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 KoreaWeatherMap(chosen, weathers, onChoose = { chosen = it }, modifier = Modifier.weight(.56f).fillMaxSize())
-                ChosenWeather(chosen, weathers[chosen], Modifier.weight(.44f).fillMaxSize())
+                ChosenWeather(chosen, weathers[chosen.key], Modifier.weight(.44f).fillMaxSize())
             }
             Spacer(Modifier.height(14.dp))
-            OutlinedTextField(query, { query = it.take(10) }, Modifier.fillMaxWidth(), singleLine = true,
-                placeholder = { Text("지역 검색 (예: 부산, ㅂㅅ)") },
+            OutlinedTextField(query, { query = it.take(30); if (it.isBlank()) found = null }, Modifier.fillMaxWidth(),
+                singleLine = true, placeholder = { Text("지역·동네 검색 (예: 홍대, 해운대, ㅂㅅ)") },
                 leadingIcon = { Icon(Icons.Filled.Search, null) }, shape = RoundedCornerShape(16.dp),
+                trailingIcon = {
+                    if (searching) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                    else if (query.isNotBlank()) TextButton(onClick = ::submit) { Text("찾기") }
+                },
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(onSearch = { submit() }),
                 colors = OutlinedTextFieldDefaults.colors(unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant))
+            // As you type, the listed regions narrow down (also by initial consonants); a submitted search adds
+            // places from the map service below them.
             val shown = HomeRegion.OPTIONS.filter { matchesRegion(query, it.name) }
-            LazyColumn(Modifier.fillMaxWidth().heightIn(max = 220.dp).padding(top = 6.dp)) {
-                items(shown, key = { it.name }) { region ->
-                    RegionRow(region.name, weathers[region.name], region.name == chosen, region.name == current) { chosen = region.name }
+            LazyColumn(Modifier.fillMaxWidth().heightIn(max = 240.dp).padding(top = 6.dp)) {
+                items(shown, key = { it.key }) { region ->
+                    RegionRow(region.name, null, weathers[region.key], region.key == chosen.key, region.key == current.key) { chosen = region }
                 }
-                if (shown.isEmpty()) item {
-                    Text("'$query'에 맞는 지역이 없어요", Modifier.padding(vertical = 16.dp),
+                val places = found
+                if (places != null) {
+                    item(key = "found-title") {
+                        Text("검색 결과", Modifier.padding(start = 12.dp, top = 10.dp, bottom = 2.dp),
+                            style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    items(places, key = { "found-" + it.key + it.name }) { place ->
+                        RegionRow(place.name, place.area, weathers[place.key], place.key == chosen.key, place.key == current.key) { chosen = place }
+                    }
+                    item(key = "found-note") {
+                        Text(when {
+                            searchFailed -> "지금은 장소를 찾지 못했어요. 잠시 후 다시 시도해 주세요."
+                            places.isEmpty() -> "'${query.trim()}'(으)로 찾은 장소가 없어요."
+                            else -> "장소 검색 © OpenStreetMap contributors"
+                        }, Modifier.padding(start = 12.dp, top = 6.dp, bottom = 6.dp), style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                } else if (shown.isEmpty()) item(key = "hint") {
+                    Text("'${query.trim()}'을(를) 동네까지 찾으려면 찾기를 눌러 주세요", Modifier.padding(12.dp),
                         style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             Spacer(Modifier.height(12.dp))
             Button(onClick = { onPick(chosen) }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
                 shape = MaterialTheme.shapes.medium) {
-                Text(if (chosen == current) "$chosen 날씨 그대로 보기" else "$chosen 날씨로 추천받기")
+                Text(if (chosen.key == current.key) "${chosen.name} 날씨 그대로 보기" else "${chosen.name} 날씨로 추천받기")
             }
             Spacer(Modifier.height(12.dp))
         }
     }
 }
 
-/** The regions as dots on the peninsula, each with its temperature; the chosen one pulses. Tap a dot to choose. */
+/**
+ * The listed regions as dots on the real coastline, each with its temperature, plus the chosen place where it
+ * really is (a searched neighbourhood too); the chosen one pulses. Tap a dot to choose it.
+ */
 @Composable
-private fun KoreaWeatherMap(chosen: String, weathers: Map<String, Weather>, onChoose: (String) -> Unit, modifier: Modifier) {
+private fun KoreaWeatherMap(chosen: Region, weathers: Map<String, Weather>, onChoose: (Region) -> Unit, modifier: Modifier) {
     val land = MaterialTheme.colorScheme.onSurface.copy(alpha = .05f)
     val coast = MaterialTheme.colorScheme.onSurface.copy(alpha = .22f)
     val ink = MaterialTheme.colorScheme.primary
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
     val text = rememberTextMeasurer()
+    val outline = rememberKoreaOutline()
     val pulse by rememberInfiniteTransition(label = "chosen").animateFloat(0f, 1f,
         infiniteRepeatable(tween(1600), RepeatMode.Restart), label = "pulse")
+    val regions = (HomeRegion.OPTIONS + chosen).distinctBy { it.key }
     Box(modifier.clip(RoundedCornerShape(20.dp)).background(MaterialTheme.colorScheme.onSurface.copy(alpha = .035f))
-        .semantics { contentDescription = "지역 지도, ${chosen} 선택됨" }) {
-        Canvas(Modifier.fillMaxSize().pointerInput(Unit) {
+        .semantics { contentDescription = "지역 지도, ${chosen.name} 선택됨" }) {
+        Canvas(Modifier.fillMaxSize().pointerInput(regions) {
             detectTapGestures { tap ->
                 val sized = Size(size.width.toFloat(), size.height.toFloat())
                 val nearest = HomeRegion.OPTIONS.minByOrNull { r ->
-                    val p = projectKorea(r.lat, r.lon, sized, 14.dp.toPx()); hypot(p.x - tap.x, p.y - tap.y)
-                }
-                if (nearest != null) {
-                    val p = projectKorea(nearest.lat, nearest.lon, sized, 14.dp.toPx())
-                    if (hypot(p.x - tap.x, p.y - tap.y) < 28.dp.toPx()) onChoose(nearest.name)
-                }
+                    val p = projectKorea(r.lat, r.lon, sized, 12.dp.toPx()); hypot(p.x - tap.x, p.y - tap.y)
+                } ?: return@detectTapGestures
+                val p = projectKorea(nearest.lat, nearest.lon, sized, 12.dp.toPx())
+                if (hypot(p.x - tap.x, p.y - tap.y) < 28.dp.toPx()) onChoose(nearest)
             }
         }) {
-            val inset = 14.dp.toPx()
+            val inset = 12.dp.toPx()
             fun at(lat: Double, lon: Double) = projectKorea(lat, lon, size, inset)
-            // Land: the outline smoothed through the midpoints of its edges.
-            val points = MAINLAND.map { (lat, lon) -> at(lat, lon) }
-            val shape = Path().apply {
-                val start = (points.last() + points.first()) / 2f
-                moveTo(start.x, start.y)
-                points.indices.forEach { i ->
-                    val p = points[i]; val next = points[(i + 1) % points.size]; val mid = (p + next) / 2f
-                    quadraticTo(p.x, p.y, mid.x, mid.y)
+            outline.forEach { ring ->
+                if (ring.size < 3) return@forEach
+                val path = Path().apply {
+                    ring.forEachIndexed { i, (lat, lon) -> val p = at(lat, lon); if (i == 0) moveTo(p.x, p.y) else lineTo(p.x, p.y) }
+                    close()
                 }
-                close()
+                drawPath(path, land)
+                drawPath(path, coast, style = Stroke(.8.dp.toPx(), join = StrokeJoin.Round))
             }
-            drawPath(shape, land)
-            drawPath(shape, coast, style = Stroke(1.dp.toPx()))
-            val jeju = at(33.38, 126.55); val jejuEdge = at(33.38 + .13, 126.55 + .33)
-            val radius = Size((jejuEdge.x - jeju.x) * 2, (jeju.y - jejuEdge.y) * 2)
-            drawOval(land, jeju - Offset(radius.width / 2, radius.height / 2), radius)
-            drawOval(coast, jeju - Offset(radius.width / 2, radius.height / 2), radius, style = Stroke(1.dp.toPx()))
-            // Dots first, then labels placed greedily so none overlaps: the chosen region first, each in the
+            // Dots first, then labels placed greedily so none overlaps: the chosen place first, each in the
             // first free spot (right, left, above, below) inside the map; one with no free spot is left out.
-            val dots = HomeRegion.OPTIONS.associate { it.name to at(it.lat, it.lon) }
-            dots.forEach { (name, p) ->
-                if (name == chosen) {
+            val dots = regions.associate { it.key to (it to at(it.lat, it.lon)) }
+            dots.forEach { (key, value) ->
+                val p = value.second
+                if (key == chosen.key) {
                     drawCircle(ink.copy(alpha = .28f * (1f - pulse)), 6.dp.toPx() + 12.dp.toPx() * pulse, p)
                     drawCircle(ink, 5.dp.toPx(), p)
                     drawCircle(Color.White, 2.dp.toPx(), p)
                 } else drawCircle(muted.copy(alpha = .75f), 3.dp.toPx(), p)
             }
-            val placed = dots.values.map { Rect(it - Offset(4.dp.toPx(), 4.dp.toPx()), Size(8.dp.toPx(), 8.dp.toPx())) }
+            val placed = dots.values.map { (_, p) -> Rect(p - Offset(4.dp.toPx(), 4.dp.toPx()), Size(8.dp.toPx(), 8.dp.toPx())) }
                 .toMutableList()
             val bounds = Rect(Offset.Zero, size)
-            dots.keys.sortedByDescending { it == chosen }.forEach { name ->
-                val temp = weathers[name]?.let { "${Math.round(it.temp)}°" } ?: return@forEach
-                val isChosen = name == chosen
+            dots.entries.sortedByDescending { it.key == chosen.key }.forEach { (key, value) ->
+                val (region, p) = value
+                val isChosen = key == chosen.key
+                val temp = weathers[key]?.let { "${Math.round(it.temp)}°" }
+                val label = when {
+                    isChosen -> listOfNotNull(region.name, temp).joinToString(" ")
+                    temp != null -> temp
+                    else -> return@forEach
+                }
                 val style = TextStyle(fontSize = if (isChosen) 11.sp else 9.sp,
                     fontWeight = if (isChosen) FontWeight.Bold else FontWeight.Medium, color = if (isChosen) ink else muted)
-                val measured = text.measure(if (isChosen) "$name $temp" else temp, style)
+                val measured = text.measure(label, style)
                 val w = measured.size.width.toFloat(); val h = measured.size.height.toFloat()
-                val p = dots.getValue(name); val gap = 6.dp.toPx()
+                val gap = 6.dp.toPx()
                 val spot = listOf(Offset(p.x + gap, p.y - h / 2), Offset(p.x - gap - w, p.y - h / 2),
                     Offset(p.x - w / 2, p.y - gap - h), Offset(p.x - w / 2, p.y + gap))
                     .map { Rect(it, Size(w, h)) }
-                    .firstOrNull { r -> bounds.contains(r.topLeft) && bounds.contains(r.bottomRight) && placed.none { it.overlaps(r) } }
+                    .filter { r -> bounds.contains(r.topLeft) && bounds.contains(r.bottomRight) }
+                    // The chosen place is always named, even beside other dots; the rest never overlap.
+                    .let { spots -> spots.firstOrNull { r -> placed.none { it.overlaps(r) } } ?: if (isChosen) spots.firstOrNull() else null }
                     ?: return@forEach
                 placed += spot
                 drawText(measured, topLeft = spot.topLeft)
@@ -267,12 +344,14 @@ private fun KoreaWeatherMap(chosen: String, weathers: Map<String, Weather>, onCh
 
 /** The chosen region's weather, large: its sky drawn, the temperature, the label, how it feels and the band. */
 @Composable
-private fun ChosenWeather(name: String, weather: Weather?, modifier: Modifier) {
+private fun ChosenWeather(place: Region, weather: Weather?, modifier: Modifier) {
     Column(modifier.clip(RoundedCornerShape(20.dp)).background(MaterialTheme.colorScheme.onSurface.copy(alpha = .035f))
         .padding(16.dp), verticalArrangement = Arrangement.SpaceBetween) {
         Column {
-            Text(name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            Text("지금 날씨", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(place.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1,
+                overflow = TextOverflow.Ellipsis)
+            Text(place.area.ifBlank { "지금 날씨" }, style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
         if (weather == null) Text("날씨를 불러오는 중이에요", style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -291,13 +370,17 @@ private fun ChosenWeather(name: String, weather: Weather?, modifier: Modifier) {
 }
 
 @Composable
-private fun RegionRow(name: String, weather: Weather?, chosen: Boolean, current: Boolean, onClick: () -> Unit) {
+private fun RegionRow(name: String, area: String?, weather: Weather?, chosen: Boolean, current: Boolean, onClick: () -> Unit) {
     val back by animateColorAsState(if (chosen) MaterialTheme.colorScheme.surfaceContainerHigh else Color.Transparent, label = "row")
     Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(back)
         .clickable(role = Role.RadioButton, onClick = onClick).semantics { selected = chosen }
         .padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(name, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge,
-            fontWeight = if (chosen) FontWeight.SemiBold else FontWeight.Normal)
+        Column(Modifier.weight(1f)) {
+            Text(name, style = MaterialTheme.typography.bodyLarge, fontWeight = if (chosen) FontWeight.SemiBold else FontWeight.Normal,
+                maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (!area.isNullOrBlank()) Text(area, style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
         if (current) Text("지금 지역", Modifier.padding(end = 10.dp), style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
         if (weather != null) {

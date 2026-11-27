@@ -69,7 +69,9 @@ fun HomeScreen(
     fitting: (@Composable (Outfit, Modifier, Boolean) -> Unit)? = null,
     todayPlan: (@Composable () -> Unit)? = null,
     hint: (@Composable () -> Unit)? = null,
-    onRegion: ((String) -> Unit)? = null,
+    onRegion: ((com.swpp.stylemate.data.recommendation.Region) -> Unit)? = null,
+    region: com.swpp.stylemate.data.recommendation.Region? = null,
+    placeSearch: (suspend (String) -> List<com.swpp.stylemate.data.recommendation.Region>?)? = null,
     // The weather of any region, for the region sheet's map and list (null in screen tests).
     regionWeather: (suspend (com.swpp.stylemate.data.recommendation.Region) -> com.swpp.stylemate.data.recommendation.Weather?)? = null,
     // null: hang the stored background-free photos; screen tests pass their own renderer.
@@ -88,7 +90,7 @@ fun HomeScreen(
         BoxWithConstraints(Modifier.fillMaxSize().padding(padding)) {
             val boardHeight = (maxHeight * 0.38f).coerceIn(170.dp, 280.dp)
             Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-                PageHeader("오늘의 코디", subtitleContent = { WeatherLine(state, onRegion, Modifier, regionWeather) })
+                PageHeader("오늘의 코디", subtitleContent = { WeatherLine(state, onRegion, Modifier, regionWeather, region, placeSearch) })
                 state.pinnedGarment?.let { garment ->
                     PinnedGarmentCard(garment, onUnpin, enabled = !state.acting)
                 }
@@ -249,8 +251,10 @@ private fun OutfitInformation(outfit: Outfit, notes: List<String>) {
 }
 
 @Composable
-private fun WeatherLine(state: HomeState, onRegion: ((String) -> Unit)?, modifier: Modifier,
-                        regionWeather: (suspend (com.swpp.stylemate.data.recommendation.Region) -> com.swpp.stylemate.data.recommendation.Weather?)? = null) {
+private fun WeatherLine(state: HomeState, onRegion: ((com.swpp.stylemate.data.recommendation.Region) -> Unit)?, modifier: Modifier,
+                        regionWeather: (suspend (com.swpp.stylemate.data.recommendation.Region) -> com.swpp.stylemate.data.recommendation.Weather?)? = null,
+                        region: com.swpp.stylemate.data.recommendation.Region? = null,
+                        placeSearch: (suspend (String) -> List<com.swpp.stylemate.data.recommendation.Region>?)? = null) {
     var picking by rememberSaveable { mutableStateOf(false) }
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
@@ -266,8 +270,11 @@ private fun WeatherLine(state: HomeState, onRegion: ((String) -> Unit)?, modifie
         if (rest.isNotBlank()) Text(" · $rest", style = MaterialTheme.typography.bodyMedium, color = muted,
             maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
-    if (picking && onRegion != null) RegionSheet(state.region, state.weather, load = { regionWeather?.invoke(it) },
-        onPick = { picking = false; if (it != state.region) onRegion(it) }, onDismiss = { picking = false })
+    if (picking && onRegion != null) {
+        val here = region ?: HomeRegion.of(state.region) ?: HomeRegion.SEOUL
+        RegionSheet(here, state.weather, load = { regionWeather?.invoke(it) }, search = { placeSearch?.invoke(it) },
+            onPick = { picking = false; if (it.key != here.key) onRegion(it) }, onDismiss = { picking = false })
+    }
 }
 
 private fun weatherLine(state: HomeState): String {

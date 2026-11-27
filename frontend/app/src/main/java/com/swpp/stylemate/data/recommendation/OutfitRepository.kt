@@ -81,6 +81,15 @@ class OutfitApiException(val code: String, message: String) : Exception(message)
  * the weather, and the body-based labels of a garment being registered.
  */
 class OutfitRepository(private val account: AccountAccess) {
+    /** Places in Korea by name, down to neighbourhoods (GET /api/weather/places/). */
+    suspend fun places(query: String): List<Region> {
+        val result = call("GET", "/api/weather/places/?q=" + java.net.URLEncoder.encode(query.take(30), "UTF-8"))
+        val rows = result.optJSONArray("places") ?: return emptyList()
+        return (0 until rows.length()).map { rows.getJSONObject(it) }.map {
+            Region(it.getString("name"), it.getDouble("lat"), it.getDouble("lon"), it.optString("area"))
+        }
+    }
+
     suspend fun weather(region: Region = HomeRegion.SEOUL): Weather = parseWeather(call("GET",
         String.format(java.util.Locale.US, "/api/weather/?lat=%.4f&lon=%.4f", region.lat, region.lon)))
 
