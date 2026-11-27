@@ -37,6 +37,8 @@ class Metric(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.DO_NOTHING, db_constraint=False,
                              related_name='+')
     task = models.CharField(max_length=32, choices=RatingTask.choices)
+    # Older ratings have no event ID; keep them intact when adding retry protection.
+    event_id = models.UUIDField(null=True, editable=False)
     wait_score = models.FloatField()
     quality_score = models.FloatField()
     convenience_score = models.FloatField()
@@ -47,6 +49,7 @@ class Metric(models.Model):
         # 판단 로직의 "최근 12시간 안에 이 작업을 평가했는가" 조회가 이 인덱스로 끝난다.
         indexes = [models.Index(fields=['user', 'task', 'rated_at'], name='metrics_user_task_time')]
         constraints = [
+            models.UniqueConstraint(fields=['user', 'event_id'], name='metrics_user_event'),
             models.CheckConstraint(condition=models.Q(wait_score__gte=0, wait_score__lte=5,
                                                       quality_score__gte=0, quality_score__lte=5,
                                                       convenience_score__gte=0, convenience_score__lte=5),

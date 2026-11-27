@@ -104,6 +104,7 @@ sudo k3s kubectl -n team14 scale deploy/mysql --replicas=1   # KakaoTalk resolve
 | MySQLDown | Check `kubectl -n team14 describe pod -l app=mysql` and logs. Restore the DB only if data is corrupted. |
 | NodeDiskLow | `sudo k3s crictl rmi --prune` to remove unused images, then check `du` on the PVCs. |
 | BackupFailed | `kubectl -n team14 logs job/<failed job>`; rerun with `create job --from=cronjob/...`. |
+| BackupJobFailed | Inspect the failed Job and fix its cause, then rerun with a name starting with `mysql-backup-` or `media-backup-`. A newer successful Job of the same type clears the alert; keep the failed Job for diagnosis. MySQL recovery does not silence a media failure. |
 | NodeNotReady | Ask the school to restart the server. local-path data stays on the disk and the apps start again with K3s. |
 | TargetDown | Check the named exporter Pod; alerts depending on it are silent until it recovers. |
 
@@ -127,6 +128,17 @@ sudo k3s kubectl -n team14 scale deploy/backend --replicas=1
 ```
 
 ## Limits
+
+Run the backup alert regression checks locally with Prometheus 2.55.1's `promtool`:
+
+```bash
+python infra/tests/check_monitoring.py --promtool /path/to/promtool
+```
+
+This extracts the deployed ConfigMap rules and checks first failures, retained failures,
+scheduled/manual recovery, older successes, and isolation between backup types and namespaces.
+`BackupJobFailed` uses retained successful Job metrics, so it also recovers after a manual retry.
+`BackupFailed` still tracks the CronJob controller's last success, which manual Jobs do not update.
 
 - Prometheus, Alertmanager and the notifier run on the same node: if the node or server is lost,
   no alert is sent.

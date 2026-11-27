@@ -51,14 +51,16 @@ def validate_rating(data, stamp):
 def save_rating(user, event):
     """제출이면 metrics에 새 행을, 체크박스를 켰으면 no_seen에 행을 넣는다. 건너뛰기만 하면 기록하지 않는다.
 
-    평가 시각은 클라이언트가 평가한 시각(occurred_at)이다. 응답을 잃고 재전송돼도 같은
-    (user, task, rated_at) 행이 이미 있으면 다시 넣지 않는다.
+    평가 시각은 클라이언트가 평가한 시각(occurred_at)이다. 재전송은 변경되지 않는
+    이벤트 ID로 식별하고, DB의 고유 제약으로 동시에 도착한 요청도 중복 저장하지 않는다.
     """
     details = event['details']
     task = details['task']
     with transaction.atomic():
-        if details['submitted'] and not Metric.objects.filter(user=user, task=task, rated_at=event['occurred_at']).exists():
-            Metric.objects.create(user=user, task=task, wait_score=details['wait'], quality_score=details['quality'],
-                                  convenience_score=details['convenience'], rated_at=event['occurred_at'])
+        if details['submitted']:
+            Metric.objects.get_or_create(user=user, event_id=event['id'], defaults={
+                'task': task, 'wait_score': details['wait'], 'quality_score': details['quality'],
+                'convenience_score': details['convenience'], 'rated_at': event['occurred_at'],
+            })
         if details['no_seen']:
             NoSeen.objects.get_or_create(user=user, task=task)

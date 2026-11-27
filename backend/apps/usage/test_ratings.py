@@ -8,6 +8,8 @@ from datetime import timedelta
 from unittest.mock import patch
 
 from django.core.management import call_command
+from django.db import IntegrityError, transaction
+from django.db.models.query import QuerySet
 from django.test import override_settings
 from django.utils import timezone
 from PIL import Image
@@ -82,6 +84,59 @@ class RatingCollectionTests(RatingFixture):
             self.assertEqual(self.post([event]).status_code, 200)
         self.assertEqual(Metric.objects.count(), 1)
         self.assertEqual(NoSeen.objects.count(), 1)
+
+    def test_overlapping_retry_recovers_from_database_conflict(self):
+        event = self.rating(no_seen=True)
+        original_get = QuerySet.get
+        raced = False
+
+        def get_with_competing_insert(queryset, *args, **kwargs):
+            nonlocal raced
+            if queryset.model is Metric and not raced:
+                try:
+                    return original_get(queryset, *args, **kwargs)
+                except Metric.DoesNotExist:
+                    # Another request commits after the initial lookup misses, before INSERT.
+                    raced = True
+                    Metric.objects.create(user=self.user, event_id=event['id'], task=FITTING,
+                                          wait_score=3.5, quality_score=4, convenience_score=0,
+                                          rated_at=timezone.now())
+                    raise
+            return original_get(queryset, *args, **kwargs)
+
+        with patch.object(QuerySet, 'get', get_with_competing_insert):
+            response = self.post([event])
+        self.assertTrue(raced)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['accepted'], [event['id']])
+        self.assertEqual(Metric.objects.count(), 1)
+        self.assertEqual(NoSeen.objects.count(), 1)
+
+    def test_database_rejects_duplicate_event_for_the_same_user(self):
+        event = self.rating()
+        self.assertEqual(self.post([event]).status_code, 200)
+        values = Metric.objects.values().get()
+        values.pop('id')
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            Metric.objects.create(**values)
+        other = User.objects.create_user(username='independent_rater', password='password123')
+        Metric.objects.create(**{**values, 'user_id': other.pk})
+        self.assertEqual(Metric.objects.count(), 2)
+
+    def test_distinct_events_at_the_same_time_are_preserved(self):
+        first = self.rating()
+        second = self.rating(occurred_at=first['occurred_at'])
+        self.assertEqual(self.post([first, second]).status_code, 200)
+        self.assertEqual(Metric.objects.count(), 2)
+
+    def test_legacy_ratings_without_event_ids_are_preserved(self):
+        values = dict(user=self.user, task=FITTING, wait_score=3.5, quality_score=4,
+                      convenience_score=0, rated_at=timezone.now())
+        first = Metric.objects.create(**values)
+        second = Metric.objects.create(**values)
+        self.assertIsNone(first.event_id)
+        self.assertIsNone(second.event_id)
+        self.assertNotEqual(first.pk, second.pk)
 
     def test_four_responses(self):
         cases = [
