@@ -97,12 +97,12 @@ import kotlin.math.hypot
 
 private val CHOSEONG = "ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ"
 
-/** The initial consonants of Hangul syllables ("부산" → "ㅂㅅ"); other characters stay as they are. */
+/** The initial consonants of Hangul syllables ("강릉" → "ㄱㄹ"); other characters stay as they are. */
 internal fun choseong(text: String) = text.map { c ->
     if (c in '가'..'힣') CHOSEONG[(c - '가') / 588] else c
 }.joinToString("")
 
-/** A region matches by name ("부", "부산") or by its initial consonants ("ㅂㅅ"). */
+/** A region matches by name ("강", "강릉") or by its initial consonants ("ㄱㄹ"). */
 internal fun matchesRegion(query: String, name: String): Boolean {
     val q = query.trim().replace(" ", "")
     if (q.isEmpty()) return true
@@ -214,7 +214,7 @@ internal fun RegionSheet(
             }
             Spacer(Modifier.height(14.dp))
             OutlinedTextField(query, { query = it.take(30); if (it.isBlank()) found = null }, Modifier.fillMaxWidth(),
-                singleLine = true, placeholder = { Text("지역·동네 검색 (예: 홍대, 해운대, ㅂㅅ)") },
+                singleLine = true, placeholder = { Text("지역·동네 검색 (예: 홍대, 해운대, ㄱㄹ)") },
                 leadingIcon = { Icon(Icons.Filled.Search, null) }, shape = RoundedCornerShape(16.dp),
                 trailingIcon = {
                     if (searching) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)

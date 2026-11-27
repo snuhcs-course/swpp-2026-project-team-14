@@ -13,11 +13,11 @@ import org.junit.Test
 
 class RegionPickerTest {
     @Test fun regionsAreFoundByNameOrByInitialConsonants() {
-        assertEquals("ㅂㅅ", choseong("부산"))
+        assertEquals("ㄱㄹ", choseong("강릉"))
         assertTrue(matchesRegion("부", "부산"))
-        assertTrue(matchesRegion("ㅂㅅ", "부산"))
+        assertTrue(matchesRegion("ㄷㄱ", "대구"))
         assertTrue(matchesRegion(" ㄱ ㄹ ", "강릉"))
-        assertFalse(matchesRegion("ㅂㅅ", "서울"))
+        assertFalse(matchesRegion("ㄷㄱ", "서울"))
         assertFalse(matchesRegion("부산", "울산"))
         assertTrue("an empty search shows everything", HomeRegion.OPTIONS.all { matchesRegion("", it.name) })
     }
