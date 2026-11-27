@@ -47,10 +47,10 @@ import kotlinx.coroutines.delay
  * not use it up. The use count is a per-device convenience, kept in the app's preferences.
  */
 internal object SpreadTips {
-    const val DWELL_MS = 7_000L
+    const val DWELL_MS = 5_000L
     const val SHOW_MS = 3_200L
-    const val PER_SCREEN = 2
-    const val STOP_AFTER_USES = 2
+    const val PER_SCREEN = 4
+    const val STOP_AFTER_USES = 3
     private const val PREFS = "stylemate_tips"
     private const val USED = "spread_used"
     private val shownOnScreen = mutableMapOf<String, Int>()
