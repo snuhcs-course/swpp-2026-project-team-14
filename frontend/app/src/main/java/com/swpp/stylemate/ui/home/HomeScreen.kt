@@ -70,6 +70,8 @@ fun HomeScreen(
     todayPlan: (@Composable () -> Unit)? = null,
     hint: (@Composable () -> Unit)? = null,
     onRegion: ((String) -> Unit)? = null,
+    // The weather of any region, for the region sheet's map and list (null in screen tests).
+    regionWeather: (suspend (com.swpp.stylemate.data.recommendation.Region) -> com.swpp.stylemate.data.recommendation.Weather?)? = null,
     // null: hang the stored background-free photos; screen tests pass their own renderer.
     photo: (@Composable (OutfitGarment, Modifier) -> Unit)? = null,
     onUnpin: () -> Unit = {},
@@ -86,7 +88,7 @@ fun HomeScreen(
         BoxWithConstraints(Modifier.fillMaxSize().padding(padding)) {
             val boardHeight = (maxHeight * 0.38f).coerceIn(170.dp, 280.dp)
             Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-                PageHeader("오늘의 코디", subtitleContent = { WeatherLine(state, onRegion, Modifier) })
+                PageHeader("오늘의 코디", subtitleContent = { WeatherLine(state, onRegion, Modifier, regionWeather) })
                 state.pinnedGarment?.let { garment ->
                     PinnedGarmentCard(garment, onUnpin, enabled = !state.acting)
                 }
@@ -205,6 +207,8 @@ private fun OutfitCarousel(state: HomeState, pager: PagerState, height: Dp, onSe
             contentDescription = "코디 ${page + 1} / ${state.outfits.size}"
         }) {
             OutfitDressed(state.outfits[page].items, photo = photo)
+            com.swpp.stylemate.ui.wardrobe.SpreadTip(state.outfits[page].id, active = page == state.index && !state.loading,
+                Modifier.align(Alignment.BottomCenter))
             if (state.loading) CircularProgressIndicator(Modifier.align(Alignment.Center))
         }
     }
@@ -245,7 +249,8 @@ private fun OutfitInformation(outfit: Outfit, notes: List<String>) {
 }
 
 @Composable
-private fun WeatherLine(state: HomeState, onRegion: ((String) -> Unit)?, modifier: Modifier) {
+private fun WeatherLine(state: HomeState, onRegion: ((String) -> Unit)?, modifier: Modifier,
+                        regionWeather: (suspend (com.swpp.stylemate.data.recommendation.Region) -> com.swpp.stylemate.data.recommendation.Weather?)? = null) {
     var picking by rememberSaveable { mutableStateOf(false) }
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
@@ -261,35 +266,8 @@ private fun WeatherLine(state: HomeState, onRegion: ((String) -> Unit)?, modifie
         if (rest.isNotBlank()) Text(" · $rest", style = MaterialTheme.typography.bodyMedium, color = muted,
             maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
-    if (picking && onRegion != null) RegionDialog(state.region, onPick = { picking = false; onRegion(it) },
-        onDismiss = { picking = false })
-}
-
-@Composable
-private fun RegionDialog(current: String, onPick: (String) -> Unit, onDismiss: () -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("날씨를 볼 지역") },
-        text = {
-            Column {
-                Text("오늘의 코디를 이 지역 날씨로 골라요. 여행지는 대화에서 \"내일 부산\"처럼 말해 주세요.",
-                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(Modifier.height(8.dp))
-                Column(Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState())) {
-                    HomeRegion.OPTIONS.forEach { option ->
-                        Row(Modifier.fillMaxWidth().clip(MaterialTheme.shapes.medium)
-                            .selectable(option.name == current, role = Role.RadioButton) { onPick(option.name) }
-                            .padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                            RadioButton(selected = option.name == current, onClick = null)
-                            Spacer(Modifier.width(8.dp))
-                            Text(option.name, style = MaterialTheme.typography.bodyLarge)
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("닫기") } },
-    )
+    if (picking && onRegion != null) RegionSheet(state.region, state.weather, load = { regionWeather?.invoke(it) },
+        onPick = { picking = false; if (it != state.region) onRegion(it) }, onDismiss = { picking = false })
 }
 
 private fun weatherLine(state: HomeState): String {
