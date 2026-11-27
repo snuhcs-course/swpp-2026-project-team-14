@@ -207,7 +207,7 @@ private fun OutfitCarousel(state: HomeState, pager: PagerState, height: Dp, onSe
             contentDescription = "코디 ${page + 1} / ${state.outfits.size}"
         }) {
             OutfitDressed(state.outfits[page].items, photo = photo)
-            com.swpp.stylemate.ui.wardrobe.SpreadTip(state.outfits[page].id, active = page == state.index && !state.loading,
+            com.swpp.stylemate.ui.wardrobe.SpreadTip(state.outfits[page].id, active = page == state.index && !state.loading, screen = "home",
                 Modifier.align(Alignment.BottomCenter))
             if (state.loading) CircularProgressIndicator(Modifier.align(Alignment.Center))
         }

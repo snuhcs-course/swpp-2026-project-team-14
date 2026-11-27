@@ -42,23 +42,27 @@ import kotlinx.coroutines.delay
 
 /**
  * When to suggest holding a styled look to spread it out. A tip, not a lesson: only after the person has
- * stayed on one outfit for a while, a few times per app session, and never again once they have used the
- * gesture. The counts are a per-device convenience, kept in the app's preferences.
+ * stayed on one outfit for a while, at most [PER_SCREEN] times per screen (홈, 코디북) in an app session and
+ * once per outfit, and never again once they have used the gesture. Going back and forth between tabs does
+ * not use it up. The use count is a per-device convenience, kept in the app's preferences.
  */
 internal object SpreadTips {
     const val DWELL_MS = 7_000L
     const val SHOW_MS = 3_200L
-    const val PER_SESSION = 3
+    const val PER_SCREEN = 2
     const val STOP_AFTER_USES = 2
     private const val PREFS = "stylemate_tips"
     private const val USED = "spread_used"
-    private var shownThisSession = 0
+    private val shownOnScreen = mutableMapOf<String, Int>()
+    private val shownFor = mutableSetOf<Any>()
 
-    fun eligible(uses: Int, shownInSession: Int) = uses < STOP_AFTER_USES && shownInSession < PER_SESSION
+    fun eligible(uses: Int, shownOnScreen: Int, alreadyShownForOutfit: Boolean) =
+        uses < STOP_AFTER_USES && shownOnScreen < PER_SCREEN && !alreadyShownForOutfit
 
     private fun uses(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getInt(USED, 0)
-    fun shouldShow(context: Context) = eligible(uses(context), shownThisSession)
-    fun shown() { shownThisSession++ }
+    fun shouldShow(context: Context, screen: String, outfit: Any) =
+        eligible(uses(context), shownOnScreen[screen] ?: 0, outfit in shownFor)
+    fun shown(screen: String, outfit: Any) { shownOnScreen[screen] = (shownOnScreen[screen] ?: 0) + 1; shownFor += outfit }
     fun used(context: Context) {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         prefs.edit().putInt(USED, prefs.getInt(USED, 0) + 1).apply()
@@ -70,15 +74,15 @@ internal object SpreadTips {
  * and one line of text. [active] is false for pages beside the one in view.
  */
 @Composable
-internal fun SpreadTip(pageKey: Any, active: Boolean, modifier: Modifier = Modifier) {
+internal fun SpreadTip(pageKey: Any, active: Boolean, screen: String, modifier: Modifier = Modifier) {
     val context = LocalContext.current.applicationContext
     var visible by remember(pageKey) { mutableStateOf(false) }
     LaunchedEffect(pageKey, active) {
         visible = false
         if (!active) return@LaunchedEffect
         delay(SpreadTips.DWELL_MS)
-        if (!SpreadTips.shouldShow(context)) return@LaunchedEffect
-        SpreadTips.shown()
+        if (!SpreadTips.shouldShow(context, screen, pageKey)) return@LaunchedEffect
+        SpreadTips.shown(screen, pageKey)
         visible = true
         delay(SpreadTips.SHOW_MS)
         visible = false

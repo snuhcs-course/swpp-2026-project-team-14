@@ -44,8 +44,9 @@ class RegionPickerTest {
     }
 
     @Test fun theSpreadTipStopsOnceTheGestureIsKnownAndStaysRare() {
-        assertTrue(SpreadTips.eligible(uses = 0, shownInSession = 0))
-        assertFalse("a few times per session at most", SpreadTips.eligible(uses = 0, shownInSession = SpreadTips.PER_SESSION))
-        assertFalse("never again once used", SpreadTips.eligible(uses = SpreadTips.STOP_AFTER_USES, shownInSession = 0))
+        assertTrue(SpreadTips.eligible(uses = 0, shownOnScreen = 0, alreadyShownForOutfit = false))
+        assertFalse("a couple of times per screen at most", SpreadTips.eligible(0, SpreadTips.PER_SCREEN, false))
+        assertFalse("once per outfit", SpreadTips.eligible(0, 0, alreadyShownForOutfit = true))
+        assertFalse("never again once used", SpreadTips.eligible(SpreadTips.STOP_AFTER_USES, 0, false))
     }
 }

@@ -151,7 +151,7 @@ fun CodiBookScreen(
                                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
                                 Box(Modifier.fillMaxSize()) {
                                     OutfitDressed(state.outfits[page].items, Modifier.padding(16.dp), photo = photo)
-                                    com.swpp.stylemate.ui.wardrobe.SpreadTip(ids[page], active = page == index,
+                                    com.swpp.stylemate.ui.wardrobe.SpreadTip(ids[page], active = page == index, screen = "codibook",
                                         Modifier.align(Alignment.BottomCenter).padding(bottom = 10.dp))
                                     if (page == index) IconButton(onClick = { onClearRemoveError(); removingId = ids[page] },
                                         enabled = enabled && !pager.isScrollInProgress,
