@@ -143,8 +143,17 @@ internal fun FittingScanLoading(
     // 3: the result itself (straight away when an earlier result is reopened).
     var phase by remember { mutableIntStateOf(if (result != null && !reveal) 3 else 0) }
     val done by rememberUpdatedState(onRevealed)
-    LaunchedEffect(result != null) {
-        if (result == null || phase == 3) return@LaunchedEffect
+    LaunchedEffect(result, reveal) {
+        if (result == null) {
+            phase = 0
+            return@LaunchedEffect
+        }
+        // The same panel survives pending -> result. Honour reveal for that transition too,
+        // so a stored result is drawn immediately and its display callback is not delayed.
+        if (!reveal) {
+            phase = 3
+            return@LaunchedEffect
+        }
         line.snapTo(sweep.value)
         phase = 1
         line.animateTo(0f, tween((line.value * 900).toInt().coerceAtLeast(120), easing = SineInOut))
